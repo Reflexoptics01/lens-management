@@ -4,6 +4,7 @@
 
 [build.environment]
   NODE_VERSION = "18"
+  VITE_CLEAR_CACHE = "true"
 
 [[redirects]]
   from = "/*"
