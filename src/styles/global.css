@@ -1,0 +1,125 @@
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: 'Sansa';
+  src: url('/fonts/Sansa-Regular.woff2') format('woff2'),
+       url('/fonts/Sansa-Regular.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+}
+
+:root {
+  /* Primary Colors */
+  --primary-blue: #4169E1;
+  --primary-hover: #3154b3;
+  --primary-light: #E6ECFC;
+  
+  /* Accent Colors */
+  --accent-gold: #FFD700;
+  --accent-teal: #20B2AA;
+  --accent-coral: #FF6B6B;
+  
+  /* Neutral Colors */
+  --neutral-50: #F9FAFB;
+  --neutral-100: #F3F4F6;
+  --neutral-200: #E5E7EB;
+  --neutral-300: #D1D5DB;
+  --neutral-400: #9CA3AF;
+  --neutral-500: #6B7280;
+  --neutral-600: #4B5563;
+  --neutral-700: #374151;
+  --neutral-800: #1F2937;
+  --neutral-900: #111827;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--neutral-50);
+  color: var(--neutral-800);
+  min-height: 100vh;
+  width: 100%;
+  font-family: 'Open Sans', sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Sansa', sans-serif;
+}
+
+/* Custom Components */
+.btn-primary {
+  @apply px-4 py-2 bg-[#4169E1] text-white rounded-lg shadow-md hover:bg-[#3154b3] transition-all duration-200 font-medium;
+}
+
+.btn-secondary {
+  @apply px-4 py-2 bg-white text-[#4169E1] border border-[#4169E1] rounded-lg shadow-sm hover:bg-[#E6ECFC] transition-all duration-200 font-medium;
+}
+
+.input-primary {
+  @apply block w-full rounded-lg border-gray-300 shadow-sm focus:border-[#4169E1] focus:ring-[#4169E1] sm:text-sm transition-all duration-200;
+}
+
+.card {
+  @apply bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow duration-200;
+}
+
+/* Mobile-friendly adjustments */
+@media (max-width: 640px) {
+  .container {
+    @apply px-4;
+  }
+  
+  .card {
+    @apply p-4;
+  }
+  
+  .btn-primary, .btn-secondary {
+    @apply w-full justify-center;
+  }
+}
+
+/* Animations */
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Form styles */
+.form-group {
+  @apply space-y-2 mb-4;
+}
+
+.form-label {
+  @apply block text-sm font-medium text-gray-700;
+}
+
+.form-input {
+  @apply mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-[#4169E1] focus:ring-[#4169E1] sm:text-sm;
+}
+
+.form-select {
+  @apply mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-[#4169E1] focus:ring-[#4169E1] sm:text-sm;
+}
+
+/* Card hover effects */
+.hover-card {
+  @apply transform transition-all duration-200 hover:-translate-y-1 hover:shadow-lg;
+}
