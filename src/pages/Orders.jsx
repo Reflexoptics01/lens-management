@@ -117,159 +117,244 @@ const Orders = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC]">
+    <div className="mobile-page">
       <Navbar />
       
-      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        {/* Header with Add Order button */}
-        <div className="flex justify-between items-center mb-8">
+      <div className="mobile-content">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-4">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Orders</h1>
+            <h1 className="text-xl font-semibold text-gray-900">Orders</h1>
             <p className="mt-1 text-sm text-gray-500">Manage and track your orders</p>
           </div>
           <button
             onClick={() => navigate('/orders/new')}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-[#4169E1] hover:bg-[#3154b3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4169E1] transition-colors duration-200"
+            className="btn-primary inline-flex items-center space-x-2"
           >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
             </svg>
-            Add New Order
+            <span className="desktop-only">Add New Order</span>
           </button>
         </div>
 
-        {/* Orders List */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          {loading ? (
-            <div className="p-8 text-center">
-              <div className="animate-spin w-8 h-8 border-4 border-[#4169E1] border-t-transparent rounded-full mx-auto mb-4"></div>
-              <p className="text-gray-500">Loading orders...</p>
-            </div>
-          ) : error ? (
-            <div className="p-8 text-center text-red-500">{error}</div>
-          ) : orders.length === 0 ? (
-            <div className="p-8 text-center">
-              <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              <p className="text-gray-500">No orders found</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px]">
-                      Order ID
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-[140px]">
-                      Date
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider pl-6">
-                      Optical Details
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider pl-6">
-                      Brand
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-[120px]">
-                      Status
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px] text-center">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {orders.map((order) => {
-                    const { date, time } = formatDate(order.createdAt);
-                    const customerDetails = getCustomerDetails(order.customerName);
-                    return (
-                      <tr 
-                        key={order.id} 
-                        onClick={() => navigate(`/orders/${order.id}`)}
-                        className="hover:bg-gray-50 cursor-pointer transition-colors duration-150"
-                      >
-                        <td className="px-6 py-4">
-                          <span className="text-sm font-medium text-[#4169E1]">#{order.displayId}</span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900">{date}</div>
-                          <div className="text-sm text-gray-500">{time}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium text-gray-900">{order.customerName}</span>
-                            {customerDetails?.city && (
-                              <span className="text-xs text-gray-500">
-                                {customerDetails.city}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-sm text-gray-900">{order.brandName}</span>
-                        </td>
-                        <td className="px-6 py-4">
-                          {editingStatus === order.id ? (
-                            <select
-                              value={order.status}
-                              onChange={(e) => handleStatusChange(e, order.id, e.target.value)}
-                              onBlur={() => setEditingStatus(null)}
-                              onClick={(e) => e.stopPropagation()}
-                              autoFocus
-                              className="text-sm rounded-lg border-gray-300 focus:border-[#4169E1] focus:ring-[#4169E1] w-full"
-                            >
-                              {ORDER_STATUSES.map(status => (
-                                <option key={status} value={status}>
-                                  {status}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <span
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingStatus(order.id);
-                              }}
-                              className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer ${STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-800'}`}
-                            >
-                              {order.status}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <div className="flex items-center justify-center space-x-3">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/orders/${order.id}`);
-                              }}
-                              className="text-[#4169E1] hover:text-[#3154b3] transition-colors duration-150"
-                              title="Edit Order"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={(e) => handleDeleteOrder(e, order.id)}
-                              className="text-red-600 hover:text-red-900 transition-colors duration-150"
-                              title="Delete Order"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+        {/* Mobile Search */}
+        <div className="mb-4 mobile-only">
+          <input
+            type="text"
+            placeholder="Search orders..."
+            className="mobile-search"
+          />
         </div>
+
+        {/* Orders List */}
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin w-8 h-8 border-4 border-[#4169E1] border-t-transparent rounded-full"></div>
+          </div>
+        ) : error ? (
+          <div className="p-4 text-center text-red-500">{error}</div>
+        ) : orders.length === 0 ? (
+          <div className="text-center py-8">
+            <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <p className="text-gray-500">No orders found</p>
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table View */}
+            <div className="desktop-only">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px]">
+                          Order ID
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-[140px]">
+                          Date
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider pl-6">
+                          Optical Details
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider pl-6">
+                          Brand
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-[120px]">
+                          Status
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px] text-center">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {orders.map((order) => {
+                        const { date, time } = formatDate(order.createdAt);
+                        const customerDetails = getCustomerDetails(order.customerName);
+                        return (
+                          <tr 
+                            key={order.id} 
+                            onClick={() => navigate(`/orders/${order.id}`)}
+                            className="hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+                          >
+                            <td className="px-6 py-4">
+                              <span className="text-sm font-medium text-[#4169E1]">#{order.displayId}</span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-900">{date}</div>
+                              <div className="text-sm text-gray-500">{time}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium text-gray-900">{order.customerName}</span>
+                                {customerDetails?.city && (
+                                  <span className="text-xs text-gray-500">
+                                    {customerDetails.city}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="text-sm text-gray-900">{order.brandName}</span>
+                            </td>
+                            <td className="px-6 py-4">
+                              {editingStatus === order.id ? (
+                                <select
+                                  value={order.status}
+                                  onChange={(e) => handleStatusChange(e, order.id, e.target.value)}
+                                  onBlur={() => setEditingStatus(null)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  autoFocus
+                                  className="text-sm rounded-lg border-gray-300 focus:border-[#4169E1] focus:ring-[#4169E1] w-full"
+                                >
+                                  {ORDER_STATUSES.map(status => (
+                                    <option key={status} value={status}>
+                                      {status}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingStatus(order.id);
+                                  }}
+                                  className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer ${STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-800'}`}
+                                >
+                                  {order.status}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <div className="flex items-center justify-center space-x-3">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/orders/${order.id}`);
+                                  }}
+                                  className="text-[#4169E1] hover:text-[#3154b3] transition-colors duration-150"
+                                  title="Edit Order"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={(e) => handleDeleteOrder(e, order.id)}
+                                  className="text-red-600 hover:text-red-900 transition-colors duration-150"
+                                  title="Delete Order"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="mobile-only space-y-3">
+              {orders.map((order) => {
+                const { date, time } = formatDate(order.createdAt);
+                const customerDetails = getCustomerDetails(order.customerName);
+                return (
+                  <div
+                    key={order.id}
+                    onClick={() => navigate(`/orders/${order.id}`)}
+                    className="mobile-card"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-sm font-medium text-[#4169E1]">#{order.displayId}</span>
+                      <span
+                        className={`px-2 py-1 text-xs font-semibold rounded-full ${STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-800'}`}
+                      >
+                        {order.status}
+                      </span>
+                    </div>
+                    
+                    <div className="mb-3">
+                      <h3 className="text-base font-medium text-gray-900">{order.customerName}</h3>
+                      {customerDetails?.city && (
+                        <p className="text-sm text-gray-500">{customerDetails.city}</p>
+                      )}
+                    </div>
+
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{order.brandName}</p>
+                        <p className="text-xs text-gray-500">{date} • {time}</p>
+                      </div>
+                      
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingStatus(order.id);
+                          }}
+                          className="p-2 text-gray-600 hover:text-[#4169E1]"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteOrder(e, order.id)}
+                          className="p-2 text-gray-600 hover:text-red-600"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Mobile FAB */}
+      <div className="fixed right-4 bottom-20 mobile-only">
+        <button
+          onClick={() => navigate('/orders/new')}
+          className="h-14 w-14 rounded-full bg-[#4169E1] text-white shadow-lg flex items-center justify-center"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
       </div>
     </div>
   );
