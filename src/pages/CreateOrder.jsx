@@ -219,7 +219,7 @@ const CreateOrder = () => {
         {/* Modals */}
         {showNewCustomerModal && (
           <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg transform transition-all fade-in p-6">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-full sm:max-w-lg transform transition-all fade-in p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Add New Customer</h3>
               
               <div className="space-y-4">
@@ -282,7 +282,7 @@ const CreateOrder = () => {
 
         {showWhatsAppModal && (
           <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg transform transition-all fade-in p-6">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-full sm:max-w-lg transform transition-all fade-in p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Send Order Details</h3>
               
               <div className="space-y-4">

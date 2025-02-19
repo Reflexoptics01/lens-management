@@ -65,18 +65,8 @@ const CustomerSearch = ({ customers, value, onChange, onSelect, onAddNew, isOrde
   };
 
   const handleAddNew = () => {
-    if (isOrderFlow) {
-      // Open in a new window with specific size
-      const width = 800;
-      const height = 900;
-      const left = (window.screen.width - width) / 2;
-      const top = (window.screen.height - height) / 2;
-
-      window.open(
-        '/customers/new',
-        'newCustomer',
-        `width=${width},height=${height},left=${left},top=${top},location=no,menubar=no,toolbar=no,status=no`
-      );
+    if (isOrderFlow && onAddNew) {
+      onAddNew();
     } else {
       window.open('/customers/new', '_blank');
     }

@@ -61,7 +61,7 @@ const LensPrescription = ({ formData, onChange }) => {
       {(selectedEye === 'RE' || selectedEye === 'BE') && (
         <div className="space-y-4">
           <h4 className="text-base font-medium text-gray-900">Right</h4>
-          <div className="grid grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">SPH</label>
               <input
@@ -130,7 +130,7 @@ const LensPrescription = ({ formData, onChange }) => {
       {(selectedEye === 'LE' || selectedEye === 'BE') && (
         <div className="space-y-4">
           <h4 className="text-base font-medium text-gray-900">Left</h4>
-          <div className="grid grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">SPH</label>
               <input
