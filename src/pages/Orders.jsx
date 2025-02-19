@@ -295,11 +295,31 @@ const Orders = () => {
                   >
                     <div className="flex justify-between items-start mb-2">
                       <span className="text-sm font-medium text-[#4169E1]">#{order.displayId}</span>
-                      <span
-                        className={`px-2 py-1 text-xs font-semibold rounded-full ${STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-800'}`}
-                      >
-                        {order.status}
-                      </span>
+                      {editingStatus === order.id ? (
+                        <select
+                          value={order.status}
+                          onChange={(e) => handleStatusChange(e, order.id, e.target.value)}
+                          onBlur={() => setEditingStatus(null)}
+                          onClick={(e) => { e.stopPropagation(); }}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          autoFocus
+                          className="text-sm rounded-lg border-gray-300 focus:border-[#4169E1] focus:ring-[#4169E1]"
+                        >
+                          {ORDER_STATUSES.map(status => (
+                            <option key={status} value={status}>
+                              {status}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span
+                          onClick={(e) => { e.stopPropagation(); setEditingStatus(order.id); }}
+                          onTouchStart={(e) => { e.stopPropagation(); setEditingStatus(order.id); }}
+                          className={`px-2 py-1 text-xs font-semibold rounded-full cursor-pointer ${STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-800'}`}
+                        >
+                          {order.status}
+                        </span>
+                      )}
                     </div>
                     
                     <div className="mb-3">
