@@ -253,7 +253,7 @@ const Orders = () => {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    navigate(`/orders/${order.id}`);
+                                    navigate(`/orders/edit/${order.id}`);
                                   }}
                                   className="text-[#4169E1] hover:text-[#3154b3] transition-colors duration-150"
                                   title="Edit Order"
@@ -339,7 +339,7 @@ const Orders = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setEditingStatus(order.id);
+                            navigate(`/orders/edit/${order.id}`);
                           }}
                           className="p-2 text-gray-600 hover:text-[#4169E1]"
                         >

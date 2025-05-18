@@ -2,114 +2,190 @@ import React, { useState } from 'react';
 
 const LensPrescription = ({ formData, onChange }) => {
   const [selectedEye, setSelectedEye] = useState('BE'); // RE, LE, or BE
-  const inputClassName = "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#4169E1] focus:ring-[#4169E1] text-base py-2 px-3";
+  const inputClassName = "block w-full rounded-md border-gray-300 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm py-1.5 px-2 text-center";
+  const labelClassName = "block uppercase tracking-wide text-xs font-bold text-sky-700 mb-1";
+
+  // For handling raw input values before formatting
+  const [rawInputs, setRawInputs] = useState({
+    rightSph: '',
+    rightCyl: '',
+    rightAxis: '',
+    rightAdd: '',
+    leftSph: '',
+    leftCyl: '',
+    leftAxis: '',
+    leftAdd: ''
+  });
+
+  // Initialize raw inputs from formData on first render
+  React.useEffect(() => {
+    setRawInputs({
+      rightSph: formData.rightSph || '',
+      rightCyl: formData.rightCyl || '',
+      rightAxis: formData.rightAxis || '',
+      rightAdd: formData.rightAdd || '',
+      leftSph: formData.leftSph || '',
+      leftCyl: formData.leftCyl || '',
+      leftAxis: formData.leftAxis || '',
+      leftAdd: formData.leftAdd || ''
+    });
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    
+    // Store the raw input value first
+    setRawInputs(prev => ({
+      ...prev,
+      [name]: value
+    }));
+
+    // Only format when user finishes typing (on blur)
+    // Let the raw value pass through onChange
+    onChange({ target: { name, value } });
+  };
+
+  const handleInputBlur = (e) => {
+    const { name, value } = e.target;
+    
+    if (value === '' || value === '-') {
+      // Don't format empty values or just a minus sign
+      return;
+    }
+
     let formattedValue = value;
 
     // Format based on input type
-    if (name.includes('Sph') || name.includes('Cyl')) {
-      // Format to 2 decimal places for SPH and CYL
-      formattedValue = value === '' ? '' : Number(value).toFixed(2);
+    if (name.includes('Sph') || name.includes('Cyl') || name.includes('Add')) {
+      // Format to 2 decimal places for SPH, CYL, and ADD
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue)) {
+        formattedValue = numValue.toFixed(2);
+        // Update the raw input with formatted value for display consistency
+        setRawInputs(prev => ({
+          ...prev,
+          [name]: formattedValue
+        }));
+        onChange({ target: { name, value: formattedValue } });
+      }
     } else if (name.includes('Axis')) {
       // Format as whole number for Axis
-      formattedValue = value === '' ? '' : Math.round(Number(value)).toString();
-    } else if (name.includes('Add')) {
-      // Format to 2 decimal places for Addition
-      formattedValue = value === '' ? '' : Number(value).toFixed(2);
+      const numValue = parseInt(value);
+      if (!isNaN(numValue)) {
+        formattedValue = numValue.toString();
+        // Update the raw input with formatted value for display consistency
+        setRawInputs(prev => ({
+          ...prev,
+          [name]: formattedValue
+        }));
+        onChange({ target: { name, value: formattedValue } });
+      }
     }
+  };
 
-    onChange({ target: { name, value: formattedValue } });
+  const getDisplayValue = (name) => {
+    // Return the raw input value while typing, but show placeholder if empty
+    const rawValue = rawInputs[name];
+    if (rawValue === '' || rawValue === undefined) {
+      // Return empty string so placeholder will show
+      return '';
+    }
+    return rawValue;
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div className="flex border rounded-full overflow-hidden">
+    <div className="space-y-4">
+      <div className="flex justify-start">
+        <div className="inline-flex rounded-md shadow-sm">
           <button
             type="button"
             onClick={() => setSelectedEye('RE')}
-            className={`px-4 py-1.5 text-sm font-medium ${
-              selectedEye === 'RE' ? 'bg-[#4169E1] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
+            className={`px-3 py-1 text-xs font-medium rounded-l-md ${
+              selectedEye === 'RE' ? 'bg-sky-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300 border'
             }`}
           >
-            RE
+            Right Eye
           </button>
           <button
             type="button"
             onClick={() => setSelectedEye('LE')}
-            className={`px-4 py-1.5 text-sm font-medium border-l border-r ${
-              selectedEye === 'LE' ? 'bg-[#4169E1] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
+            className={`px-3 py-1 text-xs font-medium ${
+              selectedEye === 'LE' ? 'bg-sky-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300 border-t border-b'
             }`}
           >
-            LE
+            Left Eye
           </button>
           <button
             type="button"
             onClick={() => setSelectedEye('BE')}
-            className={`px-4 py-1.5 text-sm font-medium ${
-              selectedEye === 'BE' ? 'bg-[#4169E1] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
+            className={`px-3 py-1 text-xs font-medium rounded-r-md ${
+              selectedEye === 'BE' ? 'bg-sky-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300 border'
             }`}
           >
-            BE
+            Both Eyes
           </button>
         </div>
       </div>
 
       {/* Right Eye */}
       {(selectedEye === 'RE' || selectedEye === 'BE') && (
-        <div className="space-y-4">
-          <h4 className="text-base font-medium text-gray-900">Right</h4>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+        <div className="space-y-2">
+          {selectedEye === 'BE' && (
+            <h4 className="text-sm font-semibold text-sky-800">Right Eye</h4>
+          )}
+          <div className="grid grid-cols-5 gap-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">SPH</label>
+              <label className={labelClassName}>SPH</label>
               <input
-                type="number"
+                type="text"
                 name="rightSph"
-                value={formData.rightSph || '0.00'}
+                value={getDisplayValue('rightSph')}
                 onChange={handleInputChange}
-                step="0.25"
-                className={`${inputClassName} text-center`}
+                onBlur={handleInputBlur}
+                placeholder="+/-0.00"
+                className={inputClassName}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">CYL</label>
+              <label className={labelClassName}>CYL</label>
               <input
-                type="number"
+                type="text"
                 name="rightCyl"
-                value={formData.rightCyl || '0.00'}
+                value={getDisplayValue('rightCyl')}
                 onChange={handleInputChange}
-                step="0.25"
-                className={`${inputClassName} text-center`}
+                onBlur={handleInputBlur}
+                placeholder="+/-0.00"
+                className={inputClassName}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Axis</label>
+              <label className={labelClassName}>AXIS</label>
               <input
                 type="number"
                 name="rightAxis"
-                value={formData.rightAxis || '0'}
+                value={getDisplayValue('rightAxis')}
                 onChange={handleInputChange}
-                step="1"
+                onBlur={handleInputBlur}
                 min="0"
                 max="180"
-                className={`${inputClassName} text-center`}
+                placeholder="0-180"
+                className={inputClassName}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Addition</label>
+              <label className={labelClassName}>ADD</label>
               <input
-                type="number"
+                type="text"
                 name="rightAdd"
-                value={formData.rightAdd || '0.00'}
+                value={getDisplayValue('rightAdd')}
                 onChange={handleInputChange}
-                step="0.25"
-                className={`${inputClassName} text-center`}
+                onBlur={handleInputBlur}
+                placeholder="+0.00"
+                className={inputClassName}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Qty</label>
+              <label className={labelClassName}>QTY</label>
               <div className="relative">
                 <input
                   type="number"
@@ -117,9 +193,9 @@ const LensPrescription = ({ formData, onChange }) => {
                   value={formData.rightQty || '1'}
                   onChange={handleInputChange}
                   min="1"
-                  className={`${inputClassName} text-center pr-16`}
+                  className={inputClassName}
                 />
-                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">pieces</span>
+                <span className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 text-xs">pcs</span>
               </div>
             </div>
           </div>
@@ -128,57 +204,63 @@ const LensPrescription = ({ formData, onChange }) => {
 
       {/* Left Eye */}
       {(selectedEye === 'LE' || selectedEye === 'BE') && (
-        <div className="space-y-4">
-          <h4 className="text-base font-medium text-gray-900">Left</h4>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+        <div className="space-y-2">
+          {selectedEye === 'BE' && (
+            <h4 className="text-sm font-semibold text-sky-800">Left Eye</h4>
+          )}
+          <div className="grid grid-cols-5 gap-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">SPH</label>
+              <label className={labelClassName}>SPH</label>
               <input
-                type="number"
+                type="text"
                 name="leftSph"
-                value={formData.leftSph || '0.00'}
+                value={getDisplayValue('leftSph')}
                 onChange={handleInputChange}
-                step="0.25"
-                className={`${inputClassName} text-center`}
+                onBlur={handleInputBlur}
+                placeholder="+/-0.00"
+                className={inputClassName}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">CYL</label>
+              <label className={labelClassName}>CYL</label>
               <input
-                type="number"
+                type="text"
                 name="leftCyl"
-                value={formData.leftCyl || '0.00'}
+                value={getDisplayValue('leftCyl')}
                 onChange={handleInputChange}
-                step="0.25"
-                className={`${inputClassName} text-center`}
+                onBlur={handleInputBlur}
+                placeholder="+/-0.00"
+                className={inputClassName}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Axis</label>
+              <label className={labelClassName}>AXIS</label>
               <input
                 type="number"
                 name="leftAxis"
-                value={formData.leftAxis || '0'}
+                value={getDisplayValue('leftAxis')}
                 onChange={handleInputChange}
-                step="1"
+                onBlur={handleInputBlur}
                 min="0"
                 max="180"
-                className={`${inputClassName} text-center`}
+                placeholder="0-180"
+                className={inputClassName}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Addition</label>
+              <label className={labelClassName}>ADD</label>
               <input
-                type="number"
+                type="text"
                 name="leftAdd"
-                value={formData.leftAdd || '0.00'}
+                value={getDisplayValue('leftAdd')}
                 onChange={handleInputChange}
-                step="0.25"
-                className={`${inputClassName} text-center`}
+                onBlur={handleInputBlur}
+                placeholder="+0.00"
+                className={inputClassName}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Qty</label>
+              <label className={labelClassName}>QTY</label>
               <div className="relative">
                 <input
                   type="number"
@@ -186,9 +268,9 @@ const LensPrescription = ({ formData, onChange }) => {
                   value={formData.leftQty || '1'}
                   onChange={handleInputChange}
                   min="1"
-                  className={`${inputClassName} text-center pr-16`}
+                  className={inputClassName}
                 />
-                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">pieces</span>
+                <span className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 text-xs">pcs</span>
               </div>
             </div>
           </div>

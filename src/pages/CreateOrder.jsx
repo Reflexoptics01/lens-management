@@ -4,6 +4,8 @@ import { db } from '../firebaseConfig';
 import { collection, addDoc, getDocs, Timestamp } from 'firebase/firestore';
 import Navbar from '../components/Navbar';
 import OrderForm from '../components/OrderForm';
+import { ArrowLeftIcon, PlusIcon } from '@heroicons/react/24/outline';
+import CustomerForm from '../components/CustomerForm';
 
 const CreateOrder = () => {
   const navigate = useNavigate();
@@ -35,8 +37,7 @@ const CreateOrder = () => {
   });
 
   const [customers, setCustomers] = useState([]);
-  const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', city: '' });
+  const [showCustomerForm, setShowCustomerForm] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [vendorPhone, setVendorPhone] = useState('');
   const [loading, setLoading] = useState(false);
@@ -64,10 +65,10 @@ const CreateOrder = () => {
   };
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     }));
   };
 
@@ -84,11 +85,8 @@ const CreateOrder = () => {
       };
 
       const docRef = await addDoc(collection(db, 'orders'), orderData);
-      
-      // Store the order ID
       setOrderId(docRef.id);
       
-      // Find the customer's phone number
       const customer = customers.find(c => c.opticalName === formData.customerName);
       if (customer?.phone) {
         setCustomerPhone(customer.phone);
@@ -104,29 +102,19 @@ const CreateOrder = () => {
     }
   };
 
-  const handleAddNewCustomer = async () => {
-    try {
-      const docRef = await addDoc(collection(db, 'customers'), newCustomer);
-      setCustomers(prev => [...prev, { id: docRef.id, ...newCustomer }]);
-      setShowNewCustomerModal(false);
-      setNewCustomer({ name: '', phone: '', city: '' });
-    } catch (error) {
-      console.error('Error adding customer:', error);
-      setError('Failed to add customer');
+  const handleCustomerFormClose = async (refreshNeeded = false) => {
+    setShowCustomerForm(false);
+    if (refreshNeeded) {
+      await fetchCustomers();
     }
   };
 
   const sendWhatsAppMessage = (type, phone) => {
     if (!phone || !orderId) return;
-
-    // Clean the phone number - remove any spaces, dashes, or other characters
     const cleanPhone = phone.replace(/[^0-9+]/g, '');
     
     const message = type === 'vendor' 
-      ? `🔔 *New Order #${orderId}*\n\n` +
-        `🏪 *Optical Details:*\n` +
-        `Name: ${formData.customerName}\n` +
-        `Phone: ${customerPhone}\n\n` +
+      ? `🔔 *New Order #${orderId.substring(0, 3)}*\n\n` +
         `👤 *Consumer Details:*\n` +
         `Name: ${formData.consumerName || 'N/A'}\n\n` +
         `🕶 *Order Details:*\n` +
@@ -155,13 +143,20 @@ const CreateOrder = () => {
         `💰 Price: ₹${formData.price}\n` +
         (formData.specialNotes ? `\n📝 *Special Notes:*\n${formData.specialNotes}` : '')
       : `🎉 *Order Confirmation*\n\n` +
-        `Dear ${formData.consumerName || 'Customer'},\n\n` +
+        `Dear ${formData.customerName || 'Customer'},\n\n` +
         `Your order has been successfully placed!\n\n` +
         `*Order Details:*\n` +
-        `Order Reference: #${orderId}\n` +
+        `Order Reference: #${orderId.substring(0, 3)}\n` +
         `Brand: ${formData.brandName}\n` +
         `Expected Delivery: ${formData.expectedDeliveryDate}\n\n` +
-        `*Prescription Details:*\n` +
+        `*Lens Details:*\n` +
+        `${formData.material ? `📍 Material: ${formData.material}\n` : ''}` +
+        `${formData.index ? `📍 Index: ${formData.index}\n` : ''}` +
+        `${formData.lensType ? `📍 Type: ${formData.lensType}\n` : ''}` +
+        `${formData.baseTint ? `📍 Base Tint: ${formData.baseTint}\n` : ''}` +
+        `${formData.coatingType ? `📍 Coating: ${formData.coatingType}${formData.coatingColour ? ` - ${formData.coatingColour}` : ''}\n` : ''}` +
+        `${formData.diameter ? `📍 Diameter: ${formData.diameter}\n` : ''}` +
+        `\n*Prescription Details:*\n` +
         `Right Eye:\n` +
         `• SPH: ${formData.rightSph || '0.00'}\n` +
         `• CYL: ${formData.rightCyl || '0.00'}\n` +
@@ -185,156 +180,107 @@ const CreateOrder = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col min-h-screen bg-slate-50">
       <Navbar />
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-xl font-medium text-gray-900">Create Order</h1>
-            <p className="mt-1 text-sm text-gray-500">Fill in the details to create a new order</p>
-          </div>
-          <button
-            onClick={() => navigate('/orders')}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4169E1]"
-          >
-            Back to Orders
-          </button>
-        </div>
-
-        {/* Main Content */}
-        <div className="space-y-6">
-          <OrderForm
-            formData={formData}
-            onChange={handleInputChange}
-            onSubmit={handleSubmit}
-            customers={customers}
-            onAddNewCustomer={() => setShowNewCustomerModal(true)}
-            loading={loading}
-            error={error}
-          />
-        </div>
-
-        {/* Modals */}
-        {showNewCustomerModal && (
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-full sm:max-w-lg transform transition-all fade-in p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Add New Customer</h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Customer Name
-                  </label>
-                  <input
-                    type="text"
-                    value={newCustomer.name}
-                    onChange={(e) => setNewCustomer(prev => ({ ...prev, name: e.target.value }))}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#4169E1] focus:ring-[#4169E1] sm:text-sm"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    value={newCustomer.phone}
-                    onChange={(e) => setNewCustomer(prev => ({ ...prev, phone: e.target.value }))}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#4169E1] focus:ring-[#4169E1] sm:text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    City
-                  </label>
-                  <input
-                    type="text"
-                    value={newCustomer.city}
-                    onChange={(e) => setNewCustomer(prev => ({ ...prev, city: e.target.value }))}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#4169E1] focus:ring-[#4169E1] sm:text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-6 flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setShowNewCustomerModal(false)}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4169E1]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleAddNewCustomer}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#4169E1] hover:bg-[#3154b3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4169E1]"
-                >
-                  Add Customer
-                </button>
-              </div>
+      <main className="flex-grow pb-6">
+        <div className="max-w-5xl mx-auto px-3 sm:px-4 pt-3 sm:pt-4">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+            <div>
+              <button
+                onClick={() => navigate('/orders')}
+                className="flex items-center text-sm text-sky-600 hover:text-sky-700 font-medium mb-1"
+              >
+                <ArrowLeftIcon className="w-4 h-4 mr-1" />
+                Back to Orders
+              </button>
+              <h1 className="text-xl font-bold text-gray-800">Create New Order</h1>
             </div>
           </div>
-        )}
 
-        {showWhatsAppModal && (
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-full sm:max-w-lg transform transition-all fade-in p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Send Order Details</h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Vendor's Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    value={vendorPhone}
-                    onChange={(e) => setVendorPhone(e.target.value)}
-                    placeholder="Enter with country code (e.g., +1234567890)"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#4169E1] focus:ring-[#4169E1] sm:text-sm"
-                  />
-                </div>
-              </div>
+          {/* Main Content Area for OrderForm */}
+          <div className="bg-white shadow-md rounded-lg p-4 sm:p-5">
+            <OrderForm
+              formData={formData}
+              onChange={handleInputChange}
+              onSubmit={handleSubmit}
+              customers={customers}
+              onAddNewCustomer={() => setShowCustomerForm(true)}
+              loading={loading}
+              error={error}
+            />
+          </div>
+        </div>
+      </main>
 
-              <div className="mt-6 flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowWhatsAppModal(false);
-                    setVendorPhone('');
-                    navigate('/orders');
-                  }}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4169E1]"
-                >
-                  Skip & Close
-                </button>
-                {vendorPhone && (
-                  <button
-                    type="button"
-                    onClick={() => sendWhatsAppMessage('vendor', vendorPhone)}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#4169E1] hover:bg-[#3154b3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4169E1]"
-                  >
-                    Send to Vendor
-                  </button>
-                )}
-                {customerPhone && (
-                  <button
-                    type="button"
-                    onClick={() => sendWhatsAppMessage('customer', customerPhone)}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#4169E1] hover:bg-[#3154b3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4169E1]"
-                  >
-                    Send to Customer
-                  </button>
-                )}
+      {/* Customer Form Modal */}
+      {showCustomerForm && (
+        <CustomerForm onClose={(refreshNeeded) => handleCustomerFormClose(refreshNeeded)} />
+      )}
+
+      {/* WhatsApp Modal */}
+      {showWhatsAppModal && (
+        <div className="fixed inset-0 bg-gray-800 bg-opacity-75 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity duration-300 ease-in-out opacity-100">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md transform transition-all duration-300 ease-in-out scale-100 p-5">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Send Order Details</h3>
+               <button onClick={() => { setShowWhatsAppModal(false); setVendorPhone(''); navigate('/orders');}} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="vendorPhone" className="block text-sm font-medium text-gray-700 mb-1">
+                  Vendor's Phone Number (Optional)
+                </label>
+                <input
+                  id="vendorPhone"
+                  type="tel"
+                  value={vendorPhone}
+                  onChange={(e) => setVendorPhone(e.target.value)}
+                  placeholder="Enter with country code (e.g., +911234567890)"
+                  className="w-full rounded-lg border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm"
+                />
+                <p className="mt-1 text-xs text-gray-500">Leave blank if you don't want to message the vendor.</p>
               </div>
             </div>
+
+            <div className="mt-6 flex flex-col sm:flex-row sm:justify-end sm:space-x-3 space-y-2 sm:space-y-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowWhatsAppModal(false);
+                  setVendorPhone('');
+                  navigate('/orders');
+                }}
+                className="w-full sm:w-auto px-4 py-2 text-sm font-medium rounded-lg text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400"
+              >
+                Skip & Close
+              </button>
+              {customerPhone && (
+                <button
+                  type="button"
+                  onClick={() => sendWhatsAppMessage('customer', customerPhone)}
+                  className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                >
+                  Send to Customer
+                </button>
+              )}
+              {vendorPhone && (
+                <button
+                  type="button"
+                  onClick={() => sendWhatsAppMessage('vendor', vendorPhone)}
+                  className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                >
+                  Send to Vendor
+                </button>
+              )}
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

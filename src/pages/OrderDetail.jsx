@@ -11,6 +11,7 @@ const OrderDetail = () => {
   const [error, setError] = useState('');
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [vendorPhone, setVendorPhone] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
 
   useEffect(() => {
     fetchOrderDetails();
@@ -35,228 +36,394 @@ const OrderDetail = () => {
   };
 
   const sendWhatsAppMessage = (type, phone) => {
-    if (!order) return;
-
+    if (!order || !phone) return;
+    const cleanPhone = phone.replace(/[^0-9+]/g, '');
+    
     const message = type === 'vendor' 
-      ? `Order Details:\nCustomer: ${order.customerName}\nBrand: ${order.brandName}\nLens Details:\n- Material: ${order.material}\n- Index: ${order.index}\n- Type: ${order.lensType}\n- Power: SPH ${order.sph} CYL ${order.cyl} AXIS ${order.axis}\nQuantity: ${order.quantity}`
-      : `Order Status Update:\nOrder ID: ${order.id}\nBrand: ${order.brandName}\nExpected Delivery: ${order.expectedDeliveryDate}\nTotal Amount: ${order.price}`;
+      ? `🔔 *New Order #${order.id.substring(0, 3)}*\n\n` +
+        `👤 *Consumer Details:*\n` +
+        `Name: ${order.consumerName || 'N/A'}\n\n` +
+        `🕶 *Order Details:*\n` +
+        `Brand: ${order.brandName}\n` +
+        `Expected Delivery: ${order.expectedDeliveryDate}\n\n` +
+        `*Lens Details:*\n` +
+        `📍 Material: ${order.material}\n` +
+        `📍 Index: ${order.index}\n` +
+        `📍 Type: ${order.lensType}\n` +
+        `📍 Base Tint: ${order.baseTint}\n` +
+        `📍 Coating: ${order.coatingType}${order.coatingColour ? ` - ${order.coatingColour}` : ''}\n` +
+        `📍 Diameter: ${order.diameter}\n\n` +
+        `*Prescription Details:*\n` +
+        `Right Eye:\n` +
+        `• SPH: ${order.rightSph || '0.00'}\n` +
+        `• CYL: ${order.rightCyl || '0.00'}\n` +
+        `• AXIS: ${order.rightAxis || '0'}\n` +
+        `• ADD: ${order.rightAdd || '0.00'}\n` +
+        `• Qty: ${order.rightQty || '1'} pieces\n\n` +
+        `Left Eye:\n` +
+        `• SPH: ${order.leftSph || '0.00'}\n` +
+        `• CYL: ${order.leftCyl || '0.00'}\n` +
+        `• AXIS: ${order.leftAxis || '0'}\n` +
+        `• ADD: ${order.leftAdd || '0.00'}\n` +
+        `• Qty: ${order.leftQty || '1'} pieces\n\n` +
+        `💰 Price: ₹${order.price}\n` +
+        (order.specialNotes ? `\n📝 *Special Notes:*\n${order.specialNotes}` : '')
+      : `🎉 *Order Confirmation*\n\n` +
+        `Dear ${order.customerName || 'Customer'},\n\n` +
+        `Your order has been successfully placed!\n\n` +
+        `*Order Details:*\n` +
+        `Order Reference: #${order.id.substring(0, 3)}\n` +
+        `Brand: ${order.brandName}\n` +
+        `Expected Delivery: ${order.expectedDeliveryDate}\n\n` +
+        `*Lens Details:*\n` +
+        `${order.material ? `📍 Material: ${order.material}\n` : ''}` +
+        `${order.index ? `📍 Index: ${order.index}\n` : ''}` +
+        `${order.lensType ? `📍 Type: ${order.lensType}\n` : ''}` +
+        `${order.baseTint ? `📍 Base Tint: ${order.baseTint}\n` : ''}` +
+        `${order.coatingType ? `📍 Coating: ${order.coatingType}${order.coatingColour ? ` - ${order.coatingColour}` : ''}\n` : ''}` +
+        `${order.diameter ? `📍 Diameter: ${order.diameter}\n` : ''}` +
+        `\n*Prescription Details:*\n` +
+        `Right Eye:\n` +
+        `• SPH: ${order.rightSph || '0.00'}\n` +
+        `• CYL: ${order.rightCyl || '0.00'}\n` +
+        `• AXIS: ${order.rightAxis || '0'}\n` +
+        `• ADD: ${order.rightAdd || '0.00'}\n` +
+        `• Qty: ${order.rightQty || '1'} pieces\n\n` +
+        `Left Eye:\n` +
+        `• SPH: ${order.leftSph || '0.00'}\n` +
+        `• CYL: ${order.leftCyl || '0.00'}\n` +
+        `• AXIS: ${order.leftAxis || '0'}\n` +
+        `• ADD: ${order.leftAdd || '0.00'}\n` +
+        `• Qty: ${order.leftQty || '1'} pieces\n\n` +
+        `💰 Amount: ₹${order.price}\n` +
+        (order.specialNotes ? `\n📝 *Special Notes:*\n${order.specialNotes}\n\n` : '\n\n') +
+        `Thank you for choosing our services! We'll keep you updated on your order status.`;
     
     const encodedMessage = encodeURIComponent(message);
-    window.open(`https://wa.me/${phone}?text=${encodedMessage}`, '_blank');
+    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
+    window.open(whatsappUrl, '_blank');
   };
+
+  const DataItem = ({ label, value, className = "" }) => (
+    <div className={`${className}`}>
+      <dt className="text-sm font-medium text-gray-500">{label}</dt>
+      <dd className="mt-1 text-sm text-gray-900">{value || '-'}</dd>
+    </div>
+  );
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-lg text-gray-600">Loading...</div>
+      <div className="flex-grow flex items-center justify-center">
+        <div className="animate-pulse flex space-x-2 items-center">
+          <div className="h-3 w-3 bg-sky-600 rounded-full"></div>
+          <div className="h-3 w-3 bg-sky-600 rounded-full"></div>
+          <div className="h-3 w-3 bg-sky-600 rounded-full"></div>
+          <span className="text-gray-600 ml-2">Loading order details...</span>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-lg text-red-600">{error}</div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center">
+          <div className="text-red-500 text-5xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Error</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button
+            onClick={() => navigate('/orders')}
+            className="w-full px-4 py-2 bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors"
+          >
+            Back to Orders
+          </button>
+        </div>
       </div>
     );
   }
 
   if (!order) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-lg text-gray-600">Order not found</div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center">
+          <div className="text-yellow-500 text-5xl mb-4">🔍</div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Order Not Found</h2>
+          <p className="text-gray-600 mb-6">We couldn't find the order you're looking for.</p>
+          <button
+            onClick={() => navigate('/orders')}
+            className="w-full px-4 py-2 bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors"
+          >
+            Back to Orders
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Order Details</h1>
-          <button
-            onClick={() => navigate('/orders')}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#4169E1] hover:bg-[#3154b3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4169E1]"
-          >
-            Back to Orders
-          </button>
-        </div>
+    <div className="flex flex-col min-h-screen bg-slate-50">
+      {/* Main content */}
+      <main className="flex-grow pb-6">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 sm:pt-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+            <h1 className="text-2xl font-bold text-gray-800">Order Details</h1>
+            <button
+              onClick={() => navigate('/orders')}
+              className="mt-2 sm:mt-0 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-sky-600 hover:bg-sky-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors"
+            >
+              Back to Orders
+            </button>
+          </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Order Information</h3>
-              <dl className="space-y-3">
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Order ID</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{order.id}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Customer Name</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{order.customerName}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Brand Name</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{order.brandName}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Status</dt>
-                  <dd className="mt-1">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      order.status === 'pending'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : order.status === 'completed'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {order.status}
-                    </span>
-                  </dd>
-                </div>
-              </dl>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Lens Details</h3>
-              <dl className="space-y-3">
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Material</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{order.material || '-'}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Index</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{order.index || '-'}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Lens Type</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{order.lensType || '-'}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Base Tint</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{order.baseTint || '-'}</dd>
-                </div>
-              </dl>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Coating Details</h3>
-              <dl className="space-y-3">
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Coating Type</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{order.coatingType || '-'}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Coating Colour</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{order.coatingColour || '-'}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Diameter</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{order.diameter || '-'}</dd>
-                </div>
-              </dl>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Power Details</h3>
-              <dl className="space-y-3">
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">SPH</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{order.sph || '-'}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">CYL</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{order.cyl || '-'}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Axis</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{order.axis || '-'}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Add</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{order.add || '-'}</dd>
-                </div>
-              </dl>
-            </div>
-
-            <div className="md:col-span-2">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Order Details</h3>
-              <dl className="space-y-3">
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Expected Delivery Date</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{order.expectedDeliveryDate}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Quantity</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{order.quantity}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Price</dt>
-                  <dd className="mt-1 text-sm text-gray-900">${order.price}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Special Notes</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{order.specialNotes || '-'}</dd>
-                </div>
-              </dl>
+          {/* Order Status Banner */}
+          <div className={`mb-6 p-4 rounded-lg ${
+            order.status === 'pending' ? 'bg-yellow-50 border border-yellow-200' : 
+            order.status === 'completed' ? 'bg-green-50 border border-green-200' : 
+            'bg-gray-50 border border-gray-200'
+          }`}>
+            <div className="flex items-center">
+              <div className={`w-2 h-2 rounded-full mr-2 ${
+                order.status === 'pending' ? 'bg-yellow-500' : 
+                order.status === 'completed' ? 'bg-green-500' : 
+                'bg-gray-500'
+              }`}></div>
+              <span className="font-medium text-sm capitalize">
+                Status: {order.status}
+              </span>
+              <span className="ml-4 text-sm text-gray-500">
+                Order #{order.id.substring(0, 3)}
+              </span>
+              <span className="ml-auto font-medium text-sm">
+                ₹{order.price}
+              </span>
             </div>
           </div>
 
-          <div className="mt-8 flex justify-end space-x-4">
-            <button
-              onClick={() => setShowWhatsAppModal(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#4169E1] hover:bg-[#3154b3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4169E1]"
-            >
-              Send to Vendor
-            </button>
-            <button
-              onClick={() => sendWhatsAppMessage('customer', order.customerPhone)}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#4169E1] hover:bg-[#3154b3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4169E1]"
-            >
-              Send to Customer
-            </button>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Order Information Card */}
+              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="border-b border-gray-200 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-gray-800">Order Information</h2>
+                </div>
+                <div className="p-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                    <DataItem label="Order ID" value={order.id} />
+                    <DataItem label="Expected Delivery" value={order.expectedDeliveryDate} />
+                    <DataItem label="Customer Name" value={order.customerName} />
+                    <DataItem label="Consumer Name" value={order.consumerName} />
+                    <DataItem label="Brand Name" value={order.brandName} />
+                    <DataItem label="Special Instructions" value={order.specialNotes} className="sm:col-span-2" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Lens & Coating Details Card */}
+              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="border-b border-gray-200 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-gray-800">Lens & Coating Details</h2>
+                </div>
+                <div className="p-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-4">
+                    <div>
+                      <h3 className="text-sm font-semibold text-sky-700 mb-3">Lens Details</h3>
+                      <div className="space-y-3">
+                        <DataItem label="Material" value={order.material} />
+                        <DataItem label="Index" value={order.index} />
+                        <DataItem label="Lens Type" value={order.lensType} />
+                        <DataItem label="Base Tint" value={order.baseTint} />
+                        <DataItem label="Diameter" value={order.diameter} />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h3 className="text-sm font-semibold text-sky-700 mb-3">Coating</h3>
+                      <div className="space-y-3">
+                        <DataItem label="Coating Type" value={order.coatingType} />
+                        <DataItem label="Coating Colour" value={order.coatingColour} />
+                        <DataItem label="Fog Mark" value={order.fogMark ? "Yes" : "No"} />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h3 className="text-sm font-semibold text-sky-700 mb-3">Additional Info</h3>
+                      <div className="space-y-3">
+                        <DataItem label="Price" value={`₹${order.price}`} />
+                        <DataItem label="Created" 
+                          value={order.createdAt ? new Date(order.createdAt.toDate()).toLocaleString() : '-'} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-6">
+              {/* Prescription Details Card */}
+              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="border-b border-gray-200 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-gray-800">Prescription</h2>
+                </div>
+                <div className="p-6">
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="flex items-center text-sm font-semibold text-sky-700 mb-3">
+                        <span className="w-3 h-3 bg-sky-600 mr-2 rounded-full inline-block"></span>
+                        Right Eye
+                      </h3>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                        <DataItem label="SPH" value={order.rightSph} />
+                        <DataItem label="CYL" value={order.rightCyl} />
+                        <DataItem label="AXIS" value={order.rightAxis} />
+                        <DataItem label="ADD" value={order.rightAdd} />
+                        <DataItem label="QTY" value={`${order.rightQty || '1'} pcs`} />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h3 className="flex items-center text-sm font-semibold text-sky-700 mb-3">
+                        <span className="w-3 h-3 bg-sky-600 mr-2 rounded-full inline-block"></span>
+                        Left Eye
+                      </h3>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                        <DataItem label="SPH" value={order.leftSph} />
+                        <DataItem label="CYL" value={order.leftCyl} />
+                        <DataItem label="AXIS" value={order.leftAxis} />
+                        <DataItem label="ADD" value={order.leftAdd} />
+                        <DataItem label="QTY" value={`${order.leftQty || '1'} pcs`} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Actions Card */}
+              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="border-b border-gray-200 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-gray-800">Actions</h2>
+                </div>
+                <div className="p-6">
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => setShowWhatsAppModal(true)} 
+                      className="w-full flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+                    >
+                      <span className="mr-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                          <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.729.729 0 0 0-.529.247c-.182.198-.691.677-.691 1.654 0 .977.71 1.916.81 2.049.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232z"/>
+                        </svg>
+                      </span>
+                      Send WhatsApp Messages
+                    </button>
+                    <button
+                      onClick={() => navigate(`/orders/edit/${order.id}`)}
+                      className="w-full flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors"
+                    >
+                      <span className="mr-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                          <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+                        </svg>
+                      </span>
+                      Edit Order
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Handle status change
+                        console.log("Update status clicked");
+                      }}
+                      className="w-full flex items-center justify-center px-4 py-2 border border-sky-600 text-sm font-medium rounded-md text-sky-600 bg-white hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors"
+                    >
+                      <span className="mr-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                          <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                          <path d="M10.97 4.97a.235.235 0 0 0-.02.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-1.071-1.05z"/>
+                        </svg>
+                      </span>
+                      Update Status
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </main>
 
       {/* WhatsApp Modal */}
       {showWhatsAppModal && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Send Order Details</h3>
+        <div className="fixed inset-0 bg-gray-800 bg-opacity-75 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity duration-300 ease-in-out opacity-100">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md transform transition-all duration-300 ease-in-out scale-100 p-5">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Send Order Details</h3>
+              <button onClick={() => { setShowWhatsAppModal(false); setVendorPhone(''); }} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
             
             <div className="space-y-4">
+              {/* Customer Phone Input */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="customerPhone" className="block text-sm font-medium text-gray-700 mb-1">
+                  Customer's Phone Number
+                </label>
+                <input
+                  id="customerPhone"
+                  type="tel"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  placeholder="Enter with country code (e.g., +911234567890)"
+                  className="w-full rounded-lg border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm"
+                />
+              </div>
+              
+              {/* Vendor Phone Input */}
+              <div>
+                <label htmlFor="vendorPhone" className="block text-sm font-medium text-gray-700 mb-1">
                   Vendor's Phone Number
                 </label>
                 <input
+                  id="vendorPhone"
                   type="tel"
                   value={vendorPhone}
                   onChange={(e) => setVendorPhone(e.target.value)}
-                  placeholder="Enter with country code (e.g., +1234567890)"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#4169E1] focus:ring-[#4169E1] sm:text-sm"
+                  placeholder="Enter with country code (e.g., +911234567890)"
+                  className="w-full rounded-lg border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm"
                 />
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end space-x-3">
+            <div className="mt-6 flex flex-col sm:flex-row sm:justify-end sm:space-x-3 space-y-2 sm:space-y-0">
               <button
                 type="button"
                 onClick={() => {
                   setShowWhatsAppModal(false);
                   setVendorPhone('');
+                  setCustomerPhone('');
                 }}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4169E1]"
+                className="w-full sm:w-auto px-4 py-2 text-sm font-medium rounded-lg text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400"
               >
                 Cancel
               </button>
-              <button
-                type="button"
-                onClick={() => sendWhatsAppMessage('vendor', vendorPhone)}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#4169E1] hover:bg-[#3154b3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4169E1]"
-              >
-                Send to Vendor
-              </button>
+              {customerPhone && (
+                <button
+                  type="button"
+                  onClick={() => sendWhatsAppMessage('customer', customerPhone)}
+                  className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                >
+                  Send to Customer
+                </button>
+              )}
+              {vendorPhone && (
+                <button
+                  type="button"
+                  onClick={() => sendWhatsAppMessage('vendor', vendorPhone)}
+                  className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                >
+                  Send to Vendor
+                </button>
+              )}
             </div>
           </div>
         </div>

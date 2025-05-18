@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { db } from '../firebaseConfig';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import Navbar from '../components/Navbar';
+import { ArrowLeftIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 const CreateCustomer = () => {
   const navigate = useNavigate();
@@ -20,7 +21,8 @@ const CreateCustomer = () => {
     pincode: '',
     gstNumber: '',
     creditLimit: '',
-    openingBalance: ''
+    openingBalance: '',
+    creditPeriod: ''
   });
 
   const [loading, setLoading] = useState(false);
@@ -51,6 +53,14 @@ const CreateCustomer = () => {
       setError('City is required');
       return false;
     }
+    if (!formData.address.trim()) {
+      setError('Full Address is required');
+      return false;
+    }
+    if (!formData.pincode.trim()) {
+      setError('Pin Code is required');
+      return false;
+    }
     return true;
   };
 
@@ -66,18 +76,20 @@ const CreateCustomer = () => {
         ...formData,
         creditLimit: formData.creditLimit ? parseFloat(formData.creditLimit) : 0,
         openingBalance: formData.openingBalance ? parseFloat(formData.openingBalance) : 0,
+        creditPeriod: formData.creditPeriod ? parseInt(formData.creditPeriod, 10) : 0,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
 
       const docRef = await addDoc(collection(db, 'customers'), customerData);
       
-      if (isPopupMode && window.opener) {
-        // Send message to parent window
-        window.opener.postMessage({
-          type: 'CUSTOMER_CREATED',
-          customer: { id: docRef.id, ...customerData }
-        }, '*');
+      if (isPopupMode) {
+        if (window.opener && typeof window.opener.postMessage === 'function') {
+          window.opener.postMessage({
+            type: 'CUSTOMER_CREATED',
+            customer: { id: docRef.id, name: customerData.opticalName, phone: customerData.phone, city: customerData.city }
+          }, '*');
+        }
         window.close();
       } else {
         navigate('/customers');
@@ -90,233 +102,131 @@ const CreateCustomer = () => {
     }
   };
 
+  const commonInputClassName = "mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm p-2.5";
+  const fieldGroupClassName = "bg-slate-50 p-4 rounded-lg border border-gray-200";
+
   return (
-    <div className="min-h-screen bg-[#f7f7f7]">
+    <div className={`min-h-screen ${isPopupMode ? 'bg-transparent' : 'bg-slate-50'}`}>
       {!isPopupMode && <Navbar />}
       
-      <div className="max-w-5xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="bg-white shadow-sm rounded-lg">
+      <div className={`py-8 px-4 sm:px-6 lg:px-8 ${isPopupMode ? 'max-w-md mx-auto' : 'max-w-4xl mx-auto'}`}>
+        <div className={`${isPopupMode ? 'bg-white rounded-xl shadow-2xl p-6' : 'bg-white shadow-xl rounded-lg p-6 md:p-8'}`}>
           {/* Header */}
-          <div className="px-8 py-6 border-b border-gray-200">
-            <div className="flex justify-between items-center">
-              <h1 className="text-2xl font-semibold text-gray-900">New Customer Address</h1>
+          <div className="flex justify-between items-center mb-6 md:mb-8">
+            <h1 className={`text-xl sm:text-2xl font-semibold ${isPopupMode ? 'text-gray-800' : 'text-gray-900'}`}>
+              {isPopupMode ? 'Add New Customer' : 'Create New Customer'}
+            </h1>
+            <button
+              onClick={() => isPopupMode ? window.close() : navigate('/customers')}
+              className={`${isPopupMode ? 'text-gray-400 hover:text-gray-600' : 'flex items-center text-sm text-sky-600 hover:text-sky-700 font-medium'}`}
+            >
+              {isPopupMode ? <XMarkIcon className="w-6 h-6" /> : <><ArrowLeftIcon className="w-5 h-5 mr-1" /> Back to Customers</>}
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-400 text-red-700 rounded-md">
+                <p className="font-medium">Error</p>
+                <p className="text-sm">{error}</p>
+              </div>
+            )}
+
+            {/* Business & Contact Information Section */}
+            <div className="space-y-6">
+              <h2 className="text-lg font-medium text-gray-700 border-b pb-2">Business & Contact</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                <div>
+                  <label htmlFor="opticalName" className="block text-sm font-medium text-gray-700 mb-1">Optical Name *</label>
+                  <input id="opticalName" type="text" name="opticalName" value={formData.opticalName} onChange={handleChange} className={commonInputClassName} placeholder="e.g. Vision Plus Optics" required />
+                </div>
+                <div>
+                  <label htmlFor="contactPerson" className="block text-sm font-medium text-gray-700 mb-1">Contact Person *</label>
+                  <input id="contactPerson" type="text" name="contactPerson" value={formData.contactPerson} onChange={handleChange} className={commonInputClassName} placeholder="e.g. John Doe" required />
+                </div>
+                <div>
+                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
+                  <input id="phone" type="tel" name="phone" value={formData.phone} onChange={handleChange} className={commonInputClassName} placeholder="e.g. +919876543210" required />
+                </div>
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                  <input id="email" type="email" name="email" value={formData.email} onChange={handleChange} className={commonInputClassName} placeholder="e.g. contact@optical.com" />
+                </div>
+                <div>
+                  <label htmlFor="gstNumber" className="block text-sm font-medium text-gray-700 mb-1">GST Number (Optional)</label>
+                  <input id="gstNumber" type="text" name="gstNumber" value={formData.gstNumber} onChange={handleChange} className={commonInputClassName} placeholder="e.g. 29AABBCCDDE1Z5" />
+                </div>
+              </div>
+            </div>
+
+            {/* Address Section */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-medium text-gray-700 border-b pb-2">Address Details</h2>
+              <div>
+                <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">Full Address *</label>
+                <textarea id="address" name="address" value={formData.address} onChange={handleChange} rows={3} className={commonInputClassName} placeholder="Enter full address" required />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
+                <div>
+                  <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">City *</label>
+                  <input id="city" type="text" name="city" value={formData.city} onChange={handleChange} className={commonInputClassName} placeholder="e.g. Mumbai" required />
+                </div>
+                <div>
+                  <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                  <input id="state" type="text" name="state" value={formData.state} onChange={handleChange} className={commonInputClassName} placeholder="e.g. Maharashtra" />
+                </div>
+                <div>
+                  <label htmlFor="pincode" className="block text-sm font-medium text-gray-700 mb-1">Pin Code *</label>
+                  <input id="pincode" type="text" name="pincode" value={formData.pincode} onChange={handleChange} className={commonInputClassName} placeholder="e.g. 400001" required />
+                </div>
+              </div>
+            </div>
+
+            {/* Financial Information Section */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-medium text-gray-700 border-b pb-2">Financial Details</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
+                <div>
+                  <label htmlFor="openingBalance" className="block text-sm font-medium text-gray-700 mb-1">Opening Balance (₹)</label>
+                  <input id="openingBalance" type="number" name="openingBalance" value={formData.openingBalance} onChange={handleChange} className={commonInputClassName} placeholder="0.00" min="0" step="0.01" />
+                </div>
+                <div>
+                  <label htmlFor="creditLimit" className="block text-sm font-medium text-gray-700 mb-1">Credit Limit (₹)</label>
+                  <input id="creditLimit" type="number" name="creditLimit" value={formData.creditLimit} onChange={handleChange} className={commonInputClassName} placeholder="0.00" min="0" step="0.01" />
+                </div>
+                <div>
+                  <label htmlFor="creditPeriod" className="block text-sm font-medium text-gray-700 mb-1">Credit Period (days)</label>
+                  <input id="creditPeriod" type="number" name="creditPeriod" value={formData.creditPeriod} onChange={handleChange} className={commonInputClassName} placeholder="e.g. 30" min="0" step="1" />
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className={`flex ${isPopupMode ? 'justify-end' : 'justify-end border-t pt-6'} space-x-3 mt-8`}>
               <button
+                type="button"
                 onClick={() => isPopupMode ? window.close() : navigate('/customers')}
-                className="text-[#4169E1] hover:text-[#3154b3] font-medium"
+                className="px-4 py-2 text-sm font-medium rounded-lg text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400"
               >
-                {isPopupMode ? 'Close' : 'Back to Customers'}
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50"
+              >
+                {loading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Saving...
+                  </>
+                ) : (isPopupMode ? <><PlusIcon className="w-5 h-5 mr-2 -ml-1" /> Add Customer</> : 'Save Customer')}
               </button>
             </div>
-          </div>
-
-          <div className="px-8 py-6">
-            <form onSubmit={handleSubmit}>
-              {error && (
-                <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700">
-                  {error}
-                </div>
-              )}
-
-              {/* ADDRESSES Section */}
-              <div className="mb-8">
-                <h2 className="text-lg font-medium text-gray-900 mb-6">ADDRESSES</h2>
-
-                {/* Business Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Optical Name *
-                    </label>
-                    <input
-                      type="text"
-                      name="opticalName"
-                      value={formData.opticalName}
-                      onChange={handleChange}
-                      className="w-full bg-white border-gray-300 rounded-md shadow-sm focus:border-[#4169E1] focus:ring-[#4169E1]"
-                      required
-                    />
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      GST Number
-                    </label>
-                    <input
-                      type="text"
-                      name="gstNumber"
-                      value={formData.gstNumber}
-                      onChange={handleChange}
-                      className="w-full bg-white border-gray-300 rounded-md shadow-sm focus:border-[#4169E1] focus:ring-[#4169E1]"
-                    />
-                  </div>
-                </div>
-
-                {/* Contact Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Contact Person *
-                    </label>
-                    <input
-                      type="text"
-                      name="contactPerson"
-                      value={formData.contactPerson}
-                      onChange={handleChange}
-                      className="w-full bg-white border-gray-300 rounded-md shadow-sm focus:border-[#4169E1] focus:ring-[#4169E1]"
-                      required
-                    />
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Phone Number *
-                    </label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      className="w-full bg-white border-gray-300 rounded-md shadow-sm focus:border-[#4169E1] focus:ring-[#4169E1]"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Email */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email Address
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      className="w-full bg-white border-gray-300 rounded-md shadow-sm focus:border-[#4169E1] focus:ring-[#4169E1]"
-                    />
-                  </div>
-                </div>
-
-                {/* Address Details */}
-                <div className="grid grid-cols-1 gap-6 mb-6">
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Address Line 1 *
-                    </label>
-                    <input
-                      type="text"
-                      name="address"
-                      value={formData.address}
-                      onChange={handleChange}
-                      className="w-full bg-white border-gray-300 rounded-md shadow-sm focus:border-[#4169E1] focus:ring-[#4169E1]"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Location Details */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      City *
-                    </label>
-                    <input
-                      type="text"
-                      name="city"
-                      value={formData.city}
-                      onChange={handleChange}
-                      className="w-full bg-white border-gray-300 rounded-md shadow-sm focus:border-[#4169E1] focus:ring-[#4169E1]"
-                      required
-                    />
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      State
-                    </label>
-                    <select
-                      name="state"
-                      value={formData.state}
-                      onChange={handleChange}
-                      className="w-full bg-white border-gray-300 rounded-md shadow-sm focus:border-[#4169E1] focus:ring-[#4169E1]"
-                    >
-                      <option value="">Select State</option>
-                      <option value="INDIANA">INDIANA</option>
-                      {/* Add other states as needed */}
-                    </select>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Postal Code
-                    </label>
-                    <input
-                      type="text"
-                      name="pincode"
-                      value={formData.pincode}
-                      onChange={handleChange}
-                      className="w-full bg-white border-gray-300 rounded-md shadow-sm focus:border-[#4169E1] focus:ring-[#4169E1]"
-                    />
-                  </div>
-                </div>
-
-                {/* Credit Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Credit Limit
-                    </label>
-                    <input
-                      type="number"
-                      name="creditLimit"
-                      value={formData.creditLimit}
-                      onChange={handleChange}
-                      className="w-full bg-white border-gray-300 rounded-md shadow-sm focus:border-[#4169E1] focus:ring-[#4169E1]"
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Opening Balance
-                    </label>
-                    <input
-                      type="number"
-                      name="openingBalance"
-                      value={formData.openingBalance}
-                      onChange={handleChange}
-                      className="w-full bg-white border-gray-300 rounded-md shadow-sm focus:border-[#4169E1] focus:ring-[#4169E1]"
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex justify-end space-x-4 border-t pt-6">
-                <button
-                  type="button"
-                  onClick={() => isPopupMode ? window.close() : navigate('/customers')}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4169E1]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="px-4 py-2 border border-transparent rounded-md text-white bg-[#4169E1] hover:bg-[#3154b3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4169E1]"
-                >
-                  {loading ? (
-                    <span className="flex items-center">
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Adding...
-                    </span>
-                  ) : 'Add'}
-                </button>
-              </div>
-            </form>
-          </div>
+          </form>
         </div>
       </div>
     </div>

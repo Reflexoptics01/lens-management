@@ -3,6 +3,7 @@ import Login from './pages/Login';
 import Orders from './pages/Orders';
 import OrderDetail from './pages/OrderDetail';
 import CreateOrder from './pages/CreateOrder';
+import EditOrder from './pages/EditOrder';
 import Customers from './pages/Customers';
 import CreateCustomer from './pages/CreateCustomer';
 import './App.css';
@@ -16,6 +17,7 @@ function App() {
           <Route path="/orders" element={<Orders />} />
           <Route path="/orders/new" element={<CreateOrder />} />
           <Route path="/orders/:orderId" element={<OrderDetail />} />
+          <Route path="/orders/edit/:orderId" element={<EditOrder />} />
           <Route path="/customers" element={<Customers />} />
           <Route path="/customers/new" element={<CreateCustomer />} />
           <Route path="/" element={<Navigate to="/orders" replace />} />

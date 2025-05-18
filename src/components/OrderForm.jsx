@@ -32,7 +32,7 @@ const COATING_COLORS = {
   'SHMC': ['GREEN', 'BLUE', 'DUAL (BLUE & GREEN)', 'MAGENTA', 'VIOLET']
 };
 
-const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, loading, error }) => {
+const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, loading, error, isEditing = false }) => {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [otherTint, setOtherTint] = useState('');
   const [showCoatingColors, setShowCoatingColors] = useState(false);
@@ -81,24 +81,28 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
     }
   };
 
-  const inputClassName = "w-full rounded-lg border-gray-300 bg-white px-4 py-2.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-[#4169E1] text-sm transition-colors";
-  const selectClassName = "w-full rounded-lg border-gray-300 bg-white px-4 py-2.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-[#4169E1] text-sm transition-colors";
-  const labelClassName = "block text-sm font-medium text-gray-700 mb-1";
-  const sectionClassName = "bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow duration-200";
+  const inputClassName = "w-full rounded-lg border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm";
+  const selectClassName = "w-full rounded-lg border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm";
+  const labelClassName = "block uppercase tracking-wide text-xs font-bold text-sky-700 mb-2";
+  const sectionClassName = "bg-white rounded-lg border border-gray-100 p-4 hover:shadow-sm transition-shadow duration-200";
+  const sectionHeaderClassName = "flex items-center gap-1.5 text-sky-600 mb-3";
+  const iconClassName = "w-4 h-4";
 
   return (
-    <form onSubmit={onSubmit} className="space-y-8">
+    <form onSubmit={onSubmit} className="space-y-5">
       {/* Customer Information */}
       <div className={sectionClassName}>
-        <div className="flex items-center gap-2 text-[#4169E1] mb-4">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className={sectionHeaderClassName}>
+          <svg className={iconClassName} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
           </svg>
-          <h3 className="text-lg font-medium">Customer Details</h3>
+          <h3 className="text-base font-medium">Customer Details</h3>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className={labelClassName}>Optical Name*</label>
+            <label className={labelClassName}>
+              Optical Name <span className="text-red-500">*</span>
+            </label>
             <CustomerSearch
               customers={customers}
               value={formData.customerName}
@@ -124,16 +128,18 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
 
       {/* Lens Specifications */}
       <div className={sectionClassName}>
-        <div className="flex items-center gap-2 text-[#4169E1] mb-4">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className={sectionHeaderClassName}>
+          <svg className={iconClassName} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
           </svg>
-          <h3 className="text-lg font-medium">Lens Specifications</h3>
+          <h3 className="text-base font-medium">Lens Specifications</h3>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className={labelClassName}>Brand Name*</label>
+            <label className={labelClassName}>
+              Brand Name <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               name="brandName"
@@ -174,7 +180,7 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           <div>
             <label className={labelClassName}>Lens Type</label>
             <select
@@ -208,14 +214,14 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
 
       {/* Coating Details */}
       <div className={sectionClassName}>
-        <div className="flex items-center gap-2 text-[#4169E1] mb-4">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className={sectionHeaderClassName}>
+          <svg className={iconClassName} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
           </svg>
-          <h3 className="text-lg font-medium">Coating & Additional Details</h3>
+          <h3 className="text-base font-medium">Coating & Additional Details</h3>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className={labelClassName}>Coating Type</label>
             <select
@@ -262,30 +268,32 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
 
       {/* Prescription */}
       <div className={sectionClassName}>
-        <div className="flex items-center gap-2 text-[#4169E1] mb-4">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className={sectionHeaderClassName}>
+          <svg className={iconClassName} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          <h3 className="text-lg font-medium">Prescription Details</h3>
+          <h3 className="text-base font-medium">Prescription Details</h3>
         </div>
         
-        <div className="bg-gray-50 p-4 rounded-lg">
+        <div className="bg-gray-50 p-3 rounded">
           <LensPrescription formData={formData} onChange={onChange} />
         </div>
       </div>
 
       {/* Order Details */}
       <div className={sectionClassName}>
-        <div className="flex items-center gap-2 text-[#4169E1] mb-4">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className={sectionHeaderClassName}>
+          <svg className={iconClassName} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
           </svg>
-          <h3 className="text-lg font-medium">Order Details</h3>
+          <h3 className="text-base font-medium">Order Details</h3>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className={labelClassName}>Expected Delivery Date*</label>
+            <label className={labelClassName}>
+              Expected Delivery Date <span className="text-red-500">*</span>
+            </label>
             <input
               type="date"
               name="expectedDeliveryDate"
@@ -304,7 +312,7 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
                 name="price"
                 value={formData.price}
                 onChange={onChange}
-                className={`${inputClassName} pl-8`}
+                className={`${inputClassName} pl-7`}
                 placeholder="Enter price"
               />
             </div>
@@ -315,7 +323,7 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
               name="specialNotes"
               value={formData.specialNotes}
               onChange={onChange}
-              rows="3"
+              rows="2"
               className={`${inputClassName} resize-none`}
               placeholder="Enter any special instructions or notes"
             />
@@ -324,35 +332,35 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
       </div>
 
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded">
+        <div className="bg-red-50 border-l-4 border-red-400 p-3 rounded text-sm">
           <div className="flex">
             <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+              <svg className="h-4 w-4 text-red-400" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
             </div>
-            <div className="ml-3">
+            <div className="ml-2">
               <p className="text-sm text-red-700">{error}</p>
             </div>
           </div>
         </div>
       )}
 
-      <div className="flex justify-end">
+      <div className="flex justify-end mt-4">
         <button
           type="submit"
           disabled={loading}
-          className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-[#4169E1] hover:bg-[#3154b3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4169E1] disabled:opacity-50 transition-colors"
+          className="inline-flex items-center px-5 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50 transition-colors"
         >
           {loading ? (
             <>
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              Creating Order...
+              {isEditing ? 'Updating Order...' : 'Creating Order...'}
             </>
-          ) : 'Create Order'}
+          ) : isEditing ? 'Update Order' : 'Create Order'}
         </button>
       </div>
     </form>

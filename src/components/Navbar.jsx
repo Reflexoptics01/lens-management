@@ -36,7 +36,7 @@ const Navbar = () => {
   if (loading) {
     return (
       <nav className="mobile-header">
-        <h1 className="text-xl font-bold text-[#4169E1]">PRISM OPTICAL</h1>
+        <h1 className="text-xl font-bold text-sky-600">PRISM OPTICAL</h1>
       </nav>
     );
   }
@@ -56,10 +56,10 @@ const Navbar = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <h1 className="text-xl font-bold text-[#4169E1]">PRISM OPTICAL</h1>
+          <h1 className="text-xl font-bold text-sky-600">PRISM OPTICAL</h1>
         </div>
         <div className="flex items-center">
-          <div className="h-8 w-8 rounded-full bg-[#4169E1] text-white flex items-center justify-center">
+          <div className="h-8 w-8 rounded-full bg-sky-600 text-white flex items-center justify-center">
             <span className="text-sm font-medium">
               {user?.email?.[0].toUpperCase() || 'U'}
             </span>
@@ -77,7 +77,7 @@ const Navbar = () => {
           <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out">
             <div className="flex flex-col h-full">
               <div className="p-4 border-b">
-                <h2 className="text-xl font-bold text-[#4169E1]">Menu</h2>
+                <h2 className="text-xl font-bold text-sky-600">Menu</h2>
               </div>
               <div className="flex-1 overflow-y-auto">
                 <div className="py-2">
@@ -88,7 +88,7 @@ const Navbar = () => {
                     }}
                     className={`w-full px-4 py-3 text-left ${
                       location.pathname.startsWith('/orders')
-                        ? 'bg-[#E6ECFC] text-[#4169E1]'
+                        ? 'bg-sky-100 text-sky-700'
                         : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
@@ -101,7 +101,7 @@ const Navbar = () => {
                     }}
                     className={`w-full px-4 py-3 text-left ${
                       location.pathname === '/customers'
-                        ? 'bg-[#E6ECFC] text-[#4169E1]'
+                        ? 'bg-sky-100 text-sky-700'
                         : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
@@ -133,7 +133,7 @@ const Navbar = () => {
           <div className="flex justify-between h-16">
             <div className="flex">
               <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-2xl font-bold text-[#4169E1]">
+                <h1 className="text-2xl font-bold text-sky-600">
                   PRISM OPTICAL
                 </h1>
               </div>
@@ -142,7 +142,7 @@ const Navbar = () => {
                   onClick={() => navigate('/orders')}
                   className={`${
                     location.pathname.startsWith('/orders')
-                      ? 'border-[#4169E1] text-gray-900'
+                      ? 'border-sky-600 text-gray-900'
                       : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
                   } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
                 >
@@ -152,7 +152,7 @@ const Navbar = () => {
                   onClick={() => navigate('/customers')}
                   className={`${
                     location.pathname === '/customers'
-                      ? 'border-[#4169E1] text-gray-900'
+                      ? 'border-sky-600 text-gray-900'
                       : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
                   } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
                 >
@@ -166,9 +166,9 @@ const Navbar = () => {
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="bg-white flex text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4169E1]"
+                    className="bg-white flex text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
                   >
-                    <div className="h-8 w-8 rounded-full bg-[#4169E1] text-white flex items-center justify-center">
+                    <div className="h-8 w-8 rounded-full bg-sky-600 text-white flex items-center justify-center">
                       <span className="text-sm font-medium">
                         {user?.email?.[0].toUpperCase() || 'U'}
                       </span>
@@ -188,7 +188,7 @@ const Navbar = () => {
             onClick={() => navigate('/orders')}
             className={`flex flex-col items-center justify-center py-2 px-4 rounded-lg ${
               location.pathname.startsWith('/orders')
-                ? 'text-[#4169E1] bg-[#E6ECFC]'
+                ? 'text-sky-700 bg-sky-100'
                 : 'text-gray-600'
             }`}
           >
@@ -201,7 +201,7 @@ const Navbar = () => {
             onClick={() => navigate('/customers')}
             className={`flex flex-col items-center justify-center py-2 px-4 rounded-lg ${
               location.pathname === '/customers'
-                ? 'text-[#4169E1] bg-[#E6ECFC]'
+                ? 'text-sky-700 bg-sky-100'
                 : 'text-gray-600'
             }`}
           >
