@@ -1,7 +1,27 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+
+const ORDER_STATUSES = [
+  'PENDING',
+  'PLACED',
+  'RECEIVED',
+  'DISPATCHED',
+  'DELIVERED',
+  'CANCELLED',
+  'DECLINED'
+];
+
+const STATUS_COLORS = {
+  'PENDING': 'bg-yellow-100 text-yellow-800',
+  'PLACED': 'bg-blue-100 text-blue-800',
+  'RECEIVED': 'bg-indigo-100 text-indigo-800',
+  'DISPATCHED': 'bg-purple-100 text-purple-800',
+  'DELIVERED': 'bg-green-100 text-green-800',
+  'CANCELLED': 'bg-red-100 text-red-800',
+  'DECLINED': 'bg-gray-100 text-gray-800'
+};
 
 const OrderDetail = () => {
   const { orderId } = useParams();
@@ -10,8 +30,12 @@ const OrderDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState('');
   const [vendorPhone, setVendorPhone] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [statusUpdateMessage, setStatusUpdateMessage] = useState('');
 
   useEffect(() => {
     fetchOrderDetails();
@@ -23,7 +47,9 @@ const OrderDetail = () => {
       const orderDoc = await getDoc(orderRef);
       
       if (orderDoc.exists()) {
-        setOrder({ id: orderDoc.id, ...orderDoc.data() });
+        const orderData = { id: orderDoc.id, ...orderDoc.data() };
+        setOrder(orderData);
+        setSelectedStatus(orderData.status || 'PENDING');
       } else {
         setError('Order not found');
       }
@@ -32,6 +58,38 @@ const OrderDetail = () => {
       setError('Failed to fetch order details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updateOrderStatus = async () => {
+    if (!order || !selectedStatus) return;
+    
+    setUpdatingStatus(true);
+    try {
+      const orderRef = doc(db, 'orders', orderId);
+      await updateDoc(orderRef, {
+        status: selectedStatus
+      });
+      
+      // Update the local order state
+      setOrder(prev => ({
+        ...prev,
+        status: selectedStatus
+      }));
+      
+      setStatusUpdateMessage('Order status updated successfully');
+      
+      // Hide the success message after 3 seconds
+      setTimeout(() => {
+        setStatusUpdateMessage('');
+        setShowStatusModal(false);
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      setError('Failed to update order status');
+    } finally {
+      setUpdatingStatus(false);
     }
   };
 
@@ -175,26 +233,40 @@ const OrderDetail = () => {
             </button>
           </div>
 
+          {/* Status Update Message */}
+          {statusUpdateMessage && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-md">
+              <div className="flex items-center">
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                {statusUpdateMessage}
+              </div>
+            </div>
+          )}
+
           {/* Order Status Banner */}
           <div className={`mb-6 p-4 rounded-lg ${
-            order.status === 'pending' ? 'bg-yellow-50 border border-yellow-200' : 
-            order.status === 'completed' ? 'bg-green-50 border border-green-200' : 
+            order?.status === 'PENDING' ? 'bg-yellow-50 border border-yellow-200' : 
+            order?.status === 'DELIVERED' ? 'bg-green-50 border border-green-200' : 
+            order?.status === 'CANCELLED' ? 'bg-red-50 border border-red-200' : 
             'bg-gray-50 border border-gray-200'
           }`}>
             <div className="flex items-center">
               <div className={`w-2 h-2 rounded-full mr-2 ${
-                order.status === 'pending' ? 'bg-yellow-500' : 
-                order.status === 'completed' ? 'bg-green-500' : 
+                order?.status === 'PENDING' ? 'bg-yellow-500' : 
+                order?.status === 'DELIVERED' ? 'bg-green-500' : 
+                order?.status === 'CANCELLED' ? 'bg-red-500' : 
                 'bg-gray-500'
               }`}></div>
               <span className="font-medium text-sm capitalize">
-                Status: {order.status}
+                Status: {order?.status || 'PENDING'}
               </span>
               <span className="ml-4 text-sm text-gray-500">
-                Order #{order.id.substring(0, 3)}
+                Order #{order?.id?.substring(0, 3)}
               </span>
               <span className="ml-auto font-medium text-sm">
-                ₹{order.price}
+                ₹{order?.price}
               </span>
             </div>
           </div>
@@ -318,7 +390,7 @@ const OrderDetail = () => {
                       Send WhatsApp Messages
                     </button>
                     <button
-                      onClick={() => navigate(`/orders/edit/${order.id}`)}
+                      onClick={() => navigate(`/orders/edit/${order?.id}`)}
                       className="w-full flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors"
                     >
                       <span className="mr-2">
@@ -329,10 +401,7 @@ const OrderDetail = () => {
                       Edit Order
                     </button>
                     <button
-                      onClick={() => {
-                        // Handle status change
-                        console.log("Update status clicked");
-                      }}
+                      onClick={() => setShowStatusModal(true)}
                       className="w-full flex items-center justify-center px-4 py-2 border border-sky-600 text-sm font-medium rounded-md text-sky-600 bg-white hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors"
                     >
                       <span className="mr-2">
@@ -424,6 +493,66 @@ const OrderDetail = () => {
                   Send to Vendor
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Status Update Modal */}
+      {showStatusModal && (
+        <div className="fixed inset-0 bg-gray-800 bg-opacity-75 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity duration-300 ease-in-out opacity-100">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md transform transition-all duration-300 ease-in-out scale-100 p-5">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Update Order Status</h3>
+              <button onClick={() => setShowStatusModal(false)} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
+                  Order Status
+                </label>
+                <select
+                  id="status"
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  className="w-full rounded-lg border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm"
+                >
+                  {ORDER_STATUSES.map(status => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setShowStatusModal(false)}
+                className="px-4 py-2 text-sm font-medium rounded-lg text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={updateOrderStatus}
+                disabled={updatingStatus}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50"
+              >
+                {updatingStatus ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Updating...
+                  </>
+                ) : 'Update Status'}
+              </button>
             </div>
           </div>
         </div>
