@@ -77,10 +77,6 @@ h1, h2, h3, h4, h5, h6 {
   @apply flex-1 px-4 py-4 overflow-y-auto pb-safe;
 }
 
-.mobile-bottom-nav {
-  @apply fixed bottom-0 left-0 right-0 bg-white shadow-lg border-t border-gray-200 pb-safe;
-}
-
 /* Custom Components */
 .btn-primary {
   @apply px-4 py-3 bg-[#4169E1] text-white rounded-lg shadow-md hover:bg-[#3154b3] active:bg-[#3154b3] transition-all duration-200 font-medium text-center;
