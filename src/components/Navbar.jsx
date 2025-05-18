@@ -118,7 +118,7 @@ const Navbar = () => {
                         : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    Customers
+                    Vendors & Customers
                   </button>
                   <button
                     onClick={() => {
@@ -132,6 +132,19 @@ const Navbar = () => {
                     }`}
                   >
                     Sales
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigate('/purchases');
+                      setIsMenuOpen(false);
+                    }}
+                    className={`w-full px-4 py-3 text-left ${
+                      location.pathname.startsWith('/purchases')
+                        ? 'bg-sky-100 text-sky-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Purchases
                   </button>
                   <button
                     onClick={() => {
@@ -244,7 +257,7 @@ const Navbar = () => {
                       : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
                   } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
                 >
-                  Customers
+                  Vendors & Customers
                 </button>
                 <button
                   onClick={() => navigate('/sales')}
@@ -255,6 +268,16 @@ const Navbar = () => {
                   } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
                 >
                   Sales
+                </button>
+                <button
+                  onClick={() => navigate('/purchases')}
+                  className={`${
+                    location.pathname.startsWith('/purchases')
+                      ? 'border-sky-600 text-gray-900'
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                  } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                >
+                  Purchases
                 </button>
                 <button
                   onClick={() => navigate('/transactions')}
@@ -359,7 +382,7 @@ const Navbar = () => {
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
-            <span className="text-xs mt-1">Customers</span>
+            <span className="text-xs mt-1">Contacts</span>
           </button>
           <button
             onClick={() => navigate('/sales')}
@@ -373,6 +396,19 @@ const Navbar = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
             <span className="text-xs mt-1">Sales</span>
+          </button>
+          <button
+            onClick={() => navigate('/purchases')}
+            className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg ${
+              location.pathname.startsWith('/purchases')
+                ? 'text-sky-700 bg-sky-100'
+                : 'text-gray-600'
+            }`}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            <span className="text-xs mt-1">Purchases</span>
           </button>
           <button
             onClick={() => navigate('/transactions')}

@@ -447,23 +447,9 @@ const CreateSale = () => {
 
   const handlePrintBill = () => {
     if (savedSaleId) {
+      // Use the FallbackInvoicePrint component for printing
       setShowFallbackPrint(true);
-    } else {
-      setError('No sale ID found. Please save the invoice first.');
-    }
-  };
-
-  const handleViewPDF = () => {
-    if (savedSaleId) {
-      setShowFallbackPrint(true);
-    } else {
-      setError('No sale ID found. Please save the invoice first.');
-    }
-  };
-
-  const handleDownloadPDF = () => {
-    if (savedSaleId) {
-      setShowFallbackPrint(true);
+      // Don't trigger automatic printing - let user click the Print Now button
     } else {
       setError('No sale ID found. Please save the invoice first.');
     }
@@ -1095,26 +1081,13 @@ const CreateSale = () => {
                   <button
                     type="button"
                     onClick={handlePrintBill}
-                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:w-auto sm:text-sm"
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:w-auto sm:text-sm"
                     disabled={loading}
                   >
-                    {loading ? 'Processing...' : 'Print Bill'}
-                  </button>
-                  <button
-                    type="button" 
-                    onClick={handleViewPDF}
-                    className="mt-3 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:w-auto sm:text-sm"
-                    disabled={loading}
-                  >
-                    View PDF
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDownloadPDF}
-                    className="mt-3 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:mt-0 sm:w-auto sm:text-sm"
-                    disabled={loading}
-                  >
-                    Download PDF
+                    <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    </svg>
+                    Print Bill
                   </button>
                   <button
                     type="button"
@@ -1122,6 +1095,9 @@ const CreateSale = () => {
                     className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-teal-600 text-base font-medium text-white hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 sm:mt-0 sm:w-auto sm:text-sm"
                     disabled={loading}
                   >
+                    <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
                     Send via WhatsApp
                   </button>
                   <button
@@ -1150,7 +1126,8 @@ const CreateSale = () => {
       {showFallbackPrint && savedSaleId && (
         <FallbackInvoicePrint 
           saleId={savedSaleId} 
-          onClose={() => setShowFallbackPrint(false)} 
+          onClose={() => setShowFallbackPrint(false)}
+          autoPrint={false}
         />
       )}
     </div>

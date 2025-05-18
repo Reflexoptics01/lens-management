@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebaseConfig';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import Navbar from '../components/Navbar';
 
@@ -33,6 +33,13 @@ const Settings = () => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  
+  // Backup & Restore
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [restoreLoading, setRestoreLoading] = useState(false);
+  const [backupFile, setBackupFile] = useState(null);
+  const [backupError, setBackupError] = useState('');
+  const [backupSuccess, setBackupSuccess] = useState('');
   
   // UI states
   const [loading, setLoading] = useState(false);
@@ -653,6 +660,212 @@ const Settings = () => {
     );
   };
   
+  // Generate a backup of the store data
+  const handleBackup = async () => {
+    try {
+      setBackupLoading(true);
+      setBackupError('');
+      setBackupSuccess('');
+      
+      // Collections to backup
+      const collectionsToBackup = ['customers', 'orders', 'sales', 'settings', 'transactions'];
+      const backupData = {};
+      
+      // Fetch data from each collection
+      for (const collectionName of collectionsToBackup) {
+        const collectionRef = collection(db, collectionName);
+        const snapshot = await getDocs(collectionRef);
+        
+        backupData[collectionName] = {};
+        
+        snapshot.docs.forEach(doc => {
+          const data = doc.data();
+          
+          // Convert any timestamps to ISO strings for JSON serialization
+          const processedData = JSON.parse(
+            JSON.stringify(data, (key, value) => {
+              // Check if the value is a Firestore Timestamp
+              if (value && typeof value === 'object' && value.toDate) {
+                return value.toDate().toISOString();
+              }
+              return value;
+            })
+          );
+          
+          backupData[collectionName][doc.id] = processedData;
+        });
+      }
+      
+      // Add metadata
+      backupData.metadata = {
+        createdAt: new Date().toISOString(),
+        version: '1.0',
+        collections: collectionsToBackup
+      };
+      
+      // Convert to JSON and create download link
+      const backupJSON = JSON.stringify(backupData, null, 2);
+      const blob = new Blob([backupJSON], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      // Create date string for filename
+      const date = new Date();
+      const dateString = date.toISOString().slice(0, 10).replace(/-/g, '');
+      
+      // Create a link element and trigger download
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `lens-management-backup-${dateString}.json`;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+      
+      setBackupSuccess('Backup created successfully! Your file is downloading.');
+    } catch (error) {
+      console.error('Error creating backup:', error);
+      setBackupError(`Failed to create backup: ${error.message}`);
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+  
+  // Handle file selection for restore
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    
+    if (file) {
+      if (file.type !== 'application/json') {
+        setBackupError('Please select a JSON file');
+        setBackupFile(null);
+        return;
+      }
+      
+      setBackupFile(file);
+      setBackupError('');
+    }
+  };
+  
+  // Restore from backup file
+  const handleRestore = async () => {
+    if (!backupFile) {
+      setBackupError('Please select a backup file first');
+      return;
+    }
+    
+    try {
+      setRestoreLoading(true);
+      setBackupError('');
+      setBackupSuccess('');
+      
+      // Read the file
+      const reader = new FileReader();
+      
+      reader.onload = async (e) => {
+        try {
+          const backupData = JSON.parse(e.target.result);
+          
+          // Validate backup format
+          if (!backupData.metadata || !backupData.metadata.collections) {
+            throw new Error('Invalid backup file format');
+          }
+          
+          // Collections to restore
+          const collections = backupData.metadata.collections;
+          
+          // Confirm with the user
+          if (!window.confirm(
+            `This will restore data for the following collections: ${collections.join(', ')}. This operation will overwrite existing data. Are you sure you want to continue?`
+          )) {
+            setRestoreLoading(false);
+            return;
+          }
+          
+          // Loop through each collection
+          for (const collectionName of collections) {
+            if (backupData[collectionName]) {
+              for (const [docId, docData] of Object.entries(backupData[collectionName])) {
+                // Write document to Firestore
+                await setDoc(doc(db, collectionName, docId), docData, { merge: true });
+              }
+            }
+          }
+          
+          setBackupSuccess('Restore completed successfully! Refreshing page...');
+          
+          // Refresh page after 2 seconds to load new data
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        } catch (parseError) {
+          console.error('Error parsing backup file:', parseError);
+          setBackupError(`Failed to parse backup file: ${parseError.message}`);
+          setRestoreLoading(false);
+        }
+      };
+      
+      reader.onerror = () => {
+        setBackupError('Error reading backup file');
+        setRestoreLoading(false);
+      };
+      
+      reader.readAsText(backupFile);
+    } catch (error) {
+      console.error('Error restoring from backup:', error);
+      setBackupError(`Failed to restore from backup: ${error.message}`);
+      setRestoreLoading(false);
+    }
+  };
+  
+  // Inside the Settings component, add a new function to delete all data
+  const handleClearAllData = async () => {
+    if (!window.confirm("⚠️ WARNING: This will delete ALL customers, vendors, orders, and other data. This action cannot be undone. Are you sure?")) {
+      return;
+    }
+    
+    if (!window.confirm("⚠️ FINAL WARNING: All data will be permanently deleted. Continue?")) {
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      // Collections to delete
+      const collectionsToDelete = [
+        'customers', 
+        'orders', 
+        'purchases', 
+        'transactions', 
+        'sales', 
+        'invoices', 
+        'counters'
+      ];
+      
+      const deletePromises = [];
+      
+      for (const collectionName of collectionsToDelete) {
+        const collectionSnapshot = await getDocs(collection(db, collectionName));
+        collectionSnapshot.docs.forEach(doc => {
+          deletePromises.push(deleteDoc(doc.ref));
+        });
+      }
+      
+      // Wait for all deletes to complete
+      await Promise.all(deletePromises);
+      
+      alert("All data has been successfully deleted. The application will now refresh.");
+      window.location.reload();
+    } catch (error) {
+      console.error('Error clearing data:', error);
+      setError('Failed to clear data: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   return (
     <div className="bg-slate-50 min-h-screen flex flex-col">
       <Navbar />
@@ -682,7 +895,7 @@ const Settings = () => {
         
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
           {/* Tabs */}
-          <div className="flex border-b border-gray-200">
+          <div className="flex border-b border-gray-200 overflow-x-auto">
             <button
               className={`px-4 py-3 text-sm font-medium ${activeTab === 'shop' ? 'text-sky-600 border-b-2 border-sky-500' : 'text-gray-500 hover:text-gray-700'}`}
               onClick={() => setActiveTab('shop')}
@@ -700,6 +913,12 @@ const Settings = () => {
               onClick={() => setActiveTab('financial')}
             >
               Financial Year
+            </button>
+            <button
+              className={`px-4 py-3 text-sm font-medium ${activeTab === 'backup' ? 'text-sky-600 border-b-2 border-sky-500' : 'text-gray-500 hover:text-gray-700'}`}
+              onClick={() => setActiveTab('backup')}
+            >
+              Backup & Restore
             </button>
             <button
               className={`px-4 py-3 text-sm font-medium ${activeTab === 'password' ? 'text-sky-600 border-b-2 border-sky-500' : 'text-gray-500 hover:text-gray-700'}`}
@@ -1004,6 +1223,138 @@ const Settings = () => {
               </div>
             )}
             
+            {/* Backup & Restore Tab */}
+            {activeTab === 'backup' && (
+              <div className="space-y-6">
+                <h2 className="text-lg font-medium text-gray-900">Backup & Restore</h2>
+                
+                {backupError && (
+                  <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4 text-red-700">
+                    <p>{backupError}</p>
+                  </div>
+                )}
+                
+                {backupSuccess && (
+                  <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-4 text-green-700">
+                    <p>{backupSuccess}</p>
+                  </div>
+                )}
+                
+                <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6 text-blue-700">
+                  <h3 className="text-md font-medium">About Backup & Restore</h3>
+                  <p className="text-sm mt-1">
+                    Backup your data to a local file that you can use to restore your shop's data in case of data loss.
+                    Regular backups are recommended to protect your business data.
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Backup Section */}
+                  <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Create Backup</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Download a backup file containing all your business data. Store this file safely.
+                    </p>
+                    
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        onClick={handleBackup}
+                        disabled={backupLoading}
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+                      >
+                        {backupLoading ? (
+                          <>
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Creating Backup...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Download Backup
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    
+                    <div className="mt-4 text-xs text-gray-500">
+                      <p>The backup includes:</p>
+                      <ul className="list-disc pl-5 mt-1">
+                        <li>Customer data</li>
+                        <li>Orders and sales</li>
+                        <li>Transactions</li>
+                        <li>Shop settings</li>
+                      </ul>
+                    </div>
+                  </div>
+                  
+                  {/* Restore Section */}
+                  <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Restore from Backup</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Restore your data from a previously created backup file. This will overwrite your current data.
+                    </p>
+                    
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Select Backup File</label>
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={handleFileChange}
+                        className="block w-full text-sm text-gray-500
+                          file:mr-4 file:py-2 file:px-4
+                          file:rounded-md file:border-0
+                          file:text-sm file:font-medium
+                          file:bg-blue-50 file:text-blue-700
+                          hover:file:bg-blue-100"
+                      />
+                    </div>
+                    
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        onClick={handleRestore}
+                        disabled={!backupFile || restoreLoading}
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50"
+                      >
+                        {restoreLoading ? (
+                          <>
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Restoring...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Restore Backup
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    
+                    <div className="mt-4 text-xs text-gray-500">
+                      <div className="flex items-center">
+                        <svg className="w-5 h-5 text-amber-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <p className="font-semibold">Important:</p>
+                      </div>
+                      <p className="mt-1">Restoring will overwrite your current data. Make sure to back up your current data first.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             {/* Password Change Tab */}
             {activeTab === 'password' && (
               <div className="space-y-6 max-w-md">
@@ -1071,8 +1422,8 @@ const Settings = () => {
               </div>
             )}
             
-            {/* Save button (only for non-password tabs) */}
-            {activeTab !== 'password' && (
+            {/* Save button (only for some tabs) */}
+            {(activeTab === 'shop' || activeTab === 'bank' || activeTab === 'financial') && (
               <div className="mt-8 flex justify-end">
                 <button
                   type="button"
@@ -1103,6 +1454,24 @@ const Settings = () => {
       {showFinancialYearEndModal && (
         <FinancialYearEndModal />
       )}
+      
+      {/* Add this button to the render section, inside the Settings UI, 
+        likely near the backup and restore features */}
+      <div className="mt-8 border-t border-gray-200 pt-8">
+        <h3 className="text-lg font-medium text-red-600">Danger Zone</h3>
+        <p className="mt-1 text-sm text-gray-500">
+          Actions here can result in permanent data loss. Proceed with caution.
+        </p>
+        <div className="mt-4">
+          <button
+            onClick={handleClearAllData}
+            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+            disabled={loading}
+          >
+            {loading ? 'Processing...' : 'Clear All Data'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

@@ -3,7 +3,7 @@ import { db } from '../firebaseConfig';
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 
-const CustomerForm = ({ onClose, customer }) => {
+const CustomerForm = ({ onClose, customer, isVendor = false }) => {
   const modalRef = useRef(null);
   const [formData, setFormData] = useState({
     opticalName: customer?.opticalName || '',
@@ -17,7 +17,8 @@ const CustomerForm = ({ onClose, customer }) => {
     gstNumber: customer?.gstNumber || '',
     creditLimit: customer?.creditLimit || '',
     openingBalance: customer?.openingBalance || '',
-    creditPeriod: customer?.creditPeriod || ''
+    creditPeriod: customer?.creditPeriod || '',
+    type: customer?.type || (isVendor ? 'vendor' : 'customer')
   });
 
   const [loading, setLoading] = useState(false);
@@ -40,7 +41,7 @@ const CustomerForm = ({ onClose, customer }) => {
   useEffect(() => {
     if (savedCustomer && window.opener && typeof window.opener.postMessage === 'function') {
       window.opener.postMessage({
-        type: 'CUSTOMER_CREATED',
+        type: isVendor ? 'VENDOR_CREATED' : 'CUSTOMER_CREATED',
         customer: { 
           id: savedCustomer.id, 
           name: savedCustomer.opticalName, 
@@ -49,7 +50,7 @@ const CustomerForm = ({ onClose, customer }) => {
         }
       }, '*');
     }
-  }, [savedCustomer]);
+  }, [savedCustomer, isVendor]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -60,8 +61,10 @@ const CustomerForm = ({ onClose, customer }) => {
   };
 
   const validateForm = () => {
+    const entityType = isVendor ? 'Business Name' : 'Optical Name';
+    
     if (!formData.opticalName.trim()) {
-      setError('Optical Name is required');
+      setError(`${entityType} is required`);
       setActiveSection('business');
       return false;
     }
@@ -91,27 +94,51 @@ const CustomerForm = ({ onClose, customer }) => {
     setError('');
 
     try {
+      // Create data without server timestamps to prevent serialization issues
       const customerData = {
         ...formData,
         creditLimit: formData.creditLimit ? parseFloat(formData.creditLimit) : 0,
         openingBalance: formData.openingBalance ? parseFloat(formData.openingBalance) : 0,
         creditPeriod: formData.creditPeriod ? parseInt(formData.creditPeriod, 10) : 0,
-        updatedAt: serverTimestamp()
+        updatedAt: new Date().toISOString(), // Use ISO string instead of serverTimestamp
+        type: isVendor ? 'vendor' : 'customer' 
       };
+
+      console.log("Saving customer data:", customerData);
 
       if (customer) {
         await updateDoc(doc(db, 'customers', customer.id), customerData);
-        setSavedCustomer({ id: customer.id, ...customerData });
+        console.log("Customer updated successfully");
+        // Remove server timestamp from local state to avoid serialization issues
+        const savedData = { 
+          id: customer.id, 
+          ...customerData,
+          updatedAt: new Date().toISOString() 
+        };
+        setSavedCustomer(savedData);
       } else {
-        customerData.createdAt = serverTimestamp();
+        customerData.createdAt = new Date().toISOString(); // Use ISO string
         const docRef = await addDoc(collection(db, 'customers'), customerData);
-        setSavedCustomer({ id: docRef.id, ...customerData });
+        console.log("New customer added successfully with ID:", docRef.id);
+        const savedData = { 
+          id: docRef.id, 
+          ...customerData 
+        };
+        setSavedCustomer(savedData);
       }
-      // Pass true to onClose to indicate a customer was added/updated
-      onClose(true);
+
+      // Small delay to ensure Firestore has time to update
+      setTimeout(() => {
+        // Pass true to onClose to indicate a customer was added/updated
+        try {
+          onClose(true);
+        } catch (closeError) {
+          console.error("Error in onClose callback:", closeError);
+        }
+      }, 300);
     } catch (error) {
       console.error('Error saving customer:', error);
-      setError('Failed to save customer. Please try again.');
+      setError(`Failed to save ${isVendor ? 'vendor' : 'customer'}. Please try again.`);
     } finally {
       setLoading(false);
     }
@@ -134,6 +161,11 @@ const CustomerForm = ({ onClose, customer }) => {
   const labelClassName = "block text-sm font-medium text-gray-700 mb-1";
   const sectionClassName = "transition-all duration-200 ease-in-out";
 
+  // Set entity-specific labels
+  const entityName = isVendor ? 'Vendor' : 'Customer';
+  const businessLabel = isVendor ? 'Business Name' : 'Optical Name';
+  const businessPlaceholder = isVendor ? 'e.g. ABC Lens Suppliers' : 'e.g. Vision Plus Optics';
+
   return (
     <div 
       className="fixed inset-0 bg-gray-800 bg-opacity-75 backdrop-blur-sm flex items-start justify-center p-4 z-50 transition-opacity duration-300 ease-in-out opacity-100 overflow-y-auto"
@@ -147,7 +179,7 @@ const CustomerForm = ({ onClose, customer }) => {
         <div className="p-6 overflow-y-auto max-h-[calc(100vh-4rem)]">
           <div className="flex justify-between items-center mb-8 sticky top-0 bg-white z-10 pb-3">
             <h3 className="text-2xl font-semibold text-gray-800">
-              {customer ? 'Edit Customer' : 'Add New Customer'}
+              {customer ? `Edit ${entityName}` : `Add New ${entityName}`}
             </h3>
             <button
               onClick={() => onClose(false)}
@@ -207,7 +239,7 @@ const CustomerForm = ({ onClose, customer }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
                 <div>
                   <label htmlFor="opticalName" className={labelClassName}>
-                    Optical Name <span className="text-red-500">*</span>
+                    {businessLabel} <span className="text-red-500">*</span>
                   </label>
                   <input 
                     id="opticalName" 
@@ -216,7 +248,7 @@ const CustomerForm = ({ onClose, customer }) => {
                     value={formData.opticalName} 
                     onChange={handleChange} 
                     className={inputClassName} 
-                    placeholder="e.g. Vision Plus Optics" 
+                    placeholder={businessPlaceholder} 
                     required 
                   />
                 </div>
@@ -252,7 +284,7 @@ const CustomerForm = ({ onClose, customer }) => {
                 </div>
                 <div>
                   <label htmlFor="email" className={labelClassName}>
-                    Email Address
+                    Email
                   </label>
                   <input 
                     id="email" 
@@ -261,12 +293,12 @@ const CustomerForm = ({ onClose, customer }) => {
                     value={formData.email} 
                     onChange={handleChange} 
                     className={inputClassName} 
-                    placeholder="e.g. contact@optical.com" 
+                    placeholder="e.g. contact@example.com" 
                   />
                 </div>
-                <div className="md:col-span-2">
+                <div>
                   <label htmlFor="gstNumber" className={labelClassName}>
-                    GST Number (Optional)
+                    GST Number
                   </label>
                   <input 
                     id="gstNumber" 
@@ -275,16 +307,15 @@ const CustomerForm = ({ onClose, customer }) => {
                     value={formData.gstNumber} 
                     onChange={handleChange} 
                     className={inputClassName} 
-                    placeholder="e.g. 29AABBCCDDE1Z5" 
+                    placeholder="e.g. 29ABCDE1234F1Z5" 
                   />
                 </div>
               </div>
-              
-              <div className="mt-6 text-right">
+              <div className="mt-6 flex justify-end">
                 <button
                   type="button"
                   onClick={() => setActiveSection('address')}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                  className="px-4 py-2 text-sm font-medium bg-sky-600 text-white rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
                 >
                   Next: Address Details
                 </button>
@@ -293,105 +324,86 @@ const CustomerForm = ({ onClose, customer }) => {
 
             {/* Address Section */}
             <div className={`${sectionClassName} ${activeSection === 'address' ? 'block' : 'hidden'}`}>
-              <div className="space-y-5">
-                <div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                <div className="md:col-span-2">
                   <label htmlFor="address" className={labelClassName}>
-                    Full Address
+                    Address
                   </label>
-                  <textarea 
+                  <input 
                     id="address" 
+                    type="text" 
                     name="address" 
                     value={formData.address} 
                     onChange={handleChange} 
-                    rows={3} 
                     className={inputClassName} 
-                    placeholder="Enter full address" 
+                    placeholder="e.g. 123 Main Street, Building A" 
                   />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-5">
-                  <div>
-                    <label htmlFor="city" className={labelClassName}>
-                      City <span className="text-red-500">*</span>
-                    </label>
-                    <input 
-                      id="city" 
-                      type="text" 
-                      name="city" 
-                      value={formData.city} 
-                      onChange={handleChange} 
-                      className={inputClassName} 
-                      placeholder="e.g. Mumbai" 
-                      required 
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="state" className={labelClassName}>
-                      State
-                    </label>
-                    <input 
-                      id="state" 
-                      type="text" 
-                      name="state" 
-                      value={formData.state} 
-                      onChange={handleChange} 
-                      className={inputClassName} 
-                      placeholder="e.g. Maharashtra" 
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="pincode" className={labelClassName}>
-                      PIN Code
-                    </label>
-                    <input 
-                      id="pincode" 
-                      type="text" 
-                      name="pincode" 
-                      value={formData.pincode} 
-                      onChange={handleChange} 
-                      className={inputClassName} 
-                      placeholder="e.g. 400001" 
-                    />
-                  </div>
+                <div>
+                  <label htmlFor="city" className={labelClassName}>
+                    City <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    id="city" 
+                    type="text" 
+                    name="city" 
+                    value={formData.city} 
+                    onChange={handleChange} 
+                    className={inputClassName} 
+                    placeholder="e.g. Mumbai" 
+                    required 
+                  />
+                </div>
+                <div>
+                  <label htmlFor="state" className={labelClassName}>
+                    State
+                  </label>
+                  <input 
+                    id="state" 
+                    type="text" 
+                    name="state" 
+                    value={formData.state} 
+                    onChange={handleChange} 
+                    className={inputClassName} 
+                    placeholder="e.g. Maharashtra" 
+                  />
+                </div>
+                <div>
+                  <label htmlFor="pincode" className={labelClassName}>
+                    PIN Code
+                  </label>
+                  <input 
+                    id="pincode" 
+                    type="text" 
+                    name="pincode" 
+                    value={formData.pincode} 
+                    onChange={handleChange} 
+                    className={inputClassName} 
+                    placeholder="e.g. 400001" 
+                  />
                 </div>
               </div>
-              
               <div className="mt-6 flex justify-between">
                 <button
                   type="button"
                   onClick={() => setActiveSection('business')}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                  className="px-4 py-2 text-sm font-medium bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
                 >
                   Back
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveSection('financial')}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                  className="px-4 py-2 text-sm font-medium bg-sky-600 text-white rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
                 >
                   Next: Financial Details
                 </button>
               </div>
             </div>
 
-            {/* Financial Information Section */}
+            {/* Financial Section */}
             <div className={`${sectionClassName} ${activeSection === 'financial' ? 'block' : 'hidden'}`}>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-5">
-                <div>
-                  <label htmlFor="openingBalance" className={labelClassName}>
-                    Opening Balance (₹)
-                  </label>
-                  <input 
-                    id="openingBalance" 
-                    type="number" 
-                    name="openingBalance" 
-                    value={formData.openingBalance} 
-                    onChange={handleChange} 
-                    className={inputClassName} 
-                    placeholder="0.00" 
-                    min="0" 
-                    step="0.01" 
-                  />
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
                 <div>
                   <label htmlFor="creditLimit" className={labelClassName}>
                     Credit Limit (₹)
@@ -403,14 +415,27 @@ const CustomerForm = ({ onClose, customer }) => {
                     value={formData.creditLimit} 
                     onChange={handleChange} 
                     className={inputClassName} 
-                    placeholder="0.00" 
+                    placeholder="e.g. 25000" 
                     min="0" 
-                    step="0.01" 
+                  />
+                </div>
+                <div>
+                  <label htmlFor="openingBalance" className={labelClassName}>
+                    Opening Balance (₹)
+                  </label>
+                  <input 
+                    id="openingBalance" 
+                    type="number" 
+                    name="openingBalance" 
+                    value={formData.openingBalance} 
+                    onChange={handleChange} 
+                    className={inputClassName} 
+                    placeholder="e.g. 5000" 
                   />
                 </div>
                 <div>
                   <label htmlFor="creditPeriod" className={labelClassName}>
-                    Credit Period (days)
+                    Credit Period (Days)
                   </label>
                   <input 
                     id="creditPeriod" 
@@ -421,16 +446,14 @@ const CustomerForm = ({ onClose, customer }) => {
                     className={inputClassName} 
                     placeholder="e.g. 30" 
                     min="0" 
-                    step="1" 
                   />
                 </div>
               </div>
-              
               <div className="mt-8 flex justify-between">
                 <button
                   type="button"
                   onClick={() => setActiveSection('address')}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                  className="px-4 py-2 text-sm font-medium bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
                 >
                   Back
                 </button>
@@ -438,24 +461,17 @@ const CustomerForm = ({ onClose, customer }) => {
                   <button
                     type="button"
                     onClick={handleCancelClick}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400"
+                    className="px-4 py-2 text-sm font-medium bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                    disabled={loading}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
+                    className="px-4 py-2 text-sm font-medium bg-sky-600 text-white rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={loading}
-                    className="inline-flex items-center px-6 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50"
                   >
-                    {loading ? (
-                      <>
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Saving...
-                      </>
-                    ) : customer ? 'Update Customer' : 'Add Customer'}
+                    {loading ? 'Saving...' : (customer ? `Update ${entityName}` : `Save ${entityName}`)}
                   </button>
                 </div>
               </div>

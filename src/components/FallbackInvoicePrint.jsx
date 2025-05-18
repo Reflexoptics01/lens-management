@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 
-const FallbackInvoicePrint = ({ saleId, onClose }) => {
+const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
   const [saleData, setSaleData] = useState(null);
   const [shopSettings, setShopSettings] = useState(null);
   const [bankDetails, setBankDetails] = useState(null);
@@ -126,11 +126,12 @@ const FallbackInvoicePrint = ({ saleId, onClose }) => {
         
         setLoading(false);
         
-        // Remove the automatic print trigger
-        // setTimeout(() => {
-        //   window.print();
-        //   // onClose();
-        // }, 500);
+        // If autoPrint is true, trigger the print dialog after data is loaded
+        if (autoPrint) {
+          setTimeout(() => {
+            window.print();
+          }, 800);
+        }
       } catch (err) {
         console.error('Error:', err);
         setError(err.message || 'Failed to load invoice');
@@ -139,7 +140,7 @@ const FallbackInvoicePrint = ({ saleId, onClose }) => {
     };
 
     fetchData();
-  }, [saleId, onClose]);
+  }, [saleId, onClose, autoPrint]);
 
   // Format currency
   const formatCurrency = (amount) => {
@@ -268,21 +269,59 @@ const FallbackInvoicePrint = ({ saleId, onClose }) => {
     <div className="print-container">
       <div className="no-print mb-4 p-4 bg-gray-100 flex justify-between items-center">
         <h2 className="text-xl font-bold">Invoice #{saleData.invoiceNumber}</h2>
-        <div>
+        <div className="flex space-x-2">
           <button 
             onClick={() => window.print()} 
-            className="px-4 py-2 bg-blue-600 text-white rounded mr-2"
+            className="px-4 py-2 bg-blue-600 text-white rounded flex items-center"
           >
-            Print Now
+            <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Print Invoice
           </button>
           <button 
             onClick={onClose} 
-            className="px-4 py-2 bg-gray-500 text-white rounded"
+            className="px-4 py-2 bg-gray-500 text-white rounded flex items-center"
           >
+            <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
             Close
           </button>
         </div>
       </div>
+      
+      <style>
+        {`
+          @media print {
+            body * {
+              visibility: hidden;
+            }
+            .print-container, .print-container * {
+              visibility: visible;
+            }
+            .no-print {
+              display: none !important;
+            }
+            .print-only {
+              display: block !important;
+            }
+            .print-container {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+            }
+            @page {
+              size: auto;
+              margin: 10mm;
+            }
+          }
+          .print-only {
+            display: block;
+          }
+        `}
+      </style>
       
       <div className="print-only">
         <div style={{ maxWidth: '800px', margin: '0 auto', fontSize: '12px' }}>

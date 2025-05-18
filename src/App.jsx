@@ -16,6 +16,9 @@ import Transactions from './pages/Transactions';
 import Ledger from './pages/Ledger';
 import GSTReturns from './pages/GSTReturns';
 import Dashboard from './pages/Dashboard';
+import Purchases from './pages/Purchases';
+import CreatePurchase from './pages/CreatePurchase';
+import BottomNavigation from './components/BottomNavigation';
 import './App.css';
 
 function App() {
@@ -35,6 +38,8 @@ function App() {
           <Route path="/sales/new" element={<CreateSale />} />
           <Route path="/sales/:saleId" element={<SaleDetail />} />
           <Route path="/sales/edit/:saleId" element={<EditSale />} />
+          <Route path="/purchases" element={<Purchases />} />
+          <Route path="/purchases/new" element={<CreatePurchase />} />
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/ledger" element={<Ledger />} />
           <Route path="/gst-returns" element={<GSTReturns />} />
@@ -43,6 +48,9 @@ function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        
+        {/* Bottom Navigation for Mobile */}
+        <BottomNavigation />
       </Router>
     </div>
   );

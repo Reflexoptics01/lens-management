@@ -7,10 +7,12 @@ import {
   EnvelopeIcon,
   IdentificationIcon, 
   BanknotesIcon,
-  ClockIcon
+  ClockIcon,
+  BuildingStorefrontIcon,
+  UserIcon
 } from '@heroicons/react/24/outline';
 
-const CustomerCard = ({ customer, onEdit, onDelete }) => {
+const CustomerCard = ({ customer, onEdit, onDelete, formatCurrency, isVendor = false }) => {
   const {
     opticalName,
     contactPerson,
@@ -24,18 +26,23 @@ const CustomerCard = ({ customer, onEdit, onDelete }) => {
     gstNumber
   } = customer;
 
-  // Helper to format currency
-  const formatCurrency = (amount) => {
+  // Use provided formatCurrency or fall back to local implementation
+  const formatAmount = formatCurrency || ((amount) => {
     if (!amount && amount !== 0) return '-';
     return `₹${parseFloat(amount).toLocaleString('en-IN')}`;
-  };
+  });
+
+  const EntityIcon = isVendor ? BuildingStorefrontIcon : UserIcon;
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
       <div className="p-4 sm:p-6">
         <div className="flex justify-between items-start">
           <div className="space-y-1">
-            <h3 className="text-lg font-semibold text-gray-900">{opticalName}</h3>
+            <div className="flex items-center">
+              <EntityIcon className="w-5 h-5 mr-2 text-gray-500" />
+              <h3 className="text-lg font-semibold text-gray-900">{opticalName}</h3>
+            </div>
             {contactPerson && (
               <p className="text-sm text-gray-600 flex items-center">
                 <IdentificationIcon className="w-4 h-4 mr-1 text-gray-400" />
@@ -45,16 +52,16 @@ const CustomerCard = ({ customer, onEdit, onDelete }) => {
           </div>
           <div className="flex space-x-1">
             <button
-              onClick={() => onEdit(customer)}
+              onClick={() => onEdit()}
               className="p-2 text-gray-400 hover:text-sky-600 rounded-full hover:bg-sky-50 transition-colors"
-              aria-label="Edit customer"
+              aria-label={`Edit ${isVendor ? 'vendor' : 'customer'}`}
             >
               <PencilIcon className="w-5 h-5" />
             </button>
             <button
-              onClick={() => onDelete(customer.id)}
+              onClick={() => onDelete()}
               className="p-2 text-gray-400 hover:text-red-600 rounded-full hover:bg-red-50 transition-colors"
-              aria-label="Delete customer"
+              aria-label={`Delete ${isVendor ? 'vendor' : 'customer'}`}
             >
               <TrashIcon className="w-5 h-5" />
             </button>
@@ -97,7 +104,7 @@ const CustomerCard = ({ customer, onEdit, onDelete }) => {
                 <BanknotesIcon className="w-4 h-4 mr-2 text-gray-400" />
                 <span className="text-gray-600">
                   <span className="text-gray-500">Credit: </span>
-                  {formatCurrency(creditLimit)}
+                  {formatAmount(creditLimit)}
                 </span>
               </div>
             )}
@@ -107,7 +114,7 @@ const CustomerCard = ({ customer, onEdit, onDelete }) => {
                 <BanknotesIcon className="w-4 h-4 mr-2 text-gray-400" />
                 <span className="text-gray-600">
                   <span className="text-gray-500">Balance: </span>
-                  {formatCurrency(openingBalance)}
+                  {formatAmount(openingBalance)}
                 </span>
               </div>
             )}
