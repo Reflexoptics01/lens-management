@@ -83,6 +83,19 @@ const Navbar = () => {
                 <div className="py-2">
                   <button
                     onClick={() => {
+                      navigate('/dashboard');
+                      setIsMenuOpen(false);
+                    }}
+                    className={`w-full px-4 py-3 text-left ${
+                      location.pathname === '/dashboard'
+                        ? 'bg-sky-100 text-sky-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Dashboard
+                  </button>
+                  <button
+                    onClick={() => {
                       navigate('/orders');
                       setIsMenuOpen(false);
                     }}
@@ -106,6 +119,84 @@ const Navbar = () => {
                     }`}
                   >
                     Customers
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigate('/sales');
+                      setIsMenuOpen(false);
+                    }}
+                    className={`w-full px-4 py-3 text-left ${
+                      location.pathname.startsWith('/sales')
+                        ? 'bg-sky-100 text-sky-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Sales
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigate('/transactions');
+                      setIsMenuOpen(false);
+                    }}
+                    className={`w-full px-4 py-3 text-left ${
+                      location.pathname === '/transactions'
+                        ? 'bg-sky-100 text-sky-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Transactions
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigate('/ledger');
+                      setIsMenuOpen(false);
+                    }}
+                    className={`w-full px-4 py-3 text-left ${
+                      location.pathname === '/ledger'
+                        ? 'bg-sky-100 text-sky-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Ledger
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigate('/gst-returns');
+                      setIsMenuOpen(false);
+                    }}
+                    className={`w-full px-4 py-3 text-left ${
+                      location.pathname === '/gst-returns'
+                        ? 'bg-sky-100 text-sky-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    GST Returns
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigate('/invoices');
+                      setIsMenuOpen(false);
+                    }}
+                    className={`w-full px-4 py-3 text-left ${
+                      location.pathname === '/invoices'
+                        ? 'bg-sky-100 text-sky-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Invoice Gallery
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigate('/settings');
+                      setIsMenuOpen(false);
+                    }}
+                    className={`w-full px-4 py-3 text-left ${
+                      location.pathname === '/settings'
+                        ? 'bg-sky-100 text-sky-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Settings
                   </button>
                 </div>
               </div>
@@ -139,6 +230,16 @@ const Navbar = () => {
               </div>
               <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
                 <button
+                  onClick={() => navigate('/dashboard')}
+                  className={`${
+                    location.pathname === '/dashboard'
+                      ? 'border-sky-600 text-gray-900'
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                  } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                >
+                  Dashboard
+                </button>
+                <button
                   onClick={() => navigate('/orders')}
                   className={`${
                     location.pathname.startsWith('/orders')
@@ -157,6 +258,66 @@ const Navbar = () => {
                   } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
                 >
                   Customers
+                </button>
+                <button
+                  onClick={() => navigate('/sales')}
+                  className={`${
+                    location.pathname.startsWith('/sales')
+                      ? 'border-sky-600 text-gray-900'
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                  } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                >
+                  Sales
+                </button>
+                <button
+                  onClick={() => navigate('/transactions')}
+                  className={`${
+                    location.pathname === '/transactions'
+                      ? 'border-sky-600 text-gray-900'
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                  } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                >
+                  Transactions
+                </button>
+                <button
+                  onClick={() => navigate('/ledger')}
+                  className={`${
+                    location.pathname === '/ledger'
+                      ? 'border-sky-600 text-gray-900'
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                  } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                >
+                  Ledger
+                </button>
+                <button
+                  onClick={() => navigate('/gst-returns')}
+                  className={`${
+                    location.pathname === '/gst-returns'
+                      ? 'border-sky-600 text-gray-900'
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                  } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                >
+                  GST Returns
+                </button>
+                <button
+                  onClick={() => navigate('/invoices')}
+                  className={`${
+                    location.pathname === '/invoices'
+                      ? 'border-sky-600 text-gray-900'
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                  } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                >
+                  Invoice Gallery
+                </button>
+                <button
+                  onClick={() => navigate('/settings')}
+                  className={`${
+                    location.pathname === '/settings'
+                      ? 'border-sky-600 text-gray-900'
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                  } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                >
+                  Settings
                 </button>
               </div>
             </div>
@@ -183,10 +344,23 @@ const Navbar = () => {
 
       {/* Mobile Bottom Navigation */}
       <div className="mobile-bottom-nav mobile-only">
-        <div className="grid grid-cols-2 gap-1 p-2">
+        <div className="grid grid-cols-5 gap-1 p-2">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg ${
+              location.pathname === '/dashboard'
+                ? 'text-sky-700 bg-sky-100'
+                : 'text-gray-600'
+            }`}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+            </svg>
+            <span className="text-xs mt-1">Dashboard</span>
+          </button>
           <button
             onClick={() => navigate('/orders')}
-            className={`flex flex-col items-center justify-center py-2 px-4 rounded-lg ${
+            className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg ${
               location.pathname.startsWith('/orders')
                 ? 'text-sky-700 bg-sky-100'
                 : 'text-gray-600'
@@ -199,7 +373,7 @@ const Navbar = () => {
           </button>
           <button
             onClick={() => navigate('/customers')}
-            className={`flex flex-col items-center justify-center py-2 px-4 rounded-lg ${
+            className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg ${
               location.pathname === '/customers'
                 ? 'text-sky-700 bg-sky-100'
                 : 'text-gray-600'
@@ -209,6 +383,86 @@ const Navbar = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
             <span className="text-xs mt-1">Customers</span>
+          </button>
+          <button
+            onClick={() => navigate('/sales')}
+            className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg ${
+              location.pathname.startsWith('/sales')
+                ? 'text-sky-700 bg-sky-100'
+                : 'text-gray-600'
+            }`}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            <span className="text-xs mt-1">Sales</span>
+          </button>
+          <button
+            onClick={() => navigate('/transactions')}
+            className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg ${
+              location.pathname === '/transactions'
+                ? 'text-sky-700 bg-sky-100'
+                : 'text-gray-600'
+            }`}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span className="text-xs mt-1">Transactions</span>
+          </button>
+          <button
+            onClick={() => navigate('/ledger')}
+            className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg ${
+              location.pathname === '/ledger'
+                ? 'text-sky-700 bg-sky-100'
+                : 'text-gray-600'
+            }`}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7c-2 0-3 1-3 3z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-6M15 17v-6M9 11h6" />
+            </svg>
+            <span className="text-xs mt-1">Ledger</span>
+          </button>
+          <button
+            onClick={() => navigate('/gst-returns')}
+            className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg ${
+              location.pathname === '/gst-returns'
+                ? 'text-sky-700 bg-sky-100'
+                : 'text-gray-600'
+            }`}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+            </svg>
+            <span className="text-xs mt-1">GST</span>
+          </button>
+          <button
+            onClick={() => navigate('/invoices')}
+            className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg ${
+              location.pathname === '/invoices'
+                ? 'text-sky-700 bg-sky-100'
+                : 'text-gray-600'
+            }`}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span className="text-xs mt-1">Invoices</span>
+          </button>
+          <button
+            onClick={() => navigate('/settings')}
+            className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg ${
+              location.pathname === '/settings'
+                ? 'text-sky-700 bg-sky-100'
+                : 'text-gray-600'
+            }`}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span className="text-xs mt-1">Settings</span>
           </button>
         </div>
       </div>
