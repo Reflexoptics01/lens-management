@@ -174,19 +174,6 @@ const Navbar = () => {
                   </button>
                   <button
                     onClick={() => {
-                      navigate('/invoices');
-                      setIsMenuOpen(false);
-                    }}
-                    className={`w-full px-4 py-3 text-left ${
-                      location.pathname === '/invoices'
-                        ? 'bg-sky-100 text-sky-700'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    Invoice Gallery
-                  </button>
-                  <button
-                    onClick={() => {
                       navigate('/settings');
                       setIsMenuOpen(false);
                     }}
@@ -298,16 +285,6 @@ const Navbar = () => {
                   } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
                 >
                   GST Returns
-                </button>
-                <button
-                  onClick={() => navigate('/invoices')}
-                  className={`${
-                    location.pathname === '/invoices'
-                      ? 'border-sky-600 text-gray-900'
-                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                  } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
-                >
-                  Invoice Gallery
                 </button>
                 <button
                   onClick={() => navigate('/settings')}
@@ -436,19 +413,6 @@ const Navbar = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
             </svg>
             <span className="text-xs mt-1">GST</span>
-          </button>
-          <button
-            onClick={() => navigate('/invoices')}
-            className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg ${
-              location.pathname === '/invoices'
-                ? 'text-sky-700 bg-sky-100'
-                : 'text-gray-600'
-            }`}
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <span className="text-xs mt-1">Invoices</span>
           </button>
           <button
             onClick={() => navigate('/settings')}

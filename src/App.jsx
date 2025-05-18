@@ -10,7 +10,6 @@ import Sales from './pages/Sales';
 import CreateSale from './pages/CreateSale';
 import EditSale from './pages/EditSale';
 import Settings from './pages/Settings';
-import InvoiceGallery from './pages/InvoiceGallery';
 import SaleDetail from './pages/SaleDetail';
 import TestPrintPage from './pages/TestPrintPage';
 import Transactions from './pages/Transactions';
@@ -36,7 +35,6 @@ function App() {
           <Route path="/sales/new" element={<CreateSale />} />
           <Route path="/sales/:saleId" element={<SaleDetail />} />
           <Route path="/sales/edit/:saleId" element={<EditSale />} />
-          <Route path="/invoices" element={<InvoiceGallery />} />
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/ledger" element={<Ledger />} />
           <Route path="/gst-returns" element={<GSTReturns />} />
