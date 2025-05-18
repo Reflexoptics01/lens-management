@@ -4,14 +4,24 @@ const CustomerSearch = ({ customers, value, onChange, onSelect, onAddNew, isOrde
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filteredCustomers, setFilteredCustomers] = useState([]);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
   const wrapperRef = useRef(null);
+  const suggestionsRef = useRef(null);
+  const inputRef = useRef(null);
+  const hadFocusRef = useRef(false);
+  const lastSelectedCustomerRef = useRef(null);
+  const isUserEditingRef = useRef(false);
 
   // Initialize searchTerm from value if provided
   useEffect(() => {
     if (value && !searchTerm) {
       setSearchTerm(value);
+    } else if (value !== searchTerm && !hadFocusRef.current && !isUserEditingRef.current) {
+      // Update searchTerm if value changes and input hasn't had focus yet
+      // and user is not actively editing the field
+      setSearchTerm(value);
     }
-  }, [value]);
+  }, [value, searchTerm]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -47,35 +57,141 @@ const CustomerSearch = ({ customers, value, onChange, onSelect, onAddNew, isOrde
         customer.opticalName?.toLowerCase().includes(searchTerm.toLowerCase())
       );
       setFilteredCustomers(filtered);
-      setShowSuggestions(true);
+      
+      // Only show suggestions if actively typing and not right after selection
+      const doShowSuggestions = 
+        filtered.length > 0 && 
+        hadFocusRef.current &&
+        (!lastSelectedCustomerRef.current || lastSelectedCustomerRef.current !== searchTerm);
+        
+      setShowSuggestions(doShowSuggestions);
+      setSelectedIndex(-1); // Reset selection when customers change
     } else {
       setFilteredCustomers([]);
       setShowSuggestions(false);
     }
   }, [searchTerm, customers]);
 
+  // Scroll selected item into view
+  useEffect(() => {
+    if (selectedIndex >= 0 && suggestionsRef.current) {
+      const selectedElement = suggestionsRef.current.children[selectedIndex];
+      if (selectedElement) {
+        selectedElement.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }, [selectedIndex]);
+
   const handleInputChange = (e) => {
     const value = e.target.value;
+    isUserEditingRef.current = true;
     setSearchTerm(value);
+    
+    // If user completely cleared the field or the input doesn't match the last selection,
+    // clear the selection reference
+    if (value === '' || (lastSelectedCustomerRef.current && !lastSelectedCustomerRef.current.startsWith(value))) {
+      lastSelectedCustomerRef.current = null;
+      // Let parent know that customer is unselected
+      onSelect(null);
+    }
+    
     if (value === '') {
       setShowSuggestions(false);
       setFilteredCustomers([]);
     }
+    
     onChange({ target: { name: 'customerName', value } });
+    
+    // Reset the editing flag after a short delay
+    setTimeout(() => {
+      isUserEditingRef.current = false;
+    }, 100);
+  };
+
+  const handleKeyDown = (e) => {
+    // Only handle keys if suggestions are showing
+    if (!showSuggestions || filteredCustomers.length === 0) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedIndex(prev => 
+          prev < filteredCustomers.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedIndex(prev => (prev > 0 ? prev - 1 : 0));
+        break;
+      case 'Enter':
+        if (selectedIndex >= 0 && selectedIndex < filteredCustomers.length) {
+          e.preventDefault();
+          handleSelectCustomer(filteredCustomers[selectedIndex]);
+        }
+        break;
+      case 'Tab':
+        if (selectedIndex >= 0 && selectedIndex < filteredCustomers.length) {
+          e.preventDefault();
+          handleSelectCustomer(filteredCustomers[selectedIndex]);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setShowSuggestions(false);
+        break;
+      default:
+        break;
+    }
   };
 
   const handleSelectCustomer = (customer) => {
+    lastSelectedCustomerRef.current = customer.opticalName;
     setSearchTerm(customer.opticalName);
     setShowSuggestions(false);
-    setFilteredCustomers([]);
     onSelect(customer);
   };
 
+  // Separate handler for mouse clicks
+  const handleCustomerClick = (e, customer) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    handleSelectCustomer(customer);
+    
+    // Move focus to next input after selection
+    setTimeout(() => {
+      const inputs = Array.from(document.querySelectorAll('input:not([type=hidden])'));
+      const currentIndex = inputs.indexOf(inputRef.current);
+      if (currentIndex >= 0 && currentIndex < inputs.length - 1) {
+        inputs[currentIndex + 1].focus();
+      }
+    }, 50);
+  };
+
   const handleAddNew = () => {
-    if (isOrderFlow && onAddNew) {
+    // Always use the parent's onAddNew handler
+    if (onAddNew) {
       onAddNew();
-    } else {
-      window.open('/customers/new', '_blank');
+    }
+  };
+  
+  const handleFocus = () => {
+    hadFocusRef.current = true;
+    
+    // Show suggestions again if there's a search term
+    if (searchTerm.trim() && filteredCustomers.length > 0 &&
+        (!lastSelectedCustomerRef.current || lastSelectedCustomerRef.current !== searchTerm)) {
+      setShowSuggestions(true);
+    }
+  };
+  
+  const handleBlur = (e) => {
+    // Don't hide suggestions if clicking on a suggestion
+    if (!e.relatedTarget || !suggestionsRef.current?.contains(e.relatedTarget)) {
+      setTimeout(() => {
+        setShowSuggestions(false);
+        hadFocusRef.current = false;
+      }, 200);
     }
   };
 
@@ -84,29 +200,37 @@ const CustomerSearch = ({ customers, value, onChange, onSelect, onAddNew, isOrde
       <div className="flex gap-1">
         <div className="flex-1">
           <input
+            ref={inputRef}
             type="text"
             value={searchTerm}
             onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
             placeholder="Start typing customer name..."
             className="w-full rounded-lg border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm"
           />
           {showSuggestions && filteredCustomers.length > 0 && (
             <div className="absolute z-10 w-full mt-1 bg-white rounded-md shadow-lg max-h-48 overflow-auto border border-sky-100">
-              <div className="sticky top-0 bg-sky-50 border-b border-sky-200 px-3 py-1.5 text-xs font-bold uppercase text-sky-700">
-                Matching Customers
-              </div>
-              {filteredCustomers.map((customer) => (
-                <div
-                  key={customer.id}
-                  className="px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                  onClick={() => handleSelectCustomer(customer)}
-                >
-                  <div className="font-medium text-sm">{customer.opticalName}</div>
-                  <div className="text-xs text-gray-500">
-                    {customer.phone} • {customer.city || 'No city'}
+              <div 
+                ref={suggestionsRef}
+                className="py-1"
+              >
+                {filteredCustomers.map((customer, idx) => (
+                  <div
+                    key={customer.id}
+                    className={`px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 ${selectedIndex === idx ? 'bg-sky-50' : ''}`}
+                    onClick={(e) => handleCustomerClick(e, customer)}
+                    onMouseEnter={() => setSelectedIndex(idx)}
+                    tabIndex="0"
+                  >
+                    <div className="font-medium text-sm">{customer.opticalName}</div>
+                    <div className="text-xs text-gray-500">
+                      {customer.phone} • {customer.city || 'No city'}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
         </div>

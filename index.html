@@ -4,7 +4,35 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React</title>
+    <title>Lens Management</title>
+    <style>
+      @media print {
+        /* body * { */
+        /*  visibility: hidden; */
+        /* } */
+        .print-only, .print-only * {
+          visibility: visible !important;
+        }
+        .no-print, .no-print * {
+          display: none !important;
+        }
+        #root {
+          visibility: visible !important;
+          height: auto;
+          overflow: visible !important;
+        }
+        /* Ensure background colors print */
+        * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        /* Remove unnecessary margins */
+        @page {
+          size: auto;
+          margin: 10mm;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

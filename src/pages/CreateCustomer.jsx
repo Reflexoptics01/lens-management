@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { db } from '../firebaseConfig';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -8,7 +8,37 @@ import { ArrowLeftIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
 const CreateCustomer = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const isPopupMode = location.state?.isPopupMode;
+  const [isPopupMode, setIsPopupMode] = useState(location.state?.isPopupMode || false);
+  
+  // Check if this component is running in popup mode
+  useEffect(() => {
+    // Check if we are in a popup window
+    const checkPopupMode = () => {
+      // First check location state
+      if (location.state?.isPopupMode) {
+        setIsPopupMode(true);
+        return;
+      }
+      
+      // Then check for window.opener which indicates we're in a popup
+      if (window.opener && window.opener !== window) {
+        setIsPopupMode(true);
+        return;
+      }
+    };
+    
+    checkPopupMode();
+    
+    // Also listen for popstate events which might be triggered by parent window
+    const handlePopState = (event) => {
+      if (event.state?.isPopupMode) {
+        setIsPopupMode(true);
+      }
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [location]);
   
   const [formData, setFormData] = useState({
     opticalName: '',

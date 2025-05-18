@@ -97,8 +97,11 @@ const OrderDetail = () => {
     if (!order || !phone) return;
     const cleanPhone = phone.replace(/[^0-9+]/g, '');
     
+    // Always use the displayId
+    const displayOrderId = order.displayId;
+    
     const message = type === 'vendor' 
-      ? `🔔 *New Order #${order.id.substring(0, 3)}*\n\n` +
+      ? `🔔 *New Order #${displayOrderId}*\n\n` +
         `👤 *Consumer Details:*\n` +
         `Name: ${order.consumerName || 'N/A'}\n\n` +
         `🕶 *Order Details:*\n` +
@@ -130,7 +133,7 @@ const OrderDetail = () => {
         `Dear ${order.customerName || 'Customer'},\n\n` +
         `Your order has been successfully placed!\n\n` +
         `*Order Details:*\n` +
-        `Order Reference: #${order.id.substring(0, 3)}\n` +
+        `Order Reference: #${displayOrderId}\n` +
         `Brand: ${order.brandName}\n` +
         `Expected Delivery: ${order.expectedDeliveryDate}\n\n` +
         `*Lens Details:*\n` +
@@ -263,7 +266,7 @@ const OrderDetail = () => {
                 Status: {order?.status || 'PENDING'}
               </span>
               <span className="ml-4 text-sm text-gray-500">
-                Order #{order?.id?.substring(0, 3)}
+                Order #{order?.displayId}
               </span>
               <span className="ml-auto font-medium text-sm">
                 ₹{order?.price}
@@ -281,7 +284,7 @@ const OrderDetail = () => {
                 </div>
                 <div className="p-6">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-                    <DataItem label="Order ID" value={order.id} />
+                    <DataItem label="Order ID" value={`#${order.displayId}`} />
                     <DataItem label="Expected Delivery" value={order.expectedDeliveryDate} />
                     <DataItem label="Customer Name" value={order.customerName} />
                     <DataItem label="Consumer Name" value={order.consumerName} />

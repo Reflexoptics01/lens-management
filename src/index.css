@@ -66,3 +66,36 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* Commenting out the entire @media print block to isolate CSS conflicts */
+/*
+@media print {
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+  
+  .print-only {
+    visibility: visible !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  
+  .no-print, .no-print * {
+    display: none !important;
+  }
+  
+  table, th, td {
+    border-color: #000 !important;
+  }
+}
+*/
+
+/* Add a class for the print container */
+.print-container {
+  background-color: white;
+  padding: 20px;
+  position: relative;
+}

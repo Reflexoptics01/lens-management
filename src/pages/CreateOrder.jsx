@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
-import { collection, addDoc, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, Timestamp, query, orderBy } from 'firebase/firestore';
 import Navbar from '../components/Navbar';
 import OrderForm from '../components/OrderForm';
 import { ArrowLeftIcon, PlusIcon } from '@heroicons/react/24/outline';
@@ -44,10 +44,27 @@ const CreateOrder = () => {
   const [error, setError] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [orderId, setOrderId] = useState(null);
+  const [nextOrderDisplayId, setNextOrderDisplayId] = useState('');
 
   useEffect(() => {
     fetchCustomers();
+    calculateNextOrderDisplayId();
   }, []);
+
+  const calculateNextOrderDisplayId = async () => {
+    try {
+      const ordersRef = collection(db, 'orders');
+      const orderQuery = query(ordersRef, orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(orderQuery);
+      
+      // Calculate the next order number
+      const orderCount = snapshot.docs.length;
+      const nextId = (orderCount + 1).toString().padStart(3, '0');
+      setNextOrderDisplayId(nextId);
+    } catch (error) {
+      console.error('Error calculating next order ID:', error);
+    }
+  };
 
   const fetchCustomers = async () => {
     try {
@@ -78,9 +95,13 @@ const CreateOrder = () => {
     setError('');
 
     try {
+      // Use the pre-calculated next order display ID
+      const displayId = nextOrderDisplayId;
+
       const orderData = {
         ...formData,
-        status: 'pending',
+        status: 'PENDING',
+        displayId,
         createdAt: Timestamp.now()
       };
 
@@ -113,8 +134,11 @@ const CreateOrder = () => {
     if (!phone || !orderId) return;
     const cleanPhone = phone.replace(/[^0-9+]/g, '');
     
+    // Get the display ID from the form data or use the first 3 characters of the ID as fallback
+    const displayOrderId = formData.displayId || orderId.substring(0, 3);
+    
     const message = type === 'vendor' 
-      ? `🔔 *New Order #${orderId.substring(0, 3)}*\n\n` +
+      ? `🔔 *New Order #${displayOrderId}*\n\n` +
         `👤 *Consumer Details:*\n` +
         `Name: ${formData.consumerName || 'N/A'}\n\n` +
         `🕶 *Order Details:*\n` +
@@ -146,7 +170,7 @@ const CreateOrder = () => {
         `Dear ${formData.customerName || 'Customer'},\n\n` +
         `Your order has been successfully placed!\n\n` +
         `*Order Details:*\n` +
-        `Order Reference: #${orderId.substring(0, 3)}\n` +
+        `Order Reference: #${displayOrderId}\n` +
         `Brand: ${formData.brandName}\n` +
         `Expected Delivery: ${formData.expectedDeliveryDate}\n\n` +
         `*Lens Details:*\n` +
@@ -195,7 +219,14 @@ const CreateOrder = () => {
                 <ArrowLeftIcon className="w-4 h-4 mr-1" />
                 Back to Orders
               </button>
-              <h1 className="text-xl font-bold text-gray-800">Create New Order</h1>
+              <div className="flex items-center">
+                <h1 className="text-xl font-bold text-gray-800">Create New Order</h1>
+                {nextOrderDisplayId && (
+                  <span className="ml-3 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                    Order #{nextOrderDisplayId}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -216,7 +247,10 @@ const CreateOrder = () => {
 
       {/* Customer Form Modal */}
       {showCustomerForm && (
-        <CustomerForm onClose={(refreshNeeded) => handleCustomerFormClose(refreshNeeded)} />
+        <CustomerForm 
+          onClose={handleCustomerFormClose}
+          customer={null}
+        />
       )}
 
       {/* WhatsApp Modal */}

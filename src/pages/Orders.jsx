@@ -43,11 +43,15 @@ const Orders = () => {
       const ordersRef = collection(db, 'orders');
       const q = query(ordersRef, orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
-      const ordersList = snapshot.docs.map((doc, index) => ({
-        id: doc.id,
-        displayId: `${(snapshot.docs.length - index).toString().padStart(3, '0')}`,
-        ...doc.data()
-      }));
+      const ordersList = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          // Just use the stored displayId directly
+          displayId: data.displayId,
+          ...data
+        };
+      });
       setOrders(ordersList);
     } catch (error) {
       console.error('Error fetching orders:', error);
