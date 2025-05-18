@@ -4,6 +4,33 @@ import { collection, getDocs, query, orderBy, updateDoc, doc, deleteDoc } from '
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 
+// Helper functions to handle different timestamp formats after restore
+const isFirestoreTimestamp = (value) => {
+  return value && typeof value === 'object' && typeof value.toDate === 'function';
+};
+
+const isISODateString = (value) => {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value);
+};
+
+const convertToDate = (value) => {
+  if (!value) return null;
+  
+  try {
+    if (isFirestoreTimestamp(value)) {
+      return value.toDate();
+    } else if (isISODateString(value)) {
+      return new Date(value);
+    } else if (value instanceof Date) {
+      return value;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error converting timestamp:', error, value);
+    return null;
+  }
+};
+
 const ORDER_STATUSES = [
   'PENDING',
   'PLACED',
@@ -40,22 +67,57 @@ const Orders = () => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
+      setError('');
+      
       const ordersRef = collection(db, 'orders');
-      const q = query(ordersRef, orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      const ordersList = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          // Just use the stored displayId directly
-          displayId: data.displayId,
-          ...data
-        };
-      });
+      let ordersList = [];
+      
+      try {
+        // Try the standard query first
+        const q = query(ordersRef, orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        
+        ordersList = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            displayId: data.displayId,
+            ...data,
+            // Convert timestamps to proper format
+            createdAt: data.createdAt 
+          };
+        });
+      } catch (error) {
+        console.error('Error with standard query, trying fallback:', error);
+        
+        // Fallback: Get all orders without sorting
+        const snapshot = await getDocs(ordersRef);
+        
+        ordersList = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            displayId: data.displayId,
+            ...data
+          };
+        });
+        
+        // Sort manually by createdAt if possible
+        ordersList.sort((a, b) => {
+          const dateA = convertToDate(a.createdAt);
+          const dateB = convertToDate(b.createdAt);
+          
+          if (dateA && dateB) {
+            return dateB - dateA; // Descending order
+          }
+          return 0;
+        });
+      }
+      
       setOrders(ordersList);
     } catch (error) {
       console.error('Error fetching orders:', error);
-      setError('Failed to fetch orders');
+      setError('Failed to fetch orders. Please try reloading the page.');
     } finally {
       setLoading(false);
     }
@@ -108,12 +170,39 @@ const Orders = () => {
   };
 
   const formatDate = (timestamp) => {
-    if (!timestamp) return '';
-    const date = timestamp.toDate();
-    return {
-      date: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-      time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-    };
+    if (!timestamp) return { date: '', time: '' };
+    
+    try {
+      // Check if timestamp is a valid Firestore timestamp object
+      if (timestamp && typeof timestamp.toDate === 'function') {
+        const date = timestamp.toDate();
+        return {
+          date: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+          time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+        };
+      } 
+      // Handle string ISO dates from backup/restore
+      else if (typeof timestamp === 'string' && timestamp.match(/^\d{4}-\d{2}-\d{2}T/)) {
+        const date = new Date(timestamp);
+        return {
+          date: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+          time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+        };
+      }
+      // Handle date objects directly
+      else if (timestamp instanceof Date) {
+        return {
+          date: timestamp.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+          time: timestamp.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+        };
+      }
+      
+      // Return empty strings if format can't be determined
+      return { date: '', time: '' };
+    } catch (error) {
+      console.error('Error formatting date:', error, timestamp);
+      return { date: '', time: '' };
+    }
   };
 
   const getCustomerDetails = (customerName) => {

@@ -7,6 +7,43 @@ import Navbar from '../components/Navbar';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
          PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 
+// Helper functions to handle different timestamp formats after restore
+const isFirestoreTimestamp = (value) => {
+  return value && typeof value === 'object' && typeof value.toDate === 'function';
+};
+
+const isISODateString = (value) => {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value);
+};
+
+const convertToDate = (value) => {
+  if (!value) return null;
+  
+  try {
+    if (isFirestoreTimestamp(value)) {
+      return value.toDate();
+    } else if (isISODateString(value)) {
+      return new Date(value);
+    } else if (value instanceof Date) {
+      return value;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error converting timestamp:', error, value);
+    return null;
+  }
+};
+
+// Convert any value to a Firestore Timestamp safely
+const safeTimestamp = (value) => {
+  if (isFirestoreTimestamp(value)) {
+    return value;
+  }
+  
+  const date = convertToDate(value);
+  return date ? Timestamp.fromDate(date) : null;
+};
+
 const Dashboard = () => {
   // Date state
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -179,109 +216,122 @@ const Dashboard = () => {
     // Fetch today's sales
     const salesRef = collection(db, 'sales');
     
-    const todaySalesQuery = query(
-      salesRef,
-      where('invoiceDate', '>=', todayTimestamps.start),
-      where('invoiceDate', '<=', todayTimestamps.end)
-    );
-    
-    const lastMonthSalesQuery = query(
-      salesRef,
-      where('invoiceDate', '>=', lastMonthTimestamps.start),
-      where('invoiceDate', '<=', lastMonthTimestamps.end)
-    );
-    
-    const lastYearSalesQuery = query(
-      salesRef,
-      where('invoiceDate', '>=', lastYearTimestamps.start),
-      where('invoiceDate', '<=', lastYearTimestamps.end)
-    );
-    
-    // Get today's sales
-    const todaySalesSnapshot = await getDocs(todaySalesQuery);
-    const todaySalesAmount = todaySalesSnapshot.docs.reduce(
-      (total, doc) => total + (doc.data().totalAmount || 0), 0
-    );
-    
-    // Get last month same day sales
-    const lastMonthSalesSnapshot = await getDocs(lastMonthSalesQuery);
-    const lastMonthSalesAmount = lastMonthSalesSnapshot.docs.reduce(
-      (total, doc) => total + (doc.data().totalAmount || 0), 0
-    );
-    
-    // Get last year same day sales
-    const lastYearSalesSnapshot = await getDocs(lastYearSalesQuery);
-    const lastYearSalesAmount = lastYearSalesSnapshot.docs.reduce(
-      (total, doc) => total + (doc.data().totalAmount || 0), 0
-    );
-    
-    // Calculate monthly projection based on current month's sales
-    const currentMonthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-    const currentMonthEnd = new Date(selectedDate);
-    
-    const daysInMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate();
-    const daysPassed = selectedDate.getDate();
-    
-    // Monthly sales to date
-    const monthSalesQuery = query(
-      salesRef,
-      where('invoiceDate', '>=', Timestamp.fromDate(currentMonthStart)),
-      where('invoiceDate', '<=', Timestamp.fromDate(currentMonthEnd))
-    );
-    
-    const monthSalesSnapshot = await getDocs(monthSalesQuery);
-    const monthToDateSales = monthSalesSnapshot.docs.reduce(
-      (total, doc) => total + (doc.data().totalAmount || 0), 0
-    );
-    
-    // Project monthly sales (simple linear projection)
-    const monthlyProjection = daysPassed > 0 
-      ? (monthToDateSales / daysPassed) * daysInMonth 
-      : 0;
-    
-    setSalesData({
-      todaySales: todaySalesAmount,
-      lastMonthSameDay: lastMonthSalesAmount,
-      lastYearSameDay: lastYearSalesAmount,
-      monthlyProjection
-    });
+    try {
+      // Modified query approach to handle restored data
+      // Instead of relying on timestamp comparison queries that might fail with restored data,
+      // we'll fetch all sales and filter them in memory
+      
+      const allSalesQuery = query(salesRef, orderBy('invoiceDate', 'desc'));
+      const allSalesSnapshot = await getDocs(allSalesQuery);
+      
+      // Process all sales data
+      const allSales = allSalesSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          // Convert timestamp to a Date object for easy comparison
+          dateObj: convertToDate(data.invoiceDate)
+        };
+      }).filter(sale => sale.dateObj !== null); // Filter out sales with invalid dates
+      
+      // Filter for today's sales
+      const todaySales = allSales.filter(sale => {
+        const saleDate = sale.dateObj;
+        return saleDate >= todayTimestamps.start.toDate() && saleDate <= todayTimestamps.end.toDate();
+      });
+      
+      // Filter for last month's same day sales
+      const lastMonthSales = allSales.filter(sale => {
+        const saleDate = sale.dateObj;
+        return saleDate >= lastMonthTimestamps.start.toDate() && saleDate <= lastMonthTimestamps.end.toDate();
+      });
+      
+      // Filter for last year's same day sales
+      const lastYearSales = allSales.filter(sale => {
+        const saleDate = sale.dateObj;
+        return saleDate >= lastYearTimestamps.start.toDate() && saleDate <= lastYearTimestamps.end.toDate();
+      });
+      
+      // Calculate totals
+      const todaySalesAmount = todaySales.reduce((total, sale) => total + (sale.totalAmount || 0), 0);
+      const lastMonthSalesAmount = lastMonthSales.reduce((total, sale) => total + (sale.totalAmount || 0), 0);
+      const lastYearSalesAmount = lastYearSales.reduce((total, sale) => total + (sale.totalAmount || 0), 0);
+      
+      // Filter for current month's sales
+      const currentMonthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+      const currentMonthEnd = new Date(selectedDate);
+      
+      const currentMonthSales = allSales.filter(sale => {
+        const saleDate = sale.dateObj;
+        return saleDate >= currentMonthStart && saleDate <= currentMonthEnd;
+      });
+      
+      const monthToDateSales = currentMonthSales.reduce((total, sale) => total + (sale.totalAmount || 0), 0);
+      
+      // Calculate monthly projection
+      const daysInMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate();
+      const daysPassed = selectedDate.getDate();
+      
+      // Project monthly sales (simple linear projection)
+      const monthlyProjection = daysPassed > 0 
+        ? (monthToDateSales / daysPassed) * daysInMonth 
+        : 0;
+      
+      setSalesData({
+        todaySales: todaySalesAmount,
+        lastMonthSameDay: lastMonthSalesAmount,
+        lastYearSameDay: lastYearSalesAmount,
+        monthlyProjection
+      });
+    } catch (error) {
+      console.error('Error processing sales data:', error);
+      setError('Error processing sales data: ' + error.message);
+    }
   };
   
   // Fetch pending orders that haven't been updated in 3+ days
   const fetchPendingOrders = async () => {
     try {
-      // Calculate date threshold (3 days ago)
-      const thresholdDate = new Date();
-      thresholdDate.setDate(thresholdDate.getDate() - 3);
-      const thresholdTimestamp = Timestamp.fromDate(thresholdDate);
-
-      // First get all orders that haven't been updated recently
       const ordersRef = collection(db, 'orders');
+      // Get all non-delivered, non-cancelled orders
       const pendingOrdersQuery = query(
         ordersRef,
-        where('updatedAt', '<=', thresholdTimestamp),
-        orderBy('updatedAt', 'asc')
+        where('status', 'not-in', ['DELIVERED', 'CANCELLED', 'DECLINED'])
       );
-
-      const pendingOrdersSnapshot = await getDocs(pendingOrdersQuery);
       
-      // Then filter out completed/delivered orders in JavaScript
-      const pendingOrdersList = pendingOrdersSnapshot.docs
-        .map(doc => ({
+      const snapshot = await getDocs(pendingOrdersQuery);
+      
+      // Process orders, converting timestamps as needed
+      const pendingOrdersList = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
           id: doc.id,
-          ...doc.data(),
-          updatedAt: doc.data().updatedAt
-        }))
-        .filter(order => 
-          order.status !== 'Delivered' && 
-          order.status !== 'Completed'
-        );
-
-      setPendingOrders(pendingOrdersList);
-      setPendingOrdersCount(pendingOrdersList.length);
+          ...data,
+          // Convert timestamps to Date objects
+          createdAt: convertToDate(data.createdAt),
+          updatedAt: convertToDate(data.updatedAt || data.createdAt) // Fall back to createdAt if updatedAt is missing
+        };
+      }).filter(order => order.createdAt !== null); // Filter out orders with invalid dates
+      
+      // Calculate today's date minus 3 days
+      const threeDaysAgo = new Date();
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+      
+      // Filter orders that haven't been updated in 3+ days
+      const oldPendingOrders = pendingOrdersList.filter(order => {
+        const lastUpdate = order.updatedAt || order.createdAt;
+        return lastUpdate < threeDaysAgo;
+      });
+      
+      // Sort by oldest first
+      oldPendingOrders.sort((a, b) => a.updatedAt - b.updatedAt);
+      
+      setPendingOrders(oldPendingOrders);
+      setPendingOrdersCount(oldPendingOrders.length);
     } catch (error) {
       console.error('Error fetching pending orders:', error);
-      setError('Failed to load pending orders: ' + error.message);
+      setError('Failed to fetch pending orders: ' + error.message);
     }
   };
   
