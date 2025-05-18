@@ -18,7 +18,6 @@ import GSTReturns from './pages/GSTReturns';
 import Dashboard from './pages/Dashboard';
 import Purchases from './pages/Purchases';
 import CreatePurchase from './pages/CreatePurchase';
-import BottomNavigation from './components/BottomNavigation';
 import './App.css';
 
 function App() {
@@ -48,9 +47,6 @@ function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
-        
-        {/* Bottom Navigation for Mobile */}
-        <BottomNavigation />
       </Router>
     </div>
   );

@@ -4,7 +4,6 @@ import { collection, getDocs, query, orderBy, doc, getDoc, deleteDoc, updateDoc,
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import PrintInvoiceModal from '../components/PrintInvoiceModal';
-import FloatingActionButton from '../components/FloatingActionButton';
 
 const Sales = () => {
   const [sales, setSales] = useState([]);
@@ -191,16 +190,6 @@ const Sales = () => {
     setDateTo('');
     setSelectedCustomerId('');
     setPartySearchTerm('');
-  };
-
-  // Add this function to render the FAB for mobile view
-  const renderFloatingActionButton = () => {
-    return (
-      <FloatingActionButton
-        onClick={() => navigate('/sales/new')}
-        label="Create new sale"
-      />
-    );
   };
 
   return (
@@ -544,9 +533,6 @@ const Sales = () => {
         saleId={selectedSaleId}
         title={selectedSaleId ? `Invoice #${sales.find(s => s.id === selectedSaleId)?.invoiceNumber || ''}` : 'Print Invoice'}
       />
-      
-      {/* Add Floating Action Button for mobile */}
-      {renderFloatingActionButton()}
     </div>
   );
 };

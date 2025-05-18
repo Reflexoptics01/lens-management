@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebaseConfig';
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
-import { updatePassword, EmailAuthProvider, reauthenticateWithCredential, signOut } from 'firebase/auth';
+import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import Navbar from '../components/Navbar';
-import { useNavigate } from 'react-router-dom';
 
 const Settings = () => {
-  const navigate = useNavigate();
   // Shop information
   const [shopName, setShopName] = useState('');
   const [gstNumber, setGstNumber] = useState('');
@@ -327,47 +325,49 @@ const Settings = () => {
   };
   
   const handleChangePassword = async () => {
+    // Reset states
     setPasswordError('');
     setPasswordSuccess('');
+    
+    // Validate passwords
     if (newPassword !== confirmPassword) {
-      setPasswordError('New passwords do not match.');
+      setPasswordError('New passwords do not match');
       return;
     }
-    if (!currentPassword || !newPassword) {
-      setPasswordError('Please fill in all password fields.');
+    
+    if (newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters');
       return;
     }
-
-    const user = auth.currentUser;
-    if (user && user.email) {
-      const credential = EmailAuthProvider.credential(user.email, currentPassword);
-      try {
-        setLoading(true);
-        await reauthenticateWithCredential(user, credential);
-        await updatePassword(user, newPassword);
-        setPasswordSuccess('Password updated successfully!');
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-      } catch (err) {
-        console.error("Error updating password:", err);
-        setPasswordError(`Failed to update password: ${err.message}`);
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      setPasswordError('User not found or email not available.');
-    }
-  };
-
-  const handleSignOut = async () => {
+    
     try {
       setLoading(true);
-      await signOut(auth);
-      navigate('/login', { replace: true });
-    } catch (err) {
-      console.error('Error signing out:', err);
-      setError('Failed to sign out. Please try again.');
+      
+      // Re-authenticate the user
+      const user = auth.currentUser;
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+      
+      // Change password
+      await updatePassword(user, newPassword);
+      
+      // Clear form and show success
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordSuccess('Password changed successfully!');
+      setTimeout(() => setPasswordSuccess(''), 3000);
+    } catch (error) {
+      console.error('Error changing password:', error);
+      let errorMessage = 'Failed to change password. Please try again.';
+      
+      if (error.code === 'auth/wrong-password') {
+        errorMessage = 'Current password is incorrect';
+      } else if (error.code === 'auth/requires-recent-login') {
+        errorMessage = 'Please log out and log back in before changing your password';
+      }
+      
+      setPasswordError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -915,16 +915,16 @@ const Settings = () => {
               Financial Year
             </button>
             <button
-              className={`px-4 py-3 text-sm font-medium ${activeTab === 'account' ? 'text-sky-600 border-b-2 border-sky-500' : 'text-gray-500 hover:text-gray-700'}`}
-              onClick={() => setActiveTab('account')}
-            >
-              Account
-            </button>
-            <button
               className={`px-4 py-3 text-sm font-medium ${activeTab === 'backup' ? 'text-sky-600 border-b-2 border-sky-500' : 'text-gray-500 hover:text-gray-700'}`}
               onClick={() => setActiveTab('backup')}
             >
               Backup & Restore
+            </button>
+            <button
+              className={`px-4 py-3 text-sm font-medium ${activeTab === 'password' ? 'text-sky-600 border-b-2 border-sky-500' : 'text-gray-500 hover:text-gray-700'}`}
+              onClick={() => setActiveTab('password')}
+            >
+              Change Password
             </button>
           </div>
           
@@ -1223,70 +1223,6 @@ const Settings = () => {
               </div>
             )}
             
-            {/* Account Tab */}
-            {activeTab === 'account' && (
-              <div className="bg-white shadow-sm rounded-lg p-6">
-                <h2 className="text-xl font-semibold text-gray-800 mb-6">Account Settings</h2>
-                
-                {/* Change Password Section */}
-                <div className="mb-8">
-                  <h3 className="text-lg font-medium text-gray-700 mb-3">Change Password</h3>
-                  {passwordError && <p className="text-sm text-red-500 mb-2">{passwordError}</p>}
-                  {passwordSuccess && <p className="text-sm text-green-500 mb-2">{passwordSuccess}</p>}
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Current Password</label>
-                      <input 
-                        type="password" 
-                        value={currentPassword} 
-                        onChange={(e) => setCurrentPassword(e.target.value)} 
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">New Password</label>
-                      <input 
-                        type="password" 
-                        value={newPassword} 
-                        onChange={(e) => setNewPassword(e.target.value)} 
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Confirm New Password</label>
-                      <input 
-                        type="password" 
-                        value={confirmPassword} 
-                        onChange={(e) => setConfirmPassword(e.target.value)} 
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500"
-                      />
-                    </div>
-                  </div>
-                  <button 
-                    onClick={handleChangePassword} 
-                    disabled={loading}
-                    className="mt-4 btn-primary"
-                  >
-                    {loading ? 'Updating...' : 'Update Password'}
-                  </button>
-                </div>
-
-                {/* Sign Out Section */}
-                <div>
-                  <h3 className="text-lg font-medium text-gray-700 mb-3">Sign Out</h3>
-                  <p className="text-sm text-gray-600 mb-3">You are currently signed in as {auth.currentUser?.email}.</p>
-                  <button 
-                    onClick={handleSignOut} 
-                    disabled={loading}
-                    className="btn-secondary bg-red-500 hover:bg-red-600 text-white"
-                  >
-                    {loading ? 'Signing Out...' : 'Sign Out'}
-                  </button>
-                </div>
-              </div>
-            )}
-            
             {/* Backup & Restore Tab */}
             {activeTab === 'backup' && (
               <div className="space-y-6">
@@ -1416,6 +1352,95 @@ const Settings = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+            
+            {/* Password Change Tab */}
+            {activeTab === 'password' && (
+              <div className="space-y-6 max-w-md">
+                <h2 className="text-lg font-medium text-gray-900">Change Password</h2>
+                
+                {passwordError && (
+                  <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4 text-red-700">
+                    <p>{passwordError}</p>
+                  </div>
+                )}
+                
+                {passwordSuccess && (
+                  <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-4 text-green-700">
+                    <p>{passwordSuccess}</p>
+                  </div>
+                )}
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Current Password *</label>
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">New Password *</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                    required
+                    minLength={6}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Password must be at least 6 characters long
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password *</label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <button
+                    type="button"
+                    onClick={handleChangePassword}
+                    disabled={loading || !currentPassword || !newPassword || !confirmPassword}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50"
+                  >
+                    {loading ? 'Changing...' : 'Change Password'}
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {/* Save button (only for some tabs) */}
+            {(activeTab === 'shop' || activeTab === 'bank' || activeTab === 'financial') && (
+              <div className="mt-8 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleSaveSettings}
+                  disabled={loading || !shopName}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50"
+                >
+                  {loading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Saving...
+                    </>
+                  ) : 'Save Settings'}
+                </button>
               </div>
             )}
           </div>
