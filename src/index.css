@@ -108,17 +108,7 @@ button:focus-visible {
   overflow: hidden;
 }
 
-.mobile-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem 1rem;
-  background-color: white;
-  border-bottom: 1px solid #e5e7eb;
-  position: sticky;
-  top: 0;
-  z-index: 20;
-}
+/* .mobile-header class removed as it is no longer used */
 
 .mobile-content {
   flex: 1;
@@ -194,7 +184,7 @@ button:focus-visible {
   /* Ensure the app takes full height on mobile */
   body,
   #root,
-  .App {
+  .App { /* .App class might not be used, ensure this selector is correct */
     height: 100%;
     overflow: hidden;
   }
@@ -203,7 +193,7 @@ button:focus-visible {
 /* Floating action button for mobile */
 .mobile-fab {
   position: fixed;
-  bottom: 5.5rem;
+  bottom: 8.5rem; /* Adjusted to be above the 2-row bottom nav */
   right: 1rem;
   width: 3.5rem;
   height: 3.5rem;
