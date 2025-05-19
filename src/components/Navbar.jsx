@@ -9,7 +9,7 @@ const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const navScrollRef = useRef(null);
+  const bottomNavRef = useRef(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -24,51 +24,29 @@ const Navbar = () => {
     return () => unsubscribe();
   }, []);
 
-  // Save scroll position when user scrolls the navbar
-  const handleNavScroll = () => {
-    if (navScrollRef.current) {
-      localStorage.setItem('navScrollPosition', navScrollRef.current.scrollLeft);
-    }
-  };
-
-  // Restore scroll position when component mounts or route changes
+  // Save scroll position on unmount and restore it when component loads
   useEffect(() => {
-    if (navScrollRef.current) {
-      const savedPosition = localStorage.getItem('navScrollPosition');
-      if (savedPosition) {
-        navScrollRef.current.scrollLeft = parseInt(savedPosition, 10);
-      } else {
-        // Set default position based on current route
-        setScrollPositionForCurrentRoute();
+    // Restore scroll position on component mount
+    if (bottomNavRef.current) {
+      const savedScrollLeft = localStorage.getItem('bottomNavScrollPosition');
+      if (savedScrollLeft) {
+        bottomNavRef.current.scrollLeft = parseInt(savedScrollLeft, 10);
       }
     }
+
+    // Save scroll position when path changes or component unmounts
+    return () => {
+      if (bottomNavRef.current) {
+        localStorage.setItem('bottomNavScrollPosition', bottomNavRef.current.scrollLeft);
+      }
+    };
   }, [location.pathname]);
 
-  // Set scroll position based on the current route
-  const setScrollPositionForCurrentRoute = () => {
-    if (!navScrollRef.current) return;
-    
-    // Determine which button should be visible based on current route
-    const buttons = navScrollRef.current.querySelectorAll('button');
-    const buttonWidth = 80; // Approximate width of each button
-    
-    let targetIndex = 0;
-    
-    if (location.pathname === '/dashboard') targetIndex = 0;
-    else if (location.pathname.startsWith('/orders')) targetIndex = 1;
-    else if (location.pathname === '/customers') targetIndex = 2;
-    else if (location.pathname.startsWith('/sales')) targetIndex = 3;
-    else if (location.pathname.startsWith('/purchases')) targetIndex = 4;
-    else if (location.pathname === '/transactions') targetIndex = 5;
-    else if (location.pathname === '/ledger') targetIndex = 6;
-    else if (location.pathname === '/gst-returns') targetIndex = 7;
-    else if (location.pathname === '/settings') targetIndex = 8;
-    
-    // Calculate the scroll position
-    navScrollRef.current.scrollLeft = Math.max(0, (targetIndex * buttonWidth) - 40);
-    
-    // Save this position
-    localStorage.setItem('navScrollPosition', navScrollRef.current.scrollLeft);
+  // Handle scroll events to save position
+  const handleNavScroll = () => {
+    if (bottomNavRef.current) {
+      localStorage.setItem('bottomNavScrollPosition', bottomNavRef.current.scrollLeft);
+    }
   };
 
   const handleLogout = async () => {
@@ -368,7 +346,7 @@ const Navbar = () => {
 
       {/* Mobile Bottom Navigation */}
       <div className="mobile-bottom-nav mobile-only">
-        <div className="overflow-x-auto" ref={navScrollRef} onScroll={handleNavScroll}>
+        <div className="overflow-x-auto" ref={bottomNavRef} onScroll={handleNavScroll}>
           <div className="flex space-x-1 p-2 min-w-max">
             <button
               onClick={() => navigate('/dashboard')}

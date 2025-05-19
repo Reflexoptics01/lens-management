@@ -867,10 +867,10 @@ const Settings = () => {
   };
   
   return (
-    <div className="bg-slate-50 min-h-screen flex flex-col settings-page">
+    <div className="flex flex-col min-h-screen bg-slate-50">
       <Navbar />
       
-      <div className="container mx-auto px-4 py-6 flex-grow">
+      <div className="flex-grow p-4 pb-24">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
         
         {error && (
@@ -1421,31 +1421,52 @@ const Settings = () => {
                 </div>
               </div>
             )}
-            
-            {/* Save button (only for some tabs) */}
-            {(activeTab === 'shop' || activeTab === 'bank' || activeTab === 'financial') && (
-              <div className="mt-8 flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleSaveSettings}
-                  disabled={loading || !shopName}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50"
-                >
-                  {loading ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Saving...
-                    </>
-                  ) : 'Save Settings'}
-                </button>
-              </div>
-            )}
           </div>
         </div>
+        
+        {/* Backup & Restore tab */}
+        {activeTab === 'backup' && (
+          <div className="mt-8 border-t border-gray-200 pt-8">
+            <h3 className="text-lg font-medium text-red-600">Danger Zone</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Actions here can result in permanent data loss. Proceed with caution.
+            </p>
+            <div className="mt-4">
+              <button
+                onClick={handleClearAllData}
+                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                disabled={loading}
+              >
+                {loading ? 'Processing...' : 'Clear All Data'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+      
+      {/* Floating Save Button - only shown for tabs that need saving */}
+      {(activeTab === 'shop' || activeTab === 'bank' || activeTab === 'financial') && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-lg z-30 mb-[65px]">
+          <div className="max-w-6xl mx-auto">
+            <button
+              type="button"
+              onClick={handleSaveSettings}
+              disabled={loading || !shopName}
+              className="w-full sm:w-auto sm:ml-auto flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50"
+            >
+              {loading ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Saving...
+                </>
+              ) : 'Save Settings'}
+            </button>
+          </div>
+        </div>
+      )}
       
       {showFinancialYearModal && (
         <FinancialYearModal />
@@ -1454,24 +1475,6 @@ const Settings = () => {
       {showFinancialYearEndModal && (
         <FinancialYearEndModal />
       )}
-      
-      {/* Add this button to the render section, inside the Settings UI, 
-        likely near the backup and restore features */}
-      <div className="mt-8 border-t border-gray-200 pt-8">
-        <h3 className="text-lg font-medium text-red-600">Danger Zone</h3>
-        <p className="mt-1 text-sm text-gray-500">
-          Actions here can result in permanent data loss. Proceed with caution.
-        </p>
-        <div className="mt-4">
-          <button
-            onClick={handleClearAllData}
-            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-            disabled={loading}
-          >
-            {loading ? 'Processing...' : 'Clear All Data'}
-          </button>
-        </div>
-      </div>
     </div>
   );
 };
