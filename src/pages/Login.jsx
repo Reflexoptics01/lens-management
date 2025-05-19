@@ -10,7 +10,31 @@ const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
+  const [currentSlide, setCurrentSlide] = useState(0);
   const navigate = useNavigate();
+
+  const slides = [
+    { 
+      image: '/images/1.png', 
+      title: 'Complete Optical Business Solutions', 
+      description: 'Comprehensive software for billing, CRM, and lens management tailored for optical businesses'
+    },
+    { 
+      image: '/images/2.png', 
+      title: 'Website & E-commerce Development', 
+      description: 'Custom optical websites with integrated e-commerce and affordable hosting solutions'
+    },
+    { 
+      image: '/images/3.png', 
+      title: 'Custom Lens Brand Development', 
+      description: 'End-to-end support to establish and grow your own lens brand with our management platform'
+    },
+    { 
+      image: '/images/4.png', 
+      title: 'Franchise Management Software', 
+      description: 'Streamlined operations for manufacturers, distributors, and retailers in the optical industry'
+    },
+  ];
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -22,6 +46,14 @@ const Login = () => {
 
     return () => unsubscribe();
   }, [navigate]);
+
+  // Slideshow automation
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev === slides.length - 1 ? 0 : prev + 1));
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -57,72 +89,179 @@ const Login = () => {
 
   if (initializing) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-xl text-gray-600">Loading...</div>
+      <div className="min-h-screen bg-gradient-to-r from-gray-800 to-gray-900 flex items-center justify-center">
+        <div className="text-xl text-white">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-lg shadow-md">
-        <div>
-          <h1 className="text-center text-4xl font-bold text-[#4169E1] mb-4 tracking-tight">
-            PRISM OPTICAL ENTERPRISES
-          </h1>
-          <h2 className="mt-6 text-center text-2xl font-semibold text-gray-900 tracking-tight">
-            Sign in to your account
-          </h2>
+    <div className="min-h-screen bg-gradient-to-r from-gray-900 to-black flex flex-col md:flex-row overflow-hidden">
+      {/* Left Section - Login Form */}
+      <div className="w-full md:w-5/12 flex items-center justify-center p-6 md:p-12 z-10">
+        <div className="w-full max-w-md backdrop-blur-xl bg-white bg-opacity-10 p-8 rounded-2xl shadow-2xl border border-gray-700 border-opacity-40">
+          <div className="mb-6">
+            <h2 className="text-center text-xl font-medium text-gray-200">
+              Sign in to your account
+            </h2>
+          </div>
+          
+          <form className="space-y-6" onSubmit={handleLogin}>
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
+                  Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  className="w-full px-4 py-3 bg-gray-800 bg-opacity-50 border border-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
+                  Password
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  required
+                  className="w-full px-4 py-3 bg-gray-800 bg-opacity-50 border border-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {error && (
+              <div className="text-sm text-center font-medium text-red-400 bg-red-900 bg-opacity-20 py-2 px-3 rounded-lg">
+                {error}
+              </div>
+            )}
+
+            <div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="relative w-full flex justify-center py-3 px-4 rounded-lg text-white bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-all duration-300 overflow-hidden group"
+              >
+                <span className="relative z-10 font-medium text-sm tracking-wide">
+                  {loading ? 'Signing in...' : 'Sign In'}
+                </span>
+                <span className="absolute bottom-0 left-0 w-full h-full transform translate-y-full bg-gradient-to-r from-indigo-600 to-blue-700 transition-transform duration-300 ease-in-out group-hover:translate-y-0"></span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      {/* Right Section - Slideshow */}
+      <div className="hidden md:block md:w-7/12 relative overflow-hidden">
+        {/* Company header */}
+        <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black to-transparent py-8 px-8 z-30">
+          <div className="max-w-3xl mx-auto">
+            <h1 className="text-3xl font-bold text-white mb-2">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-500">
+                REFLEX OPTIC SOLUTIONS
+              </span>
+            </h1>
+            <h2 className="text-xl font-medium text-gray-200">
+              Empowering Optical Businesses
+            </h2>
+            <p className="text-sm text-gray-300 mt-1">
+              Affordable Solutions for Every Optical Business
+            </p>
+            
+            {/* Contact Info */}
+            <div className="mt-4 pt-3 border-t border-gray-700 border-opacity-40 flex flex-wrap justify-start items-center gap-4 text-white">
+              <a href="tel:+916361773719" className="flex items-center space-x-2 text-sm hover:text-blue-400 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+                <span>91 - 63617 73719</span>
+              </a>
+              <a href="mailto:Info@reflexoptics.in" className="flex items-center space-x-2 text-sm hover:text-blue-400 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                <span>Info@reflexoptics.in</span>
+              </a>
+              <a href="https://www.reflexoptics.in" target="_blank" rel="noopener noreferrer" className="flex items-center space-x-2 text-sm hover:text-blue-400 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                </svg>
+                <span>www.reflexoptics.in</span>
+              </a>
+            </div>
+          </div>
         </div>
         
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="email" className="sr-only">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-[#4169E1] focus:border-[#4169E1] focus:z-10 sm:text-sm"
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-[#4169E1] focus:border-[#4169E1] focus:z-10 sm:text-sm"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {error && (
-            <div className="text-sm text-center font-medium text-red-500">
-              {error}
-            </div>
-          )}
-
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2.5 px-4 border border-transparent text-sm font-semibold rounded-md text-white bg-[#4169E1] hover:bg-[#3154b3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4169E1] disabled:opacity-50 transition-colors duration-200"
+        {/* Overlay gradient */}
+        <div className="absolute inset-0 bg-gradient-to-l from-transparent to-black opacity-30 z-10"></div>
+        
+        {/* Slideshow Images */}
+        <div className="absolute inset-0 flex items-center justify-center z-0">
+          {slides.map((slide, index) => (
+            <div 
+              key={index}
+              className={`absolute w-full h-full max-w-3xl max-h-[650px] mx-auto transition-all duration-1000 ease-in-out ${
+                index === currentSlide 
+                  ? 'opacity-100 scale-100' 
+                  : 'opacity-0 scale-105'
+              }`}
             >
-              {loading ? 'Signing in...' : 'Sign In'}
-            </button>
+              <div className="w-full h-full flex items-center justify-center p-8">
+                <img 
+                  src={slide.image} 
+                  alt={slide.title} 
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        {/* Content Overlay */}
+        <div className="absolute bottom-16 left-12 right-12 z-20">
+          <div className="bg-black bg-opacity-30 backdrop-blur-sm p-6 rounded-xl border border-white border-opacity-10 transform transition-all duration-700 ease-out translate-y-0 opacity-100">
+            <h3 className="text-3xl font-bold text-white mb-2">
+              {slides[currentSlide].title}
+            </h3>
+            <div className="w-16 h-1 bg-gradient-to-r from-blue-400 to-indigo-500 mb-4"></div>
+            <p className="text-gray-200 mb-2">{slides[currentSlide].description}</p>
+            <div className="mt-4 flex flex-wrap items-center">
+              <span className="text-blue-300 text-sm font-semibold mr-2 mb-2">OUR SERVICES:</span>
+              <div className="flex flex-wrap gap-2">
+                <span className="px-2 py-1 bg-blue-900 bg-opacity-40 rounded text-xs text-white">Billing</span>
+                <span className="px-2 py-1 bg-blue-900 bg-opacity-40 rounded text-xs text-white">CRM</span>
+                <span className="px-2 py-1 bg-blue-900 bg-opacity-40 rounded text-xs text-white">E-commerce</span>
+                <span className="px-2 py-1 bg-blue-900 bg-opacity-40 rounded text-xs text-white">Applications</span>
+                <span className="px-2 py-1 bg-blue-900 bg-opacity-40 rounded text-xs text-white">Hosting</span>
+              </div>
+            </div>
           </div>
-        </form>
+        </div>
+
+        {/* Slideshow Navigation Dots */}
+        <div className="absolute bottom-6 left-0 right-0 flex justify-center space-x-3 z-20">
+          {slides.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentSlide(index)}
+              className={`w-12 h-1 rounded-full transition-all duration-300 ${
+                index === currentSlide 
+                  ? 'bg-gradient-to-r from-blue-400 to-indigo-500 w-16' 
+                  : 'bg-gray-400 bg-opacity-40'
+              }`}
+              aria-label={`Go to slide ${index + 1}`}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
