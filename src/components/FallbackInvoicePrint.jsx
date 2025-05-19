@@ -325,17 +325,36 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
       
       <div className="print-only">
         <div style={{ maxWidth: '800px', margin: '0 auto', fontSize: '12px' }}>
-          {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
-            <div>
-              <h1 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '5px' }}>
-                {shopSettings?.businessName || 'PRISM OPTICAL ENTERPRISES'}
-              </h1>
-              <p style={{ fontSize: '11px', marginBottom: '2px' }}>{formatAddress() || '#340, 1st floor Dr.Rajkumar road, 6th block, Rajajinagar Bengaluru'}</p>
-              {shopSettings?.phone && <p style={{ fontSize: '11px', marginBottom: '2px' }}>Phone: {shopSettings.phone}</p>}
-              {shopSettings?.email && <p style={{ fontSize: '11px', marginBottom: '2px' }}>Email: {shopSettings.email}</p>}
-              <p style={{ fontSize: '11px', marginBottom: '2px' }}>GSTIN: {shopSettings?.gstNumber || '29CLFPM4136F1Z2'}</p>
+          {/* Header with Logo */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              {/* Logo on the left */}
+              {(shopSettings?.logoDataURL || shopSettings?.logoUrl) && (
+                <div style={{ marginRight: '15px' }}>
+                  <img 
+                    src={shopSettings.logoDataURL || shopSettings.logoUrl} 
+                    alt="Business Logo" 
+                    style={{ 
+                      maxWidth: '80px', 
+                      maxHeight: '80px', 
+                      objectFit: 'contain'
+                    }} 
+                  />
+                </div>
+              )}
+              
+              {/* Business info */}
+              <div>
+                <h1 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '5px' }}>
+                  {shopSettings?.businessName || 'PRISM OPTICAL ENTERPRISES'}
+                </h1>
+                <p style={{ fontSize: '11px', marginBottom: '2px' }}>{formatAddress() || '#340, 1st floor Dr.Rajkumar road, 6th block, Rajajinagar Bengaluru'}</p>
+                {shopSettings?.phone && <p style={{ fontSize: '11px', marginBottom: '2px' }}>Phone: {shopSettings.phone}</p>}
+                {shopSettings?.email && <p style={{ fontSize: '11px', marginBottom: '2px' }}>Email: {shopSettings.email}</p>}
+                <p style={{ fontSize: '11px', marginBottom: '2px' }}>GSTIN: {shopSettings?.gstNumber || '29CLFPM4136F1Z2'}</p>
+              </div>
             </div>
+            
             <div>
               <h2 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '5px' }}>INVOICE</h2>
               <p style={{ fontSize: '11px', marginBottom: '2px' }}>#{saleData.invoiceNumber}</p>
@@ -478,17 +497,17 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
           </div>
           
           {/* Footer with Bank Details and UPI */}
-          <div style={{ marginTop: '20px', borderTop: '1px solid #ddd', paddingTop: '8px', fontSize: '11px' }}>
+          <div style={{ marginTop: '20px', borderTop: '1px solid #ddd', paddingTop: '12px', fontSize: '11px' }}>
             {/* Centered thank you message */}
-            <div style={{ width: '100%', textAlign: 'center', marginBottom: '10px' }}>
+            <div style={{ width: '100%', textAlign: 'center', marginBottom: '15px' }}>
               <p style={{ fontWeight: 'bold', fontSize: '12px' }}>Thank you for your business!</p>
             </div>
             
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '15px' }}>
               {/* Left side - Bank Details */}
-              <div style={{ maxWidth: '60%', textAlign: 'left' }}>
-                <div style={{ marginTop: '5px', border: '1px solid #ddd', padding: '5px', borderRadius: '2px' }}>
-                  <p style={{ fontWeight: 'bold', marginBottom: '5px', fontSize: '10px' }}>Bank Details</p>
+              <div style={{ flex: '3', textAlign: 'left' }}>
+                <div style={{ marginTop: '5px', border: '1px solid #ddd', padding: '8px', borderRadius: '4px', backgroundColor: '#f9f9f9' }}>
+                  <p style={{ fontWeight: 'bold', marginBottom: '5px', fontSize: '11px', color: '#333' }}>Bank Details</p>
                   
                   {/* Always show this section regardless of bankDetails being null */}
                   <table style={{ borderCollapse: 'collapse', width: '100%' }}>
@@ -496,40 +515,40 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
                       {/* Only show account name if it comes from settings */}
                       {displayBankDetails.accountName && (
                         <tr>
-                          <td style={{ padding: '1px 2px 1px 0', fontWeight: 'bold' }}>Account Name:</td>
-                          <td style={{ padding: '1px 0' }}>{displayBankDetails.accountName}</td>
+                          <td style={{ padding: '2px 5px 2px 0', fontWeight: 'bold', fontSize: '10px' }}>Account Name:</td>
+                          <td style={{ padding: '2px 0', fontSize: '10px' }}>{displayBankDetails.accountName}</td>
                         </tr>
                       )}
                       
                       {/* Only show bank name if it comes from settings */}
                       {displayBankDetails.bankName && (
                         <tr>
-                          <td style={{ padding: '1px 2px 1px 0', fontWeight: 'bold' }}>Bank Name:</td>
-                          <td style={{ padding: '1px 0' }}>{displayBankDetails.bankName}</td>
+                          <td style={{ padding: '2px 5px 2px 0', fontWeight: 'bold', fontSize: '10px' }}>Bank Name:</td>
+                          <td style={{ padding: '2px 0', fontSize: '10px' }}>{displayBankDetails.bankName}</td>
                         </tr>
                       )}
                       
                       {/* Only show account number if it comes from settings */}
                       {displayBankDetails.accountNumber && (
                         <tr>
-                          <td style={{ padding: '1px 2px 1px 0', fontWeight: 'bold' }}>Account Number:</td>
-                          <td style={{ padding: '1px 0' }}>{displayBankDetails.accountNumber}</td>
+                          <td style={{ padding: '2px 5px 2px 0', fontWeight: 'bold', fontSize: '10px' }}>Account Number:</td>
+                          <td style={{ padding: '2px 0', fontSize: '10px' }}>{displayBankDetails.accountNumber}</td>
                         </tr>
                       )}
                       
                       {/* Show branch if available */}
                       {(displayBankDetails.branchName || displayBankDetails.branch) && (
                         <tr>
-                          <td style={{ padding: '1px 2px 1px 0', fontWeight: 'bold' }}>Branch:</td>
-                          <td style={{ padding: '1px 0' }}>{displayBankDetails.branchName || displayBankDetails.branch}</td>
+                          <td style={{ padding: '2px 5px 2px 0', fontWeight: 'bold', fontSize: '10px' }}>Branch:</td>
+                          <td style={{ padding: '2px 0', fontSize: '10px' }}>{displayBankDetails.branchName || displayBankDetails.branch}</td>
                         </tr>
                       )}
                       
                       {/* Only show IFSC if it comes from settings */}
                       {displayBankDetails.ifscCode && (
                         <tr>
-                          <td style={{ padding: '1px 2px 1px 0', fontWeight: 'bold' }}>IFSC Code:</td>
-                          <td style={{ padding: '1px 0' }}>{displayBankDetails.ifscCode}</td>
+                          <td style={{ padding: '2px 5px 2px 0', fontWeight: 'bold', fontSize: '10px' }}>IFSC Code:</td>
+                          <td style={{ padding: '2px 0', fontSize: '10px' }}>{displayBankDetails.ifscCode}</td>
                         </tr>
                       )}
                       
@@ -551,16 +570,18 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
               </div>
               
               {/* Right side - UPI & QR Code */}
-              <div style={{ maxWidth: '35%', textAlign: 'center' }}>
+              <div style={{ flex: '2', textAlign: 'center' }}>
                 {/* Payment Information Box */}
-                <div style={{ border: '1px solid #ddd', padding: '5px', borderRadius: '2px' }}>
-                  <p style={{ fontWeight: 'bold', marginBottom: '5px', fontSize: '10px' }}>Payment Options</p>
+                <div style={{ border: '1px solid #ddd', padding: '8px', borderRadius: '4px', backgroundColor: '#f9f9f9' }}>
+                  <p style={{ fontWeight: 'bold', marginBottom: '5px', fontSize: '11px', color: '#333' }}>Payment Options</p>
                   
                   {/* Always show UPI if available */}
                   {(bankDetails?.upiId || displayBankDetails.upiId) && (
                     <div style={{ marginBottom: '5px' }}>
-                      <p style={{ fontWeight: 'bold', marginBottom: '2px', fontSize: '9px' }}>UPI Payment</p>
-                      <p style={{ fontSize: '8px' }}>{bankDetails?.upiId || displayBankDetails.upiId}</p>
+                      <p style={{ fontWeight: 'bold', marginBottom: '2px', fontSize: '10px' }}>UPI Payment</p>
+                      <p style={{ fontSize: '9px', padding: '2px', backgroundColor: '#eee', borderRadius: '2px' }}>
+                        {bankDetails?.upiId || displayBankDetails.upiId}
+                      </p>
                     </div>
                   )}
                   
@@ -571,6 +592,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
                       bankDetails?.qrCodeUrl || 
                       bankDetails?.qrCode || 
                       bankDetails?.qrcode || 
+                      shopSettings?.qrCodeDataURL ||  // Add support for the new data URL format
                       shopSettings?.qrCodeUrl || 
                       shopSettings?.qrCode || 
                       shopSettings?.qrcode;
@@ -579,12 +601,14 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
                     if (qrCodeUrl) {
                       return (
                         <div style={{ marginTop: '5px' }}>
-                          <p style={{ fontWeight: 'bold', marginBottom: '2px', fontSize: '9px' }}>Scan to Pay</p>
-                          <img 
-                            src={qrCodeUrl}
-                            alt="QR Code for payment" 
-                            style={{ maxWidth: '60px', height: 'auto', margin: '0 auto', border: '1px solid #eee', padding: '2px' }} 
-                          />
+                          <p style={{ fontWeight: 'bold', marginBottom: '3px', fontSize: '10px' }}>Scan QR Code to Pay</p>
+                          <div style={{ border: '1px solid #ddd', padding: '4px', borderRadius: '4px', backgroundColor: 'white', display: 'inline-block' }}>
+                            <img 
+                              src={qrCodeUrl}
+                              alt="QR Code for payment" 
+                              style={{ width: '90px', height: '90px', objectFit: 'contain' }} 
+                            />
+                          </div>
                         </div>
                       );
                     }
