@@ -15,11 +15,57 @@ const Purchases = () => {
   // State for print invoice modal
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [selectedPurchaseId, setSelectedPurchaseId] = useState(null);
+  const [printData, setPrintData] = useState(null);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   useEffect(() => {
     fetchPurchases();
     fetchVendors();
   }, []);
+
+  // Add print-specific styles when printing
+  useEffect(() => {
+    if (isPrinting) {
+      const originalTitle = document.title;
+      document.title = `Purchase Order - ${printData?.purchaseNumber || 'Print'}`;
+      
+      // Add the print-specific styles
+      const style = document.createElement('style');
+      style.id = 'print-styles';
+      style.innerHTML = `
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          #print-content, #print-content * {
+            visibility: visible;
+          }
+          #print-content {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+          }
+          @page {
+            size: A4;
+            margin: 10mm;
+          }
+        }
+      `;
+      document.head.appendChild(style);
+      
+      // Trigger print
+      window.print();
+      
+      // Clean up
+      return () => {
+        document.title = originalTitle;
+        const printStyles = document.getElementById('print-styles');
+        if (printStyles) printStyles.remove();
+        setIsPrinting(false);
+      };
+    }
+  }, [isPrinting, printData]);
 
   const fetchPurchases = async () => {
     try {
@@ -91,10 +137,74 @@ const Purchases = () => {
     return vendors.find(v => v.id === vendorId);
   };
 
-  const handlePrintPurchase = (e, purchaseId) => {
+  const handlePrintPurchase = async (e, purchaseId) => {
     e.stopPropagation();
-    setSelectedPurchaseId(purchaseId);
-    setShowPrintModal(true);
+    try {
+      // Fetch the full purchase data
+      const purchaseDoc = await getDoc(doc(db, 'purchases', purchaseId));
+      if (!purchaseDoc.exists()) {
+        console.error('Purchase not found');
+        return;
+      }
+      
+      const purchaseData = purchaseDoc.data();
+      
+      // Get vendor details
+      let vendorData = null;
+      if (purchaseData.vendorId) {
+        const vendorDoc = await getDoc(doc(db, 'customers', purchaseData.vendorId));
+        if (vendorDoc.exists()) {
+          vendorData = vendorDoc.data();
+        }
+      }
+      
+      // Set the print data
+      setPrintData({ 
+        ...purchaseData,
+        id: purchaseId,
+        displayId: purchases.find(p => p.id === purchaseId)?.displayId || purchaseId,
+        vendor: vendorData
+      });
+      
+      // Trigger printing
+      setIsPrinting(true);
+    } catch (error) {
+      console.error('Error preparing purchase for print:', error);
+    }
+  };
+
+  // Function to get tax label
+  const getTaxLabel = (taxId) => {
+    const TAX_OPTIONS = [
+      { id: 'TAX_FREE', label: 'Tax Free', rate: 0 },
+      { id: 'GST_6', label: 'GST 6%', rate: 6 },
+      { id: 'GST_12', label: 'GST 12%', rate: 12 },
+      { id: 'GST_18', label: 'GST 18%', rate: 18 },
+      { id: 'CGST_SGST_6', label: 'CGST/SGST 6%', rate: 6, split: true },
+      { id: 'CGST_SGST_12', label: 'CGST/SGST 12%', rate: 12, split: true },
+      { id: 'CGST_SGST_18', label: 'CGST/SGST 18%', rate: 18, split: true },
+      { id: 'IGST_6', label: 'IGST 6%', rate: 6 },
+      { id: 'IGST_12', label: 'IGST 12%', rate: 12 },
+      { id: 'IGST_18', label: 'IGST 18%', rate: 18 }
+    ];
+    const tax = TAX_OPTIONS.find(tax => tax.id === taxId);
+    return tax ? tax.label : 'No Tax';
+  };
+
+  // Get payment status badge
+  const getPaymentStatusText = (status) => {
+    if (!status) return 'Unknown';
+    
+    switch(status.toUpperCase()) {
+      case 'PAID':
+        return 'Paid';
+      case 'PARTIAL':
+        return 'Partially Paid';
+      case 'UNPAID':
+        return 'Unpaid';
+      default:
+        return status;
+    }
   };
 
   return (
@@ -335,13 +445,129 @@ const Purchases = () => {
         )}
       </div>
       
-      {/* Print Modal */}
+      {/* Print Modal - Only visible when showPrintModal is true */}
       {showPrintModal && (
         <PrintInvoiceModal
           invoiceId={selectedPurchaseId}
           onClose={() => setShowPrintModal(false)}
           isPurchase={true}
         />
+      )}
+
+      {/* Print Content - Hidden until print is triggered */}
+      {isPrinting && printData && (
+        <div id="print-content" className="hidden print:block p-8 max-w-full bg-white">
+          <div className="text-center border-b-2 border-gray-200 pb-4 mb-6">
+            <h1 className="text-2xl font-bold text-gray-900">PURCHASE ORDER</h1>
+            <p className="text-xl">{printData.displayId || `#${printData.purchaseNumber || 'N/A'}`}</p>
+          </div>
+          
+          <div className="flex justify-between mb-8">
+            <div>
+              <p className="text-gray-700 font-bold">Vendor:</p>
+              <p className="font-semibold text-gray-900">{printData.vendor?.opticalName || printData.vendorName || 'N/A'}</p>
+              {printData.vendor?.contactPerson && <p>{printData.vendor.contactPerson}</p>}
+              {printData.vendor?.address && <p>{printData.vendor.address}</p>}
+              {printData.vendor?.city && <p>{printData.vendor.city}{printData.vendor?.pincode ? `, ${printData.vendor.pincode}` : ''}</p>}
+              {printData.vendor?.phone && <p>Phone: {printData.vendor.phone}</p>}
+            </div>
+            <div className="text-right">
+              <p><span className="font-bold">Date: </span>{formatDate(printData.purchaseDate).date}</p>
+              <p><span className="font-bold">Invoice #: </span>{printData.vendorInvoiceNumber || 'N/A'}</p>
+              <p><span className="font-bold">Payment Status: </span>{getPaymentStatusText(printData.paymentStatus)}</p>
+            </div>
+          </div>
+          
+          <table className="w-full mb-8 border-collapse">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="border border-gray-300 px-4 py-2 text-left">Item</th>
+                <th className="border border-gray-300 px-4 py-2 text-center">Qty</th>
+                <th className="border border-gray-300 px-4 py-2 text-center">Unit</th>
+                <th className="border border-gray-300 px-4 py-2 text-right">Price</th>
+                <th className="border border-gray-300 px-4 py-2 text-right">Discount</th>
+                <th className="border border-gray-300 px-4 py-2 text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {printData.items?.length > 0 ? (
+                printData.items.map((item, index) => (
+                  <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="border border-gray-300 px-4 py-2">
+                      <div className="font-semibold">{item.itemName}</div>
+                      {item.description && <div className="text-sm text-gray-600">{item.description}</div>}
+                    </td>
+                    <td className="border border-gray-300 px-4 py-2 text-center">{item.qty}</td>
+                    <td className="border border-gray-300 px-4 py-2 text-center">{item.unit}</td>
+                    <td className="border border-gray-300 px-4 py-2 text-right">{formatCurrency(item.price)}</td>
+                    <td className="border border-gray-300 px-4 py-2 text-right">
+                      {item.itemDiscountType === 'percentage' 
+                        ? `${item.itemDiscount}%` 
+                        : formatCurrency(item.itemDiscount)}
+                    </td>
+                    <td className="border border-gray-300 px-4 py-2 text-right font-semibold">{formatCurrency(item.total)}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6" className="border border-gray-300 px-4 py-4 text-center text-gray-500">No items in this purchase</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          
+          <div className="flex justify-end mb-8">
+            <div className="w-64">
+              <div className="flex justify-between py-2">
+                <span className="font-semibold">Subtotal:</span>
+                <span>{formatCurrency(printData.subtotal)}</span>
+              </div>
+              
+              <div className="flex justify-between py-2 border-t border-gray-200">
+                <span className="font-semibold">Discount:</span>
+                <span>{formatCurrency(printData.discountAmount)}</span>
+              </div>
+              
+              <div className="flex justify-between py-2 border-t border-gray-200">
+                <span className="font-semibold">Tax ({getTaxLabel(printData.taxOption)}):</span>
+                <span>{formatCurrency(printData.taxAmount)}</span>
+              </div>
+              
+              <div className="flex justify-between py-2 border-t border-gray-200">
+                <span className="font-semibold">Freight:</span>
+                <span>{formatCurrency(printData.frieghtCharge)}</span>
+              </div>
+              
+              <div className="flex justify-between py-2 border-t-2 border-gray-900">
+                <span className="font-bold text-lg">Total:</span>
+                <span className="font-bold text-lg">{formatCurrency(printData.totalAmount)}</span>
+              </div>
+              
+              <div className="flex justify-between py-2 border-t border-gray-200">
+                <span className="font-semibold">Amount Paid:</span>
+                <span>{formatCurrency(printData.amountPaid)}</span>
+              </div>
+              
+              <div className="flex justify-between py-2 border-t border-gray-200">
+                <span className="font-semibold">Balance Due:</span>
+                <span className={printData.balance > 0 ? 'text-red-600 font-bold' : 'text-green-600 font-bold'}>
+                  {formatCurrency(printData.balance)}
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          {printData.notes && (
+            <div className="mt-6 border-t border-gray-200 pt-4">
+              <p className="font-bold">Notes:</p>
+              <p className="text-gray-700">{printData.notes}</p>
+            </div>
+          )}
+          
+          <div className="mt-16 pt-8 border-t border-gray-300 text-center text-sm text-gray-600">
+            <p>Thank you for your business</p>
+          </div>
+        </div>
       )}
     </div>
   );
