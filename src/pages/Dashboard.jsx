@@ -57,7 +57,6 @@ const Dashboard = () => {
   // Loading and error states
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [debugMode, setDebugMode] = useState(false);
   
   // Dashboard data states
   const [salesData, setSalesData] = useState({
@@ -76,9 +75,6 @@ const Dashboard = () => {
   const [topLensPowers, setTopLensPowers] = useState([]);
   const [monthlySales, setMonthlySales] = useState([]);
   
-  // Debug data
-  const [debugData, setDebugData] = useState(null);
-  
   useEffect(() => {
     // Check if we should show GST reminder (after 4th and before 10th of month)
     const today = new Date();
@@ -92,6 +88,20 @@ const Dashboard = () => {
     // Load dashboard data for initial view
     loadDashboardData(selectedDate);
   }, []);
+  
+  // Helper function to get a Firestore timestamp for a specific day
+  const getDayTimestamps = (date) => {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    return {
+      start: Timestamp.fromDate(startOfDay),
+      end: Timestamp.fromDate(endOfDay)
+    };
+  };
   
   // Handle date change
   const handleDateChange = (date) => {
@@ -114,7 +124,6 @@ const Dashboard = () => {
     try {
       setLoading(true);
       setError('');
-      setDebugData(null);
       
       // Parse the selected date
       const selectedDate = new Date(dateString);
@@ -137,62 +146,6 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
-  
-  // Debug function to inspect sales data
-  const fetchDebugData = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      
-      // Get recent sales for debugging
-      const salesRef = collection(db, 'sales');
-      const recentSalesQuery = query(
-        salesRef,
-        orderBy('invoiceDate', 'desc'),
-        limit(5)
-      );
-      
-      const salesSnapshot = await getDocs(recentSalesQuery);
-      
-      // Extract the actual data structure
-      const debugSalesData = salesSnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          invoiceDate: data.invoiceDate ? data.invoiceDate.toDate().toISOString() : null,
-          totalAmount: data.totalAmount,
-          items: data.items ? data.items.map(item => ({
-            productName: item.productName,
-            price: item.price,
-            quantity: item.quantity,
-            lensPower: item.lensPower
-          })) : []
-        };
-      });
-      
-      setDebugData(debugSalesData);
-      
-    } catch (error) {
-      console.error('Error fetching debug data:', error);
-      setError('Failed to load debug data: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  // Helper function to get a Firestore timestamp for a specific day
-  const getDayTimestamps = (date) => {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-    
-    return {
-      start: Timestamp.fromDate(startOfDay),
-      end: Timestamp.fromDate(endOfDay)
-    };
   };
   
   // Fetch sales for today, same day last month, and same day last year
@@ -394,16 +347,6 @@ const Dashboard = () => {
       const salesSnapshot = await getDocs(salesQuery);
       console.log('Found sales documents:', salesSnapshot.docs.length);
       
-      // Debug: Check sales structure
-      if (salesSnapshot.docs.length > 0) {
-        const sampleSale = salesSnapshot.docs[0].data();
-        console.log('Sample sale structure:', JSON.stringify({
-          invoiceDate: sampleSale.invoiceDate ? 'Timestamp object' : 'missing',
-          items: Array.isArray(sampleSale.items) ? `Array with ${sampleSale.items.length} items` : 'missing or not an array',
-          sampleItem: sampleSale.items && sampleSale.items.length > 0 ? sampleSale.items[0] : 'No items'
-        }, null, 2));
-      }
-      
       // Product frequency map
       const productCounts = {};
       const productRevenue = {};
@@ -419,29 +362,24 @@ const Dashboard = () => {
           return;
         }
         
-        console.log(`Processing sale ${doc.id}, date: ${saleDate}, items: ${sale.items?.length || 0}`);
-        
         if (sale.items && Array.isArray(sale.items)) {
           sale.items.forEach(item => {
-            // Debug: Log individual item
-            console.log(`Item: ${item.productName || 'Unknown'}, Price: ${item.price}, Qty: ${item.quantity}, Power: ${item.lensPower || 'N/A'}`);
-            
-            // Count product frequencies
-            const productName = item.productName || 'Unknown Product';
+            // Count product frequencies - use itemName instead of productName
+            const productName = item.itemName || 'Unknown Product';
             if (!productCounts[productName]) {
               productCounts[productName] = 0;
               productRevenue[productName] = 0;
             }
-            productCounts[productName] += item.quantity || 1;
-            productRevenue[productName] += (item.price * item.quantity) || 0;
+            productCounts[productName] += parseInt(item.qty) || 1;
+            productRevenue[productName] += (parseFloat(item.price) * (parseInt(item.qty) || 1)) || 0;
             
-            // Count lens power frequencies
-            if (item.lensPower) {
-              const power = item.lensPower.toString();
+            // Count lens power frequencies - use SPH value as primary lens power
+            if (item.sph) {
+              const power = item.sph.toString();
               if (!powerCounts[power]) {
                 powerCounts[power] = 0;
               }
-              powerCounts[power] += item.quantity || 1;
+              powerCounts[power] += parseInt(item.qty) || 1;
             }
           });
         }
@@ -577,36 +515,9 @@ const Dashboard = () => {
               <span className="text-sm text-gray-500 mr-2">
                 {loading ? 'Loading data...' : 'Data updated'}
               </span>
-              <button
-                onClick={() => {
-                  setDebugMode(!debugMode);
-                  if (!debugMode) fetchDebugData();
-                }}
-                className="ml-2 text-xs bg-gray-100 hover:bg-gray-200 text-gray-800 py-1 px-2 rounded"
-              >
-                {debugMode ? 'Hide Debug' : 'Debug Data'}
-              </button>
             </div>
           </div>
         </div>
-        
-        {/* Debug data display */}
-        {debugMode && debugData && (
-          <div className="mb-4 p-4 bg-gray-50 rounded-lg shadow overflow-hidden">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Debug Data (Recent Sales)</h3>
-            <div className="bg-white p-3 rounded overflow-x-auto text-xs">
-              <pre>{JSON.stringify(debugData, null, 2)}</pre>
-            </div>
-            <div className="mt-3 text-xs text-gray-500">
-              <p>Quick tips:</p>
-              <ul className="list-disc pl-5 mt-1 space-y-1">
-                <li>Check if the "items" array exists and contains products</li>
-                <li>Verify that products have "productName", "price", and "quantity" fields</li>
-                <li>For lens powers, check if the "lensPower" field exists on items</li>
-              </ul>
-            </div>
-          </div>
-        )}
         
         {/* Error message */}
         {error && (
@@ -926,7 +837,7 @@ const Dashboard = () => {
             <div className="bg-white rounded-lg shadow overflow-hidden">
               <div className="px-4 py-3 bg-indigo-50 border-b border-indigo-100">
                 <h3 className="text-sm font-medium text-indigo-800">
-                  Popular Lens Powers ({timeframe === 'yearly' ? 'Year' : timeframe === 'quarterly' ? 'Quarter' : 'Month'})
+                  Popular SPH Powers ({timeframe === 'yearly' ? 'Year' : timeframe === 'quarterly' ? 'Quarter' : 'Month'})
                 </h3>
               </div>
               <div className="p-4">
@@ -953,8 +864,8 @@ const Dashboard = () => {
                   </ResponsiveContainer>
                 ) : (
                   <div className="text-center py-8">
-                    <p className="text-gray-500">No lens power data available for this period</p>
-                    <p className="text-sm text-gray-400 mt-2">Make sure you have sales with lens powers in the selected date range</p>
+                    <p className="text-gray-500">No SPH power data available for this period</p>
+                    <p className="text-sm text-gray-400 mt-2">Make sure you have sales with SPH values in the selected date range</p>
                   </div>
                 )}
               </div>
