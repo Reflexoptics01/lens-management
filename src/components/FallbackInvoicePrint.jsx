@@ -128,9 +128,10 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
         
         // If autoPrint is true, trigger the print dialog after data is loaded
         if (autoPrint) {
+          // Allow more time for all images and resources to load
           setTimeout(() => {
-            window.print();
-          }, 800);
+            handlePrint();
+          }, 1200);
         }
       } catch (err) {
         console.error('Error:', err);
@@ -141,6 +142,73 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
 
     fetchData();
   }, [saleId, onClose, autoPrint]);
+
+  // Add print handler function
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      console.error("Couldn't open print window. Make sure popup blocker is disabled.");
+      alert("Please allow popups to print the invoice.");
+      return;
+    }
+
+    // Get the HTML content of the print-only div
+    const content = document.querySelector('.print-only');
+    if (!content) {
+      console.error("Print content not found");
+      return;
+    }
+
+    // Write to the new window
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Invoice #${saleData?.invoiceNumber || 'Print'}</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 0;
+              padding: 20px;
+              background-color: white;
+            }
+            table {
+              border-collapse: collapse;
+              width: 100%;
+            }
+            th, td {
+              border: 1px solid #ddd;
+              padding: 4px;
+            }
+            @media print {
+              @page {
+                margin: 10mm;
+              }
+              body {
+                margin: 0;
+                padding: 0;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          ${content.innerHTML}
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    
+    // Wait for images to load before printing
+    printWindow.addEventListener('load', () => {
+      printWindow.focus();
+      printWindow.print();
+      // Uncomment this line if you want to close the print window after printing:
+      // printWindow.addEventListener('afterprint', () => printWindow.close());
+    });
+  };
 
   // Format currency
   const formatCurrency = (amount) => {
@@ -271,7 +339,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
         <h2 className="text-xl font-bold">Invoice #{saleData.invoiceNumber}</h2>
         <div className="flex space-x-2">
           <button 
-            onClick={() => window.print()} 
+            onClick={handlePrint} 
             className="px-4 py-2 bg-blue-600 text-white rounded flex items-center"
           >
             <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { auth, db } from '../firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import React from 'react';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -304,20 +305,28 @@ const Navbar = () => {
     <>
       {/* Mobile Navbar */}
       <nav className="mobile-header mobile-only bg-white shadow-md z-50">
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="p-2 -ml-2 text-gray-600 hover:text-indigo-600 transition-colors duration-300"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-            <div className="transform transition-transform hover:scale-105 duration-300">
-              {renderLogoOrInitial()}
-            </div>
-          </div>
+        <div className="flex items-center justify-between px-4 py-2">
+          <button
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            className="p-2 text-gray-600 hover:text-indigo-600 transition-colors duration-300"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          
+          <h2 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-600">
+            {shopName || 'Lens Management'}
+          </h2>
+          
+          <button
+            onClick={handleLogout}
+            className="p-2 text-red-600 hover:text-red-700 transition-colors duration-300 flex items-center"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </button>
         </div>
       </nav>
 
@@ -330,17 +339,20 @@ const Navbar = () => {
           />
           <div className="fixed inset-y-0 left-0 w-72 bg-white shadow-xl transform transition-all duration-300 ease-in-out rounded-r-2xl">
             <div className="flex flex-col h-full">
-              <div className="p-6 border-b flex items-center space-x-4">
-                <div className="transform transition-transform hover:scale-105 duration-300">
-                  {renderLogoOrInitial()}
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-600">
-                    Menu
-                  </h2>
-                </div>
+              <div className="p-4 border-b flex items-center justify-between">
+                <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-600">
+                  Menu
+                </h2>
+                <button
+                  onClick={() => setIsMenuOpen(false)}
+                  className="p-1.5 text-gray-600 hover:text-indigo-600 transition-colors duration-300 rounded-full hover:bg-gray-100"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-              <div className="flex-1 overflow-y-auto py-4">
+              <div className="flex-1 overflow-y-auto py-2">
                 <div className="space-y-1 px-3">
                   {getAccessibleMenuItems().map((item) => (
                     <button
@@ -349,7 +361,7 @@ const Navbar = () => {
                         handleNavigation(item.path);
                         setIsMenuOpen(false);
                       }}
-                      className={`w-full px-4 py-3 text-left rounded-xl flex items-center space-x-3 transform transition-all duration-300 hover:scale-105 ${
+                      className={`w-full px-3 py-2.5 text-left rounded-xl flex items-center space-x-3 transform transition-all duration-300 hover:scale-105 ${
                         location.pathname === item.path || location.pathname.startsWith(item.path + '/')
                           ? `bg-gradient-to-r ${item.color} text-white shadow-md` 
                           : 'text-gray-700 hover:bg-gray-50'
@@ -360,9 +372,9 @@ const Navbar = () => {
                           ? 'text-white'
                           : `text-transparent bg-clip-text bg-gradient-to-r ${item.color}`
                       }`}>
-                        {item.icon}
+                        {React.cloneElement(item.icon, { className: 'w-5 h-5' })}
                       </div>
-                      <span>{item.title}</span>
+                      <span className="text-sm">{item.title}</span>
                     </button>
                   ))}
                 </div>
@@ -370,12 +382,12 @@ const Navbar = () => {
               <div className="p-4 border-t">
                 <button
                   onClick={handleLogout}
-                  className="w-full px-3 py-2 text-left rounded-xl flex items-center space-x-2 text-red-600 hover:bg-red-50 transform transition-all duration-300 hover:scale-105"
+                  className="w-full px-3 py-2.5 text-left rounded-xl flex items-center space-x-3 text-red-600 hover:bg-red-50 transform transition-all duration-300 hover:scale-105"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                   </svg>
-                  <span className="text-xs">Sign out</span>
+                  <span className="text-sm font-medium">Sign out</span>
                 </button>
               </div>
             </div>
@@ -442,19 +454,18 @@ const Navbar = () => {
       {/* Mobile Bottom Navigation */}
       <div className="mobile-bottom-nav mobile-only fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
         <div className="overflow-x-auto scrollbar-hide" ref={bottomNavRef} onScroll={handleNavScroll}>
-          <div className="flex p-2 min-w-max">
+          <div className="flex p-1 min-w-max">
             {getAccessibleMenuItems().map((item) => (
               <button
                 key={item.path}
                 onClick={() => {
-                  // Add debugging and use the explicit handler
                   console.log('Bottom nav clicked:', item.path);
                   handleNavigation(item.path);
                 }}
-                data-path={item.path} // Add a data attribute for easier debugging
-                className="flex flex-col items-center justify-center py-3 px-4 min-w-[70px] relative transition-transform duration-300 hover:scale-110"
+                data-path={item.path}
+                className="flex flex-col items-center justify-center py-1.5 px-3 min-w-[60px] relative transition-transform duration-300 hover:scale-110"
               >
-                <div className={`p-2 rounded-full mb-1 ${
+                <div className={`p-1.5 rounded-full mb-1 ${
                   location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
                     ? 'bg-gradient-to-r ' + item.color + ' shadow-md animate-pulse' 
                     : 'bg-gray-100'
@@ -464,10 +475,10 @@ const Navbar = () => {
                       ? 'text-white' 
                       : 'text-gray-600'
                   }`}>
-                    {item.icon}
+                    {React.cloneElement(item.icon, { className: 'w-5 h-5' })}
                   </div>
                 </div>
-                <span className={`text-xs font-medium ${
+                <span className={`text-[10px] font-medium ${
                   location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
                     ? 'text-transparent bg-clip-text bg-gradient-to-r ' + item.color
                     : 'text-gray-600'
@@ -475,7 +486,7 @@ const Navbar = () => {
                   {item.shortTitle || item.title}
                 </span>
                 {(location.pathname === item.path || location.pathname.startsWith(item.path + '/')) && (
-                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-8 h-1 rounded-full bg-gradient-to-r animate-pulse shadow-md" style={{backgroundImage: `linear-gradient(to right, var(--tw-gradient-stops))`}} />
+                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-1 rounded-full bg-gradient-to-r animate-pulse shadow-md" style={{backgroundImage: `linear-gradient(to right, var(--tw-gradient-stops))`}} />
                 )}
               </button>
             ))}
@@ -519,11 +530,11 @@ const Navbar = () => {
             display: none;
           }
           .mobile-bottom-nav {
-            height: 90px;
+            height: 70px;
           }
           /* Add padding to bottom of the page content to prevent content from being hidden behind the navbar */
           main {
-            padding-bottom: 90px;
+            padding-bottom: 70px;
           }
         }
         

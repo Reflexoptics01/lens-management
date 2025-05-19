@@ -59,6 +59,9 @@ const LensInventory = () => {
   // Add tab state
   const [activeTab, setActiveTab] = useState('rx'); // 'rx', 'stock', or 'contact'
   
+  // Add view mode state (table or card)
+  const [viewMode, setViewMode] = useState(window.innerWidth < 768 ? 'card' : 'table');
+  
   // Lens specifications (common for all prescriptions)
   const [lensSpecifications, setLensSpecifications] = useState({
     material: '',
@@ -102,6 +105,23 @@ const LensInventory = () => {
   useEffect(() => {
     fetchLensInventory();
   }, []);
+  
+  // Add window resize listener to switch view modes based on screen size
+  useEffect(() => {
+    const handleResize = () => {
+      // Switch to card view on small screens
+      if (window.innerWidth < 768 && viewMode === 'table') {
+        setViewMode('card');
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
+    // Cleanup function
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [viewMode]);
   
   useEffect(() => {
     // Filter lenses based on search term and active tab
@@ -585,19 +605,155 @@ const LensInventory = () => {
     };
   };
   
+  // Add a function to render mobile card view for lenses
+  const renderMobileCardView = () => {
+    if (loading) {
+      return (
+        <div className="flex justify-center items-center py-6">
+          <svg className="animate-spin h-6 w-6 text-sky-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span className="ml-2 text-sm text-gray-500">Loading inventory...</span>
+        </div>
+      );
+    }
+
+    if (filteredLenses.length === 0) {
+      return (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-4 rounded-r text-sm">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-xs text-yellow-700">
+                {searchTerm ? 'No lenses match your search criteria.' : 'No lenses in inventory yet. Add your first lens to get started!'}
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 gap-3">
+        {filteredLenses.map((lens, index) => (
+          <div key={lens.id} className={`p-3 rounded-lg border ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} shadow-sm`}>
+            <div className="flex justify-between items-center mb-2">
+              <div className="font-medium text-sky-600">
+                {lens.brandName || 'N/A'}
+              </div>
+              <div className="text-xs text-gray-500">
+                Qty: {lens.qty || '1'}
+              </div>
+            </div>
+
+            {/* RX lens details */}
+            {activeTab === 'rx' && (
+              <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                <div>
+                  <span className="text-gray-600 font-medium">Eye:</span>{' '}
+                  {lens.eye === 'right' ? 'Right' : lens.eye === 'left' ? 'Left' : lens.eye === 'both' ? 'Both' : 'N/A'}
+                </div>
+                <div>
+                  <span className="text-gray-600 font-medium">SPH:</span> {lens.sph || 'N/A'}
+                </div>
+                <div>
+                  <span className="text-gray-600 font-medium">CYL:</span> {lens.cyl || 'N/A'}
+                </div>
+                <div>
+                  <span className="text-gray-600 font-medium">AXIS:</span> {lens.axis || 'N/A'}
+                </div>
+                <div>
+                  <span className="text-gray-600 font-medium">ADD:</span> {lens.add || 'N/A'}
+                </div>
+                <div>
+                  <span className="text-gray-600 font-medium">Material:</span> {lens.material || 'N/A'}
+                </div>
+                <div>
+                  <span className="text-gray-600 font-medium">Index:</span> {lens.index || 'N/A'}
+                </div>
+              </div>
+            )}
+
+            {/* Stock lens details */}
+            {activeTab === 'stock' && (
+              <div className="grid grid-cols-1 gap-2 text-xs mb-3">
+                <div>
+                  <span className="text-gray-600 font-medium">Power Series:</span> {lens.powerSeries || 'N/A'}
+                </div>
+              </div>
+            )}
+
+            {/* Contact lens details */}
+            {activeTab === 'contact' && (
+              <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                <div>
+                  <span className="text-gray-600 font-medium">Power Series:</span> {lens.powerSeries || 'N/A'}
+                </div>
+                <div>
+                  <span className="text-gray-600 font-medium">Category:</span> {lens.category || 'N/A'}
+                </div>
+                <div>
+                  <span className="text-gray-600 font-medium">Type:</span> {lens.contactType || 'N/A'}
+                </div>
+                <div>
+                  <span className="text-gray-600 font-medium">Color:</span> {lens.color || 'N/A'}
+                </div>
+                <div>
+                  <span className="text-gray-600 font-medium">Disposal:</span> {lens.disposalFrequency || 'N/A'}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-between items-center text-xs">
+              <div>
+                <div>
+                  <span className="text-gray-600 font-medium">Purchase:</span>{' '}
+                  {lens.purchasePrice ? `₹${parseFloat(lens.purchasePrice).toFixed(2)}` : 'N/A'}
+                </div>
+                <div>
+                  <span className="text-gray-600 font-medium">Sale:</span>{' '}
+                  {lens.salePrice ? `₹${parseFloat(lens.salePrice).toFixed(2)}` : 'N/A'}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleEditLens(lens)}
+                  className="text-sky-600 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 px-2 py-1 rounded text-xs"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => removeLens(lens.id)}
+                  className="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-2 py-1 rounded text-xs"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
       <Navbar />
       
-      <main className="flex-grow px-4 py-6 max-w-7xl mx-auto w-full">
-        <div className="mb-8">
-          <div className="flex justify-between items-center mb-2">
-            <h1 className="text-2xl font-bold text-gray-900">Lens Inventory</h1>
-            <div className="flex space-x-3">
+      <main className="flex-grow px-2 sm:px-4 py-4 sm:py-6 max-w-7xl mx-auto w-full">
+        <div className="mb-4 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-2">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-0">Lens Inventory</h1>
+            <div className="flex flex-wrap gap-2">
               {(showAddForm || showStockLensForm || showContactLensForm) ? (
                 <button
                   onClick={resetForms}
-                  className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 focus:outline-none shadow-sm transition-colors"
+                  className="px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 focus:outline-none shadow-sm transition-colors text-sm w-full sm:w-auto"
                 >
                   Cancel
                 </button>
@@ -610,7 +766,7 @@ const LensInventory = () => {
                       setShowContactLensForm(false);
                       setActiveSection('addLens');
                     }}
-                    className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 focus:outline-none shadow-sm transition-colors"
+                    className="px-3 py-1.5 sm:px-4 sm:py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 focus:outline-none shadow-sm transition-colors text-sm flex-1 sm:flex-none"
                   >
                     Add RX Lens
                   </button>
@@ -621,7 +777,7 @@ const LensInventory = () => {
                       setShowContactLensForm(false);
                       setActiveSection('addStockLens');
                     }}
-                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 focus:outline-none shadow-sm transition-colors"
+                    className="px-3 py-1.5 sm:px-4 sm:py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 focus:outline-none shadow-sm transition-colors text-sm flex-1 sm:flex-none"
                   >
                     Add Stock Lens
                   </button>
@@ -632,13 +788,13 @@ const LensInventory = () => {
                       setShowStockLensForm(false);
                       setActiveSection('addContactLens');
                     }}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:outline-none shadow-sm transition-colors"
+                    className="px-3 py-1.5 sm:px-4 sm:py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:outline-none shadow-sm transition-colors text-sm flex-1 sm:flex-none"
                   >
                     Add Contact Lens
                   </button>
                   <button
                     onClick={() => navigate('/lens-inventory-report')}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none shadow-sm transition-colors"
+                    className="px-3 py-1.5 sm:px-4 sm:py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none shadow-sm transition-colors text-sm flex-1 sm:flex-none"
                   >
                     Inventory Report
                   </button>
@@ -649,7 +805,7 @@ const LensInventory = () => {
         </div>
         
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-400 text-red-700 rounded-r-md shadow-sm">
+          <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border-l-4 border-red-400 text-red-700 rounded-r-md shadow-sm text-sm">
             <p>{error}</p>
           </div>
         )}
@@ -686,37 +842,37 @@ const LensInventory = () => {
         
         {/* Inventory Table Section */}
         {(!showAddForm && !showStockLensForm && !showContactLensForm) && (
-          <div className={sectionClassName}>
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex space-x-2">
+          <div className={`${sectionClassName} p-3 sm:p-6`}>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-3">
+              <div className="flex flex-wrap gap-1 sm:gap-2 overflow-x-auto pb-1">
                 <button
                   onClick={() => setActiveTab('rx')}
-                  className={`${tabClassName} ${activeTab === 'rx' ? activeTabClassName : inactiveTabClassName}`}
+                  className={`${tabClassName} ${activeTab === 'rx' ? activeTabClassName : inactiveTabClassName} text-xs sm:text-sm`}
                 >
                   RX Lenses
                 </button>
                 <button
                   onClick={() => setActiveTab('stock')}
-                  className={`${tabClassName} ${activeTab === 'stock' ? activeTabClassName : inactiveTabClassName}`}
+                  className={`${tabClassName} ${activeTab === 'stock' ? activeTabClassName : inactiveTabClassName} text-xs sm:text-sm`}
                 >
                   Stock Lenses
                 </button>
                 <button
                   onClick={() => setActiveTab('contact')}
-                  className={`${tabClassName} ${activeTab === 'contact' ? activeTabClassName : inactiveTabClassName}`}
+                  className={`${tabClassName} ${activeTab === 'contact' ? activeTabClassName : inactiveTabClassName} text-xs sm:text-sm`}
                 >
                   Contact Lenses
                 </button>
               </div>
               
-              <div className="flex space-x-3">
-                <div className="relative">
+              <div className="flex flex-col sm:flex-row sm:space-x-3 gap-2 sm:gap-0">
+                <div className="relative w-full sm:w-auto">
                   <input
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Search lens inventory..."
-                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-sky-500 focus:border-sky-500"
+                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-sky-500 focus:border-sky-500 w-full text-sm"
                   />
                   <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -724,161 +880,190 @@ const LensInventory = () => {
                     </svg>
                   </div>
                 </div>
-                <button
-                  onClick={fetchLensInventory}
-                  className="flex items-center text-sm text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 px-3 py-1 rounded-md"
-                >
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh
-                </button>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={fetchLensInventory}
+                    className="flex items-center justify-center text-sm text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 px-3 py-1 rounded-md sm:ml-2"
+                  >
+                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Refresh
+                  </button>
+                  <button
+                    onClick={() => setViewMode(viewMode === 'table' ? 'card' : 'table')}
+                    className="flex items-center justify-center text-sm text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 px-3 py-1 rounded-md"
+                  >
+                    {viewMode === 'table' ? (
+                      <>
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                        </svg>
+                        Card View
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M3 14h18M3 6h18M3 18h18" />
+                        </svg>
+                        Table View
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
             
-            {filteredLenses.length === 0 && !loading ? (
-              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4 rounded-r">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-yellow-700">
-                      {searchTerm ? 'No lenses match your search criteria.' : 'No lenses in inventory yet. Add your first lens to get started!'}
-                    </p>
-                  </div>
-                </div>
-              </div>
+            {/* Render card view on mobile or when card view is selected */}
+            {(viewMode === 'card') ? (
+              renderMobileCardView()
             ) : (
-              <div className="overflow-x-auto shadow border-b border-gray-200 rounded-lg">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Brand</th>
-                      
-                      {/* Columns for RX lenses */}
-                      {activeTab === 'rx' && (
-                        <>
-                          <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Eye</th>
-                          <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SPH</th>
-                          <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CYL</th>
-                          <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AXIS</th>
-                          <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ADD</th>
-                          <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Material</th>
-                          <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Index</th>
-                        </>
-                      )}
-                      
-                      {/* Columns for Stock lenses */}
-                      {activeTab === 'stock' && (
-                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Power Series</th>
-                      )}
-                      
-                      {/* Columns for Contact lenses */}
-                      {activeTab === 'contact' && (
-                        <>
-                          <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Power Series</th>
-                          <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                          <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                          <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Color</th>
-                          <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Disposal</th>
-                        </>
-                      )}
-                      
-                      {/* Common columns for all lens types */}
-                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Purchase</th>
-                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sale</th>
-                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
-                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {loading ? (
-                      <tr>
-                        <td colSpan={activeTab === 'rx' ? 11 : activeTab === 'stock' ? 5 : activeTab === 'contact' ? 9 : 4} className="px-3 py-4 text-center">
-                          <div className="flex justify-center items-center">
-                            <svg className="animate-spin h-5 w-5 text-sky-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <span className="ml-2 text-sm text-gray-500">Loading inventory...</span>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredLenses.map((lens, index) => (
-                        <tr key={lens.id} className={index % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-gray-100'}>
-                          <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                            <a href={`/lens-inventory/${lens.id}`} className="text-sky-600 hover:text-sky-800 hover:underline">
-                              {lens.brandName || 'N/A'}
-                            </a>
-                          </td>
+              <>
+                {filteredLenses.length === 0 && !loading ? (
+                  <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 sm:p-4 mb-4 rounded-r text-sm">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-xs sm:text-sm text-yellow-700">
+                          {searchTerm ? 'No lenses match your search criteria.' : 'No lenses in inventory yet. Add your first lens to get started!'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto -mx-3 sm:mx-0 shadow border-b border-gray-200 rounded-lg">
+                    <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Brand</th>
                           
-                          {/* Conditional rendering for RX lens columns */}
+                          {/* Columns for RX lenses */}
                           {activeTab === 'rx' && (
                             <>
-                              <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900 font-medium">
-                                {lens.eye === 'right' ? 'Right' : lens.eye === 'left' ? 'Left' : lens.eye === 'both' ? 'Both' : 'N/A'}
-                              </td>
-                              <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">{lens.sph || 'N/A'}</td>
-                              <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">{lens.cyl || 'N/A'}</td>
-                              <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">{lens.axis || 'N/A'}</td>
-                              <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">{lens.add || 'N/A'}</td>
-                              <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">{lens.material || 'N/A'}</td>
-                              <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">{lens.index || 'N/A'}</td>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Eye</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SPH</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CYL</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AXIS</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ADD</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Material</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Index</th>
                             </>
                           )}
                           
-                          {/* Power Series column for stock lenses */}
+                          {/* Columns for Stock lenses */}
                           {activeTab === 'stock' && (
-                            <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                              {lens.powerSeries || 'N/A'}
-                            </td>
+                            <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Power Series</th>
                           )}
                           
-                          {/* Contact lens specific columns */}
+                          {/* Columns for Contact lenses */}
                           {activeTab === 'contact' && (
                             <>
-                              <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">{lens.powerSeries || 'N/A'}</td>
-                              <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">{lens.category || 'N/A'}</td>
-                              <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">{lens.contactType || 'N/A'}</td>
-                              <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">{lens.color || 'N/A'}</td>
-                              <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">{lens.disposalFrequency || 'N/A'}</td>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Power Series</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Color</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Disposal</th>
                             </>
                           )}
                           
                           {/* Common columns for all lens types */}
-                          <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                            {lens.purchasePrice ? `₹${parseFloat(lens.purchasePrice).toFixed(2)}` : 'N/A'}
-                          </td>
-                          <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                            {lens.salePrice ? `₹${parseFloat(lens.salePrice).toFixed(2)}` : 'N/A'}
-                          </td>
-                          <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">{lens.qty || '1'}</td>
-                          <td className="px-3 py-3 whitespace-nowrap text-sm font-medium">
-                            <div className="flex space-x-2">
-                              <button
-                                onClick={() => handleEditLens(lens)}
-                                className="text-sky-600 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 px-2 py-1 rounded"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => removeLens(lens.id)}
-                                className="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-2 py-1 rounded"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </td>
+                          <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Purchase</th>
+                          <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sale</th>
+                          <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
+                          <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {loading ? (
+                          <tr>
+                            <td colSpan={activeTab === 'rx' ? 11 : activeTab === 'stock' ? 5 : activeTab === 'contact' ? 9 : 4} className="px-2 sm:px-3 py-3 text-center">
+                              <div className="flex justify-center items-center">
+                                <svg className="animate-spin h-5 w-5 text-sky-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span className="ml-2 text-xs sm:text-sm text-gray-500">Loading inventory...</span>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredLenses.map((lens, index) => (
+                            <tr key={lens.id} className={index % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-gray-100'}>
+                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">
+                                <a href={`/lens-inventory/${lens.id}`} className="text-sky-600 hover:text-sky-800 hover:underline">
+                                  {lens.brandName || 'N/A'}
+                                </a>
+                              </td>
+                              
+                              {/* Conditional rendering for RX lens columns */}
+                              {activeTab === 'rx' && (
+                                <>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 font-medium">
+                                    {lens.eye === 'right' ? 'Right' : lens.eye === 'left' ? 'Left' : lens.eye === 'both' ? 'Both' : 'N/A'}
+                                  </td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.sph || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.cyl || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.axis || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.add || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.material || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.index || 'N/A'}</td>
+                                </>
+                              )}
+                              
+                              {/* Power Series column for stock lenses */}
+                              {activeTab === 'stock' && (
+                                <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">
+                                  {lens.powerSeries || 'N/A'}
+                                </td>
+                              )}
+                              
+                              {/* Contact lens specific columns */}
+                              {activeTab === 'contact' && (
+                                <>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.powerSeries || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.category || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.contactType || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.color || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.disposalFrequency || 'N/A'}</td>
+                                </>
+                              )}
+                              
+                              {/* Common columns for all lens types */}
+                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">
+                                {lens.purchasePrice ? `₹${parseFloat(lens.purchasePrice).toFixed(2)}` : 'N/A'}
+                              </td>
+                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">
+                                {lens.salePrice ? `₹${parseFloat(lens.salePrice).toFixed(2)}` : 'N/A'}
+                              </td>
+                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.qty || '1'}</td>
+                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm font-medium">
+                                <div className="flex gap-1 sm:gap-2">
+                                  <button
+                                    onClick={() => handleEditLens(lens)}
+                                    className="text-sky-600 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 px-1.5 sm:px-2 py-1 rounded text-xs sm:text-sm"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => removeLens(lens.id)}
+                                    className="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-1.5 sm:px-2 py-1 rounded text-xs sm:text-sm"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
