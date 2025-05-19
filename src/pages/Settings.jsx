@@ -15,7 +15,8 @@ const Settings = () => {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   
-  // QR Code (stored directly as data URL)
+  // Logo and QR Code (stored directly as data URL)
+  const [logoDataURL, setLogoDataURL] = useState('');
   const [qrCodeDataURL, setQrCodeDataURL] = useState('');
   
   // Bank Details
@@ -90,6 +91,18 @@ const Settings = () => {
         setPhone(data.phone || '');
         setEmail(data.email || '');
         
+        // Logo Data URL
+        if (data.logoDataURL) {
+          setLogoDataURL(data.logoDataURL);
+        } else if (data.logoURL) {
+          // Handle transition from old storage method (URL) to new one (data URL)
+          // Just show a notification that the user should re-upload logo
+          console.log('Old logo URL format detected. Please re-upload your logo for better performance.');
+          setLogoDataURL('');
+        } else {
+          setLogoDataURL('');
+        }
+        
         // QR Code Data URL
         if (data.qrCodeDataURL) {
           setQrCodeDataURL(data.qrCodeDataURL);
@@ -150,6 +163,9 @@ const Settings = () => {
         pincode,
         phone,
         email,
+        
+        // Logo Data URL
+        logoDataURL,
         
         // QR Code as data URL
         qrCodeDataURL,
@@ -220,6 +236,62 @@ const Settings = () => {
     setTimeout(() => setSuccess(''), 5000);
     // Scroll to the top to make the message visible
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  
+  // Validate logo file
+  const validateLogo = (file) => {
+    // Check file size (limit to 1MB to avoid Firestore size limits)
+    const maxSize = 1 * 1024 * 1024; // 1MB
+    if (file.size > maxSize) {
+      displayError('Logo image is too large. Please upload an image smaller than 1MB.');
+      return false;
+    }
+    
+    // Check file type - allow SVG in addition to other image formats
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+    if (!validTypes.includes(file.type)) {
+      displayError('Invalid file type. Please upload a JPEG, PNG, GIF, WEBP, or SVG image.');
+      return false;
+    }
+    
+    return true;
+  };
+  
+  // Handle logo upload
+  const handleLogoChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (!validateLogo(file)) {
+      e.target.value = ''; // Reset input
+      return;
+    }
+    
+    // Convert to data URL and store directly
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target.result;
+      
+      // If the image is larger than 800KB, compress it
+      if (dataUrl.length > 800000 && file.type !== 'image/svg+xml') {
+        setLoading(true); // Show loading state during compression
+        compressImage(dataUrl, 800000, (compressedDataUrl) => {
+          setLogoDataURL(compressedDataUrl);
+          setLoading(false);
+        });
+      } else {
+        setLogoDataURL(dataUrl);
+      }
+    };
+    reader.onerror = () => {
+      displayError("Failed to read the logo image. Please try another image.");
+    };
+    reader.readAsDataURL(file);
+  };
+  
+  // Remove logo
+  const removeLogo = () => {
+    setLogoDataURL('');
   };
   
   // Add QR code validation function
@@ -1021,14 +1093,89 @@ const Settings = () => {
                   </div>
                 </div>
                 
+                {/* Shop Logo Section */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">QR Code for Payments (Optional)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Shop Logo (Optional)</label>
+                  <div className="mt-1 flex items-center">
+                    {logoDataURL ? (
+                      <div className="relative">
+                        <img 
+                          src={logoDataURL} 
+                          alt="Shop Logo" 
+                          className="h-32 w-32 object-contain bg-gray-100 rounded-md"
+                        />
+                        <button
+                          type="button"
+                          onClick={removeLogo}
+                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ) : loading ? (
+                      <div className="flex justify-center items-center border-2 border-dashed border-gray-300 rounded-md h-32 w-32 p-2">
+                        <div className="text-center">
+                          <svg className="animate-spin mx-auto h-8 w-8 text-sky-500" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <p className="text-xs text-sky-500 mt-1">Processing...</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex justify-center items-center border-2 border-dashed border-gray-300 rounded-md h-32 w-32 p-2">
+                        <div className="text-center">
+                          <svg className="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          <p className="text-xs text-gray-500 mt-1">Upload Logo</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <input
+                      type="file"
+                      id="logo-upload"
+                      className="hidden"
+                      accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+                      onChange={handleLogoChange}
+                      disabled={loading}
+                    />
+                    <div className="ml-4 flex flex-col space-y-2">
+                      <label
+                        htmlFor="logo-upload"
+                        className={`inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 cursor-pointer ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {loading ? 'Processing...' : logoDataURL ? 'Change Logo' : 'Upload Logo'}
+                      </label>
+                      {logoDataURL && (
+                        <button
+                          type="button"
+                          onClick={removeLogo}
+                          className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                          disabled={loading}
+                        >
+                          Remove Logo
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">
+                    Upload a logo for your shop. This will appear on invoices and other documents.<br />
+                    <span className="text-amber-600 font-medium">Note: Max file size 1MB. Supported formats: JPEG, PNG, GIF, WEBP, SVG.</span><br />
+                    <span className="text-gray-500 italic">Large images will be automatically compressed to fit size limits.</span>
+                  </p>
+                </div>
+                
+                {/* QR Code Section */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">QR Code (Optional)</label>
                   <div className="mt-1 flex items-center">
                     {qrCodeDataURL ? (
                       <div className="relative">
                         <img 
                           src={qrCodeDataURL} 
-                          alt="Payment QR Code" 
+                          alt="QR Code" 
                           className="h-32 w-32 object-contain bg-gray-100 rounded-md"
                         />
                         <button
@@ -1055,14 +1202,14 @@ const Settings = () => {
                           <svg className="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                           </svg>
-                          <p className="text-xs text-gray-500 mt-1">Upload QR</p>
+                          <p className="text-xs text-gray-500 mt-1">Upload QR Code</p>
                         </div>
                       </div>
                     )}
                     
                     <input
                       type="file"
-                      id="qr-upload"
+                      id="qr-code-upload"
                       className="hidden"
                       accept="image/jpeg,image/png,image/gif,image/webp"
                       onChange={handleQRCodeChange}
@@ -1070,7 +1217,7 @@ const Settings = () => {
                     />
                     <div className="ml-4 flex flex-col space-y-2">
                       <label
-                        htmlFor="qr-upload"
+                        htmlFor="qr-code-upload"
                         className={`inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 cursor-pointer ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         {loading ? 'Processing...' : qrCodeDataURL ? 'Change QR Code' : 'Upload QR Code'}
@@ -1088,7 +1235,7 @@ const Settings = () => {
                     </div>
                   </div>
                   <p className="mt-2 text-xs text-gray-500">
-                    Upload a QR code for UPI or other digital payments. This will appear on invoices.<br />
+                    Upload a QR code for your shop. This will be used for various purposes.<br />
                     <span className="text-amber-600 font-medium">Note: Max file size 1MB. Supported formats: JPEG, PNG, GIF, WEBP.</span><br />
                     <span className="text-gray-500 italic">Large images will be automatically compressed to fit size limits.</span>
                   </p>
@@ -1424,49 +1571,54 @@ const Settings = () => {
           </div>
         </div>
         
-        {/* Backup & Restore tab */}
-        {activeTab === 'backup' && (
-          <div className="mt-8 border-t border-gray-200 pt-8">
-            <h3 className="text-lg font-medium text-red-600">Danger Zone</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Actions here can result in permanent data loss. Proceed with caution.
-            </p>
-            <div className="mt-4">
+        {/* Floating Save Button - only shown for tabs that need saving (MOBILE ONLY) */}
+        {(activeTab === 'shop' || activeTab === 'bank' || activeTab === 'financial') && (
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-lg z-30 mb-[65px] sm:hidden">
+            <div className="max-w-6xl mx-auto">
               <button
-                onClick={handleClearAllData}
-                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                disabled={loading}
+                type="button"
+                onClick={handleSaveSettings}
+                disabled={loading || !shopName}
+                className="w-full flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50"
               >
-                {loading ? 'Processing...' : 'Clear All Data'}
+                {loading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Saving...
+                  </>
+                ) : 'Save Settings'}
               </button>
             </div>
           </div>
         )}
-      </div>
-      
-      {/* Floating Save Button - only shown for tabs that need saving */}
-      {(activeTab === 'shop' || activeTab === 'bank' || activeTab === 'financial') && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-lg z-30 mb-[65px]">
-          <div className="max-w-6xl mx-auto">
-            <button
-              type="button"
-              onClick={handleSaveSettings}
-              disabled={loading || !shopName}
-              className="w-full sm:w-auto sm:ml-auto flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50"
-            >
-              {loading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Saving...
-                </>
-              ) : 'Save Settings'}
-            </button>
-          </div>
+        
+        {/* Desktop Save Button - add this right after the tab content */}
+        <div className="max-w-6xl mx-auto px-4 hidden sm:block">
+          {(activeTab === 'shop' || activeTab === 'bank' || activeTab === 'financial') && (
+            <div className="my-6 flex justify-end">
+              <button
+                type="button"
+                onClick={handleSaveSettings}
+                disabled={loading || !shopName}
+                className="flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50"
+              >
+                {loading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Saving...
+                  </>
+                ) : 'Save Settings'}
+              </button>
+            </div>
+          )}
         </div>
-      )}
+      </div>
       
       {showFinancialYearModal && (
         <FinancialYearModal />
