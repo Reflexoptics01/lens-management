@@ -58,13 +58,6 @@ const Navbar = () => {
           </button>
           <h1 className="text-xl font-bold text-sky-600">PRISM OPTICAL</h1>
         </div>
-        <div className="flex items-center">
-          <div className="h-8 w-8 rounded-full bg-sky-600 text-white flex items-center justify-center">
-            <span className="text-sm font-medium">
-              {user?.email?.[0].toUpperCase() || 'U'}
-            </span>
-          </div>
-        </div>
       </nav>
 
       {/* Mobile Menu */}
@@ -319,23 +312,6 @@ const Navbar = () => {
                 >
                   Settings
                 </button>
-              </div>
-            </div>
-            <div className="hidden sm:ml-6 sm:flex sm:items-center">
-              <div className="ml-3 relative">
-                <div>
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="bg-white flex text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
-                  >
-                    <div className="h-8 w-8 rounded-full bg-sky-600 text-white flex items-center justify-center">
-                      <span className="text-sm font-medium">
-                        {user?.email?.[0].toUpperCase() || 'U'}
-                      </span>
-                    </div>
-                  </button>
-                </div>
               </div>
             </div>
           </div>

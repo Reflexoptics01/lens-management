@@ -17,13 +17,15 @@ const BottomActionBar = ({
   className = '', 
   bgColor = 'bg-white' 
 }) => {
-  const baseClasses = `${bgColor} px-4 py-3 border-t border-gray-200 shadow-lg z-40 safe-area-bottom`;
+  const baseClasses = `${bgColor} px-4 py-3 border-t border-gray-200 shadow-lg z-40`;
+  
+  // Adjust positioning to account for navigation bar
   const positionClass = fixed 
-    ? 'fixed bottom-0 left-0 right-0' 
-    : 'sticky bottom-0 -mx-4 -mb-4';
+    ? 'fixed bottom-0 left-0 right-0 mb-[60px]' // Add margin to account for nav bar height
+    : 'sticky bottom-0 -mx-4 mb-[60px]'; // Add margin for nav bar height
   
   return (
-    <div className={`${baseClasses} ${positionClass} ${className}`}>
+    <div className={`${baseClasses} ${positionClass} ${className} safe-area-bottom`}>
       {children}
     </div>
   );
