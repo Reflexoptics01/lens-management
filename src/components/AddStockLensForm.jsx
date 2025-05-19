@@ -1,0 +1,301 @@
+import React, { useState, useEffect } from 'react';
+import { db } from '../firebaseConfig';
+import { collection, addDoc, doc, updateDoc, Timestamp } from 'firebase/firestore';
+
+const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCancel }) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  
+  // Array of stock lens rows for batch adding
+  const [stockLensRows, setStockLensRows] = useState(
+    Array(10).fill().map((_, index) => ({
+      id: index + 1,
+      brandName: '',
+      powerSeries: '',
+      purchasePrice: '',
+      salePrice: '',
+      qty: 1
+    }))
+  );
+  
+  // Styling constants
+  const inputClassName = "block w-full rounded-md border-gray-300 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm py-1.5 px-2 text-center";
+  const selectClassName = "block w-full rounded-md border-gray-300 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm py-1.5 px-2";
+  const labelClassName = "block uppercase tracking-wide text-xs font-bold text-sky-700 mb-1";
+  const sectionClassName = "bg-white rounded-lg shadow-md p-6 mb-6";
+  
+  useEffect(() => {
+    // If editing a lens, populate the form with a single row
+    if (editMode && lensToEdit) {
+      const stockLensData = {
+        id: 1,
+        brandName: lensToEdit.brandName || '',
+        powerSeries: lensToEdit.powerSeries || '',
+        purchasePrice: lensToEdit.purchasePrice || '',
+        salePrice: lensToEdit.salePrice || '',
+        qty: lensToEdit.qty || 1
+      };
+      
+      setStockLensRows([stockLensData]);
+    }
+  }, [editMode, lensToEdit]);
+  
+  const handleStockLensChange = (index, field, value) => {
+    const updatedRows = [...stockLensRows];
+    updatedRows[index] = {
+      ...updatedRows[index],
+      [field]: value
+    };
+    setStockLensRows(updatedRows);
+  };
+  
+  const addStockLensRow = () => {
+    setStockLensRows([
+      ...stockLensRows, 
+      {
+        id: stockLensRows.length + 1,
+        brandName: '',
+        powerSeries: '',
+        purchasePrice: '',
+        salePrice: '',
+        qty: 1
+      }
+    ]);
+  };
+  
+  const removeStockLensRow = (index) => {
+    if (stockLensRows.length <= 1) return;
+    const updatedRows = stockLensRows.filter((_, i) => i !== index);
+    // Reassign IDs to maintain sequence
+    const reindexedRows = updatedRows.map((row, i) => ({
+      ...row,
+      id: i + 1
+    }));
+    setStockLensRows(reindexedRows);
+  };
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      setLoading(true);
+      setError('');
+      
+      // Filter out empty rows (no brand name)
+      const validRows = stockLensRows.filter(row => row.brandName && row.brandName.trim() !== '');
+      
+      if (validRows.length === 0) {
+        setError('Please add at least one stock lens detail.');
+        setLoading(false);
+        return;
+      }
+      
+      if (editMode && lensToEdit) {
+        // Edit existing stock lens - only the first row is used
+        const row = validRows[0];
+        const lensData = {
+          brandName: row.brandName,
+          powerSeries: row.powerSeries,
+          purchasePrice: row.purchasePrice,
+          salePrice: row.salePrice,
+          qty: parseInt(row.qty) || 1,
+          type: 'stock',
+          updatedAt: Timestamp.now()
+        };
+        
+        await updateDoc(doc(db, 'lens_inventory', lensToEdit.id), lensData);
+        console.log("Updated stock lens:", lensData);
+        
+        // Call the onSubmit callback
+        if (onSubmit) onSubmit();
+      } else {
+        // Add new stock lenses
+        const addedLenses = [];
+        
+        // For each valid stock lens row, create a lens in inventory
+        for (const row of validRows) {
+          const lensData = {
+            brandName: row.brandName,
+            powerSeries: row.powerSeries,
+            purchasePrice: row.purchasePrice,
+            salePrice: row.salePrice,
+            qty: parseInt(row.qty) || 1,
+            type: 'stock',
+            createdAt: Timestamp.now()
+          };
+          
+          // Add document to Firestore
+          const docRef = await addDoc(collection(db, 'lens_inventory'), lensData);
+          addedLenses.push({ id: docRef.id, ...lensData });
+        }
+        
+        // Call the onSubmit callback with the added lenses
+        if (onSubmit) onSubmit(addedLenses);
+      }
+      
+    } catch (error) {
+      console.error('Error adding/updating stock lenses to inventory:', error);
+      setError(`Failed to process stock lenses: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  return (
+    <div className={sectionClassName}>
+      <h2 className="text-xl font-semibold text-gray-800 mb-4">
+        {editMode ? 'Edit Stock Lens' : 'Add Stock Lenses in Batch'}
+      </h2>
+      
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-md font-semibold text-sky-800">Stock Lens Details</h3>
+            {!editMode && (
+              <button
+                type="button"
+                onClick={addStockLensRow}
+                className="flex items-center text-sm text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 px-3 py-1 rounded-md"
+              >
+                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Add Row
+              </button>
+            )}
+          </div>
+          
+          <div className="overflow-x-auto shadow border-b border-gray-200 rounded-lg">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SL No</th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lens Brand Name</th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Power Series</th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Purchase Price</th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sale Price</th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QTY</th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {stockLensRows.map((row, index) => (
+                  <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="px-2 py-2 whitespace-nowrap text-center text-sm text-gray-900">
+                      {row.id}
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <input
+                        type="text"
+                        value={row.brandName}
+                        onChange={(e) => handleStockLensChange(index, 'brandName', e.target.value)}
+                        className={inputClassName + " text-xs"}
+                        placeholder="Brand Name"
+                      />
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <input
+                        type="text"
+                        value={row.powerSeries}
+                        onChange={(e) => handleStockLensChange(index, 'powerSeries', e.target.value)}
+                        className={inputClassName + " text-xs"}
+                        placeholder="e.g. -1.00 to -6.00"
+                      />
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <input
+                        type="number"
+                        value={row.purchasePrice}
+                        onChange={(e) => handleStockLensChange(index, 'purchasePrice', e.target.value)}
+                        className={inputClassName + " text-xs"}
+                        placeholder="0.00"
+                        min="0"
+                        step="0.01"
+                      />
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <input
+                        type="number"
+                        value={row.salePrice}
+                        onChange={(e) => handleStockLensChange(index, 'salePrice', e.target.value)}
+                        className={inputClassName + " text-xs"}
+                        placeholder="0.00"
+                        min="0"
+                        step="0.01"
+                      />
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <input
+                        type="number"
+                        value={row.qty}
+                        onChange={(e) => handleStockLensChange(index, 'qty', parseInt(e.target.value))}
+                        min="1"
+                        className={inputClassName + " text-xs"}
+                      />
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => removeStockLensRow(index)}
+                        className="text-red-600 hover:text-red-800"
+                        disabled={stockLensRows.length <= 1}
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        {error && (
+          <div className="bg-red-50 border-l-4 border-red-400 p-3 rounded-r text-sm">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-4 w-4 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-2">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <div className="flex justify-end space-x-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-5 py-2 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 transition-colors shadow-sm"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-5 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 transition-colors shadow-sm"
+          >
+            {loading ? (
+              <span className="flex items-center">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                {editMode ? 'Updating...' : 'Adding...'}
+              </span>
+            ) : (
+              editMode ? 'Update Stock Lens' : 'Add to Inventory'
+            )}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+export default AddStockLensForm; 

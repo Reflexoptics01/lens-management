@@ -18,6 +18,11 @@ import GSTReturns from './pages/GSTReturns';
 import Dashboard from './pages/Dashboard';
 import Purchases from './pages/Purchases';
 import CreatePurchase from './pages/CreatePurchase';
+import EditPurchase from './pages/EditPurchase';
+import PurchaseDetail from './pages/PurchaseDetail';
+import LensInventory from './pages/LensInventory';
+import LensDetail from './pages/LensDetail';
+import LensInventoryReport from './pages/LensInventoryReport';
 import './App.css';
 
 function App() {
@@ -33,17 +38,23 @@ function App() {
           <Route path="/orders/edit/:orderId" element={<EditOrder />} />
           <Route path="/customers" element={<Customers />} />
           <Route path="/customers/new" element={<CreateCustomer />} />
+          <Route path="/add-vendor" element={<CreateCustomer isVendor={true} />} />
           <Route path="/sales" element={<Sales />} />
           <Route path="/sales/new" element={<CreateSale />} />
           <Route path="/sales/:saleId" element={<SaleDetail />} />
           <Route path="/sales/edit/:saleId" element={<EditSale />} />
           <Route path="/purchases" element={<Purchases />} />
           <Route path="/purchases/new" element={<CreatePurchase />} />
+          <Route path="/purchases/:purchaseId" element={<PurchaseDetail />} />
+          <Route path="/purchases/edit/:purchaseId" element={<EditPurchase />} />
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/ledger" element={<Ledger />} />
           <Route path="/gst-returns" element={<GSTReturns />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/test-print" element={<TestPrintPage />} />
+          <Route path="/lens-inventory" element={<LensInventory />} />
+          <Route path="/lens-inventory/:id" element={<LensDetail />} />
+          <Route path="/lens-inventory-report" element={<LensInventoryReport />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
