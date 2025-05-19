@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { db } from '../firebaseConfig';
-import { collection, getDocs, getDoc, doc, addDoc, serverTimestamp, query, where, orderBy, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, addDoc, serverTimestamp, query, where, orderBy, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import CustomerSearch from '../components/CustomerSearch';
@@ -8,6 +8,7 @@ import CustomerForm from '../components/CustomerForm';
 import ItemSuggestions from '../components/ItemSuggestions';
 import FallbackInvoicePrint from '../components/FallbackInvoicePrint';
 import BottomActionBar from '../components/BottomActionBar';
+import { Timestamp } from 'firebase/firestore';
 
 const TAX_OPTIONS = [
   { id: 'TAX_FREE', label: 'Tax Free', rate: 0 },
@@ -283,110 +284,176 @@ const CreateSale = () => {
   };
 
   const fetchOrderDetails = async (orderId, rowIndex) => {
-    if (!orderId || orderId.trim() === '') {
-      // Clear the row if order ID is empty
-      const updatedRows = [...tableRows];
-      updatedRows[rowIndex] = {
-        ...updatedRows[rowIndex],
-        orderId: '',
-        orderDetails: null,
-        itemName: '',
-        sph: '',
-        cyl: '',
-        axis: '',
-        add: '',
-        qty: 1,
-        unit: 'Pairs',
-        price: 0,
-        total: 0
-      };
-      setTableRows(updatedRows);
-      return;
-    }
-
     try {
-      // First try to find the order by displayId
+      if (!orderId) return;
+      
+      console.log(`Fetching details for order ${orderId}`);
+      
+      // First, try the exact display ID as entered
       let orderDoc = null;
+      let snapshot = null;
       
-      // Check if the input looks like a displayId (like "007")
-      const isDisplayIdFormat = /^\d{1,3}$/.test(orderId.trim());
+      // Try with the original displayId
+      const ordersRef = collection(db, 'orders');
+      let q = query(ordersRef, where('displayId', '==', orderId));
+      snapshot = await getDocs(q);
       
-      if (isDisplayIdFormat) {
-        // Pad the number to ensure it matches format in database (e.g. "7" becomes "007")
-        const paddedDisplayId = orderId.trim().padStart(3, '0');
+      // If no results, try with padding
+      if (snapshot.empty) {
+        console.log(`No order found with display ID: "${orderId}", trying with padding`);
+        const paddedDisplayId = orderId.toString().padStart(3, '0');
+        console.log(`Trying with padded display ID: "${paddedDisplayId}"`);
         
-        // Search by displayId
-        const ordersRef = collection(db, 'orders');
-        const q = query(ordersRef, where('displayId', '==', paddedDisplayId));
-        const snapshot = await getDocs(q);
+        q = query(ordersRef, where('displayId', '==', paddedDisplayId));
+        snapshot = await getDocs(q);
         
-        if (!snapshot.empty) {
-          orderDoc = snapshot.docs[0];
+        if (snapshot.empty) {
+          console.log(`No order found with padded display ID: "${paddedDisplayId}" either`);
+          return;
         }
       }
       
-      // If not found by displayId, try direct ID lookup
-      if (!orderDoc) {
-        try {
-          orderDoc = await getDoc(doc(db, 'orders', orderId));
-        } catch (e) {
-          // If direct ID fails, no order was found
-          console.log('Order not found by ID:', e);
+      if (!snapshot.empty) {
+        orderDoc = snapshot.docs[0];
+        
+        if (orderDoc && orderDoc.exists()) {
+          const orderData = { id: orderDoc.id, ...orderDoc.data() };
+          console.log(`Found order: ${orderData.id} with display ID: ${orderData.displayId}`);
+          
+          // Calculate proper quantity in pairs
+          let quantity = 1; // default
+          const rightQty = parseInt(orderData.rightQty || 0);
+          const leftQty = parseInt(orderData.leftQty || 0);
+          
+          // If both right and left are present, this is a pair
+          if (rightQty > 0 && leftQty > 0) {
+            // In optical terms, 1 right + 1 left = 1 pair
+            // We take the maximum since you can't have a partial pair
+            quantity = Math.max(rightQty, leftQty);
+          } else {
+            // If only one side is ordered, then count just that side
+            quantity = Math.max(rightQty, leftQty);
+          }
+          
+          // Ensure we have at least 1 quantity
+          quantity = quantity || 1;
+          
+          // Update the row with order details
+          const updatedRows = [...tableRows];
+          updatedRows[rowIndex] = {
+            ...updatedRows[rowIndex],
+            // Use the displayId for showing in the UI
+            orderId: orderData.displayId, 
+            orderDetails: orderData,
+            itemName: orderData.brandName || '',
+            // Extract prescription from either the right or left eye and format it
+            sph: formatOpticalValue(orderData.rightSph || orderData.leftSph || ''),
+            cyl: formatOpticalValue(orderData.rightCyl || orderData.leftCyl || ''),
+            axis: orderData.rightAxis || orderData.leftAxis || '', // No formatting for AXIS
+            add: formatOpticalValue(orderData.rightAdd || orderData.leftAdd || ''),
+            qty: quantity,
+            unit: 'Pairs', // Always use 'Pairs' regardless of the unit in the order
+            price: orderData.price || 0,
+            total: (orderData.price || 0) * quantity
+          };
+          setTableRows(updatedRows);
         }
-      }
-
-      if (orderDoc && orderDoc.exists()) {
-        const orderData = { id: orderDoc.id, ...orderDoc.data() };
-        
-        // Calculate proper quantity in pairs
-        let quantity = 1; // default
-        const rightQty = parseInt(orderData.rightQty || 0);
-        const leftQty = parseInt(orderData.leftQty || 0);
-        
-        // If both right and left are present, this is a pair
-        if (rightQty > 0 && leftQty > 0) {
-          // In optical terms, 1 right + 1 left = 1 pair
-          // We take the maximum since you can't have a partial pair
-          quantity = Math.max(rightQty, leftQty);
-        } else {
-          // If only one side is ordered, then count just that side
-          quantity = Math.max(rightQty, leftQty);
-        }
-        
-        // Ensure we have at least 1 quantity
-        quantity = quantity || 1;
-        
-        // Update the row with order details
-        const updatedRows = [...tableRows];
-        updatedRows[rowIndex] = {
-          ...updatedRows[rowIndex],
-          // Use the displayId for showing in the UI
-          orderId: orderData.displayId, 
-          orderDetails: orderData,
-          itemName: orderData.brandName || '',
-          // Extract prescription from either the right or left eye and format it
-          sph: formatOpticalValue(orderData.rightSph || orderData.leftSph || ''),
-          cyl: formatOpticalValue(orderData.rightCyl || orderData.leftCyl || ''),
-          axis: orderData.rightAxis || orderData.leftAxis || '', // No formatting for AXIS
-          add: formatOpticalValue(orderData.rightAdd || orderData.leftAdd || ''),
-          qty: quantity,
-          unit: 'Pairs', // Always use 'Pairs' regardless of the unit in the order
-          price: orderData.price || 0,
-          total: (orderData.price || 0) * quantity
-        };
-        setTableRows(updatedRows);
-      } else {
-        // Order not found, just update the orderId in the row
-        const updatedRows = [...tableRows];
-        updatedRows[rowIndex] = {
-          ...updatedRows[rowIndex],
-          orderId
-        };
-        setTableRows(updatedRows);
-        console.log('Order not found');
       }
     } catch (error) {
       console.error('Error fetching order details:', error);
+    }
+  };
+
+  // New function to deduct lenses from inventory
+  const deductLensesFromInventory = async (orderData) => {
+    try {
+      // Only proceed if we have an orderID
+      if (!orderData || !orderData.id) {
+        console.log('Cannot deduct: No orderData or orderData.id available', orderData);
+        return;
+      }
+      
+      console.log('Attempting to deduct lenses for order:', orderData.id, 'with display ID:', orderData.displayId);
+      
+      // Check order status - only deduct from inventory for valid statuses
+      const validStatuses = ['RECEIVED', 'DISPATCHED', 'DELIVERED'];
+      if (!validStatuses.includes(orderData.status)) {
+        console.log(`Not deducting from inventory due to order status: ${orderData.status}`);
+        return;
+      }
+      
+      // First try searching by orderId
+      console.log('Searching for lenses with orderId:', orderData.id);
+      const lensRef = collection(db, 'lens_inventory');
+      let q = query(lensRef, where('orderId', '==', orderData.id));
+      let snapshot = await getDocs(q);
+      
+      // If no lenses found by orderId, try by orderDisplayId
+      if (snapshot.empty && orderData.displayId) {
+        console.log('No lenses found with orderId, trying orderDisplayId:', orderData.displayId);
+        q = query(lensRef, where('orderDisplayId', '==', orderData.displayId));
+        snapshot = await getDocs(q);
+        
+        // Try with padded displayId too
+        if (snapshot.empty) {
+          const paddedDisplayId = orderData.displayId.toString().padStart(3, '0');
+          console.log('Still no lenses found, trying with padded orderDisplayId:', paddedDisplayId);
+          q = query(lensRef, where('orderDisplayId', '==', paddedDisplayId));
+          snapshot = await getDocs(q);
+        }
+      }
+      
+      if (snapshot.empty) {
+        console.log('No lenses found in inventory for this order ID or display ID');
+        return;
+      }
+      
+      console.log(`Found ${snapshot.docs.length} lenses in inventory for order ${orderData.id}`);
+      
+      // Process each lens in inventory
+      const batch = [];
+      snapshot.docs.forEach(lensDoc => {
+        const lens = lensDoc.data();
+        const lensId = lensDoc.id;
+        
+        console.log(`Processing lens ${lensId}, current qty: ${lens.qty}`);
+        
+        // Determine if we should deduct or delete
+        if (lens.qty > 1) {
+          // Deduct one from the quantity
+          batch.push({
+            id: lensId,
+            action: 'update',
+            data: {
+              qty: lens.qty - 1,
+              updatedAt: Timestamp.now()
+            }
+          });
+        } else {
+          // Remove the lens from inventory if qty is 1 or less
+          batch.push({
+            id: lensId,
+            action: 'delete'
+          });
+        }
+      });
+      
+      // Execute all updates/deletes
+      for (const operation of batch) {
+        const lensDocRef = doc(db, 'lens_inventory', operation.id);
+        
+        if (operation.action === 'update') {
+          await updateDoc(lensDocRef, operation.data);
+          console.log(`Updated lens quantity for ${operation.id}`);
+        } else if (operation.action === 'delete') {
+          await deleteDoc(lensDocRef);
+          console.log(`Removed lens ${operation.id} from inventory`);
+        }
+      }
+      
+      console.log(`Processed ${batch.length} lenses from inventory for order ${orderData.id}`);
+    } catch (error) {
+      console.error('Error deducting lenses from inventory:', error);
     }
   };
 
@@ -500,6 +567,9 @@ const CreateSale = () => {
 
       const docRef = await addDoc(collection(db, 'sales'), saleData);
       
+      // Process all order IDs to mark lenses as sold in inventory
+      await processOrderIdsForInventory(filledRows);
+      
       setSavedSaleId(docRef.id);
       setShowSuccessModal(true);
       setSuccess(true);
@@ -508,6 +578,105 @@ const CreateSale = () => {
       setError('Failed to save sale. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // New function to process order IDs from the sale items
+  const processOrderIdsForInventory = async (saleItems) => {
+    try {
+      // Collect order IDs from items
+      const orderIds = saleItems
+        .filter(item => item.orderId && item.orderId.trim() !== '')
+        .map(item => item.orderId);
+      
+      if (orderIds.length === 0) {
+        console.log('No order IDs to process for inventory');
+        return;
+      }
+      
+      console.log(`Processing ${orderIds.length} order IDs for inventory:`, orderIds);
+      
+      // For each order ID, find the actual order document
+      for (const displayId of orderIds) {
+        try {
+          console.log(`Looking up order by displayId: "${displayId}"`);
+          
+          // Find the order by displayId
+          const ordersRef = collection(db, 'orders');
+          const q = query(ordersRef, where('displayId', '==', displayId));
+          const snapshot = await getDocs(q);
+          
+          if (snapshot.empty) {
+            console.log(`No order found with display ID: "${displayId}"`);
+            
+            // Try with padding to see if that helps
+            const paddedDisplayId = displayId.toString().padStart(3, '0');
+            console.log(`Trying with padded display ID: "${paddedDisplayId}"`);
+            
+            const q2 = query(ordersRef, where('displayId', '==', paddedDisplayId));
+            const snapshot2 = await getDocs(q2);
+            
+            if (snapshot2.empty) {
+              console.log(`No order found with padded display ID: "${paddedDisplayId}" either`);
+              continue;
+            } else {
+              console.log(`Found order with padded display ID: "${paddedDisplayId}"`);
+              const orderDoc = snapshot2.docs[0];
+              const orderData = { id: orderDoc.id, ...orderDoc.data() };
+              
+              console.log(`Order details: ID=${orderData.id}, Status=${orderData.status}, DisplayID=${orderData.displayId}`);
+              
+              // Skip orders with invalid statuses
+              const invalidStatuses = ['PENDING', 'PLACED', 'CANCELLED', 'DECLINED'];
+              if (invalidStatuses.includes(orderData.status)) {
+                console.log(`Skipping order ${paddedDisplayId} due to status: ${orderData.status}`);
+                continue;
+              }
+              
+              // Mark this order as DELIVERED in the orders collection
+              await updateDoc(doc(db, 'orders', orderData.id), {
+                status: 'DELIVERED',
+                updatedAt: serverTimestamp()
+              });
+              console.log(`Updated order ${paddedDisplayId} status to DELIVERED`);
+              
+              // Deduct lenses from inventory
+              await deductLensesFromInventory(orderData);
+              
+              console.log(`Processed order ${paddedDisplayId} for inventory`);
+              continue; // Skip to next order since we found this one with padding
+            }
+          }
+          
+          const orderDoc = snapshot.docs[0];
+          const orderData = { id: orderDoc.id, ...orderDoc.data() };
+          
+          console.log(`Order details: ID=${orderData.id}, Status=${orderData.status}, DisplayID=${orderData.displayId}`);
+          
+          // Skip orders with invalid statuses
+          const invalidStatuses = ['PENDING', 'PLACED', 'CANCELLED', 'DECLINED'];
+          if (invalidStatuses.includes(orderData.status)) {
+            console.log(`Skipping order ${displayId} due to status: ${orderData.status}`);
+            continue;
+          }
+          
+          // Mark this order as DELIVERED in the orders collection
+          await updateDoc(doc(db, 'orders', orderData.id), {
+            status: 'DELIVERED',
+            updatedAt: serverTimestamp()
+          });
+          console.log(`Updated order ${displayId} status to DELIVERED`);
+          
+          // Deduct lenses from inventory
+          await deductLensesFromInventory(orderData);
+          
+          console.log(`Processed order ${displayId} for inventory`);
+        } catch (error) {
+          console.error(`Error processing order ID ${displayId}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error('Error processing order IDs for inventory:', error);
     }
   };
 
