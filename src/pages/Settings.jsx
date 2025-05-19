@@ -867,7 +867,7 @@ const Settings = () => {
   };
   
   return (
-    <div className="bg-slate-50 min-h-screen flex flex-col">
+    <div className="bg-slate-50 min-h-screen flex flex-col settings-page">
       <Navbar />
       
       <div className="container mx-auto px-4 py-6 flex-grow">
