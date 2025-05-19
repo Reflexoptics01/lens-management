@@ -53,16 +53,67 @@ const STATUS_COLORS = {
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
+  const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [editingStatus, setEditingStatus] = useState(null);
   const navigate = useNavigate();
   const [customers, setCustomers] = useState([]);
+  
+  // Filter states
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   useEffect(() => {
     fetchOrders();
     fetchCustomers();
   }, []);
+  
+  // Apply filters whenever orders or filter values change
+  useEffect(() => {
+    applyFilters();
+  }, [orders, fromDate, toDate, searchTerm, statusFilter]);
+  
+  // Apply all filters
+  const applyFilters = () => {
+    let result = [...orders];
+    
+    // Apply date range filter if both dates are set
+    if (fromDate && toDate) {
+      const fromDateObj = new Date(fromDate);
+      fromDateObj.setHours(0, 0, 0, 0);
+      
+      const toDateObj = new Date(toDate);
+      toDateObj.setHours(23, 59, 59, 999);
+      
+      result = result.filter(order => {
+        const orderDate = convertToDate(order.createdAt);
+        return orderDate && orderDate >= fromDateObj && orderDate <= toDateObj;
+      });
+    }
+    
+    // Apply search term filter
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      result = result.filter(order => 
+        // Search in customer name
+        (order.customerName && 
+          order.customerName.toLowerCase().includes(searchLower)) ||
+        // Search in order ID/display ID
+        (order.displayId && 
+          order.displayId.toString().includes(searchLower))
+      );
+    }
+    
+    // Apply status filter
+    if (statusFilter) {
+      result = result.filter(order => order.status === statusFilter);
+    }
+    
+    setFilteredOrders(result);
+  };
 
   const fetchOrders = async () => {
     try {
@@ -209,36 +260,94 @@ const Orders = () => {
     return customers.find(c => c.opticalName === customerName);
   };
 
+  // Reset all filters
+  const resetFilters = () => {
+    setFromDate('');
+    setToDate('');
+    setSearchTerm('');
+    setStatusFilter('');
+  };
+
   return (
     <div className="mobile-page">
       <Navbar />
       
       <div className="mobile-content">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-4">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">Orders</h1>
-            <p className="mt-1 text-sm text-gray-500">Manage and track your orders</p>
+        {/* Header - Single line with filters and button */}
+        <div className="flex flex-wrap items-end gap-2 mb-4">
+          {/* Date Range */}
+          <div className="flex gap-2 items-center">
+            <div className="w-[140px]">
+              <label className="block text-xs font-medium text-gray-500 mb-1">From</label>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="w-full rounded-md border-gray-300 border shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1.5"
+              />
+            </div>
+            
+            <div className="w-[140px]">
+              <label className="block text-xs font-medium text-gray-500 mb-1">To</label>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="w-full rounded-md border-gray-300 border shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1.5"
+              />
+            </div>
           </div>
-          {/* Hide the top 'Add New Order' button on mobile - only keeping the floating one */}
+          
+          {/* Status Filter */}
+          <div className="w-[160px]">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full rounded-md border-gray-300 border shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1.5"
+            >
+              <option value="">All Statuses</option>
+              {ORDER_STATUSES.map(status => (
+                <option key={status} value={status}>{status}</option>
+              ))}
+            </select>
+          </div>
+          
+          {/* Search Box - Grows to fill available space */}
+          <div className="flex-grow min-w-[200px]">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Search by Name or Order ID</label>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search orders by optical name or order ID..."
+              className="w-full rounded-md border-gray-300 border shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1.5"
+            />
+          </div>
+          
+          {/* Reset Filters Button - only visible when filters are applied */}
+          {(fromDate || toDate || searchTerm || statusFilter) && (
+            <button 
+              onClick={resetFilters}
+              className="h-[38px] px-3 py-2 text-sm text-indigo-600 hover:text-indigo-800 flex items-center hover:bg-indigo-50 rounded-md transition-colors"
+            >
+              <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Clear
+            </button>
+          )}
+          
+          {/* Add New Order Button */}
           <button
             onClick={() => navigate('/orders/new')}
-            className="btn-primary inline-flex items-center space-x-2 desktop-only"
+            className="h-[38px] btn-primary inline-flex items-center space-x-2 px-4 py-1.5 bg-[#4169E1] hover:bg-[#3154b3]"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
             </svg>
             <span>Add New Order</span>
           </button>
-        </div>
-
-        {/* Mobile Search */}
-        <div className="mb-4 mobile-only">
-          <input
-            type="text"
-            placeholder="Search orders..."
-            className="mobile-search"
-          />
         </div>
 
         {/* Orders List */}
@@ -254,6 +363,13 @@ const Orders = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
             <p className="text-gray-500">No orders found</p>
+          </div>
+        ) : filteredOrders.length === 0 ? (
+          <div className="text-center py-8">
+            <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <p className="text-gray-500">No matching orders for your filters</p>
           </div>
         ) : (
           <>
@@ -285,7 +401,7 @@ const Orders = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {orders.map((order) => {
+                      {filteredOrders.map((order) => {
                         const { date, time } = formatDate(order.createdAt);
                         const customerDetails = getCustomerDetails(order.customerName);
                         return (
@@ -378,7 +494,7 @@ const Orders = () => {
 
             {/* Mobile Card View */}
             <div className="mobile-only space-y-3">
-              {orders.map((order) => {
+              {filteredOrders.map((order) => {
                 const { date, time } = formatDate(order.createdAt);
                 const customerDetails = getCustomerDetails(order.customerName);
                 return (

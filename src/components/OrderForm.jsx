@@ -263,6 +263,19 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
               placeholder="Enter diameter"
             />
           </div>
+          <div>
+            <label className={labelClassName}>Fitting</label>
+            <select
+              name="fitting"
+              value={formData.fitting}
+              onChange={onChange}
+              className={selectClassName}
+            >
+              <option value="None">None</option>
+              <option value="With Fitting">With Fitting</option>
+              <option value="Without Fitting">Without Fitting</option>
+            </select>
+          </div>
         </div>
       </div>
 

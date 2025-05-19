@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
-import { collection, addDoc, getDocs, Timestamp, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, Timestamp, query, orderBy, where } from 'firebase/firestore';
 import Navbar from '../components/Navbar';
 import OrderForm from '../components/OrderForm';
 import { ArrowLeftIcon, PlusIcon } from '@heroicons/react/24/outline';
@@ -21,6 +21,7 @@ const CreateOrder = () => {
     coatingColour: '',
     diameter: '',
     fogMark: false,
+    fitting: 'None',
     rightSph: '',
     rightCyl: '',
     rightAxis: '',
@@ -45,11 +46,119 @@ const CreateOrder = () => {
   const [customerPhone, setCustomerPhone] = useState('');
   const [orderId, setOrderId] = useState(null);
   const [nextOrderDisplayId, setNextOrderDisplayId] = useState('');
+  
+  // Add state for lens inventory matches
+  const [matchingLenses, setMatchingLenses] = useState([]);
+  const [showLensMatches, setShowLensMatches] = useState(false);
 
   useEffect(() => {
     fetchCustomers();
     calculateNextOrderDisplayId();
   }, []);
+
+  // Add effect to check for matching lenses when prescription data changes
+  useEffect(() => {
+    // Check if we have valid prescription data
+    if (formData.rightSph || formData.leftSph) {
+      checkLensInventory();
+    } else {
+      setMatchingLenses([]);
+      setShowLensMatches(false);
+    }
+  }, [formData.rightSph, formData.rightCyl, formData.rightAxis, formData.rightAdd, 
+      formData.leftSph, formData.leftCyl, formData.leftAxis, formData.leftAdd,
+      formData.material, formData.index, formData.baseTint]);
+
+  const checkLensInventory = async () => {
+    try {
+      // Don't search if we don't have enough data
+      if (!formData.material) return;
+      
+      const lensInventoryRef = collection(db, 'lens_inventory');
+      
+      // Create two queries - one for right eye, one for left eye
+      const queries = [];
+      
+      // If we have right eye prescription data
+      if (formData.rightSph) {
+        // Build query for right eye
+        // Allow for a small tolerance in the prescription values (±0.25)
+        const rightSphMin = parseFloat(formData.rightSph) - 0.25;
+        const rightSphMax = parseFloat(formData.rightSph) + 0.25;
+        
+        const rightQuery = query(
+          lensInventoryRef,
+          where('material', '==', formData.material),
+          where('eye', '==', 'right'),
+          where('sph', '>=', rightSphMin.toString()),
+          where('sph', '<=', rightSphMax.toString())
+        );
+        
+        queries.push({ query: rightQuery, eye: 'right' });
+      }
+      
+      // If we have left eye prescription data
+      if (formData.leftSph) {
+        // Build query for left eye
+        const leftSphMin = parseFloat(formData.leftSph) - 0.25;
+        const leftSphMax = parseFloat(formData.leftSph) + 0.25;
+        
+        const leftQuery = query(
+          lensInventoryRef,
+          where('material', '==', formData.material),
+          where('eye', '==', 'left'),
+          where('sph', '>=', leftSphMin.toString()),
+          where('sph', '<=', leftSphMax.toString())
+        );
+        
+        queries.push({ query: leftQuery, eye: 'left' });
+      }
+      
+      // Execute all queries
+      const results = [];
+      for (const q of queries) {
+        const snapshot = await getDocs(q.query);
+        
+        if (!snapshot.empty) {
+          // Filter results further for cyl and axis
+          snapshot.docs.forEach(doc => {
+            const lens = { id: doc.id, ...doc.data(), eye: q.eye };
+            
+            // Check if cyl is within range
+            let cylMatch = true;
+            if (q.eye === 'right' && formData.rightCyl && lens.cyl) {
+              const cylDiff = Math.abs(parseFloat(formData.rightCyl) - parseFloat(lens.cyl));
+              cylMatch = cylDiff <= 0.25;
+            } else if (q.eye === 'left' && formData.leftCyl && lens.cyl) {
+              const cylDiff = Math.abs(parseFloat(formData.leftCyl) - parseFloat(lens.cyl));
+              cylMatch = cylDiff <= 0.25;
+            }
+            
+            // Check if axis is within range (±5 degrees)
+            let axisMatch = true;
+            if (q.eye === 'right' && formData.rightAxis && lens.axis) {
+              const axisDiff = Math.abs(parseInt(formData.rightAxis) - parseInt(lens.axis));
+              axisMatch = axisDiff <= 5 || axisDiff >= 175; // Handle wrap-around case
+            } else if (q.eye === 'left' && formData.leftAxis && lens.axis) {
+              const axisDiff = Math.abs(parseInt(formData.leftAxis) - parseInt(lens.axis));
+              axisMatch = axisDiff <= 5 || axisDiff >= 175; // Handle wrap-around case
+            }
+            
+            // If everything matches, add to results
+            if (cylMatch && axisMatch) {
+              results.push(lens);
+            }
+          });
+        }
+      }
+      
+      setMatchingLenses(results);
+      setShowLensMatches(results.length > 0);
+      
+    } catch (error) {
+      console.error('Error checking lens inventory:', error);
+    }
+  };
 
   const calculateNextOrderDisplayId = async () => {
     try {
@@ -87,6 +196,40 @@ const CreateOrder = () => {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+  };
+
+  const selectInventoryLens = (lens) => {
+    // Update form data with selected lens details
+    if (lens.eye === 'right') {
+      setFormData(prev => ({
+        ...prev,
+        rightSph: lens.sph || prev.rightSph,
+        rightCyl: lens.cyl || prev.rightCyl,
+        rightAxis: lens.axis || prev.rightAxis,
+        rightAdd: lens.add || prev.rightAdd,
+        material: lens.material || prev.material,
+        index: lens.index || prev.index,
+        baseTint: lens.baseTint || prev.baseTint,
+        diameter: lens.diameter || prev.diameter,
+        specialNotes: `Using inventory lens ID: ${lens.id}. ${prev.specialNotes || ''}`
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        leftSph: lens.sph || prev.leftSph,
+        leftCyl: lens.cyl || prev.leftCyl,
+        leftAxis: lens.axis || prev.leftAxis,
+        leftAdd: lens.add || prev.leftAdd,
+        material: lens.material || prev.material,
+        index: lens.index || prev.index,
+        baseTint: lens.baseTint || prev.baseTint,
+        diameter: lens.diameter || prev.diameter,
+        specialNotes: `Using inventory lens ID: ${lens.id}. ${prev.specialNotes || ''}`
+      }));
+    }
+    
+    // Close the matches panel
+    setShowLensMatches(false);
   };
 
   const handleSubmit = async (e) => {
@@ -150,7 +293,8 @@ const CreateOrder = () => {
         `📍 Type: ${formData.lensType}\n` +
         `📍 Base Tint: ${formData.baseTint}\n` +
         `📍 Coating: ${formData.coatingType}${formData.coatingColour ? ` - ${formData.coatingColour}` : ''}\n` +
-        `📍 Diameter: ${formData.diameter}\n\n` +
+        `📍 Diameter: ${formData.diameter}\n` +
+        `📍 Fitting: ${formData.fitting}\n\n` +
         `*Prescription Details:*\n` +
         `Right Eye:\n` +
         `• SPH: ${formData.rightSph || '0.00'}\n` +
@@ -180,6 +324,7 @@ const CreateOrder = () => {
         `${formData.baseTint ? `📍 Base Tint: ${formData.baseTint}\n` : ''}` +
         `${formData.coatingType ? `📍 Coating: ${formData.coatingType}${formData.coatingColour ? ` - ${formData.coatingColour}` : ''}\n` : ''}` +
         `${formData.diameter ? `📍 Diameter: ${formData.diameter}\n` : ''}` +
+        `${formData.fitting !== 'None' ? `📍 Fitting: ${formData.fitting}\n` : ''}` +
         `\n*Prescription Details:*\n` +
         `Right Eye:\n` +
         `• SPH: ${formData.rightSph || '0.00'}\n` +
@@ -241,12 +386,76 @@ const CreateOrder = () => {
               loading={loading}
               error={error}
             />
+
+            {/* Lens Inventory Matches */}
+            {showLensMatches && matchingLenses.length > 0 && (
+              <div className="mt-6 border-t pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-md font-semibold text-gray-800 flex items-center">
+                    <svg className="h-5 w-5 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Matching Lenses in Inventory
+                  </h3>
+                  <button
+                    onClick={() => setShowLensMatches(false)}
+                    className="text-sm text-gray-500 hover:text-gray-700"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+                
+                <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4 rounded">
+                  <p className="text-sm text-blue-700">
+                    We found {matchingLenses.length} lens(es) in inventory that match your requirements. Using these will save time and costs.
+                  </p>
+                </div>
+                
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Eye</th>
+                        <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SPH</th>
+                        <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CYL</th>
+                        <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AXIS</th>
+                        <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Material</th>
+                        <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Index</th>
+                        <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {matchingLenses.map((lens, index) => (
+                        <tr key={lens.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                            {lens.eye === 'right' ? 'Right' : 'Left'}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{lens.sph}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{lens.cyl || 'N/A'}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{lens.axis || 'N/A'}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{lens.material}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{lens.index}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
+                            <button 
+                              onClick={() => selectInventoryLens(lens)}
+                              className="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded-md"
+                            >
+                              Use this lens
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </main>
 
-      {/* Floating Submit Button */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-lg z-30 mb-[65px]">
+      {/* Floating Submit Button - Mobile Only */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-lg z-30 mb-[65px] sm:hidden">
         <div className="max-w-5xl mx-auto">
           <button
             type="button"

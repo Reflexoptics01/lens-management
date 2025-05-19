@@ -11,9 +11,6 @@ import BottomActionBar from '../components/BottomActionBar';
 
 const TAX_OPTIONS = [
   { id: 'TAX_FREE', label: 'Tax Free', rate: 0 },
-  { id: 'GST_6', label: 'GST 6%', rate: 6 },
-  { id: 'GST_12', label: 'GST 12%', rate: 12 },
-  { id: 'GST_18', label: 'GST 18%', rate: 18 },
   { id: 'CGST_SGST_6', label: 'CGST/SGST 6%', rate: 6, split: true },
   { id: 'CGST_SGST_12', label: 'CGST/SGST 12%', rate: 12, split: true },
   { id: 'CGST_SGST_18', label: 'CGST/SGST 18%', rate: 18, split: true },
@@ -99,6 +96,25 @@ const CreateSale = () => {
 
   // New state for fallback print
   const [showFallbackPrint, setShowFallbackPrint] = useState(false);
+
+  // Format optical values (SPH, CYL, ADD) to "0.00" format with signs
+  const formatOpticalValue = (value) => {
+    if (!value || value === '') return '';
+    
+    // Convert to number
+    let numValue = parseFloat(value);
+    if (isNaN(numValue)) return value; // Return original if not a valid number
+    
+    // Format to 2 decimal places and add + sign for positive values
+    let formattedValue = numValue.toFixed(2);
+    
+    // Add plus sign for positive values (including zero with a plus sign if it has no sign)
+    if (numValue > 0 || (numValue === 0 && !value.includes('-'))) {
+      formattedValue = '+' + formattedValue;
+    }
+    
+    return formattedValue;
+  };
 
   // Handlers for tax calculations
   const getTaxOption = (taxId) => {
@@ -322,6 +338,24 @@ const CreateSale = () => {
       if (orderDoc && orderDoc.exists()) {
         const orderData = { id: orderDoc.id, ...orderDoc.data() };
         
+        // Calculate proper quantity in pairs
+        let quantity = 1; // default
+        const rightQty = parseInt(orderData.rightQty || 0);
+        const leftQty = parseInt(orderData.leftQty || 0);
+        
+        // If both right and left are present, this is a pair
+        if (rightQty > 0 && leftQty > 0) {
+          // In optical terms, 1 right + 1 left = 1 pair
+          // We take the maximum since you can't have a partial pair
+          quantity = Math.max(rightQty, leftQty);
+        } else {
+          // If only one side is ordered, then count just that side
+          quantity = Math.max(rightQty, leftQty);
+        }
+        
+        // Ensure we have at least 1 quantity
+        quantity = quantity || 1;
+        
         // Update the row with order details
         const updatedRows = [...tableRows];
         updatedRows[rowIndex] = {
@@ -330,15 +364,15 @@ const CreateSale = () => {
           orderId: orderData.displayId, 
           orderDetails: orderData,
           itemName: orderData.brandName || '',
-          // Extract prescription from either the right or left eye
-          sph: orderData.rightSph || orderData.leftSph || '',
-          cyl: orderData.rightCyl || orderData.leftCyl || '',
-          axis: orderData.rightAxis || orderData.leftAxis || '',
-          add: orderData.rightAdd || orderData.leftAdd || '',
-          qty: (parseInt(orderData.rightQty || 0) + parseInt(orderData.leftQty || 0)) || 1,
-          unit: orderData.unit || 'Pairs',
+          // Extract prescription from either the right or left eye and format it
+          sph: formatOpticalValue(orderData.rightSph || orderData.leftSph || ''),
+          cyl: formatOpticalValue(orderData.rightCyl || orderData.leftCyl || ''),
+          axis: orderData.rightAxis || orderData.leftAxis || '', // No formatting for AXIS
+          add: formatOpticalValue(orderData.rightAdd || orderData.leftAdd || ''),
+          qty: quantity,
+          unit: 'Pairs', // Always use 'Pairs' regardless of the unit in the order
           price: orderData.price || 0,
-          total: (orderData.price || 0) * ((parseInt(orderData.rightQty || 0) + parseInt(orderData.leftQty || 0)) || 1)
+          total: (orderData.price || 0) * quantity
         };
         setTableRows(updatedRows);
       } else {
@@ -358,10 +392,20 @@ const CreateSale = () => {
 
   const handleTableRowChange = (index, field, value) => {
     const updatedRows = [...tableRows];
-    updatedRows[index] = {
-      ...updatedRows[index],
-      [field]: value
-    };
+    
+    // Format SPH, CYL, and ADD values when they're changed
+    if (field === 'sph' || field === 'cyl' || field === 'add') {
+      // Only format when the field loses focus or user presses Enter
+      updatedRows[index] = {
+        ...updatedRows[index],
+        [field]: value
+      };
+    } else {
+      updatedRows[index] = {
+        ...updatedRows[index],
+        [field]: value
+      };
+    }
 
     // Recalculate total for the row if price or qty changes
     if (field === 'price' || field === 'qty') {
@@ -375,6 +419,16 @@ const CreateSale = () => {
       }
     }
 
+    setTableRows(updatedRows);
+  };
+  
+  // Format SPH, CYL, and ADD when the field loses focus
+  const handleOpticalValueBlur = (index, field, value) => {
+    const updatedRows = [...tableRows];
+    updatedRows[index] = {
+      ...updatedRows[index],
+      [field]: formatOpticalValue(value)
+    };
     setTableRows(updatedRows);
   };
 
@@ -405,18 +459,29 @@ const CreateSale = () => {
         customerCity: selectedCustomer.city,
         customerState: selectedCustomer.state,
         customerGst: selectedCustomer.gstNumber,
-        items: filledRows.map(row => ({
-          orderId: row.orderId,
-          itemName: row.itemName,
-          sph: row.sph,
-          cyl: row.cyl,
-          axis: row.axis,
-          add: row.add,
-          qty: parseInt(row.qty),
-          unit: row.unit,
-          price: parseFloat(row.price),
-          total: parseFloat(row.total)
-        })),
+        items: filledRows.map(row => {
+          // Make sure SPH, CYL, and ADD are properly formatted for each item
+          const formattedRow = {
+            ...row,
+            sph: formatOpticalValue(row.sph),
+            cyl: formatOpticalValue(row.cyl),
+            add: formatOpticalValue(row.add)
+            // AXIS is not formatted, keeping the original value
+          };
+          
+          return {
+            orderId: formattedRow.orderId,
+            itemName: formattedRow.itemName,
+            sph: formattedRow.sph,
+            cyl: formattedRow.cyl,
+            axis: formattedRow.axis, // Using original AXIS value
+            add: formattedRow.add,
+            qty: parseInt(formattedRow.qty),
+            unit: formattedRow.unit,
+            price: parseFloat(formattedRow.price),
+            total: parseFloat(formattedRow.total)
+          };
+        }),
         subtotal: calculateSubtotal(),
         discountType,
         discountValue: parseFloat(discountValue || 0),
@@ -496,13 +561,14 @@ const CreateSale = () => {
   // Add function to fetch saved items
   const fetchItems = async () => {
     try {
+      // Fetch regular items from 'items' collection
       const itemsRef = collection(db, 'items');
-      const snapshot = await getDocs(itemsRef);
+      const itemsSnapshot = await getDocs(itemsRef);
       
       // Create a map to deduplicate items by name
       const uniqueItems = {};
       
-      snapshot.docs.forEach(doc => {
+      itemsSnapshot.docs.forEach(doc => {
         const item = { id: doc.id, ...doc.data() };
         const normalizedName = item.name.trim().toLowerCase();
         
@@ -511,6 +577,36 @@ const CreateSale = () => {
             (item.updatedAt && uniqueItems[normalizedName].updatedAt && 
              item.updatedAt.toDate() > uniqueItems[normalizedName].updatedAt.toDate())) {
           uniqueItems[normalizedName] = item;
+        }
+      });
+
+      // Fetch stock lenses from 'lens_inventory' collection
+      const lensRef = collection(db, 'lens_inventory');
+      const q = query(lensRef, where('type', '==', 'stock'));
+      const lensSnapshot = await getDocs(q);
+      
+      // Add stock lenses to the unique items
+      lensSnapshot.docs.forEach(doc => {
+        const lens = { id: doc.id, ...doc.data() };
+        
+        // Create a unique name that includes brand and power series
+        const itemName = `${lens.brandName || ''} ${lens.powerSeries || ''}`.trim();
+        if (itemName) {
+          const normalizedName = itemName.toLowerCase();
+          
+          // Add to uniqueItems if it doesn't exist or if this is a newer entry
+          if (!uniqueItems[normalizedName] || 
+              (lens.createdAt && uniqueItems[normalizedName].createdAt && 
+               lens.createdAt.toDate() > uniqueItems[normalizedName].createdAt.toDate())) {
+            uniqueItems[normalizedName] = {
+              id: lens.id,
+              name: itemName,
+              price: lens.salePrice || 0,
+              createdAt: lens.createdAt,
+              isStockLens: true,
+              stockData: lens
+            };
+          }
         }
       });
       
@@ -566,10 +662,28 @@ const CreateSale = () => {
   // Handle item selection from the ItemSuggestions component
   const handleItemSelect = (index, itemData) => {
     const updatedRows = [...tableRows];
-    updatedRows[index] = {
-      ...updatedRows[index],
-      ...itemData // This contains itemName, price, and total
-    };
+    
+    // Check if this is a stock lens item
+    if (itemData.isStockLens && itemData.stockData) {
+      const stockData = itemData.stockData;
+      
+      // For stock lenses, we can pre-populate power series info
+      updatedRows[index] = {
+        ...updatedRows[index],
+        itemName: itemData.name,
+        price: parseFloat(stockData.salePrice || 0),
+        total: parseFloat(stockData.salePrice || 0) * parseInt(updatedRows[index].qty || 1),
+        // Additional stock lens info that might be useful
+        powerSeries: stockData.powerSeries || ''
+      };
+    } else {
+      // Regular item handling (unchanged)
+      updatedRows[index] = {
+        ...updatedRows[index],
+        ...itemData // This contains itemName, price, and total
+      };
+    }
+    
     setTableRows(updatedRows);
   };
 
@@ -756,6 +870,11 @@ const CreateSale = () => {
                       rowQty={row.qty}
                       saveItemToDatabase={saveItemToDatabase}
                     />
+                    {row.powerSeries && (
+                      <div className="text-xs text-emerald-600 mt-1">
+                        {row.powerSeries}
+                      </div>
+                    )}
                   </td>
                   
                   <td className="px-3 py-2 whitespace-nowrap">
@@ -763,6 +882,7 @@ const CreateSale = () => {
                       type="text"
                       value={row.sph}
                       onChange={(e) => handleTableRowChange(index, 'sph', e.target.value)}
+                      onBlur={(e) => handleOpticalValueBlur(index, 'sph', e.target.value)}
                       className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center"
                       placeholder="SPH"
                     />
@@ -772,6 +892,7 @@ const CreateSale = () => {
                       type="text"
                       value={row.cyl}
                       onChange={(e) => handleTableRowChange(index, 'cyl', e.target.value)}
+                      onBlur={(e) => handleOpticalValueBlur(index, 'cyl', e.target.value)}
                       className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center"
                       placeholder="CYL"
                     />
@@ -790,6 +911,7 @@ const CreateSale = () => {
                       type="text"
                       value={row.add}
                       onChange={(e) => handleTableRowChange(index, 'add', e.target.value)}
+                      onBlur={(e) => handleOpticalValueBlur(index, 'add', e.target.value)}
                       className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center"
                       placeholder="ADD"
                     />
