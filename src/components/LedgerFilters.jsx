@@ -7,6 +7,7 @@ const LedgerFilters = ({ fromDate, setFromDate, toDate, setToDate, selectedEntit
   const [filteredEntities, setFilteredEntities] = useState([]);
   const [showEntityList, setShowEntityList] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedEntityIndex, setSelectedEntityIndex] = useState(-1);
   
   useEffect(() => {
     fetchEntities();
@@ -55,12 +56,48 @@ const LedgerFilters = ({ fromDate, setFromDate, toDate, setToDate, selectedEntit
     
     setFilteredEntities(filtered);
     setShowEntityList(true);
+    setSelectedEntityIndex(-1); // Reset the selected index when search results change
   };
   
   const handleEntitySelect = (entity) => {
     setSelectedEntity(entity);
     setSearchTerm(entity.opticalName);
     setShowEntityList(false);
+  };
+  
+  const handleKeyDown = (e) => {
+    if (!showEntityList || filteredEntities.length === 0) return;
+    
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedEntityIndex(prev => 
+          prev < filteredEntities.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedEntityIndex(prev => (prev > 0 ? prev - 1 : 0));
+        break;
+      case 'Enter':
+        if (selectedEntityIndex >= 0 && selectedEntityIndex < filteredEntities.length) {
+          e.preventDefault();
+          handleEntitySelect(filteredEntities[selectedEntityIndex]);
+        }
+        break;
+      case 'Tab':
+        if (selectedEntityIndex >= 0 && selectedEntityIndex < filteredEntities.length) {
+          e.preventDefault();
+          handleEntitySelect(filteredEntities[selectedEntityIndex]);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setShowEntityList(false);
+        break;
+      default:
+        break;
+    }
   };
   
   return (
@@ -97,6 +134,7 @@ const LedgerFilters = ({ fromDate, setFromDate, toDate, setToDate, selectedEntit
               setSearchTerm(e.target.value);
               handleEntitySearch(e.target.value);
             }}
+            onKeyDown={handleKeyDown}
             onClick={() => {
               if (searchTerm) {
                 handleEntitySearch(searchTerm);
@@ -108,11 +146,14 @@ const LedgerFilters = ({ fromDate, setFromDate, toDate, setToDate, selectedEntit
           
           {showEntityList && filteredEntities.length > 0 && (
             <div className="absolute z-50 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-sm overflow-auto border border-gray-300">
-              {filteredEntities.map((entity) => (
+              {filteredEntities.map((entity, idx) => (
                 <div
                   key={entity.id}
                   onClick={() => handleEntitySelect(entity)}
-                  className="cursor-default select-none relative py-1 pl-3 pr-9 hover:bg-gray-100"
+                  onMouseEnter={() => setSelectedEntityIndex(idx)}
+                  className={`cursor-pointer py-1 pl-3 pr-9 hover:bg-gray-100 ${
+                    selectedEntityIndex === idx ? 'bg-blue-50 text-blue-700' : ''
+                  }`}
                 >
                   <span className="font-medium block truncate">{entity.opticalName}</span>
                   {entity.contactPerson && (

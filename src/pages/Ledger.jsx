@@ -168,6 +168,13 @@ const Ledger = () => {
       
       setLedgerData(dataWithBalance);
       
+      // Setup window functions as soon as we have the data
+      if (dataWithBalance.length > 0) {
+        window.printLedger = () => handlePrint(viewMode);
+        window.exportToExcel = () => exportToExcel(viewMode);
+        window.shareViaWhatsApp = () => shareViaWhatsApp(viewMode);
+      }
+      
     } catch (error) {
       console.error('Error fetching ledger data:', error);
       setError('Failed to fetch ledger data: ' + error.message);
@@ -469,22 +476,23 @@ const Ledger = () => {
     window.open(whatsappURL, '_blank');
   };
   
-  // Make functions available globally for the LedgerFilters buttons
+  // Cleanup window functions when component unmounts
   useEffect(() => {
-    // Set these functions only once when we have data
-    if (selectedEntity && ledgerData.length > 0) {
-      window.printLedger = () => handlePrint(viewMode);
-      window.exportToExcel = () => exportToExcel(viewMode);
-      window.shareViaWhatsApp = () => shareViaWhatsApp(viewMode);
-    }
-    
-    // Cleanup
     return () => {
       window.printLedger = undefined;
       window.exportToExcel = undefined;
       window.shareViaWhatsApp = undefined;
     };
-  }, [viewMode, selectedEntity]);
+  }, []);
+  
+  // Update window functions when viewMode changes
+  useEffect(() => {
+    if (selectedEntity && ledgerData.length > 0) {
+      window.printLedger = () => handlePrint(viewMode);
+      window.exportToExcel = () => exportToExcel(viewMode);
+      window.shareViaWhatsApp = () => shareViaWhatsApp(viewMode);
+    }
+  }, [viewMode, ledgerData]);
   
   return (
     <div className="mobile-page">

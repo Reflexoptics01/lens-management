@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { auth, db } from '../firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -13,18 +13,24 @@ const Navbar = () => {
   const bottomNavRef = useRef(null);
   const [shopName, setShopName] = useState('');
   const [logoDataURL, setLogoDataURL] = useState('');
+  const [userRole, setUserRole] = useState('user');
+  const [userPermissions, setUserPermissions] = useState({});
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
-      setLoading(false);
       
       if (!currentUser && location.pathname !== '/login') {
         navigate('/login', { replace: true });
       } else if (currentUser) {
         // Fetch shop settings when user is authenticated
         fetchShopSettings();
+        
+        // Fetch user role and permissions
+        await fetchUserPermissions(currentUser.email);
       }
+      
+      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -42,6 +48,37 @@ const Navbar = () => {
       }
     } catch (error) {
       console.error('Error fetching shop settings:', error);
+    }
+  };
+
+  // Fetch user role and permissions
+  const fetchUserPermissions = async (email) => {
+    try {
+      // First check localStorage for permissions
+      const storedRole = localStorage.getItem('userRole');
+      const storedPermissions = localStorage.getItem('userPermissions');
+      
+      if (storedRole && storedPermissions) {
+        setUserRole(storedRole);
+        setUserPermissions(JSON.parse(storedPermissions));
+      } else {
+        // Fetch from Firestore if not in localStorage
+        const usersRef = collection(db, 'users');
+        const userQuery = query(usersRef, where('email', '==', email));
+        const userSnapshot = await getDocs(userQuery);
+        
+        if (!userSnapshot.empty) {
+          const userData = userSnapshot.docs[0].data();
+          setUserRole(userData.role || 'user');
+          setUserPermissions(userData.permissions || {});
+          
+          // Save to localStorage for future use
+          localStorage.setItem('userRole', userData.role || 'user');
+          localStorage.setItem('userPermissions', JSON.stringify(userData.permissions || {}));
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user permissions:', error);
     }
   };
 
@@ -234,6 +271,23 @@ const Navbar = () => {
     },
   ];
 
+  // Check if user has permission to view menu item
+  const hasPermission = (path) => {
+    // Admins have access to everything
+    if (userRole === 'admin') return true;
+    
+    // If no permissions set and user is not admin, deny access
+    if (!userPermissions || Object.keys(userPermissions).length === 0) return false;
+    
+    // Check specific permission
+    return userPermissions[path] === true;
+  };
+
+  // Filter menu items based on permissions
+  const getAccessibleMenuItems = () => {
+    return menuItems.filter(item => hasPermission(item.path));
+  };
+
   if (loading) {
     return (
       <nav className="mobile-header">
@@ -288,7 +342,7 @@ const Navbar = () => {
               </div>
               <div className="flex-1 overflow-y-auto py-4">
                 <div className="space-y-1 px-3">
-                  {menuItems.map((item) => (
+                  {getAccessibleMenuItems().map((item) => (
                     <button
                       key={item.path}
                       onClick={() => {
@@ -340,7 +394,7 @@ const Navbar = () => {
                 </div>
               </div>
               <div className="hidden sm:ml-6 sm:flex sm:space-x-4">
-                {menuItems.map((item) => (
+                {getAccessibleMenuItems().map((item) => (
                   <button
                     key={item.path}
                     onClick={() => handleNavigation(item.path)}
@@ -389,7 +443,7 @@ const Navbar = () => {
       <div className="mobile-bottom-nav mobile-only fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
         <div className="overflow-x-auto scrollbar-hide" ref={bottomNavRef} onScroll={handleNavScroll}>
           <div className="flex p-2 min-w-max">
-            {menuItems.map((item) => (
+            {getAccessibleMenuItems().map((item) => (
               <button
                 key={item.path}
                 onClick={() => {

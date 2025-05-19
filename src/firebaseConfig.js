@@ -3,6 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 
 // Your Firebase configuration
 const firebaseConfig = {
@@ -35,6 +36,19 @@ const db = getFirestore(app);
 // Initialize Storage
 const storage = getStorage(app);
 
+// Initialize Functions - specify us-central1 region explicitly
+const functions = getFunctions(app, 'us-central1');
+
+// Connect to Functions emulator if in development
+if (import.meta.env.MODE === 'development') {
+  try {
+    connectFunctionsEmulator(functions, "localhost", 5001);
+    console.log('Connected to Functions emulator');
+  } catch (error) {
+    console.warn('Failed to connect to Functions emulator:', error);
+  }
+}
+
 // Export Firebase modules for use in other parts of the app
-export { auth, db, storage };
+export { auth, db, storage, functions };
 export default app;

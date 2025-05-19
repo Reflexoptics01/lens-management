@@ -3,6 +3,7 @@ import { db } from '../firebaseConfig';
 import { collection, getDocs, addDoc, serverTimestamp, query, where, doc, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import CustomerForm from '../components/CustomerForm';
 
 const TAX_OPTIONS = [
   { id: 'TAX_FREE', label: 'Tax Free', rate: 0 },
@@ -17,6 +18,15 @@ const TAX_OPTIONS = [
   { id: 'IGST_18', label: 'IGST 18%', rate: 18 }
 ];
 
+const UNIT_OPTIONS = [
+  'Pairs',
+  'Pcs',
+  'Boxes',
+  'Sets',
+  'Bottles',
+  'Cases'
+];
+
 const CreatePurchase = () => {
   const navigate = useNavigate();
   const [vendors, setVendors] = useState([]);
@@ -24,9 +34,11 @@ const CreatePurchase = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [showVendorModal, setShowVendorModal] = useState(false);
   
   // Purchase details
   const [purchaseNumber, setPurchaseNumber] = useState('');
+  const [vendorInvoiceNumber, setVendorInvoiceNumber] = useState('');
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedTaxOption, setSelectedTaxOption] = useState(TAX_OPTIONS[0].id);
   const [discountType, setDiscountType] = useState('amount'); // 'amount' or 'percentage'
@@ -42,6 +54,8 @@ const CreatePurchase = () => {
     description: '',
     qty: 1,
     unit: 'Pairs', // Default unit
+    itemDiscount: 0,
+    itemDiscountType: 'amount', // 'amount' or 'percentage'
     price: 0,
     total: 0
   })));
@@ -54,6 +68,27 @@ const CreatePurchase = () => {
     generatePurchaseNumber();
   }, []);
 
+  // Listen for messages from popup windows
+  useEffect(() => {
+    const handleMessage = (event) => {
+      // Check if the message is about a new vendor being created
+      if (event.data && event.data.type === "VENDOR_CREATED") {
+        console.log("Received vendor creation message:", event.data);
+        fetchVendors().then(() => {
+          // Find the newly created vendor in our updated vendors list
+          const newVendor = vendors.find(v => v.id === event.data.customer.id);
+          if (newVendor) {
+            setSelectedVendor(newVendor);
+            setVendorSearchTerm('');
+          }
+        });
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [vendors]);
+
   const fetchVendors = async () => {
     try {
       setLoading(true);
@@ -65,9 +100,11 @@ const CreatePurchase = () => {
         ...doc.data()
       }));
       setVendors(vendorsList);
+      return vendorsList;
     } catch (error) {
       console.error('Error fetching vendors:', error);
       setError('Failed to fetch vendors');
+      return [];
     } finally {
       setLoading(false);
     }
@@ -86,9 +123,27 @@ const CreatePurchase = () => {
     }
   };
 
+  // Calculate item discount
+  const calculateItemDiscount = (item) => {
+    if (item.itemDiscountType === 'percentage') {
+      return (item.price * item.qty * parseFloat(item.itemDiscount || 0)) / 100;
+    }
+    return parseFloat(item.itemDiscount || 0);
+  };
+
+  // Calculate row total with discount
+  const calculateRowTotal = (item) => {
+    const subtotal = item.qty * item.price;
+    const discountAmount = calculateItemDiscount(item);
+    return subtotal - discountAmount;
+  };
+
   // Calculate subtotal before tax/discount
   const calculateSubtotal = () => {
-    return tableRows.reduce((sum, row) => sum + (row.total || 0), 0);
+    return tableRows.reduce((sum, row) => {
+      // Recalculate total with item discount
+      return sum + calculateRowTotal(row);
+    }, 0);
   };
   
   // Calculate discount amount
@@ -131,14 +186,31 @@ const CreatePurchase = () => {
       [field]: value
     };
     
-    // Calculate total for this row
-    if (field === 'qty' || field === 'price') {
-      const qty = field === 'qty' ? parseFloat(value) || 0 : parseFloat(updatedRows[index].qty) || 0;
-      const price = field === 'price' ? parseFloat(value) || 0 : parseFloat(updatedRows[index].price) || 0;
-      updatedRows[index].total = qty * price;
+    // Update the total when relevant fields change
+    if (['qty', 'price', 'itemDiscount', 'itemDiscountType'].includes(field)) {
+      updatedRows[index].total = calculateRowTotal(updatedRows[index]);
     }
     
     setTableRows(updatedRows);
+  };
+
+  const handleVendorModalClose = async (vendorCreated) => {
+    setShowVendorModal(false);
+    if (vendorCreated) {
+      // Refresh vendors list
+      const updatedVendors = await fetchVendors();
+      // Find the most recently created vendor (assuming it's the one with the latest createdAt timestamp)
+      if (updatedVendors.length > 0) {
+        const sortedVendors = [...updatedVendors].sort((a, b) => {
+          // If createdAt is a timestamp, convert to Date objects
+          const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt || 0);
+          const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt || 0);
+          return dateB - dateA;
+        });
+        
+        setSelectedVendor(sortedVendors[0]);
+      }
+    }
   };
 
   const handleSavePurchase = async () => {
@@ -161,9 +233,13 @@ const CreatePurchase = () => {
       const purchaseData = {
         vendorId: selectedVendor.id,
         vendorName: selectedVendor.opticalName,
+        vendorInvoiceNumber,
         purchaseNumber,
         purchaseDate,
-        items: filteredRows,
+        items: filteredRows.map(row => ({
+          ...row,
+          itemDiscountAmount: calculateItemDiscount(row)
+        })),
         subtotal: calculateSubtotal(),
         discountType,
         discountValue: parseFloat(discountValue) || 0,
@@ -240,45 +316,53 @@ const CreatePurchase = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Vendor *
             </label>
-            <div className="relative">
-              <input 
-                type="text" 
-                value={selectedVendor ? selectedVendor.opticalName : vendorSearchTerm}
-                onChange={(e) => {
-                  setVendorSearchTerm(e.target.value);
-                  setSelectedVendor(null);
-                  setShowVendorDropdown(true);
-                }}
-                onClick={() => setShowVendorDropdown(true)}
-                className="block w-full rounded border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
-                placeholder="Search for vendor..."
-              />
-              
-              {showVendorDropdown && (
-                <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5">
-                  {filteredVendors.length === 0 ? (
-                    <div className="py-2 px-3 text-gray-500">No vendors found</div>
-                  ) : (
-                    filteredVendors.map(vendor => (
-                      <div
-                        key={vendor.id}
-                        className="cursor-pointer py-2 px-3 hover:bg-gray-100"
-                        onClick={() => handleVendorSelect(vendor)}
-                      >
-                        <div className="font-medium">{vendor.opticalName}</div>
-                        {vendor.contactPerson && (
-                          <div className="text-xs text-gray-500">{vendor.contactPerson}</div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
+            <div className="flex space-x-2">
+              <div className="relative flex-1">
+                <input 
+                  type="text" 
+                  value={selectedVendor ? selectedVendor.opticalName : vendorSearchTerm}
+                  onChange={(e) => {
+                    setVendorSearchTerm(e.target.value);
+                    setSelectedVendor(null);
+                    setShowVendorDropdown(true);
+                  }}
+                  onClick={() => setShowVendorDropdown(true)}
+                  className="block w-full rounded border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
+                  placeholder="Search for vendor..."
+                />
+                
+                {showVendorDropdown && (
+                  <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5">
+                    {filteredVendors.length === 0 ? (
+                      <div className="py-2 px-3 text-gray-500">No vendors found</div>
+                    ) : (
+                      filteredVendors.map(vendor => (
+                        <div
+                          key={vendor.id}
+                          className="cursor-pointer py-2 px-3 hover:bg-gray-100"
+                          onClick={() => handleVendorSelect(vendor)}
+                        >
+                          <div className="font-medium">{vendor.opticalName}</div>
+                          {vendor.contactPerson && (
+                            <div className="text-xs text-gray-500">{vendor.contactPerson}</div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => setShowVendorModal(true)}
+                className="flex items-center justify-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-sky-600 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+              >
+                + Add Vendor
+              </button>
             </div>
           </div>
 
           {/* Purchase Details */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Purchase Number
@@ -289,6 +373,18 @@ const CreatePurchase = () => {
                 onChange={(e) => setPurchaseNumber(e.target.value)}
                 className="block w-full rounded border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-gray-50"
                 readOnly
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Vendor Invoice Number
+              </label>
+              <input 
+                type="text" 
+                value={vendorInvoiceNumber}
+                onChange={(e) => setVendorInvoiceNumber(e.target.value)}
+                className="block w-full rounded border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
+                placeholder="Enter vendor's invoice number"
               />
             </div>
             <div>
@@ -307,69 +403,192 @@ const CreatePurchase = () => {
 
         {/* Purchase Items */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6 overflow-x-auto">
-          <h2 className="text-lg font-medium text-gray-800 mb-4">Purchase Items</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-medium text-gray-800">Purchase Items</h2>
+            <div>
+              <button
+                onClick={() => {
+                  const newRows = Array(5).fill().map(() => ({
+                    itemName: '',
+                    description: '',
+                    qty: 1,
+                    unit: 'Pairs',
+                    itemDiscount: 0,
+                    itemDiscountType: 'amount',
+                    price: 0,
+                    total: 0
+                  }));
+                  setTableRows([...tableRows, ...newRows]);
+                }}
+                className="px-3 py-1.5 text-sm font-medium rounded-md text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 flex items-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add 5 Rows
+              </button>
+            </div>
+          </div>
           
-          <table className="min-w-full">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left text-xs font-medium text-gray-500 uppercase py-2">Item</th>
-                <th className="text-right text-xs font-medium text-gray-500 uppercase py-2 w-20">Qty</th>
-                <th className="text-right text-xs font-medium text-gray-500 uppercase py-2 w-20">Price</th>
-                <th className="text-right text-xs font-medium text-gray-500 uppercase py-2 w-24">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tableRows.map((row, index) => (
-                <tr key={index} className="border-b">
-                  <td className="py-2 pr-2">
-                    <input 
-                      type="text" 
-                      value={row.itemName}
-                      onChange={(e) => handleTableRowChange(index, 'itemName', e.target.value)}
-                      className="block w-full bg-transparent border-0 border-b border-transparent focus:border-sky-500 focus:ring-0 sm:text-sm"
-                      placeholder="Item name"
-                    />
-                    <input 
-                      type="text" 
-                      value={row.description}
-                      onChange={(e) => handleTableRowChange(index, 'description', e.target.value)}
-                      className="block w-full bg-transparent border-0 text-gray-500 text-xs focus:border-sky-500 focus:ring-0"
-                      placeholder="Description (optional)"
-                    />
-                  </td>
-                  <td className="py-2">
-                    <input 
-                      type="number" 
-                      value={row.qty}
-                      onChange={(e) => handleTableRowChange(index, 'qty', e.target.value)}
-                      className="block w-full bg-transparent border-0 text-right focus:border-sky-500 focus:ring-0 sm:text-sm"
-                      min="1"
-                    />
-                  </td>
-                  <td className="py-2">
-                    <input 
-                      type="number" 
-                      value={row.price}
-                      onChange={(e) => handleTableRowChange(index, 'price', e.target.value)}
-                      className="block w-full bg-transparent border-0 text-right focus:border-sky-500 focus:ring-0 sm:text-sm"
-                      min="0"
-                      step="0.01"
-                    />
-                  </td>
-                  <td className="py-2 text-right font-medium">
-                    {formatCurrency(row.total)}
-                  </td>
+          <div className="border rounded-lg overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                    #
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Item Details
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                    Qty
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                    Unit
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+                    Discount
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                    Price
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+                    Total
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                    Action
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {tableRows.map((row, index) => (
+                  <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 text-center">
+                      {index + 1}
+                    </td>
+                    <td className="px-3 py-2">
+                      <input 
+                        type="text" 
+                        value={row.itemName}
+                        onChange={(e) => handleTableRowChange(index, 'itemName', e.target.value)}
+                        className="block w-full border-0 bg-transparent focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm font-medium"
+                        placeholder="Item name"
+                      />
+                      <input 
+                        type="text" 
+                        value={row.description}
+                        onChange={(e) => handleTableRowChange(index, 'description', e.target.value)}
+                        className="block w-full border-0 bg-transparent text-gray-500 text-xs focus:ring-0 focus:border-b focus:border-sky-400 mt-1"
+                        placeholder="Description (optional)"
+                      />
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <input 
+                        type="number" 
+                        value={row.qty}
+                        onChange={(e) => handleTableRowChange(index, 'qty', e.target.value)}
+                        className="block w-full border-0 bg-transparent text-right focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm"
+                        min="1"
+                      />
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <select
+                        value={row.unit}
+                        onChange={(e) => handleTableRowChange(index, 'unit', e.target.value)}
+                        className="block w-full border-0 bg-transparent focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-center"
+                      >
+                        {UNIT_OPTIONS.map(unit => (
+                          <option key={unit} value={unit}>{unit}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <div className="flex items-center space-x-1">
+                        <select
+                          value={row.itemDiscountType}
+                          onChange={(e) => handleTableRowChange(index, 'itemDiscountType', e.target.value)}
+                          className="w-12 border-0 bg-transparent focus:ring-0 focus:border-b-2 focus:border-sky-500 text-xs pr-0"
+                        >
+                          <option value="amount">₹</option>
+                          <option value="percentage">%</option>
+                        </select>
+                        <input 
+                          type="number" 
+                          value={row.itemDiscount}
+                          onChange={(e) => handleTableRowChange(index, 'itemDiscount', e.target.value)}
+                          className="block w-full border-0 bg-transparent text-right focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm"
+                          min="0"
+                          step="0.01"
+                        />
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <input 
+                        type="number" 
+                        value={row.price}
+                        onChange={(e) => handleTableRowChange(index, 'price', e.target.value)}
+                        className="block w-full border-0 bg-transparent text-right focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm"
+                        min="0"
+                        step="0.01"
+                      />
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-right font-medium text-gray-900">
+                      {formatCurrency(row.total)}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-center">
+                      <button
+                        onClick={() => {
+                          const updatedRows = [...tableRows];
+                          updatedRows.splice(index, 1);
+                          setTableRows(updatedRows);
+                        }}
+                        className="text-red-500 hover:text-red-700 focus:outline-none"
+                        title="Remove item"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {tableRows.length === 0 && (
+                  <tr>
+                    <td colSpan="8" className="px-3 py-4 text-center text-gray-500">
+                      No items added yet. Click the "Add 5 Rows" button to add purchase items.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
           
-          <button
-            onClick={() => setTableRows([...tableRows, { itemName: '', description: '', qty: 1, unit: 'Pairs', price: 0, total: 0 }])}
-            className="mt-4 text-sm text-sky-600 hover:text-sky-800"
-          >
-            + Add More Items
-          </button>
+          <div className="mt-4 flex justify-between">
+            <div className="text-sm text-gray-500">
+              {tableRows.length} items
+            </div>
+            <button
+              onClick={() => {
+                const newRows = Array(5).fill().map(() => ({
+                  itemName: '',
+                  description: '',
+                  qty: 1,
+                  unit: 'Pairs',
+                  itemDiscount: 0,
+                  itemDiscountType: 'amount',
+                  price: 0,
+                  total: 0
+                }));
+                setTableRows([...tableRows, ...newRows]);
+              }}
+              className="text-sm text-sky-600 hover:text-sky-800 flex items-center"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add 5 More Items
+            </button>
+          </div>
         </div>
 
         {/* Summary */}
@@ -518,6 +737,11 @@ const CreatePurchase = () => {
           </button>
         </div>
       </div>
+
+      {/* Vendor Modal */}
+      {showVendorModal && (
+        <CustomerForm isVendor={true} onClose={handleVendorModalClose} />
+      )}
     </div>
   );
 };

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { db, auth } from '../firebaseConfig';
-import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
-import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { db, auth, functions } from '../firebaseConfig';
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, addDoc, query, where } from 'firebase/firestore';
+import { updatePassword, EmailAuthProvider, reauthenticateWithCredential, createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { httpsCallable } from 'firebase/functions';
 import Navbar from '../components/Navbar';
 
 const Settings = () => {
@@ -50,6 +51,32 @@ const Settings = () => {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
   
+  // Users management
+  const [users, setUsers] = useState([]);
+  const [inactiveUsers, setInactiveUsers] = useState([]);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserRole, setNewUserRole] = useState('user');
+  const [newUserPermissions, setNewUserPermissions] = useState({});
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [userError, setUserError] = useState('');
+  const [userSuccess, setUserSuccess] = useState('');
+  const [usersTab, setUsersTab] = useState('active'); // 'active' or 'inactive'
+  
+  // Define menu items to display in permissions checkboxes
+  const menuItems = [
+    { path: '/dashboard', title: 'Dashboard' },
+    { path: '/orders', title: 'Orders' },
+    { path: '/customers', title: 'Vendors & Customers' },
+    { path: '/sales', title: 'Sales' },
+    { path: '/purchases', title: 'Purchases' },
+    { path: '/transactions', title: 'Transactions' },
+    { path: '/ledger', title: 'Ledger' },
+    { path: '/gst-returns', title: 'GST Returns' },
+    { path: '/lens-inventory', title: 'Lens Inventory' },
+    { path: '/settings', title: 'Settings' },
+  ];
+  
   // Generate financial year options
   const generateFinancialYears = () => {
     const currentYear = new Date().getFullYear();
@@ -70,6 +97,9 @@ const Settings = () => {
   
   useEffect(() => {
     fetchSettings();
+    if (auth.currentUser) {
+      fetchUsers();
+    }
   }, []);
   
   const fetchSettings = async () => {
@@ -938,6 +968,267 @@ const Settings = () => {
     }
   };
   
+  // Fetch users
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      console.log('Fetching users from Firestore');
+      
+      // Fetch all users
+      const usersCollection = collection(db, 'users');
+      const usersSnapshot = await getDocs(usersCollection);
+      
+      console.log(`Retrieved ${usersSnapshot.docs.length} user documents from Firestore`);
+      
+      const activeUsersList = [];
+      const inactiveUsersList = [];
+      
+      // Process users
+      usersSnapshot.forEach(doc => {
+        const userData = doc.data();
+        console.log(`Processing user: ${userData.email}`);
+        
+        // Skip the current admin user
+        if (userData.email !== auth.currentUser?.email) {
+          const userWithId = {
+            id: doc.id,
+            ...userData,
+            // Convert Firestore Timestamp to JS Date for display
+            createdAt: userData.createdAt ? userData.createdAt.toDate() : null,
+            inactiveAt: userData.inactiveAt ? userData.inactiveAt.toDate() : null
+          };
+          
+          if (userData.isActive === false) {
+            console.log(`Adding to inactive users: ${userData.email}`);
+            inactiveUsersList.push(userWithId);
+          } else {
+            console.log(`Adding to active users: ${userData.email}`);
+            activeUsersList.push(userWithId);
+          }
+        } else {
+          console.log(`Skipping current admin user: ${userData.email}`);
+        }
+      });
+      
+      console.log(`Found ${activeUsersList.length} active users and ${inactiveUsersList.length} inactive users`);
+      setUsers(activeUsersList);
+      setInactiveUsers(inactiveUsersList);
+      
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      setUserError('Failed to load users. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Restore inactive user
+  const handleRestoreUser = async (userId, userEmail) => {
+    try {
+      setLoading(true);
+      
+      // Update the user document to mark as active
+      await updateDoc(doc(db, 'users', userId), {
+        isActive: true,
+        inactiveAt: null,
+        inactiveBy: null,
+        restoredAt: new Date(),
+        restoredBy: auth.currentUser.uid
+      });
+      
+      setUserSuccess(`User ${userEmail} has been restored and can now log in again.`);
+      
+      // Refresh the users list
+      await fetchUsers();
+      
+    } catch (error) {
+      console.error('Error restoring user:', error);
+      setUserError(`Failed to restore user: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Add an effect to refresh the users list periodically
+  useEffect(() => {
+    // Initial fetch
+    fetchUsers();
+    
+    // Set up an interval to refresh users every 30 seconds
+    const intervalId = setInterval(() => {
+      if (activeTab === 'users') {
+        console.log('Auto-refreshing users list');
+        fetchUsers();
+      }
+    }, 30000);
+    
+    // Clean up interval when component unmounts
+    return () => clearInterval(intervalId);
+  }, [activeTab]);
+  
+  // Also refresh users whenever we switch to the users tab
+  useEffect(() => {
+    if (activeTab === 'users') {
+      console.log('Tab changed to users, refreshing data');
+      fetchUsers();
+    }
+  }, [activeTab]);
+  
+  // Create new user
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    setUserError('');
+    setUserSuccess('');
+    
+    if (!newUserEmail || !newUserPassword) {
+      setUserError('Email and password are required');
+      return;
+    }
+    
+    if (newUserPassword.length < 6) {
+      setUserError('Password must be at least 6 characters long');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      
+      // Create user directly with Firebase Auth
+      console.log('Creating new user with email:', newUserEmail);
+      
+      // Get a separate auth instance to avoid logging out the current admin
+      const auth2 = getAuth();
+      
+      // Create the user in Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(
+        auth2, 
+        newUserEmail, 
+        newUserPassword
+      );
+      
+      console.log('User created successfully with uid:', userCredential.user.uid);
+      
+      // Add user to Firestore with permissions
+      await addDoc(collection(db, 'users'), {
+        uid: userCredential.user.uid,
+        email: newUserEmail,
+        role: newUserRole,
+        permissions: newUserPermissions,
+        createdAt: new Date(),
+        createdBy: auth.currentUser.uid,
+        isActive: true
+      });
+      
+      // Reset form and refresh users
+      setNewUserEmail('');
+      setNewUserPassword('');
+      setNewUserRole('user');
+      setNewUserPermissions({});
+      await fetchUsers();
+      
+      setUserSuccess(`User ${newUserEmail} created successfully!`);
+    } catch (error) {
+      console.error('Error creating user:', error);
+      let errorMessage = 'Failed to create user';
+      
+      // Extract detailed error message
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'This email is already in use. Please use a different email address.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email format. Please provide a valid email address.';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'Password is too weak. It must be at least 6 characters long.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setUserError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Update user permissions
+  const handleUpdatePermissions = async (userId, permissions) => {
+    try {
+      setLoading(true);
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, { permissions });
+      await fetchUsers();
+      setUserSuccess('User permissions updated successfully');
+    } catch (error) {
+      console.error('Error updating permissions:', error);
+      setUserError(`Failed to update permissions: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Delete user
+  const handleDeleteUser = async (userId, userEmail, userUid) => {
+    if (!window.confirm(`Are you sure you want to delete ${userEmail}? This action cannot be undone.`)) {
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      
+      // Instead of deleting from Firebase Auth (which requires admin privileges),
+      // we'll mark the user as inactive in Firestore
+      console.log(`Marking user ${userEmail} as inactive`);
+      
+      // Update the user document to mark as inactive
+      await updateDoc(doc(db, 'users', userId), {
+        isActive: false,
+        inactiveAt: new Date(),
+        inactiveBy: auth.currentUser.uid
+      });
+      
+      setUserSuccess(`User ${userEmail} has been marked as inactive and will no longer be able to log in.`);
+      
+      // Refresh the users list to remove the inactive user
+      await fetchUsers();
+      
+    } catch (error) {
+      console.error('Error deactivating user:', error);
+      setUserError(`Failed to deactivate user: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Test login for a user
+  const testUserLogin = async (userEmail) => {
+    try {
+      setLoading(true);
+      setUserError('');
+      setUserSuccess('');
+      
+      // Ask for the password
+      const password = window.prompt(`Enter the password for ${userEmail} to test login:`);
+      
+      if (!password) {
+        setLoading(false);
+        return;
+      }
+      
+      // Try to sign in
+      const auth2 = getAuth();  // Get a new auth instance to avoid signing out the current user
+      try {
+        await signInWithEmailAndPassword(auth2, userEmail, password);
+        setUserSuccess(`Login test successful for ${userEmail}! This user's credentials are valid.`);
+      } catch (error) {
+        console.error('Test login error:', error);
+        setUserError(`Login test failed: ${error.message || error.code}`);
+      }
+    } catch (error) {
+      console.error('Error in test login function:', error);
+      setUserError(`Test login error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
       <Navbar />
@@ -991,6 +1282,12 @@ const Settings = () => {
               onClick={() => setActiveTab('backup')}
             >
               Backup & Restore
+            </button>
+            <button
+              className={`px-4 py-3 text-sm font-medium ${activeTab === 'users' ? 'text-sky-600 border-b-2 border-sky-500' : 'text-gray-500 hover:text-gray-700'}`}
+              onClick={() => setActiveTab('users')}
+            >
+              Users
             </button>
             <button
               className={`px-4 py-3 text-sm font-medium ${activeTab === 'password' ? 'text-sky-600 border-b-2 border-sky-500' : 'text-gray-500 hover:text-gray-700'}`}
@@ -1566,6 +1863,458 @@ const Settings = () => {
                     {loading ? 'Changing...' : 'Change Password'}
                   </button>
                 </div>
+              </div>
+            )}
+            
+            {/* Users Tab */}
+            {activeTab === 'users' && (
+              <div className="space-y-6">
+                <h2 className="text-lg font-medium text-gray-900">User Management</h2>
+                
+                {userError && (
+                  <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6 text-red-700 flex justify-between items-center">
+                    <p>{userError}</p>
+                    <button 
+                      onClick={() => setUserError('')}
+                      className="ml-4 text-red-700 hover:text-red-900"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                
+                {userSuccess && (
+                  <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-6 text-green-700 flex justify-between items-center">
+                    <p>{userSuccess}</p>
+                    <button 
+                      onClick={() => setUserSuccess('')}
+                      className="ml-4 text-green-700 hover:text-green-900"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                
+                <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6 text-blue-700">
+                  <h3 className="text-md font-medium">About User Management</h3>
+                  <p className="text-sm mt-1">
+                    As an admin, you can create additional users with limited permissions. 
+                    Each user will have their own login credentials but will only be able to 
+                    access the features you grant them permission for.
+                  </p>
+                </div>
+                
+                {/* Create New User Form */}
+                <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm mb-8">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Create New User</h3>
+                  
+                  <form onSubmit={handleCreateUser} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                        <input
+                          type="email"
+                          value={newUserEmail}
+                          onChange={(e) => setNewUserEmail(e.target.value)}
+                          className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                          required
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+                        <input
+                          type="password"
+                          value={newUserPassword}
+                          onChange={(e) => setNewUserPassword(e.target.value)}
+                          className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                          required
+                          minLength={6}
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                          Password must be at least 6 characters long
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                      <select
+                        value={newUserRole}
+                        onChange={(e) => setNewUserRole(e.target.value)}
+                        className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      >
+                        <option value="user">Standard User</option>
+                        <option value="admin">Administrator</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Permissions</label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        {menuItems.map((item) => (
+                          <label key={item.path} className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              checked={newUserPermissions[item.path] || false}
+                              onChange={(e) => setNewUserPermissions({
+                                ...newUserPermissions,
+                                [item.path]: e.target.checked
+                              })}
+                              className="h-4 w-4 text-sky-600 focus:ring-sky-500 border-gray-300 rounded"
+                            />
+                            <span className="text-sm text-gray-700">{item.title}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <button
+                        type="submit"
+                        disabled={loading || !newUserEmail || !newUserPassword}
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50"
+                      >
+                        {loading ? (
+                          <>
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Creating...
+                          </>
+                        ) : 'Create User'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+                
+                {/* Existing Users List */}
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-medium text-gray-900">Existing Users</h3>
+                    <button
+                      onClick={fetchUsers}
+                      className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-sky-700 bg-sky-100 hover:bg-sky-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                    >
+                      <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Refresh
+                    </button>
+                  </div>
+                  
+                  {/* User Tabs */}
+                  <div className="border-b border-gray-200 mb-4">
+                    <nav className="-mb-px flex space-x-8">
+                      <button
+                        onClick={() => setUsersTab('active')}
+                        className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm ${
+                          usersTab === 'active'
+                            ? 'border-sky-500 text-sky-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        Active Users
+                        {users.length > 0 && (
+                          <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${
+                            usersTab === 'active' ? 'bg-sky-100 text-sky-600' : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {users.length}
+                          </span>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => setUsersTab('inactive')}
+                        className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm ${
+                          usersTab === 'inactive'
+                            ? 'border-sky-500 text-sky-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        Inactive Users
+                        {inactiveUsers.length > 0 && (
+                          <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${
+                            usersTab === 'inactive' ? 'bg-sky-100 text-sky-600' : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {inactiveUsers.length}
+                          </span>
+                        )}
+                      </button>
+                    </nav>
+                  </div>
+                  
+                  {loading && (
+                    <div className="flex justify-center my-8">
+                      <svg className="animate-spin h-8 w-8 text-sky-500" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    </div>
+                  )}
+                  
+                  {/* Active Users Table */}
+                  {!loading && usersTab === 'active' && users.length === 0 && (
+                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 text-yellow-700">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                          <svg className="h-5 w-5 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm">No active users found other than the main admin. Try creating a new user.</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Inactive Users Table */}
+                  {!loading && usersTab === 'inactive' && inactiveUsers.length === 0 && (
+                    <div className="bg-gray-50 border-l-4 border-gray-400 p-4 text-gray-700">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                          <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm">No inactive users found. Deactivated users will appear here.</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Active Users Table */}
+                  {!loading && usersTab === 'active' && users.length > 0 && (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Email
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Role
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Permissions
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {users.map((user) => (
+                            <tr key={user.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">{user.email}</div>
+                                <div className="text-xs text-gray-500">
+                                  Created: {user.createdAt ? user.createdAt.toLocaleDateString() : 'N/A'}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                  user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
+                                }`}>
+                                  {user.role === 'admin' ? 'Administrator' : 'Standard User'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex flex-wrap gap-1">
+                                  {user.permissions && Object.entries(user.permissions)
+                                    .filter(([_, value]) => value)
+                                    .map(([path]) => {
+                                      const menuItem = menuItems.find(item => item.path === path);
+                                      return menuItem ? (
+                                        <span key={path} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                          {menuItem.title}
+                                        </span>
+                                      ) : null;
+                                    })
+                                  }
+                                  {(!user.permissions || Object.values(user.permissions).filter(Boolean).length === 0) && (
+                                    <span className="text-xs text-gray-500 italic">No specific permissions</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <button
+                                  onClick={() => setSelectedUser(user)}
+                                  className="text-sky-600 hover:text-sky-900 mr-3"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteUser(user.id, user.email, user.uid)}
+                                  className="text-red-600 hover:text-red-900 mr-3"
+                                >
+                                  Deactivate
+                                </button>
+                                <button
+                                  onClick={() => testUserLogin(user.email)}
+                                  className="text-amber-600 hover:text-amber-900"
+                                >
+                                  Test Login
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  
+                  {/* Inactive Users Table */}
+                  {!loading && usersTab === 'inactive' && inactiveUsers.length > 0 && (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Email
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Role
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Deactivated
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {inactiveUsers.map((user) => (
+                            <tr key={user.id} className="hover:bg-gray-50 bg-red-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">{user.email}</div>
+                                <div className="text-xs text-gray-500">
+                                  Created: {user.createdAt ? user.createdAt.toLocaleDateString() : 'N/A'}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                  user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
+                                }`}>
+                                  {user.role === 'admin' ? 'Administrator' : 'Standard User'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {user.inactiveAt ? (
+                                  <div className="text-xs text-gray-500">
+                                    {user.inactiveAt.toLocaleDateString()} {user.inactiveAt.toLocaleTimeString()}
+                                  </div>
+                                ) : (
+                                  <div className="text-xs text-gray-500">Unknown</div>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <button
+                                  onClick={() => handleRestoreUser(user.id, user.email)}
+                                  className="text-green-600 hover:text-green-900"
+                                >
+                                  Restore User
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Edit User Modal */}
+                {selectedUser && (
+                  <div className="fixed inset-0 overflow-y-auto z-50">
+                    <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center">
+                      <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+                        <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+                      </div>
+                      
+                      <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                        <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                          <div className="sm:flex sm:items-start">
+                            <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                              <h3 className="text-lg leading-6 font-medium text-gray-900">
+                                Edit User Permissions
+                              </h3>
+                              <div className="mt-2">
+                                <p className="text-sm text-gray-500 mb-4">
+                                  Update permissions for {selectedUser.email}
+                                </p>
+                                
+                                <div className="mt-4">
+                                  <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                                  <select
+                                    value={selectedUser.role}
+                                    onChange={(e) => setSelectedUser({
+                                      ...selectedUser,
+                                      role: e.target.value
+                                    })}
+                                    className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                                  >
+                                    <option value="user">Standard User</option>
+                                    <option value="admin">Administrator</option>
+                                  </select>
+                                </div>
+                                
+                                <div className="mt-4">
+                                  <label className="block text-sm font-medium text-gray-700 mb-2">Permissions</label>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto p-2">
+                                    {menuItems.map((item) => (
+                                      <label key={item.path} className="flex items-center space-x-2">
+                                        <input
+                                          type="checkbox"
+                                          checked={selectedUser.permissions?.[item.path] || false}
+                                          onChange={(e) => setSelectedUser({
+                                            ...selectedUser,
+                                            permissions: {
+                                              ...selectedUser.permissions,
+                                              [item.path]: e.target.checked
+                                            }
+                                          })}
+                                          className="h-4 w-4 text-sky-600 focus:ring-sky-500 border-gray-300 rounded"
+                                        />
+                                        <span className="text-sm text-gray-700">{item.title}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleUpdatePermissions(selectedUser.id, selectedUser.permissions);
+                              setSelectedUser(null);
+                            }}
+                            className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-sky-600 text-base font-medium text-white hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 sm:ml-3 sm:w-auto sm:text-sm"
+                          >
+                            Save Changes
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedUser(null)}
+                            className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 sm:mt-0 sm:w-auto sm:text-sm"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

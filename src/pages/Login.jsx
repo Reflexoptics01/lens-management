@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { auth, db } from '../firebaseConfig';
 import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
-import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 
 const Login = () => {
@@ -37,9 +37,66 @@ const Login = () => {
   ];
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        navigate('/orders');
+        // Check if user exists and get permissions
+        try {
+          const usersRef = collection(db, 'users');
+          const userQuery = query(usersRef, where('email', '==', user.email));
+          const userSnapshot = await getDocs(userQuery);
+          
+          if (!userSnapshot.empty) {
+            // Store user role and permissions in localStorage for app-wide access
+            const userData = userSnapshot.docs[0].data();
+            
+            // Check if user is inactive
+            if (userData.isActive === false) {
+              console.error('User account is inactive');
+              // Sign out the user
+              await auth.signOut();
+              setError('Your account has been deactivated. Please contact an administrator.');
+              setInitializing(false);
+              return;
+            }
+            
+            localStorage.setItem('userRole', userData.role || 'user');
+            localStorage.setItem('userPermissions', JSON.stringify(userData.permissions || {}));
+            
+            // Navigate based on role or permissions
+            if (userData.role === 'admin') {
+              navigate('/dashboard');
+            } else {
+              // For regular users, navigate to the first permitted page
+              const permissions = userData.permissions || {};
+              const availablePaths = Object.entries(permissions)
+                .filter(([_, hasAccess]) => hasAccess)
+                .map(([path]) => path);
+                
+              if (availablePaths.length > 0) {
+                navigate(availablePaths[0]);
+              } else {
+                navigate('/orders'); // Default page if no specific permissions
+              }
+            }
+          } else {
+            // Create new user document if it doesn't exist (for first login)
+            await addDoc(collection(db, 'users'), {
+              uid: user.uid,
+              email: user.email,
+              role: 'admin', // First user is admin by default
+              permissions: {}, // Admin has all permissions by default
+              createdAt: new Date(),
+              isActive: true // Mark as active by default
+            });
+            localStorage.setItem('userRole', 'admin');
+            localStorage.setItem('userPermissions', JSON.stringify({}));
+            navigate('/dashboard');
+          }
+        } catch (error) {
+          console.error('Error checking user:', error);
+          // Still navigate to default page on error
+          navigate('/orders');
+        }
       }
       setInitializing(false);
     });
@@ -61,27 +118,38 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      console.log('Attempting to sign in with email:', email);
       
-      // Check if user exists in Firestore
-      const usersRef = collection(db, 'users');
-      const userQuery = query(usersRef, where('email', '==', email));
-      const userSnapshot = await getDocs(userQuery);
-
-      if (!userSnapshot.empty) {
-        navigate('/orders');
-      } else {
-        // Create new user document if it doesn't exist
-        await addDoc(collection(db, 'users'), {
-          uid: userCredential.user.uid,
-          email: email,
-          createdAt: new Date()
-        });
-        navigate('/orders');
+      // Trim whitespace from email and password
+      const trimmedEmail = email.trim();
+      const trimmedPassword = password.trim();
+      
+      if (trimmedEmail !== email || trimmedPassword !== password) {
+        console.log('Trimmed whitespace from credentials');
       }
+      
+      // Sign in user with Firebase authentication
+      await signInWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
+      
+      // Navigation is handled in the onAuthStateChanged listener
     } catch (error) {
       console.error('Error signing in:', error);
-      setError(error.message || 'Failed to sign in');
+      let errorMessage = 'Failed to sign in';
+      
+      // Provide more helpful error messages
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/invalid-email' || error.code === 'auth/user-not-found') {
+        errorMessage = 'Invalid email or password. Please check your credentials and try again.';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password. Please try again.';
+      } else if (error.code === 'auth/user-disabled') {
+        errorMessage = 'This account has been disabled. Please contact an administrator.';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many unsuccessful login attempts. Please try again later or reset your password.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

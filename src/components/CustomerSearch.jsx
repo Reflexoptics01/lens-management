@@ -87,20 +87,16 @@ const CustomerSearch = ({ customers, value, onChange, onSelect, onAddNew, isOrde
     isUserEditingRef.current = true;
     setSearchTerm(value);
     
-    // If user completely cleared the field or the input doesn't match the last selection,
-    // clear the selection reference
-    if (value === '' || (lastSelectedCustomerRef.current && !lastSelectedCustomerRef.current.startsWith(value))) {
-      lastSelectedCustomerRef.current = null;
-      // Let parent know that customer is unselected
-      onSelect(null);
-    }
+    // Always update the parent with the current input value
+    onChange({ target: { name: 'customerName', value } });
     
+    // Only clear the selection if field is completely empty
     if (value === '') {
+      lastSelectedCustomerRef.current = null;
       setShowSuggestions(false);
       setFilteredCustomers([]);
+      onSelect(null);
     }
-    
-    onChange({ target: { name: 'customerName', value } });
     
     // Reset the editing flag after a short delay
     setTimeout(() => {

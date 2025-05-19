@@ -23,6 +23,7 @@ const Transactions = () => {
   const [entities, setEntities] = useState([]);
   const [filteredEntities, setFilteredEntities] = useState([]);
   const [activeRowIndex, setActiveRowIndex] = useState(null);
+  const [selectedEntityIndex, setSelectedEntityIndex] = useState(-1);
   const [searchTerm, setSearchTerm] = useState('');
   const [showEntityList, setShowEntityList] = useState(false);
   
@@ -148,7 +149,44 @@ const Transactions = () => {
     );
     
     setFilteredEntities(filtered);
-    setShowEntityList(true);
+    setShowEntityList(filtered.length > 0);
+    setSelectedEntityIndex(-1); // Reset the selected index when search results change
+  };
+  
+  const handleKeyDown = (e, rowIndex) => {
+    // Only handle keys if suggestions are showing and we have filtered entities
+    if (!showEntityList || filteredEntities.length === 0 || activeRowIndex !== rowIndex) return;
+    
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedEntityIndex(prev => 
+          prev < filteredEntities.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedEntityIndex(prev => (prev > 0 ? prev - 1 : 0));
+        break;
+      case 'Enter':
+        if (selectedEntityIndex >= 0 && selectedEntityIndex < filteredEntities.length) {
+          e.preventDefault();
+          handleEntitySelect(filteredEntities[selectedEntityIndex], rowIndex);
+        }
+        break;
+      case 'Tab':
+        if (selectedEntityIndex >= 0 && selectedEntityIndex < filteredEntities.length) {
+          e.preventDefault();
+          handleEntitySelect(filteredEntities[selectedEntityIndex], rowIndex);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setShowEntityList(false);
+        break;
+      default:
+        break;
+    }
   };
   
   const handleEntitySelect = (entity, rowIndex) => {
@@ -476,16 +514,20 @@ const Transactions = () => {
                               handleInputChange(index, 'entityName', e.target.value);
                               handleSearch(e.target.value);
                             }}
+                            onKeyDown={(e) => handleKeyDown(e, index)}
                             placeholder="Search party..."
                             className="w-full text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                           />
                           {activeRowIndex === index && showEntityList && filteredEntities.length > 0 && (
                             <div className="absolute z-50 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-sm overflow-auto">
-                              {filteredEntities.map((entity) => (
+                              {filteredEntities.map((entity, idx) => (
                                 <div
                                   key={entity.id}
                                   onClick={() => handleEntitySelect(entity, index)}
-                                  className="cursor-default select-none relative py-2 pl-3 pr-9 hover:bg-gray-100"
+                                  onMouseEnter={() => setSelectedEntityIndex(idx)}
+                                  className={`cursor-pointer py-2 pl-3 pr-9 hover:bg-gray-100 ${
+                                    selectedEntityIndex === idx ? 'bg-blue-50 text-blue-700' : ''
+                                  }`}
                                 >
                                   <span className="font-medium block truncate">{entity.opticalName}</span>
                                   {entity.contactPerson && (

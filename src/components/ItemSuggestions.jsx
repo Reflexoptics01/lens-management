@@ -145,11 +145,23 @@ const ItemSuggestions = ({
     setSearchTerm(item.name);
     setShowSuggestions(false);
     
-    onSelect(index, {
-      itemName: item.name,
-      price: item.price,
-      total: item.price * (parseInt(rowQty) || 1)
-    });
+    if (item.isStockLens) {
+      // For stock lens items, pass the full data
+      onSelect(index, {
+        itemName: item.name,
+        price: item.price,
+        total: item.price * (parseInt(rowQty) || 1),
+        isStockLens: true,
+        stockData: item.stockData
+      });
+    } else {
+      // For regular items
+      onSelect(index, {
+        itemName: item.name,
+        price: item.price,
+        total: item.price * (parseInt(rowQty) || 1)
+      });
+    }
   };
 
   // Separate function for mouse clicks on items
@@ -226,7 +238,12 @@ const ItemSuggestions = ({
                 onClick={(e) => handleItemClick(e, item)}
                 onMouseEnter={() => setSelectedIndex(idx)}
               >
-                <span className="font-medium text-sm truncate flex-1">{item.name}</span>
+                <div className="flex flex-col flex-1 truncate">
+                  <span className="font-medium text-sm truncate">{item.name}</span>
+                  {item.isStockLens && item.stockData && (
+                    <span className="text-xs text-emerald-600">Stock Lens {item.stockData.powerSeries}</span>
+                  )}
+                </div>
                 <span className="text-xs text-gray-500 ml-2 whitespace-nowrap">₹{item.price}</span>
               </div>
             ))}
