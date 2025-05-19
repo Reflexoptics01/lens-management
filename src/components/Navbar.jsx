@@ -95,6 +95,12 @@ const Navbar = () => {
     }
   };
 
+  // Navigation handler with debugging
+  const handleNavigation = (path) => {
+    console.log('Navigating to:', path);
+    navigate(path);
+  };
+
   // Get the first letter of shop name for fallback display
   const getShopInitial = () => {
     return shopName ? shopName.charAt(0).toUpperCase() : 'S';
@@ -286,7 +292,7 @@ const Navbar = () => {
                     <button
                       key={item.path}
                       onClick={() => {
-                        navigate(item.path);
+                        handleNavigation(item.path);
                         setIsMenuOpen(false);
                       }}
                       className={`w-full px-4 py-3 text-left rounded-xl flex items-center space-x-3 transform transition-all duration-300 hover:scale-105 ${
@@ -337,7 +343,7 @@ const Navbar = () => {
                 {menuItems.map((item) => (
                   <button
                     key={item.path}
-                    onClick={() => navigate(item.path)}
+                    onClick={() => handleNavigation(item.path)}
                     className={`group flex flex-col items-center justify-center px-3 py-1 transition-all duration-300 hover:scale-105 ${
                       location.pathname === item.path || location.pathname.startsWith(item.path + '/')
                         ? 'text-transparent bg-clip-text bg-gradient-to-r ' + item.color
@@ -386,7 +392,12 @@ const Navbar = () => {
             {menuItems.map((item) => (
               <button
                 key={item.path}
-                onClick={() => navigate(item.path)}
+                onClick={() => {
+                  // Add debugging and use the explicit handler
+                  console.log('Bottom nav clicked:', item.path);
+                  handleNavigation(item.path);
+                }}
+                data-path={item.path} // Add a data attribute for easier debugging
                 className="flex flex-col items-center justify-center py-3 px-4 min-w-[70px] relative transition-transform duration-300 hover:scale-110"
               >
                 <div className={`p-2 rounded-full mb-1 ${
