@@ -220,14 +220,15 @@ const Orders = () => {
             <h1 className="text-xl font-semibold text-gray-900">Orders</h1>
             <p className="mt-1 text-sm text-gray-500">Manage and track your orders</p>
           </div>
+          {/* Hide the top 'Add New Order' button on mobile - only keeping the floating one */}
           <button
             onClick={() => navigate('/orders/new')}
-            className="btn-primary inline-flex items-center space-x-2"
+            className="btn-primary inline-flex items-center space-x-2 desktop-only"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
             </svg>
-            <span className="desktop-only">Add New Order</span>
+            <span>Add New Order</span>
           </button>
         </div>
 

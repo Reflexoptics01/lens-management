@@ -30,24 +30,39 @@ const Navbar = () => {
     if (bottomNavRef.current) {
       const savedScrollLeft = localStorage.getItem('bottomNavScrollPosition');
       if (savedScrollLeft) {
-        bottomNavRef.current.scrollLeft = parseInt(savedScrollLeft, 10);
+        // Use a timeout to make sure the DOM is fully rendered
+        setTimeout(() => {
+          try {
+            bottomNavRef.current.scrollLeft = parseInt(savedScrollLeft, 10);
+          } catch (e) {
+            console.error("Error setting scroll position:", e);
+          }
+        }, 100);
       }
     }
+  }, []); // Only run on mount
 
-    // Save scroll position when path changes or component unmounts
+  // Handle scroll events to save position immediately
+  const handleNavScroll = () => {
+    if (bottomNavRef.current) {
+      localStorage.setItem('bottomNavScrollPosition', bottomNavRef.current.scrollLeft);
+    }
+  };
+
+  // Additional effect to handle saving scroll position on route changes and unmount
+  useEffect(() => {
+    // Save the current position whenever route changes
+    if (bottomNavRef.current) {
+      localStorage.setItem('bottomNavScrollPosition', bottomNavRef.current.scrollLeft);
+    }
+
+    // Also save on unmount
     return () => {
       if (bottomNavRef.current) {
         localStorage.setItem('bottomNavScrollPosition', bottomNavRef.current.scrollLeft);
       }
     };
   }, [location.pathname]);
-
-  // Handle scroll events to save position
-  const handleNavScroll = () => {
-    if (bottomNavRef.current) {
-      localStorage.setItem('bottomNavScrollPosition', bottomNavRef.current.scrollLeft);
-    }
-  };
 
   const handleLogout = async () => {
     try {
