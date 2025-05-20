@@ -27,6 +27,26 @@ const UNIT_OPTIONS = [
   'Cases'
 ];
 
+const LENS_TYPES = [
+  'Not Lens',
+  'Stock Lens',
+  'Contact Lens'
+];
+
+// Move the EMPTY_ROW constant above the CreatePurchase component
+const EMPTY_ROW = {
+  itemName: '',
+  description: '',
+  powerRange: '',
+  lensType: 'Not Lens',
+  qty: 1,
+  unit: 'Pairs',
+  itemDiscount: 0,
+  itemDiscountType: 'amount',
+  price: 0,
+  total: 0
+};
+
 const CreatePurchase = () => {
   const navigate = useNavigate();
   const [vendors, setVendors] = useState([]);
@@ -48,17 +68,8 @@ const CreatePurchase = () => {
   const [paymentStatus, setPaymentStatus] = useState('UNPAID'); // 'UNPAID', 'PARTIAL', 'PAID'
   const [amountPaid, setAmountPaid] = useState(0);
   
-  // Table rows (purchase items)
-  const [tableRows, setTableRows] = useState(Array(5).fill().map(() => ({
-    itemName: '',
-    description: '',
-    qty: 1,
-    unit: 'Pairs', // Default unit
-    itemDiscount: 0,
-    itemDiscountType: 'amount', // 'amount' or 'percentage'
-    price: 0,
-    total: 0
-  })));
+  // Table rows (purchase items) - use the EMPTY_ROW constant
+  const [tableRows, setTableRows] = useState(Array(5).fill().map(() => ({...EMPTY_ROW})));
 
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
   const [vendorSearchTerm, setVendorSearchTerm] = useState('');
@@ -213,6 +224,62 @@ const CreatePurchase = () => {
     }
   };
 
+  const addLensesToInventory = async (purchaseId) => {
+    try {
+      const stockLenses = [];
+      const contactLenses = [];
+      
+      // Filter out lens items from the purchase
+      tableRows.forEach(row => {
+        if (row.itemName && row.qty > 0 && (row.lensType === 'Stock Lens' || row.lensType === 'Contact Lens')) {
+          const lensData = {
+            brandName: row.itemName,
+            powerSeries: row.powerRange || 'N/A',
+            purchasePrice: parseFloat(row.price) || 0,
+            salePrice: (parseFloat(row.price) * 1.3) || 0, // 30% markup for sale price
+            qty: parseInt(row.qty) || 1,
+            createdAt: serverTimestamp(),
+            purchaseId: purchaseId,
+            notes: `Added from Purchase #${purchaseNumber}`
+          };
+          
+          if (row.lensType === 'Stock Lens') {
+            stockLenses.push({
+              ...lensData,
+              type: 'stock'
+            });
+          } else {
+            contactLenses.push({
+              ...lensData,
+              type: 'contact',
+              category: row.description || 'Standard'
+            });
+          }
+        }
+      });
+      
+      // Add stock lenses to inventory
+      for (const lens of stockLenses) {
+        await addDoc(collection(db, 'lens_inventory'), lens);
+        console.log('Added stock lens to inventory:', lens.brandName);
+      }
+      
+      // Add contact lenses to inventory
+      for (const lens of contactLenses) {
+        await addDoc(collection(db, 'lens_inventory'), lens);
+        console.log('Added contact lens to inventory:', lens.brandName);
+      }
+      
+      const totalLensesAdded = stockLenses.length + contactLenses.length;
+      console.log(`Added ${totalLensesAdded} lenses to inventory from purchase #${purchaseNumber}`);
+      
+      return totalLensesAdded;
+    } catch (error) {
+      console.error('Error adding lenses to inventory:', error);
+      throw error;
+    }
+  };
+
   const handleSavePurchase = async () => {
     if (!selectedVendor) {
       setError('Please select a vendor');
@@ -256,6 +323,17 @@ const CreatePurchase = () => {
       };
 
       const docRef = await addDoc(collection(db, 'purchases'), purchaseData);
+      
+      // Add lenses to inventory if any
+      const lensItems = filteredRows.filter(row => 
+        row.lensType === 'Stock Lens' || row.lensType === 'Contact Lens'
+      );
+      
+      if (lensItems.length > 0) {
+        const addedLensCount = await addLensesToInventory(docRef.id);
+        console.log(`Successfully added ${addedLensCount} lens items to inventory`);
+      }
+      
       setSuccess(true);
       navigate('/purchases');
     } catch (error) {
@@ -408,16 +486,7 @@ const CreatePurchase = () => {
             <div>
               <button
                 onClick={() => {
-                  const newRows = Array(5).fill().map(() => ({
-                    itemName: '',
-                    description: '',
-                    qty: 1,
-                    unit: 'Pairs',
-                    itemDiscount: 0,
-                    itemDiscountType: 'amount',
-                    price: 0,
-                    total: 0
-                  }));
+                  const newRows = Array(5).fill().map(() => ({...EMPTY_ROW}));
                   setTableRows([...tableRows, ...newRows]);
                 }}
                 className="px-3 py-1.5 text-sm font-medium rounded-md text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 flex items-center"
@@ -439,6 +508,12 @@ const CreatePurchase = () => {
                   </th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Item Details
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Power Range
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+                    Lens Type
                   </th>
                   <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                     Qty
@@ -481,6 +556,27 @@ const CreatePurchase = () => {
                         className="block w-full border-0 bg-transparent text-gray-500 text-xs focus:ring-0 focus:border-b focus:border-sky-400 mt-1"
                         placeholder="Description (optional)"
                       />
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <input 
+                        type="text" 
+                        value={row.powerRange}
+                        onChange={(e) => handleTableRowChange(index, 'powerRange', e.target.value)}
+                        className="block w-full border-0 bg-transparent focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm"
+                        placeholder={row.lensType !== 'Not Lens' ? "e.g. -1.00 to -6.00" : ""}
+                        disabled={row.lensType === 'Not Lens'}
+                      />
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <select
+                        value={row.lensType}
+                        onChange={(e) => handleTableRowChange(index, 'lensType', e.target.value)}
+                        className="block w-full border-0 bg-transparent focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-center"
+                      >
+                        {LENS_TYPES.map(type => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       <input 
@@ -569,16 +665,7 @@ const CreatePurchase = () => {
             </div>
             <button
               onClick={() => {
-                const newRows = Array(5).fill().map(() => ({
-                  itemName: '',
-                  description: '',
-                  qty: 1,
-                  unit: 'Pairs',
-                  itemDiscount: 0,
-                  itemDiscountType: 'amount',
-                  price: 0,
-                  total: 0
-                }));
+                const newRows = Array(5).fill().map(() => ({...EMPTY_ROW}));
                 setTableRows([...tableRows, ...newRows]);
               }}
               className="text-sm text-sky-600 hover:text-sky-800 flex items-center"
