@@ -99,6 +99,32 @@ const LensPrescription = ({ formData, onChange, matchingLenses = [] }) => {
     navigate(`/lens-inventory/${lensId}`);
   };
 
+  // Helper function to get class name for lens value comparison
+  const getLensValueClassName = (lensValue, prescriptionValue, isAxis = false) => {
+    if (!lensValue || !prescriptionValue) return '';
+    
+    try {
+      if (isAxis) {
+        const axisDiff = Math.abs(parseInt(lensValue) - parseInt(prescriptionValue));
+        const normalizedDiff = Math.min(axisDiff, 180 - axisDiff);
+        
+        if (normalizedDiff === 0) return 'font-semibold text-green-600';
+        if (normalizedDiff <= 5) return 'font-medium text-emerald-600';
+        if (normalizedDiff <= 10) return 'text-yellow-600';
+        return 'text-orange-500';
+      } else {
+        const diff = Math.abs(parseFloat(lensValue) - parseFloat(prescriptionValue));
+        
+        if (diff === 0) return 'font-semibold text-green-600';
+        if (diff <= 0.125) return 'font-medium text-emerald-600';
+        if (diff <= 0.25) return 'text-yellow-600';
+        return 'text-orange-500';
+      }
+    } catch (e) {
+      return '';
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-start">
@@ -294,7 +320,7 @@ const LensPrescription = ({ formData, onChange, matchingLenses = [] }) => {
           </h4>
           
           <div className="bg-sky-50 border-l-4 border-sky-300 p-3 mb-4 text-xs text-sky-700">
-            Matching lenses found in inventory! Click any lens to view complete details.
+            Lenses are matched with tolerances of ±0.25 for SPH/CYL/ADD and ±10° for AXIS. Click any lens to view details.
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -305,10 +331,24 @@ const LensPrescription = ({ formData, onChange, matchingLenses = [] }) => {
                 onClick={() => navigateToLensDetail(lens.id)}
               >
                 <div className="flex justify-between items-start mb-2">
-                  <span className="text-sm font-medium text-sky-700">
-                    {lens.brandName || 'Unknown Brand'}
-                  </span>
-                  <div className="flex gap-1">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-sky-700">
+                      {lens.brandName || 'Unknown Brand'}
+                    </span>
+                    {lens.matchQuality && (
+                      <span className="text-xs text-gray-500">
+                        Match quality: 
+                        <span className={`ml-1 font-medium ${
+                          lens.matchQuality >= 90 ? 'text-green-600' : 
+                          lens.matchQuality >= 75 ? 'text-emerald-500' : 
+                          lens.matchQuality >= 60 ? 'text-yellow-600' : 'text-orange-500'
+                        }`}>
+                          {lens.matchQuality}%
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1 items-end">
                     {lens.matchedEye && (
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                         lens.matchedEye === 'right' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'
@@ -325,25 +365,35 @@ const LensPrescription = ({ formData, onChange, matchingLenses = [] }) => {
                 <div className="grid grid-cols-4 gap-1 text-xs mb-2">
                   <div className="text-center bg-gray-50 p-1 rounded">
                     <div className="text-gray-500 font-medium">SPH</div>
-                    <div>{lens.sph || 'N/A'}</div>
+                    <div className={getLensValueClassName(lens.sph, lens.matchedEye === 'right' ? formData.rightSph : formData.leftSph)}>
+                      {lens.sph || 'N/A'}
+                    </div>
                   </div>
                   <div className="text-center bg-gray-50 p-1 rounded">
                     <div className="text-gray-500 font-medium">CYL</div>
-                    <div>{lens.cyl || 'N/A'}</div>
+                    <div className={getLensValueClassName(lens.cyl, lens.matchedEye === 'right' ? formData.rightCyl : formData.leftCyl)}>
+                      {lens.cyl || 'N/A'}
+                    </div>
                   </div>
                   <div className="text-center bg-gray-50 p-1 rounded">
                     <div className="text-gray-500 font-medium">AXIS</div>
-                    <div>{lens.axis || 'N/A'}</div>
+                    <div className={getLensValueClassName(lens.axis, lens.matchedEye === 'right' ? formData.rightAxis : formData.leftAxis, true)}>
+                      {lens.axis || 'N/A'}
+                    </div>
                   </div>
                   <div className="text-center bg-gray-50 p-1 rounded">
-                    <div className="text-gray-500 font-medium">QTY</div>
-                    <div>{lens.qty || '1'}</div>
+                    <div className="text-gray-500 font-medium">ADD</div>
+                    <div className={getLensValueClassName(lens.add, lens.matchedEye === 'right' ? formData.rightAdd : formData.leftAdd)}>
+                      {lens.add || 'N/A'}
+                    </div>
                   </div>
                 </div>
 
                 <div className="flex justify-between items-center text-xs">
-                  <div className="text-gray-500">
-                    {lens.material || 'N/A'} - {lens.index || 'N/A'}
+                  <div className="flex gap-2 text-gray-500">
+                    <span>{lens.material || 'N/A'}</span>
+                    {lens.index && <span>• {lens.index}</span>}
+                    {lens.qty && <span>• Qty: {lens.qty}</span>}
                   </div>
                   <div className="flex items-center text-sky-600 font-medium">
                     View Details 
