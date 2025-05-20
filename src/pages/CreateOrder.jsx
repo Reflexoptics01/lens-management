@@ -56,30 +56,34 @@ const CreateOrder = () => {
     calculateNextOrderDisplayId();
   }, []);
 
-  // Add effect to check for matching lenses when prescription data changes
+  // Modify useEffect to search every time formData changes for prescription fields
   useEffect(() => {
-    // Check if we have valid prescription data
-    if (formData.rightSph || formData.leftSph) {
-      checkLensInventory();
-    } else {
-      setMatchingLenses([]);
-      setShowLensMatches(false);
-    }
-  }, [formData.rightSph, formData.rightCyl, formData.rightAxis, formData.rightAdd, 
-      formData.leftSph, formData.leftCyl, formData.leftAxis, formData.leftAdd,
-      formData.material, formData.index, formData.baseTint]);
+    // Check for matching lenses whenever prescription data changes
+    checkLensInventory();
+  }, [
+    formData.rightSph, 
+    formData.rightCyl, 
+    formData.rightAxis, 
+    formData.rightAdd,
+    formData.leftSph, 
+    formData.leftCyl, 
+    formData.leftAxis, 
+    formData.leftAdd
+  ]);
 
   const checkLensInventory = async () => {
     try {
-      // Only search if we have prescription data
+      // Only search if we have prescription data for at least one eye
       if (!formData.rightSph && !formData.leftSph) {
         setMatchingLenses([]);
         return;
       }
       
+      console.log("Checking lens inventory for matches...");
+      
       const lensInventoryRef = collection(db, 'lens_inventory');
       
-      // Get all RX lenses - we'll filter them in memory for more flexibility
+      // Get all RX lenses 
       const rxQuery = query(
         lensInventoryRef,
         where('type', '==', 'prescription')
@@ -87,6 +91,7 @@ const CreateOrder = () => {
       
       const snapshot = await getDocs(rxQuery);
       if (snapshot.empty) {
+        console.log("No RX lenses found in inventory");
         setMatchingLenses([]);
         return;
       }
@@ -97,6 +102,8 @@ const CreateOrder = () => {
         ...doc.data()
       }));
       
+      console.log(`Found ${allLenses.length} RX lenses in inventory`, allLenses);
+      
       // Helper function to check if prescription values match within tolerance
       const isWithinTolerance = (val1, val2, tolerance = 0.25) => {
         if (!val1 || !val2) return false;
@@ -104,7 +111,9 @@ const CreateOrder = () => {
         try {
           const num1 = parseFloat(val1);
           const num2 = parseFloat(val2);
-          return !isNaN(num1) && !isNaN(num2) && Math.abs(num1 - num2) <= tolerance;
+          if (isNaN(num1) || isNaN(num2)) return false;
+          
+          return Math.abs(num1 - num2) <= tolerance;
         } catch (e) {
           return false;
         }
@@ -117,73 +126,77 @@ const CreateOrder = () => {
         try {
           const num1 = parseInt(val1);
           const num2 = parseInt(val2);
+          if (isNaN(num1) || isNaN(num2)) return false;
+          
           // Handle wrap-around case (e.g., 5 degrees is close to 175 degrees in lens terminology)
           const diff = Math.abs(num1 - num2);
-          return !isNaN(num1) && !isNaN(num2) && (diff <= tolerance || diff >= (180 - tolerance));
+          return diff <= tolerance || diff >= (180 - tolerance);
         } catch (e) {
           return false;
         }
       };
       
-      // Filter lenses based on prescription values with tolerance
-      const filteredLenses = allLenses.filter(lens => {
-        // Match by material if specified
-        if (formData.material && lens.material && 
-            formData.material.trim() !== '' && 
-            lens.material.trim().toLowerCase() !== formData.material.trim().toLowerCase()) {
-          return false;
-        }
+      // Create separate matching arrays for right eye and left eye
+      const rightEyeMatches = [];
+      const leftEyeMatches = [];
+      
+      // If we have right eye prescription data, find matches
+      if (formData.rightSph) {
+        console.log(`Searching for right eye matches, SPH: ${formData.rightSph}`);
         
-        // Match by index if specified
-        if (formData.index && lens.index && 
-            formData.index.trim() !== '' && 
-            lens.index.trim() !== formData.index.trim()) {
-          return false;
-        }
-        
-        // For right eye lenses or lenses without specified eye
-        if (lens.eye === 'right' || !lens.eye) {
-          // If prescription has right eye data, check if it matches
-          if (formData.rightSph) {
+        // Look for right eye lenses or lenses without specified eye
+        for (const lens of allLenses) {
+          // Only consider right eye lenses or unspecified eye
+          if (lens.eye !== 'left') {
             const sphMatch = isWithinTolerance(lens.sph, formData.rightSph);
             const cylMatch = !formData.rightCyl || !lens.cyl || isWithinTolerance(lens.cyl, formData.rightCyl);
             const axisMatch = !formData.rightAxis || !lens.axis || isAxisWithinTolerance(lens.axis, formData.rightAxis);
             const addMatch = !formData.rightAdd || !lens.add || isWithinTolerance(lens.add, formData.rightAdd);
             
-            // If it's specifically a right eye lens, all values must match
-            if (lens.eye === 'right') {
-              return sphMatch && cylMatch && axisMatch && addMatch;
+            // For a match, all available fields should match
+            if (sphMatch && cylMatch && axisMatch && addMatch) {
+              // Mark as right eye match
+              console.log(`Found matching lens for right eye:`, lens);
+              rightEyeMatches.push({
+                ...lens,
+                matchedEye: 'right'
+              });
             }
-            
-            // For lenses without specified eye, at least sph should match
-            return sphMatch;
           }
         }
+      }
+      
+      // If we have left eye prescription data, find matches
+      if (formData.leftSph) {
+        console.log(`Searching for left eye matches, SPH: ${formData.leftSph}`);
         
-        // For left eye lenses or lenses without specified eye
-        if (lens.eye === 'left' || !lens.eye) {
-          // If prescription has left eye data, check if it matches
-          if (formData.leftSph) {
+        // Look for left eye lenses or lenses without specified eye
+        for (const lens of allLenses) {
+          // Only consider left eye lenses or unspecified eye
+          if (lens.eye !== 'right') {
             const sphMatch = isWithinTolerance(lens.sph, formData.leftSph);
             const cylMatch = !formData.leftCyl || !lens.cyl || isWithinTolerance(lens.cyl, formData.leftCyl);
             const axisMatch = !formData.leftAxis || !lens.axis || isAxisWithinTolerance(lens.axis, formData.leftAxis);
             const addMatch = !formData.leftAdd || !lens.add || isWithinTolerance(lens.add, formData.leftAdd);
             
-            // If it's specifically a left eye lens, all values must match
-            if (lens.eye === 'left') {
-              return sphMatch && cylMatch && axisMatch && addMatch;
+            // For a match, all available fields should match
+            if (sphMatch && cylMatch && axisMatch && addMatch) {
+              // Mark as left eye match
+              console.log(`Found matching lens for left eye:`, lens);
+              leftEyeMatches.push({
+                ...lens,
+                matchedEye: 'left'
+              });
             }
-            
-            // For lenses without specified eye, at least sph should match
-            return sphMatch;
           }
         }
-        
-        return false;
-      });
+      }
       
-      console.log(`Found ${filteredLenses.length} matching lenses in inventory`);
-      setMatchingLenses(filteredLenses);
+      // Combine both match arrays
+      const combinedMatches = [...rightEyeMatches, ...leftEyeMatches];
+      console.log(`Found ${combinedMatches.length} total matching lenses`);
+      
+      setMatchingLenses(combinedMatches);
       
     } catch (error) {
       console.error('Error checking lens inventory:', error);

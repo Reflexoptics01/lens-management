@@ -290,14 +290,14 @@ const LensPrescription = ({ formData, onChange, matchingLenses = [] }) => {
             <svg className="h-5 w-5 text-sky-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            Matching Lenses in Inventory ({matchingLenses.length})
+            Available Matching Lenses ({matchingLenses.length})
           </h4>
           
           <div className="bg-sky-50 border-l-4 border-sky-300 p-3 mb-4 text-xs text-sky-700">
-            We found matching lenses with similar specifications in inventory. Click to view details.
+            Matching lenses found in inventory! Click any lens to view complete details.
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {matchingLenses.map(lens => (
               <div 
                 key={lens.id} 
@@ -308,9 +308,18 @@ const LensPrescription = ({ formData, onChange, matchingLenses = [] }) => {
                   <span className="text-sm font-medium text-sky-700">
                     {lens.brandName || 'Unknown Brand'}
                   </span>
-                  <span className="bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full text-xs">
-                    {lens.eye === 'right' ? 'Right Eye' : lens.eye === 'left' ? 'Left Eye' : 'Both Eyes'}
-                  </span>
+                  <div className="flex gap-1">
+                    {lens.matchedEye && (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        lens.matchedEye === 'right' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'
+                      }`}>
+                        {lens.matchedEye === 'right' ? 'Right Eye' : 'Left Eye'}
+                      </span>
+                    )}
+                    <span className="bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full text-xs">
+                      {lens.eye === 'right' ? 'Right' : lens.eye === 'left' ? 'Left' : 'Both'}
+                    </span>
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-4 gap-1 text-xs mb-2">
@@ -332,9 +341,16 @@ const LensPrescription = ({ formData, onChange, matchingLenses = [] }) => {
                   </div>
                 </div>
 
-                <div className="flex justify-between text-xs text-gray-500">
-                  <div>{lens.material || 'N/A'} - {lens.index || 'N/A'}</div>
-                  <div className="text-sky-600 font-medium">View Details →</div>
+                <div className="flex justify-between items-center text-xs">
+                  <div className="text-gray-500">
+                    {lens.material || 'N/A'} - {lens.index || 'N/A'}
+                  </div>
+                  <div className="flex items-center text-sky-600 font-medium">
+                    View Details 
+                    <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
                 </div>
               </div>
             ))}
