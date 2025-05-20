@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
-const LensPrescription = ({ formData, onChange }) => {
+const LensPrescription = ({ formData, onChange, matchingLenses = [] }) => {
+  const navigate = useNavigate();
   const [selectedEye, setSelectedEye] = useState('BE'); // RE, LE, or BE
   const inputClassName = "block w-full rounded-md border-gray-300 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm py-1.5 px-2 text-center";
   const labelClassName = "block uppercase tracking-wide text-xs font-bold text-sky-700 mb-1";
@@ -91,6 +93,10 @@ const LensPrescription = ({ formData, onChange }) => {
       return '';
     }
     return rawValue;
+  };
+
+  const navigateToLensDetail = (lensId) => {
+    navigate(`/lens-inventory/${lensId}`);
   };
 
   return (
@@ -273,6 +279,65 @@ const LensPrescription = ({ formData, onChange }) => {
                 <span className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 text-xs">pcs</span>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Matching Lenses Section */}
+      {matchingLenses && matchingLenses.length > 0 && (
+        <div className="mt-6 pt-4 border-t border-gray-200">
+          <h4 className="text-sm font-semibold text-sky-800 flex items-center mb-3">
+            <svg className="h-5 w-5 text-sky-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Matching Lenses in Inventory ({matchingLenses.length})
+          </h4>
+          
+          <div className="bg-sky-50 border-l-4 border-sky-300 p-3 mb-4 text-xs text-sky-700">
+            We found matching lenses with similar specifications in inventory. Click to view details.
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {matchingLenses.map(lens => (
+              <div 
+                key={lens.id} 
+                className="border border-gray-200 rounded-md p-3 bg-white shadow-sm hover:shadow-md hover:border-sky-300 cursor-pointer transition-all"
+                onClick={() => navigateToLensDetail(lens.id)}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-sm font-medium text-sky-700">
+                    {lens.brandName || 'Unknown Brand'}
+                  </span>
+                  <span className="bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full text-xs">
+                    {lens.eye === 'right' ? 'Right Eye' : lens.eye === 'left' ? 'Left Eye' : 'Both Eyes'}
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-4 gap-1 text-xs mb-2">
+                  <div className="text-center bg-gray-50 p-1 rounded">
+                    <div className="text-gray-500 font-medium">SPH</div>
+                    <div>{lens.sph || 'N/A'}</div>
+                  </div>
+                  <div className="text-center bg-gray-50 p-1 rounded">
+                    <div className="text-gray-500 font-medium">CYL</div>
+                    <div>{lens.cyl || 'N/A'}</div>
+                  </div>
+                  <div className="text-center bg-gray-50 p-1 rounded">
+                    <div className="text-gray-500 font-medium">AXIS</div>
+                    <div>{lens.axis || 'N/A'}</div>
+                  </div>
+                  <div className="text-center bg-gray-50 p-1 rounded">
+                    <div className="text-gray-500 font-medium">QTY</div>
+                    <div>{lens.qty || '1'}</div>
+                  </div>
+                </div>
+
+                <div className="flex justify-between text-xs text-gray-500">
+                  <div>{lens.material || 'N/A'} - {lens.index || 'N/A'}</div>
+                  <div className="text-sky-600 font-medium">View Details →</div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

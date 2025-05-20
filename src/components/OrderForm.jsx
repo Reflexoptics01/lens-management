@@ -32,7 +32,7 @@ const COATING_COLORS = {
   'SHMC': ['GREEN', 'BLUE', 'DUAL (BLUE & GREEN)', 'MAGENTA', 'VIOLET']
 };
 
-const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, loading, error, isEditing = false }) => {
+const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, loading, error, isEditing = false, matchingLenses = [] }) => {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [otherTint, setOtherTint] = useState('');
   const [showCoatingColors, setShowCoatingColors] = useState(false);
@@ -110,6 +110,7 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
               onSelect={handleCustomerSelect}
               onAddNew={onAddNewCustomer}
               isOrderFlow={true}
+              className={formData.customerName ? '' : 'ring-1 ring-red-300'}
             />
           </div>
           <div>
@@ -146,7 +147,8 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
               value={formData.brandName}
               onChange={onChange}
               required
-              className={inputClassName}
+              aria-required="true"
+              className={`${inputClassName} ${formData.brandName ? '' : 'ring-1 ring-red-300'}`}
             />
           </div>
           <div>
@@ -289,7 +291,7 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
         </div>
         
         <div className="bg-gray-50 p-3 rounded">
-          <LensPrescription formData={formData} onChange={onChange} />
+          <LensPrescription formData={formData} onChange={onChange} matchingLenses={matchingLenses} />
         </div>
       </div>
 
@@ -313,7 +315,8 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
               value={formData.expectedDeliveryDate}
               onChange={onChange}
               required
-              className={inputClassName}
+              aria-required="true"
+              className={`${inputClassName} ${formData.expectedDeliveryDate ? '' : 'ring-1 ring-red-300'}`}
             />
           </div>
           <div>

@@ -71,92 +71,123 @@ const CreateOrder = () => {
 
   const checkLensInventory = async () => {
     try {
-      // Don't search if we don't have enough data
-      if (!formData.material) return;
+      // Only search if we have prescription data
+      if (!formData.rightSph && !formData.leftSph) {
+        setMatchingLenses([]);
+        return;
+      }
       
       const lensInventoryRef = collection(db, 'lens_inventory');
       
-      // Create two queries - one for right eye, one for left eye
-      const queries = [];
+      // Get all RX lenses - we'll filter them in memory for more flexibility
+      const rxQuery = query(
+        lensInventoryRef,
+        where('type', '==', 'prescription')
+      );
       
-      // If we have right eye prescription data
-      if (formData.rightSph) {
-        // Build query for right eye
-        // Allow for a small tolerance in the prescription values (±0.25)
-        const rightSphMin = parseFloat(formData.rightSph) - 0.25;
-        const rightSphMax = parseFloat(formData.rightSph) + 0.25;
-        
-        const rightQuery = query(
-          lensInventoryRef,
-          where('material', '==', formData.material),
-          where('eye', '==', 'right'),
-          where('sph', '>=', rightSphMin.toString()),
-          where('sph', '<=', rightSphMax.toString())
-        );
-        
-        queries.push({ query: rightQuery, eye: 'right' });
+      const snapshot = await getDocs(rxQuery);
+      if (snapshot.empty) {
+        setMatchingLenses([]);
+        return;
       }
       
-      // If we have left eye prescription data
-      if (formData.leftSph) {
-        // Build query for left eye
-        const leftSphMin = parseFloat(formData.leftSph) - 0.25;
-        const leftSphMax = parseFloat(formData.leftSph) + 0.25;
-        
-        const leftQuery = query(
-          lensInventoryRef,
-          where('material', '==', formData.material),
-          where('eye', '==', 'left'),
-          where('sph', '>=', leftSphMin.toString()),
-          where('sph', '<=', leftSphMax.toString())
-        );
-        
-        queries.push({ query: leftQuery, eye: 'left' });
-      }
+      // Get all lenses
+      const allLenses = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
       
-      // Execute all queries
-      const results = [];
-      for (const q of queries) {
-        const snapshot = await getDocs(q.query);
+      // Helper function to check if prescription values match within tolerance
+      const isWithinTolerance = (val1, val2, tolerance = 0.25) => {
+        if (!val1 || !val2) return false;
         
-        if (!snapshot.empty) {
-          // Filter results further for cyl and axis
-          snapshot.docs.forEach(doc => {
-            const lens = { id: doc.id, ...doc.data(), eye: q.eye };
-            
-            // Check if cyl is within range
-            let cylMatch = true;
-            if (q.eye === 'right' && formData.rightCyl && lens.cyl) {
-              const cylDiff = Math.abs(parseFloat(formData.rightCyl) - parseFloat(lens.cyl));
-              cylMatch = cylDiff <= 0.25;
-            } else if (q.eye === 'left' && formData.leftCyl && lens.cyl) {
-              const cylDiff = Math.abs(parseFloat(formData.leftCyl) - parseFloat(lens.cyl));
-              cylMatch = cylDiff <= 0.25;
-            }
-            
-            // Check if axis is within range (±5 degrees)
-            let axisMatch = true;
-            if (q.eye === 'right' && formData.rightAxis && lens.axis) {
-              const axisDiff = Math.abs(parseInt(formData.rightAxis) - parseInt(lens.axis));
-              axisMatch = axisDiff <= 5 || axisDiff >= 175; // Handle wrap-around case
-            } else if (q.eye === 'left' && formData.leftAxis && lens.axis) {
-              const axisDiff = Math.abs(parseInt(formData.leftAxis) - parseInt(lens.axis));
-              axisMatch = axisDiff <= 5 || axisDiff >= 175; // Handle wrap-around case
-            }
-            
-            // If everything matches, add to results
-            if (cylMatch && axisMatch) {
-              results.push(lens);
-            }
-          });
+        try {
+          const num1 = parseFloat(val1);
+          const num2 = parseFloat(val2);
+          return !isNaN(num1) && !isNaN(num2) && Math.abs(num1 - num2) <= tolerance;
+        } catch (e) {
+          return false;
         }
-      }
+      };
       
-      setMatchingLenses(results);
-      setShowLensMatches(results.length > 0);
+      // Helper function to check if axis values match within tolerance
+      const isAxisWithinTolerance = (val1, val2, tolerance = 5) => {
+        if (!val1 || !val2) return false;
+        
+        try {
+          const num1 = parseInt(val1);
+          const num2 = parseInt(val2);
+          // Handle wrap-around case (e.g., 5 degrees is close to 175 degrees in lens terminology)
+          const diff = Math.abs(num1 - num2);
+          return !isNaN(num1) && !isNaN(num2) && (diff <= tolerance || diff >= (180 - tolerance));
+        } catch (e) {
+          return false;
+        }
+      };
+      
+      // Filter lenses based on prescription values with tolerance
+      const filteredLenses = allLenses.filter(lens => {
+        // Match by material if specified
+        if (formData.material && lens.material && 
+            formData.material.trim() !== '' && 
+            lens.material.trim().toLowerCase() !== formData.material.trim().toLowerCase()) {
+          return false;
+        }
+        
+        // Match by index if specified
+        if (formData.index && lens.index && 
+            formData.index.trim() !== '' && 
+            lens.index.trim() !== formData.index.trim()) {
+          return false;
+        }
+        
+        // For right eye lenses or lenses without specified eye
+        if (lens.eye === 'right' || !lens.eye) {
+          // If prescription has right eye data, check if it matches
+          if (formData.rightSph) {
+            const sphMatch = isWithinTolerance(lens.sph, formData.rightSph);
+            const cylMatch = !formData.rightCyl || !lens.cyl || isWithinTolerance(lens.cyl, formData.rightCyl);
+            const axisMatch = !formData.rightAxis || !lens.axis || isAxisWithinTolerance(lens.axis, formData.rightAxis);
+            const addMatch = !formData.rightAdd || !lens.add || isWithinTolerance(lens.add, formData.rightAdd);
+            
+            // If it's specifically a right eye lens, all values must match
+            if (lens.eye === 'right') {
+              return sphMatch && cylMatch && axisMatch && addMatch;
+            }
+            
+            // For lenses without specified eye, at least sph should match
+            return sphMatch;
+          }
+        }
+        
+        // For left eye lenses or lenses without specified eye
+        if (lens.eye === 'left' || !lens.eye) {
+          // If prescription has left eye data, check if it matches
+          if (formData.leftSph) {
+            const sphMatch = isWithinTolerance(lens.sph, formData.leftSph);
+            const cylMatch = !formData.leftCyl || !lens.cyl || isWithinTolerance(lens.cyl, formData.leftCyl);
+            const axisMatch = !formData.leftAxis || !lens.axis || isAxisWithinTolerance(lens.axis, formData.leftAxis);
+            const addMatch = !formData.leftAdd || !lens.add || isWithinTolerance(lens.add, formData.leftAdd);
+            
+            // If it's specifically a left eye lens, all values must match
+            if (lens.eye === 'left') {
+              return sphMatch && cylMatch && axisMatch && addMatch;
+            }
+            
+            // For lenses without specified eye, at least sph should match
+            return sphMatch;
+          }
+        }
+        
+        return false;
+      });
+      
+      console.log(`Found ${filteredLenses.length} matching lenses in inventory`);
+      setMatchingLenses(filteredLenses);
       
     } catch (error) {
       console.error('Error checking lens inventory:', error);
+      setMatchingLenses([]);
     }
   };
 
@@ -234,8 +265,30 @@ const CreateOrder = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    
+    // Set error to empty initially
     setError('');
+    
+    // Additional validation for required fields - check customer name first
+    if (!formData.customerName || formData.customerName.trim() === '') {
+      setError('Customer name is required');
+      // Focus on the customer name field
+      document.querySelector('input[name="customerName"]')?.focus();
+      return;
+    }
+
+    if (!formData.brandName || formData.brandName.trim() === '') {
+      setError('Brand name is required');
+      return;
+    }
+
+    if (!formData.expectedDeliveryDate || formData.expectedDeliveryDate.trim() === '') {
+      setError('Expected delivery date is required');
+      return;
+    }
+    
+    // If we reach here, proceed with form submission
+    setLoading(true);
 
     try {
       // Use the pre-calculated next order display ID
@@ -251,6 +304,9 @@ const CreateOrder = () => {
       const docRef = await addDoc(collection(db, 'orders'), orderData);
       setOrderId(docRef.id);
       
+      // Add the lens to inventory
+      await addLensToInventory(orderData, docRef.id);
+      
       const customer = customers.find(c => c.opticalName === formData.customerName);
       if (customer?.phone) {
         setCustomerPhone(customer.phone);
@@ -263,6 +319,91 @@ const CreateOrder = () => {
       setError('Failed to create order');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // New function to add lens to inventory
+  const addLensToInventory = async (orderData, orderId) => {
+    try {
+      // Check if the order has prescription data
+      const hasRightEye = orderData.rightSph || orderData.rightCyl;
+      const hasLeftEye = orderData.leftSph || orderData.leftCyl;
+      
+      if (!hasRightEye && !hasLeftEye) {
+        console.log('No prescription data to add to inventory');
+        return;
+      }
+      
+      // Check order status - only add to inventory for valid statuses
+      const validStatuses = ['RECEIVED', 'DISPATCHED', 'DELIVERED'];
+      if (!validStatuses.includes(orderData.status)) {
+        console.log(`Not adding to inventory due to status: ${orderData.status}`);
+        return;
+      }
+      
+      // Create lens inventory items
+      if (hasRightEye) {
+        const rightLensData = {
+          orderId: orderId,
+          orderDisplayId: orderData.displayId,
+          brandName: orderData.brandName,
+          eye: 'right',
+          sph: orderData.rightSph || '',
+          cyl: orderData.rightCyl || '',
+          axis: orderData.rightAxis || '',
+          add: orderData.rightAdd || '',
+          material: orderData.material || '',
+          index: orderData.index || '',
+          baseTint: orderData.baseTint || '',
+          coatingType: orderData.coatingType || '',
+          coatingColor: orderData.coatingColour || '',
+          diameter: orderData.diameter || '',
+          qty: parseInt(orderData.rightQty) || 1,
+          purchasePrice: orderData.price || 0,
+          salePrice: (parseFloat(orderData.price) * 1.3) || 0, // 30% markup for sale price
+          type: 'prescription',
+          status: orderData.status,
+          location: 'Main Cabinet',
+          notes: `Added from Order #${orderData.displayId}`,
+          createdAt: Timestamp.now()
+        };
+        
+        await addDoc(collection(db, 'lens_inventory'), rightLensData);
+        console.log('Added right eye lens to inventory');
+      }
+      
+      if (hasLeftEye) {
+        const leftLensData = {
+          orderId: orderId,
+          orderDisplayId: orderData.displayId,
+          brandName: orderData.brandName,
+          eye: 'left',
+          sph: orderData.leftSph || '',
+          cyl: orderData.leftCyl || '',
+          axis: orderData.leftAxis || '',
+          add: orderData.leftAdd || '',
+          material: orderData.material || '',
+          index: orderData.index || '',
+          baseTint: orderData.baseTint || '',
+          coatingType: orderData.coatingType || '',
+          coatingColor: orderData.coatingColour || '',
+          diameter: orderData.diameter || '',
+          qty: parseInt(orderData.leftQty) || 1,
+          purchasePrice: orderData.price || 0,
+          salePrice: (parseFloat(orderData.price) * 1.3) || 0, // 30% markup for sale price
+          type: 'prescription',
+          status: orderData.status,
+          location: 'Main Cabinet',
+          notes: `Added from Order #${orderData.displayId}`,
+          createdAt: Timestamp.now()
+        };
+        
+        await addDoc(collection(db, 'lens_inventory'), leftLensData);
+        console.log('Added left eye lens to inventory');
+      }
+    } catch (error) {
+      console.error('Error adding lens to inventory:', error);
+      // Don't throw error to prevent blocking the order creation
     }
   };
 
@@ -385,71 +526,8 @@ const CreateOrder = () => {
               onAddNewCustomer={() => setShowCustomerForm(true)}
               loading={loading}
               error={error}
+              matchingLenses={matchingLenses}
             />
-
-            {/* Lens Inventory Matches */}
-            {showLensMatches && matchingLenses.length > 0 && (
-              <div className="mt-6 border-t pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-md font-semibold text-gray-800 flex items-center">
-                    <svg className="h-5 w-5 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Matching Lenses in Inventory
-                  </h3>
-                  <button
-                    onClick={() => setShowLensMatches(false)}
-                    className="text-sm text-gray-500 hover:text-gray-700"
-                  >
-                    Dismiss
-                  </button>
-                </div>
-                
-                <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4 rounded">
-                  <p className="text-sm text-blue-700">
-                    We found {matchingLenses.length} lens(es) in inventory that match your requirements. Using these will save time and costs.
-                  </p>
-                </div>
-                
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Eye</th>
-                        <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SPH</th>
-                        <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CYL</th>
-                        <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AXIS</th>
-                        <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Material</th>
-                        <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Index</th>
-                        <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {matchingLenses.map((lens, index) => (
-                        <tr key={lens.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
-                            {lens.eye === 'right' ? 'Right' : 'Left'}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{lens.sph}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{lens.cyl || 'N/A'}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{lens.axis || 'N/A'}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{lens.material}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{lens.index}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
-                            <button 
-                              onClick={() => selectInventoryLens(lens)}
-                              className="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded-md"
-                            >
-                              Use this lens
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </main>
