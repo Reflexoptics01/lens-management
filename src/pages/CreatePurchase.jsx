@@ -7,9 +7,6 @@ import CustomerForm from '../components/CustomerForm';
 
 const TAX_OPTIONS = [
   { id: 'TAX_FREE', label: 'Tax Free', rate: 0 },
-  { id: 'GST_6', label: 'GST 6%', rate: 6 },
-  { id: 'GST_12', label: 'GST 12%', rate: 12 },
-  { id: 'GST_18', label: 'GST 18%', rate: 18 },
   { id: 'CGST_SGST_6', label: 'CGST/SGST 6%', rate: 6, split: true },
   { id: 'CGST_SGST_12', label: 'CGST/SGST 12%', rate: 12, split: true },
   { id: 'CGST_SGST_18', label: 'CGST/SGST 18%', rate: 18, split: true },
@@ -38,7 +35,7 @@ const EMPTY_ROW = {
   itemName: '',
   description: '',
   powerRange: '',
-  lensType: 'Not Lens',
+  lensType: 'Stock Lens',
   qty: 1,
   unit: 'Pairs',
   itemDiscount: 0,
