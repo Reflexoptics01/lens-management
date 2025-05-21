@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
 import Orders from './pages/Orders';
 import OrderDetail from './pages/OrderDetail';
 import CreateOrder from './pages/CreateOrder';
@@ -23,6 +24,8 @@ import PurchaseDetail from './pages/PurchaseDetail';
 import LensInventory from './pages/LensInventory';
 import LensDetail from './pages/LensDetail';
 import LensInventoryReport from './pages/LensInventoryReport';
+import SalesReturn from "./pages/SalesReturn";
+import PurchaseReturn from "./pages/PurchaseReturn";
 import './App.css';
 
 function App() {
@@ -31,6 +34,7 @@ function App() {
       <Router>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/orders" element={<Orders />} />
           <Route path="/orders/new" element={<CreateOrder />} />
@@ -55,6 +59,14 @@ function App() {
           <Route path="/lens-inventory" element={<LensInventory />} />
           <Route path="/lens-inventory/:id" element={<LensDetail />} />
           <Route path="/lens-inventory-report" element={<LensInventoryReport />} />
+          <Route path="/sales-returns" element={<SalesReturn />} />
+          <Route path="/purchase-returns" element={<PurchaseReturn />} />
+          <Route path="/sales/return/:id" element={<SalesReturn isCreate={true} />} />
+          <Route path="/purchases/return/:id" element={<PurchaseReturn isCreate={true} />} />
+          <Route path="/sales/return/new" element={<SalesReturn isCreate={true} newReturn={true} />} />
+          <Route path="/purchases/return/new" element={<PurchaseReturn isCreate={true} newReturn={true} />} />
+          <Route path="/sales-returns/:id" element={<SalesReturn isView={true} />} />
+          <Route path="/purchase-returns/:id" element={<PurchaseReturn isView={true} />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
