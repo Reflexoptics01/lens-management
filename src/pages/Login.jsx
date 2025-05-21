@@ -158,19 +158,19 @@ const Login = () => {
 
   if (initializing) {
     return (
-      <div className="min-h-screen bg-gradient-to-r from-gray-800 to-gray-900 flex items-center justify-center">
-        <div className="text-xl text-white">Loading...</div>
+      <div className="min-h-screen bg-gradient-to-r from-gray-50 to-white flex items-center justify-center">
+        <div className="text-xl text-gray-800">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-r from-gray-900 to-black flex flex-col md:flex-row overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-r from-white to-gray-50 flex flex-col md:flex-row overflow-hidden">
       {/* Left Section - Login Form */}
       <div className="w-full md:w-5/12 flex items-center justify-center p-6 md:p-12 z-10">
-        <div className="w-full max-w-md backdrop-blur-xl bg-white bg-opacity-10 p-8 rounded-2xl shadow-2xl border border-gray-700 border-opacity-40">
+        <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
           <div className="mb-6">
-            <h2 className="text-center text-xl font-medium text-gray-200">
+            <h2 className="text-center text-xl font-medium text-gray-800">
               Sign in to your account
             </h2>
           </div>
@@ -178,21 +178,21 @@ const Login = () => {
           <form className="space-y-6" onSubmit={handleLogin}>
             <div className="space-y-4">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
                   Email
                 </label>
                 <input
                   id="email"
                   type="email"
                   required
-                  className="w-full px-4 py-3 bg-gray-800 bg-opacity-50 border border-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                   placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
                   Password
                 </label>
                 <div className="relative">
@@ -200,14 +200,14 @@ const Login = () => {
                     id="password"
                     type={showPassword ? "text" : "password"}
                     required
-                    className="w-full px-4 py-3 bg-gray-800 bg-opacity-50 border border-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
                   <button
                     type="button"
-                    className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-gray-200 transition-colors"
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-gray-700 transition-colors"
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? (
@@ -223,7 +223,7 @@ const Login = () => {
                   </button>
                 </div>
                 <div className="mt-2 text-right">
-                  <Link to="/forgot-password" className="text-sm text-blue-400 hover:text-blue-300 transition-colors">
+                  <Link to="/forgot-password" className="text-sm text-blue-600 hover:text-blue-800 transition-colors">
                     Forgot password?
                   </Link>
                 </div>
@@ -231,7 +231,7 @@ const Login = () => {
             </div>
 
             {error && (
-              <div className="text-sm text-center font-medium text-red-400 bg-red-900 bg-opacity-20 py-2 px-3 rounded-lg">
+              <div className="text-sm text-center font-medium text-red-600 bg-red-100 py-2 px-3 rounded-lg">
                 {error}
               </div>
             )}

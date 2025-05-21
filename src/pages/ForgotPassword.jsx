@@ -39,26 +39,26 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-r from-gray-900 to-black flex items-center justify-center p-6">
-      <div className="w-full max-w-md backdrop-blur-xl bg-white bg-opacity-10 p-8 rounded-2xl shadow-2xl border border-gray-700 border-opacity-40">
+    <div className="min-h-screen bg-gradient-to-r from-white to-gray-50 flex items-center justify-center p-6">
+      <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
         <div className="mb-6">
-          <h2 className="text-center text-xl font-medium text-gray-200">
+          <h2 className="text-center text-xl font-medium text-gray-800">
             Reset Your Password
           </h2>
-          <p className="text-center text-sm text-gray-400 mt-2">
+          <p className="text-center text-sm text-gray-600 mt-2">
             Enter your email address and we'll send you a link to reset your password.
           </p>
         </div>
         
         {success ? (
           <div className="space-y-6">
-            <div className="text-sm text-center font-medium text-green-400 bg-green-900 bg-opacity-20 py-3 px-4 rounded-lg">
+            <div className="text-sm text-center font-medium text-green-600 bg-green-100 py-3 px-4 rounded-lg">
               Password reset email sent! Check your inbox for further instructions.
             </div>
             <div className="text-center">
               <Link 
                 to="/login" 
-                className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors"
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors"
               >
                 Return to login
               </Link>
@@ -67,14 +67,14 @@ const ForgotPassword = () => {
         ) : (
           <form className="space-y-6" onSubmit={handleResetPassword}>
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
                 Email Address
               </label>
               <input
                 id="email"
                 type="email"
                 required
-                className="w-full px-4 py-3 bg-gray-800 bg-opacity-50 border border-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                 placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -82,7 +82,7 @@ const ForgotPassword = () => {
             </div>
 
             {error && (
-              <div className="text-sm text-center font-medium text-red-400 bg-red-900 bg-opacity-20 py-2 px-3 rounded-lg">
+              <div className="text-sm text-center font-medium text-red-600 bg-red-100 py-2 px-3 rounded-lg">
                 {error}
               </div>
             )}
@@ -103,7 +103,7 @@ const ForgotPassword = () => {
             <div className="text-center">
               <Link 
                 to="/login" 
-                className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors"
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors"
               >
                 Return to login
               </Link>
