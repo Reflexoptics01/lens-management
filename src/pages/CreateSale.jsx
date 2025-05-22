@@ -294,10 +294,10 @@ const CreateSale = () => {
       let snapshot = null;
       
       // Try with the original displayId
-      const ordersRef = collection(db, 'orders');
+        const ordersRef = collection(db, 'orders');
       let q = query(ordersRef, where('displayId', '==', orderId));
       snapshot = await getDocs(q);
-      
+        
       // If no results, try with padding
       if (snapshot.empty) {
         console.log(`No order found with display ID: "${orderId}", trying with padding`);
@@ -315,48 +315,48 @@ const CreateSale = () => {
       
       if (!snapshot.empty) {
         orderDoc = snapshot.docs[0];
-        
-        if (orderDoc && orderDoc.exists()) {
-          const orderData = { id: orderDoc.id, ...orderDoc.data() };
+
+      if (orderDoc && orderDoc.exists()) {
+        const orderData = { id: orderDoc.id, ...orderDoc.data() };
           console.log(`Found order: ${orderData.id} with display ID: ${orderData.displayId}`);
-          
-          // Calculate proper quantity in pairs
-          let quantity = 1; // default
-          const rightQty = parseInt(orderData.rightQty || 0);
-          const leftQty = parseInt(orderData.leftQty || 0);
-          
-          // If both right and left are present, this is a pair
-          if (rightQty > 0 && leftQty > 0) {
-            // In optical terms, 1 right + 1 left = 1 pair
-            // We take the maximum since you can't have a partial pair
-            quantity = Math.max(rightQty, leftQty);
-          } else {
-            // If only one side is ordered, then count just that side
-            quantity = Math.max(rightQty, leftQty);
-          }
-          
-          // Ensure we have at least 1 quantity
-          quantity = quantity || 1;
-          
-          // Update the row with order details
-          const updatedRows = [...tableRows];
-          updatedRows[rowIndex] = {
-            ...updatedRows[rowIndex],
-            // Use the displayId for showing in the UI
-            orderId: orderData.displayId, 
-            orderDetails: orderData,
-            itemName: orderData.brandName || '',
-            // Extract prescription from either the right or left eye and format it
-            sph: formatOpticalValue(orderData.rightSph || orderData.leftSph || ''),
-            cyl: formatOpticalValue(orderData.rightCyl || orderData.leftCyl || ''),
-            axis: orderData.rightAxis || orderData.leftAxis || '', // No formatting for AXIS
-            add: formatOpticalValue(orderData.rightAdd || orderData.leftAdd || ''),
-            qty: quantity,
-            unit: 'Pairs', // Always use 'Pairs' regardless of the unit in the order
-            price: orderData.price || 0,
-            total: (orderData.price || 0) * quantity
-          };
-          setTableRows(updatedRows);
+        
+        // Calculate proper quantity in pairs
+        let quantity = 1; // default
+        const rightQty = parseInt(orderData.rightQty || 0);
+        const leftQty = parseInt(orderData.leftQty || 0);
+        
+        // If both right and left are present, this is a pair
+        if (rightQty > 0 && leftQty > 0) {
+          // In optical terms, 1 right + 1 left = 1 pair
+          // We take the maximum since you can't have a partial pair
+          quantity = Math.max(rightQty, leftQty);
+        } else {
+          // If only one side is ordered, then count just that side
+          quantity = Math.max(rightQty, leftQty);
+        }
+        
+        // Ensure we have at least 1 quantity
+        quantity = quantity || 1;
+        
+        // Update the row with order details
+        const updatedRows = [...tableRows];
+        updatedRows[rowIndex] = {
+          ...updatedRows[rowIndex],
+          // Use the displayId for showing in the UI
+          orderId: orderData.displayId, 
+          orderDetails: orderData,
+          itemName: orderData.brandName || '',
+          // Extract prescription from either the right or left eye and format it
+          sph: formatOpticalValue(orderData.rightSph || orderData.leftSph || ''),
+          cyl: formatOpticalValue(orderData.rightCyl || orderData.leftCyl || ''),
+          axis: orderData.rightAxis || orderData.leftAxis || '', // No formatting for AXIS
+          add: formatOpticalValue(orderData.rightAdd || orderData.leftAdd || ''),
+          qty: quantity,
+          unit: 'Pairs', // Always use 'Pairs' regardless of the unit in the order
+          price: orderData.price || 0,
+          total: (orderData.price || 0) * quantity
+        };
+        setTableRows(updatedRows);
         }
       }
     } catch (error) {

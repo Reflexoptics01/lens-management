@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
-import { collection, getDocs, query, orderBy, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, updateDoc, doc, deleteDoc, writeBatch, where, serverTimestamp, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 
@@ -191,32 +191,253 @@ const Orders = () => {
   const handleStatusChange = async (e, orderId, newStatus) => {
     e.stopPropagation(); // Prevent row click when changing status
     try {
-      const orderRef = doc(db, 'orders', orderId);
-      await updateDoc(orderRef, {
+      // Get the current order to access its data
+      const orderDoc = await getDoc(doc(db, 'orders', orderId));
+      
+      if (!orderDoc.exists()) {
+        setError('Order not found');
+        return;
+      }
+      
+      const orderData = { id: orderId, ...orderDoc.data() };
+      const oldStatus = orderData.status;
+      
+      // Update order status
+      await updateDoc(doc(db, 'orders', orderId), {
         status: newStatus
       });
+      
+      // Update lens inventory based on status change
+      await updateLensStatusForOrder(orderData, oldStatus, newStatus);
+      
       setOrders(prevOrders =>
         prevOrders.map(order =>
           order.id === orderId ? { ...order, status: newStatus } : order
         )
       );
+      
       setEditingStatus(null);
     } catch (error) {
-      console.error('Error updating order status:', error);
+      console.error('Error updating status:', error);
       setError('Failed to update order status');
     }
   };
 
-  const handleDeleteOrder = async (e, orderId) => {
-    e.stopPropagation(); // Prevent row click when deleting
-    if (!window.confirm('Are you sure you want to delete this order?')) return;
-    
+  // Enhanced function to update lens status in inventory
+  const updateLensStatusForOrder = async (orderData, oldStatus, newStatus) => {
     try {
-      await deleteDoc(doc(db, 'orders', orderId));
-      setOrders(prevOrders => prevOrders.filter(order => order.id !== orderId));
+      // Check what kind of transition this is
+      const invalidStatuses = ['CANCELLED', 'DECLINED'];
+      const validStatuses = ['RECEIVED', 'DISPATCHED', 'DELIVERED'];
+      
+      const wasInvalid = invalidStatuses.includes(oldStatus);
+      const isNowValid = validStatuses.includes(newStatus);
+      const isNowInvalid = invalidStatuses.includes(newStatus);
+      
+      // Find existing lenses in inventory
+      const lensRef = collection(db, 'lens_inventory');
+      const q = query(lensRef, where('orderId', '==', orderData.id));
+      const snapshot = await getDocs(q);
+      
+      // Case 1: Status changing to CANCELLED/DECLINED - remove lenses
+      if (isNowInvalid) {
+        if (!snapshot.empty) {
+          // Remove lenses from inventory
+          const batch = writeBatch(db);
+          
+          snapshot.docs.forEach(lensDoc => {
+            const lensRef = doc(db, 'lens_inventory', lensDoc.id);
+            batch.delete(lensRef);
+          });
+          
+          // Commit the batch
+          await batch.commit();
+          console.log(`Removed ${snapshot.docs.length} lenses from inventory due to ${newStatus} status`);
+        }
+        return;
+      }
+      
+      // Case 2: Status changing from CANCELLED/DECLINED to valid - add lenses back
+      if (wasInvalid && isNowValid) {
+        // Check if lenses already exist (they shouldn't, but check anyway)
+        if (!snapshot.empty) {
+          console.log('Lenses exist despite invalid previous status - updating them');
+          
+          const batch = writeBatch(db);
+          snapshot.docs.forEach(lensDoc => {
+            const lensRef = doc(db, 'lens_inventory', lensDoc.id);
+            batch.update(lensRef, { 
+              status: newStatus,
+              updatedAt: serverTimestamp()
+            });
+          });
+          
+          await batch.commit();
+        } else {
+          // No lenses found - recreate them from order data
+          await createLensesFromOrder(orderData, newStatus);
+        }
+        return;
+      }
+      
+      // Case 3: Status changing between valid states - just update status
+      if (!snapshot.empty) {
+        const batch = writeBatch(db);
+        
+        snapshot.docs.forEach(lensDoc => {
+          const lensRef = doc(db, 'lens_inventory', lensDoc.id);
+          batch.update(lensRef, { 
+            status: newStatus,
+            updatedAt: serverTimestamp()
+          });
+        });
+        
+        // Commit the batch
+        await batch.commit();
+        console.log(`Updated status for ${snapshot.docs.length} lenses to ${newStatus}`);
+      } else if (isNowValid) {
+        // No lenses found but status is valid - create them
+        await createLensesFromOrder(orderData, newStatus);
+      }
     } catch (error) {
-      console.error('Error deleting order:', error);
-      setError('Failed to delete order');
+      console.error('Error updating lens status:', error);
+    }
+  };
+  
+  // Helper function to create lenses from order data
+  const createLensesFromOrder = async (orderData, status) => {
+    try {
+      // Check if the order has prescription data
+      const hasRightEye = orderData.rightSph || orderData.rightCyl;
+      const hasLeftEye = orderData.leftSph || orderData.leftCyl;
+      
+      if (!hasRightEye && !hasLeftEye) {
+        console.log('No prescription data to add to inventory');
+        return;
+      }
+      
+      // Batch for creating lenses
+      const batch = writeBatch(db);
+      let lensCount = 0;
+      
+      // Create lens inventory items
+      if (hasRightEye) {
+        const rightLensRef = doc(collection(db, 'lens_inventory'));
+        const rightLensData = {
+          orderId: orderData.id,
+          orderDisplayId: orderData.displayId,
+          brandName: orderData.brandName || '',
+          eye: 'right',
+          sph: orderData.rightSph || '',
+          cyl: orderData.rightCyl || '',
+          axis: orderData.rightAxis || '',
+          add: orderData.rightAdd || '',
+          material: orderData.material || '',
+          index: orderData.index || '',
+          baseTint: orderData.baseTint || '',
+          coatingType: orderData.coatingType || '',
+          coatingColor: orderData.coatingColour || '',
+          diameter: orderData.diameter || '',
+          qty: parseInt(orderData.rightQty) || 1,
+          purchasePrice: orderData.price || 0,
+          salePrice: (parseFloat(orderData.price || 0) * 1.3), // 30% markup for sale price
+          type: 'prescription',
+          status: status,
+          location: 'Main Cabinet',
+          notes: `Added from Order #${orderData.displayId}`,
+          createdAt: serverTimestamp()
+        };
+        
+        batch.set(rightLensRef, rightLensData);
+        lensCount++;
+      }
+      
+      if (hasLeftEye) {
+        const leftLensRef = doc(collection(db, 'lens_inventory'));
+        const leftLensData = {
+          orderId: orderData.id,
+          orderDisplayId: orderData.displayId,
+          brandName: orderData.brandName || '',
+          eye: 'left',
+          sph: orderData.leftSph || '',
+          cyl: orderData.leftCyl || '',
+          axis: orderData.leftAxis || '',
+          add: orderData.leftAdd || '',
+          material: orderData.material || '',
+          index: orderData.index || '',
+          baseTint: orderData.baseTint || '',
+          coatingType: orderData.coatingType || '',
+          coatingColor: orderData.coatingColour || '',
+          diameter: orderData.diameter || '',
+          qty: parseInt(orderData.leftQty) || 1,
+          purchasePrice: orderData.price || 0,
+          salePrice: (parseFloat(orderData.price || 0) * 1.3), // 30% markup for sale price
+          type: 'prescription',
+          status: status,
+          location: 'Main Cabinet',
+          notes: `Added from Order #${orderData.displayId}`,
+          createdAt: serverTimestamp()
+        };
+        
+        batch.set(leftLensRef, leftLensData);
+        lensCount++;
+      }
+      
+      if (lensCount > 0) {
+        // Commit the batch
+        await batch.commit();
+        console.log(`Created ${lensCount} lenses for order ${orderData.displayId}`);
+      }
+    } catch (error) {
+      console.error('Error creating lenses from order:', error);
+    }
+  };
+
+  const handleDeleteOrder = async (e, orderId) => {
+    e.stopPropagation();
+    if (window.confirm('Are you sure you want to delete this order?')) {
+      try {
+        // Delete the order
+        await deleteDoc(doc(db, 'orders', orderId));
+        
+        // Also delete any associated lenses in inventory
+        await deleteLensesForOrder(orderId);
+        
+        // Update local state
+        setOrders(prevOrders => prevOrders.filter(order => order.id !== orderId));
+      } catch (error) {
+        console.error('Error deleting order:', error);
+        setError('Failed to delete order');
+      }
+    }
+  };
+  
+  // New function to delete lenses for an order
+  const deleteLensesForOrder = async (orderId) => {
+    try {
+      // Find lenses associated with this order
+      const lensRef = collection(db, 'lens_inventory');
+      const q = query(lensRef, where('orderId', '==', orderId));
+      const snapshot = await getDocs(q);
+      
+      if (snapshot.empty) {
+        console.log('No lenses found in inventory for this order');
+        return;
+      }
+      
+      // Create batch to delete all lenses
+      const batch = writeBatch(db);
+      
+      snapshot.docs.forEach(lensDoc => {
+        const lensRef = doc(db, 'lens_inventory', lensDoc.id);
+        batch.delete(lensRef);
+      });
+      
+      // Commit the batch
+      await batch.commit();
+      console.log(`Deleted ${snapshot.docs.length} lenses from inventory for order ${orderId}`);
+    } catch (error) {
+      console.error('Error deleting lenses from inventory:', error);
     }
   };
 

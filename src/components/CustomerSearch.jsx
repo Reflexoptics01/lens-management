@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const CustomerSearch = ({ customers, value, onChange, onSelect, onAddNew, isOrderFlow = false }) => {
+const CustomerSearch = ({ customers, value, onChange, onSelect, onAddNew, isOrderFlow = false, className = '' }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filteredCustomers, setFilteredCustomers] = useState([]);
@@ -198,13 +198,16 @@ const CustomerSearch = ({ customers, value, onChange, onSelect, onAddNew, isOrde
           <input
             ref={inputRef}
             type="text"
+            name="customerName"
             value={searchTerm}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             onFocus={handleFocus}
             onBlur={handleBlur}
             placeholder="Start typing customer name..."
-            className="w-full rounded-lg border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm"
+            required
+            aria-required="true"
+            className={`w-full rounded-lg border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm ${className}`}
           />
           {showSuggestions && filteredCustomers.length > 0 && (
             <div className="absolute z-10 w-full mt-1 bg-white rounded-md shadow-lg max-h-48 overflow-auto border border-sky-100">

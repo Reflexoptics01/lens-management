@@ -32,11 +32,12 @@ const COATING_COLORS = {
   'SHMC': ['GREEN', 'BLUE', 'DUAL (BLUE & GREEN)', 'MAGENTA', 'VIOLET']
 };
 
-const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, loading, error, isEditing = false, matchingLenses = [] }) => {
+const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, loading, error, isEditing = false, matchingLenses = [], sectionColors }) => {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [otherTint, setOtherTint] = useState('');
   const [showCoatingColors, setShowCoatingColors] = useState(false);
   const [includePrescription, setIncludePrescription] = useState(true);
+  const [activeSection, setActiveSection] = useState(null);
 
   useEffect(() => {
     if (formData.coatingType === 'HMC' || formData.coatingType === 'SHMC') {
@@ -81,26 +82,72 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
     }
   };
 
-  const inputClassName = "w-full rounded-lg border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm";
-  const selectClassName = "w-full rounded-lg border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm";
-  const labelClassName = "block uppercase tracking-wide text-xs font-bold text-sky-700 mb-2";
-  const sectionClassName = "bg-white rounded-lg border border-gray-100 p-4 hover:shadow-sm transition-shadow duration-200";
-  const sectionHeaderClassName = "flex items-center gap-1.5 text-sky-600 mb-3";
-  const iconClassName = "w-4 h-4";
+  const handleSectionFocus = (section) => {
+    setActiveSection(section);
+  };
+
+  // Define colors for each section
+  const colors = sectionColors || {
+    customer: { gradient: 'from-blue-600 to-indigo-600', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' },
+    lens: { gradient: 'from-purple-600 to-pink-600', bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700' },
+    coating: { gradient: 'from-teal-600 to-cyan-600', bg: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-700' },
+    prescription: { gradient: 'from-green-600 to-teal-600', bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700' },
+    delivery: { gradient: 'from-amber-600 to-orange-600', bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' }
+  };
+
+  // Dynamic class for input fields
+  const getInputClass = (fieldName, section) => {
+    const baseClass = "w-full rounded-lg shadow-sm bg-white px-3 py-2.5 text-gray-900 text-sm transition-all duration-200";
+    
+    // Field validation style
+    const validationClass = fieldName && formData[fieldName] === '' && 
+      ['customerName', 'brandName', 'expectedDeliveryDate'].includes(fieldName)
+      ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+      : `border-gray-200 focus:border-${section}-500 focus:ring-${section}-500`;
+    
+    // Active section highlight
+    const activeClass = activeSection === section ? `border-${section}-400` : '';
+    
+    return `${baseClass} ${validationClass} ${activeClass}`;
+  };
+
+  // Section styles
+  const getSectionClass = (section) => {
+    const baseClass = "bg-white rounded-lg shadow-sm p-5 transition-all duration-300 border-l-4";
+    const borderColor = `border-${section}-500`;
+    const hoverEffect = `hover:shadow-md hover:border-${section}-600`;
+    const activeClass = activeSection === section ? `border-${section}-600 shadow-md` : '';
+    
+    return `${baseClass} ${borderColor} ${hoverEffect} ${activeClass}`;
+  };
+
+  const getSectionHeaderClass = (section) => {
+    return `flex items-center gap-2 mb-4 text-${section}-600 font-medium`;
+  };
+
+  const getLabelClass = (section) => {
+    return `block text-xs font-semibold tracking-wide text-${section}-700 mb-1.5`;
+  };
 
   return (
-    <form onSubmit={onSubmit} className="space-y-5">
+    <form onSubmit={onSubmit} className="space-y-6">
       {/* Customer Information */}
-      <div className={sectionClassName}>
-        <div className={sectionHeaderClassName}>
-          <svg className={iconClassName} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-          </svg>
+      <div 
+        className={getSectionClass('blue')}
+        onFocus={() => handleSectionFocus('customer')}
+        onClick={() => handleSectionFocus('customer')}
+      >
+        <div className={getSectionHeaderClass('blue')}>
+          <div className={`w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center shadow-sm`}>
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          </div>
           <h3 className="text-base font-medium">Customer Details</h3>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div>
-            <label className={labelClassName}>
+            <label className={getLabelClass('blue')}>
               Optical Name <span className="text-red-500">*</span>
             </label>
             <CustomerSearch
@@ -110,35 +157,45 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
               onSelect={handleCustomerSelect}
               onAddNew={onAddNewCustomer}
               isOrderFlow={true}
-              className={formData.customerName ? '' : 'ring-1 ring-red-300'}
+              className={formData.customerName ? getInputClass('customerName', 'blue') : `${getInputClass('customerName', 'blue')} ring-1 ring-red-300`}
             />
+            {!formData.customerName && (
+              <p className="mt-1 text-xs text-red-500">This field is required</p>
+            )}
           </div>
           <div>
-            <label className={labelClassName}>Consumer Name</label>
+            <label className={getLabelClass('blue')}>Consumer Name</label>
             <input
               type="text"
               name="consumerName"
               value={formData.consumerName}
               onChange={onChange}
-              className={inputClassName}
+              className={getInputClass(null, 'blue')}
               placeholder="Enter consumer name"
+              onFocus={() => handleSectionFocus('customer')}
             />
           </div>
         </div>
       </div>
 
       {/* Lens Specifications */}
-      <div className={sectionClassName}>
-        <div className={sectionHeaderClassName}>
-          <svg className={iconClassName} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
+      <div 
+        className={getSectionClass('purple')}
+        onFocus={() => handleSectionFocus('lens')}
+        onClick={() => handleSectionFocus('lens')}
+      >
+        <div className={getSectionHeaderClass('purple')}>
+          <div className={`w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center shadow-sm`}>
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+          </div>
           <h3 className="text-base font-medium">Lens Specifications</h3>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           <div>
-            <label className={labelClassName}>
+            <label className={getLabelClass('purple')}>
               Brand Name <span className="text-red-500">*</span>
             </label>
             <input
@@ -148,16 +205,22 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
               onChange={onChange}
               required
               aria-required="true"
-              className={`${inputClassName} ${formData.brandName ? '' : 'ring-1 ring-red-300'}`}
+              className={formData.brandName ? getInputClass('brandName', 'purple') : `${getInputClass('brandName', 'purple')} ring-1 ring-red-300`}
+              placeholder="Enter brand name"
+              onFocus={() => handleSectionFocus('lens')}
             />
+            {!formData.brandName && (
+              <p className="mt-1 text-xs text-red-500">This field is required</p>
+            )}
           </div>
           <div>
-            <label className={labelClassName}>Material</label>
+            <label className={getLabelClass('purple')}>Material</label>
             <select
               name="material"
               value={formData.material}
               onChange={handleMaterialChange}
-              className={selectClassName}
+              className={getInputClass(null, 'purple')}
+              onFocus={() => handleSectionFocus('lens')}
             >
               <option value="">Select Material</option>
               {MATERIALS.map(material => (
@@ -166,13 +229,14 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
             </select>
           </div>
           <div>
-            <label className={labelClassName}>Index</label>
+            <label className={getLabelClass('purple')}>Index</label>
             <select
               name="index"
               value={formData.index}
               onChange={onChange}
               disabled={!formData.material}
-              className={selectClassName}
+              className={`${getInputClass(null, 'purple')} ${!formData.material ? 'opacity-60 cursor-not-allowed' : ''}`}
+              onFocus={() => handleSectionFocus('lens')}
             >
               <option value="">Select Index</option>
               {formData.material && INDEX_BY_MATERIAL[formData.material].map(index => (
@@ -182,14 +246,15 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5">
           <div>
-            <label className={labelClassName}>Lens Type</label>
+            <label className={getLabelClass('purple')}>Lens Type</label>
             <select
               name="lensType"
               value={formData.lensType}
               onChange={onChange}
-              className={selectClassName}
+              className={getInputClass(null, 'purple')}
+              onFocus={() => handleSectionFocus('lens')}
             >
               <option value="">Select Lens Type</option>
               {LENS_TYPES.map(type => (
@@ -198,12 +263,13 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
             </select>
           </div>
           <div>
-            <label className={labelClassName}>Base Tint</label>
+            <label className={getLabelClass('purple')}>Base Tint</label>
             <select
               name="baseTint"
               value={formData.baseTint}
               onChange={handleBaseTintChange}
-              className={selectClassName}
+              className={getInputClass(null, 'purple')}
+              onFocus={() => handleSectionFocus('lens')}
             >
               <option value="">Select Base Tint</option>
               {BASE_TINTS.map(tint => (
@@ -215,22 +281,29 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
       </div>
 
       {/* Coating Details */}
-      <div className={sectionClassName}>
-        <div className={sectionHeaderClassName}>
-          <svg className={iconClassName} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-          </svg>
+      <div 
+        className={getSectionClass('teal')}
+        onFocus={() => handleSectionFocus('coating')}
+        onClick={() => handleSectionFocus('coating')}
+      >
+        <div className={getSectionHeaderClass('teal')}>
+          <div className={`w-8 h-8 rounded-full bg-gradient-to-r from-teal-500 to-cyan-500 flex items-center justify-center shadow-sm`}>
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+            </svg>
+          </div>
           <h3 className="text-base font-medium">Coating & Additional Details</h3>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           <div>
-            <label className={labelClassName}>Coating Type</label>
+            <label className={getLabelClass('teal')}>Coating Type</label>
             <select
               name="coatingType"
               value={formData.coatingType}
               onChange={onChange}
-              className={selectClassName}
+              className={getInputClass(null, 'teal')}
+              onFocus={() => handleSectionFocus('coating')}
             >
               <option value="">Select Coating</option>
               {COATING_TYPES.map(type => (
@@ -239,13 +312,14 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
             </select>
           </div>
           {showCoatingColors && (
-            <div>
-              <label className={labelClassName}>Coating Color</label>
+            <div className="transition-opacity duration-300 ease-in-out">
+              <label className={getLabelClass('teal')}>Coating Color</label>
               <select
                 name="coatingColour"
                 value={formData.coatingColour}
                 onChange={onChange}
-                className={selectClassName}
+                className={getInputClass(null, 'teal')}
+                onFocus={() => handleSectionFocus('coating')}
               >
                 <option value="">Select Color</option>
                 {COATING_COLORS[formData.coatingType]?.map(color => (
@@ -255,58 +329,86 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
             </div>
           )}
           <div>
-            <label className={labelClassName}>Diameter</label>
+            <label className={getLabelClass('teal')}>Diameter</label>
             <input
               type="text"
               name="diameter"
               value={formData.diameter}
               onChange={onChange}
-              className={inputClassName}
+              className={getInputClass(null, 'teal')}
               placeholder="Enter diameter"
+              onFocus={() => handleSectionFocus('coating')}
             />
           </div>
           <div>
-            <label className={labelClassName}>Fitting</label>
+            <label className={getLabelClass('teal')}>Fitting</label>
             <select
               name="fitting"
               value={formData.fitting}
               onChange={onChange}
-              className={selectClassName}
+              className={getInputClass(null, 'teal')}
+              onFocus={() => handleSectionFocus('coating')}
             >
               <option value="None">None</option>
               <option value="With Fitting">With Fitting</option>
               <option value="Without Fitting">Without Fitting</option>
             </select>
           </div>
+          <div className="flex items-center mt-2 ml-1">
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={formData.fogMark}
+                name="fogMark"
+                onChange={onChange}
+                className="sr-only peer"
+                onFocus={() => handleSectionFocus('coating')}
+              />
+              <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-teal-600"></div>
+              <span className="ml-3 text-sm font-medium text-gray-700">Fog Mark</span>
+            </label>
+          </div>
         </div>
       </div>
 
       {/* Prescription */}
-      <div className={sectionClassName}>
-        <div className={sectionHeaderClassName}>
-          <svg className={iconClassName} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
+      <div 
+        className={getSectionClass('green')}
+        onFocus={() => handleSectionFocus('prescription')}
+        onClick={() => handleSectionFocus('prescription')}
+      >
+        <div className={getSectionHeaderClass('green')}>
+          <div className={`w-8 h-8 rounded-full bg-gradient-to-r from-green-500 to-teal-500 flex items-center justify-center shadow-sm`}>
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
           <h3 className="text-base font-medium">Prescription Details</h3>
         </div>
         
-        <div className="bg-gray-50 p-3 rounded">
+        <div className="bg-gradient-to-br from-white via-white to-green-50 p-4 rounded-lg border border-green-100 shadow-sm">
           <LensPrescription formData={formData} onChange={onChange} matchingLenses={matchingLenses} />
         </div>
       </div>
 
       {/* Order Details */}
-      <div className={sectionClassName}>
-        <div className={sectionHeaderClassName}>
-          <svg className={iconClassName} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-          </svg>
+      <div 
+        className={getSectionClass('amber')}
+        onFocus={() => handleSectionFocus('delivery')}
+        onClick={() => handleSectionFocus('delivery')}
+      >
+        <div className={getSectionHeaderClass('amber')}>
+          <div className={`w-8 h-8 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 flex items-center justify-center shadow-sm`}>
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            </svg>
+          </div>
           <h3 className="text-base font-medium">Order Details</h3>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div>
-            <label className={labelClassName}>
+            <label className={getLabelClass('amber')}>
               Expected Delivery Date <span className="text-red-500">*</span>
             </label>
             <input
@@ -316,11 +418,15 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
               onChange={onChange}
               required
               aria-required="true"
-              className={`${inputClassName} ${formData.expectedDeliveryDate ? '' : 'ring-1 ring-red-300'}`}
+              className={formData.expectedDeliveryDate ? getInputClass('expectedDeliveryDate', 'amber') : `${getInputClass('expectedDeliveryDate', 'amber')} ring-1 ring-red-300`}
+              onFocus={() => handleSectionFocus('delivery')}
             />
+            {!formData.expectedDeliveryDate && (
+              <p className="mt-1 text-xs text-red-500">This field is required</p>
+            )}
           </div>
           <div>
-            <label className={labelClassName}>Price</label>
+            <label className={getLabelClass('amber')}>Price</label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₹</span>
               <input
@@ -328,57 +434,62 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
                 name="price"
                 value={formData.price}
                 onChange={onChange}
-                className={`${inputClassName} pl-7`}
+                className={`${getInputClass(null, 'amber')} pl-7`}
                 placeholder="Enter price"
+                onFocus={() => handleSectionFocus('delivery')}
               />
             </div>
           </div>
           <div className="md:col-span-2">
-            <label className={labelClassName}>Special Notes</label>
+            <label className={getLabelClass('amber')}>Special Notes</label>
             <textarea
               name="specialNotes"
               value={formData.specialNotes}
               onChange={onChange}
               rows="2"
-              className={`${inputClassName} resize-none`}
+              className={`${getInputClass(null, 'amber')} resize-none`}
               placeholder="Enter any special instructions or notes"
+              onFocus={() => handleSectionFocus('delivery')}
             />
           </div>
         </div>
       </div>
 
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-400 p-3 rounded text-sm">
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-md shadow-sm animate-pulse">
           <div className="flex">
             <div className="flex-shrink-0">
-              <svg className="h-4 w-4 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
             </div>
-            <div className="ml-2">
-              <p className="text-sm text-red-700">{error}</p>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-red-800">{error}</p>
             </div>
           </div>
         </div>
       )}
 
-      <div className="flex justify-end mt-4">
-        <button
-          type="submit"
-          disabled={loading}
-          className="inline-flex items-center px-5 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50 transition-colors"
-        >
-          {loading ? (
-            <>
-              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              {isEditing ? 'Updating Order...' : 'Creating Order...'}
-            </>
-          ) : isEditing ? 'Update Order' : 'Create Order'}
-        </button>
-      </div>
+      {/* Only show the submit button when not on the CreateOrder page (e.g., when editing) */}
+      {isEditing && (
+        <div className="flex justify-end mt-6">
+          <button
+            type="submit"
+            disabled={loading}
+            className="inline-flex items-center px-6 py-3 border border-transparent text-sm font-medium rounded-lg shadow-md text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-all transform hover:scale-[1.02] duration-300"
+          >
+            {loading ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Updating Order...
+              </>
+            ) : 'Update Order'}
+          </button>
+        </div>
+      )}
     </form>
   );
 };
