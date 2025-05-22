@@ -98,6 +98,13 @@ const CreateSale = () => {
   // New state for fallback print
   const [showFallbackPrint, setShowFallbackPrint] = useState(false);
 
+  // Add state for dispatch logs
+  const [dispatchLogs, setDispatchLogs] = useState([]);
+  const [showDispatchLogs, setShowDispatchLogs] = useState(false);
+  const [searchLogQuery, setSearchLogQuery] = useState('');
+  const [isSearchingLogs, setIsSearchingLogs] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+
   // Format optical values (SPH, CYL, ADD) to "0.00" format with signs
   const formatOpticalValue = (value) => {
     if (!value || value === '') return '';
@@ -159,6 +166,13 @@ const CreateSale = () => {
     generateInvoiceNumber();
     fetchItems();
   }, []);
+
+  // Add useEffect to fetch dispatch logs when invoice date changes
+  useEffect(() => {
+    if (invoiceDate) {
+      fetchDispatchLogs(invoiceDate);
+    }
+  }, [invoiceDate]);
 
   const fetchCustomers = async () => {
     try {
@@ -856,6 +870,239 @@ const CreateSale = () => {
     setTableRows(updatedRows);
   };
 
+  // Add function to fetch dispatch logs
+  const fetchDispatchLogs = async (date) => {
+    try {
+      const startDate = new Date(date);
+      startDate.setHours(0, 0, 0, 0);
+      
+      const endDate = new Date(date);
+      endDate.setHours(23, 59, 59, 999);
+      
+      const dispatchRef = collection(db, 'dispatch_logs');
+      const q = query(
+        dispatchRef,
+        where('date', '>=', startDate),
+        where('date', '<=', endDate),
+        orderBy('date', 'desc')
+      );
+      
+      const snapshot = await getDocs(q);
+      
+      // Group entries by logId
+      const groupedLogs = {};
+      snapshot.docs.forEach(doc => {
+        const log = { id: doc.id, ...doc.data() };
+        if (!groupedLogs[log.logId]) {
+          groupedLogs[log.logId] = {
+            logId: log.logId,
+            opticalName: log.opticalName,
+            entries: []
+          };
+        }
+        groupedLogs[log.logId].entries.push(log);
+      });
+      
+      // Convert to array for rendering
+      const logsArray = Object.values(groupedLogs);
+      setDispatchLogs(logsArray);
+    } catch (error) {
+      console.error('Error fetching dispatch logs:', error);
+    }
+  };
+  
+  // Add function to import dispatch log entries to invoice
+  const importDispatchLog = (log) => {
+    console.log("Importing dispatch log:", log);
+    
+    // First check if we have a customer selected
+    if (!selectedCustomer) {
+      // Check if the optical name matches one of our customers
+      const matchingCustomer = customers.find(
+        customer => customer.opticalName === log.opticalName
+      );
+      
+      if (matchingCustomer) {
+        handleCustomerSelect(matchingCustomer);
+      } else {
+        setError(`Please select a customer first or ensure the optical name "${log.opticalName}" matches a customer in your system.`);
+        return;
+      }
+    }
+    
+    try {
+      // Create blank rows just like when we initialize the form
+      // Using the exact same structure as when we initialize tableRows in the component
+      const importedRows = Array(log.entries.length * 2).fill().map(() => ({
+        orderId: '',
+        orderDetails: null,
+        itemName: '',
+        sph: '',
+        cyl: '',
+        axis: '',
+        add: '',
+        qty: 1,
+        unit: 'Pairs',
+        price: 0,
+        total: 0
+      }));
+      
+      // Now fill in the data from log entries
+      log.entries.forEach((entry, index) => {
+        const rightIdx = index * 2;
+        const leftIdx = index * 2 + 1;
+        
+        // Base item name without log reference
+        const baseName = entry.lensName || 'Lens';
+        
+        // Check if we have right eye data
+        if (entry.rightSph || entry.rightCyl || entry.rightAxis || entry.rightAdd || entry.rightQty) {
+          importedRows[rightIdx].orderId = log.logId || ''; // Put log ID in orderId field
+          importedRows[rightIdx].itemName = `${baseName} - RIGHT`;
+          importedRows[rightIdx].sph = entry.rightSph || '';
+          importedRows[rightIdx].cyl = entry.rightCyl || '';
+          importedRows[rightIdx].axis = entry.rightAxis || '';
+          importedRows[rightIdx].add = entry.rightAdd || '';
+          importedRows[rightIdx].qty = parseInt(entry.rightQty || 1);
+        }
+        
+        // Check if we have left eye data
+        if (entry.leftSph || entry.leftCyl || entry.leftAxis || entry.leftAdd || entry.leftQty) {
+          importedRows[leftIdx].orderId = log.logId || ''; // Put log ID in orderId field
+          importedRows[leftIdx].itemName = `${baseName} - LEFT`;
+          importedRows[leftIdx].sph = entry.leftSph || '';
+          importedRows[leftIdx].cyl = entry.leftCyl || '';
+          importedRows[leftIdx].axis = entry.leftAxis || '';
+          importedRows[leftIdx].add = entry.leftAdd || '';
+          importedRows[leftIdx].qty = parseInt(entry.leftQty || 1);
+        }
+      });
+      
+      // Filter out empty rows (where itemName is still empty)
+      const validRows = importedRows.filter(row => row.itemName !== '');
+      
+      console.log("Valid imported rows:", validRows);
+      
+      // Add imported rows to the top of the table
+      // First check if we have any existing filled rows
+      const existingFilledRows = tableRows.filter(row => row.itemName.trim() !== '');
+      const existingEmptyRows = tableRows.filter(row => row.itemName.trim() === '');
+      
+      // If we have some filled rows, put new rows after them, otherwise at the top
+      let newTableRows;
+      
+      if (existingFilledRows.length > 0) {
+        // Add the imported rows after the last filled row
+        newTableRows = [
+          ...existingFilledRows,
+          ...validRows,
+          ...existingEmptyRows
+        ];
+      } else {
+        // Add imported rows at the top, then the empty rows
+        newTableRows = [
+          ...validRows,
+          ...existingEmptyRows
+        ];
+      }
+      
+      // Update state with the new combined array
+      setTableRows(newTableRows);
+      
+      // Give a success message
+      console.log(`Successfully imported ${validRows.length} items from dispatch log`);
+      setError(''); // Clear any previous errors
+      
+    } catch (error) {
+      console.error("Error importing dispatch log:", error);
+      setError(`Failed to import: ${error.message}`);
+    }
+    
+    // Close the dispatch logs modal
+    setShowDispatchLogs(false);
+  };
+
+  // Add function to fetch dispatch logs by search query
+  const searchDispatchLogs = async (searchTerm) => {
+    if (!searchTerm || searchTerm.trim() === '') {
+      setSearchResults([]);
+      return;
+    }
+    
+    try {
+      setIsSearchingLogs(true);
+      console.log("Searching for logs with term:", searchTerm);
+      
+      // Normalize the search query to lowercase for case-insensitive comparison
+      const normalizedQuery = searchTerm.toLowerCase().trim();
+      
+      // Get all dispatch logs (limited to last 100 days to avoid too much data)
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 100); // Last 100 days
+      
+      const dispatchRef = collection(db, 'dispatch_logs');
+      const querySnapshot = await getDocs(
+        query(
+          dispatchRef,
+          where('date', '>=', startDate),
+          where('date', '<=', endDate),
+          orderBy('date', 'desc')
+        )
+      );
+      
+      console.log(`Found ${querySnapshot.docs.length} logs in date range`);
+      
+      // First group by logId and filter by search term
+      const groupedLogs = {};
+      let matchCount = 0;
+      
+      querySnapshot.docs.forEach(doc => {
+        const log = { id: doc.id, ...doc.data() };
+        
+        // Skip if this doesn't match our search
+        const matchesLogId = log.logId && log.logId.toLowerCase().includes(normalizedQuery);
+        const matchesOpticalName = log.opticalName && log.opticalName.toLowerCase().includes(normalizedQuery);
+        const matchesLensName = log.lensName && log.lensName.toLowerCase().includes(normalizedQuery);
+        
+        if (!matchesLogId && !matchesOpticalName && !matchesLensName) {
+          return;
+        }
+        
+        matchCount++;
+        
+        if (!groupedLogs[log.logId]) {
+          groupedLogs[log.logId] = {
+            logId: log.logId,
+            opticalName: log.opticalName,
+            date: log.date,
+            entries: []
+          };
+        }
+        
+        groupedLogs[log.logId].entries.push(log);
+      });
+      
+      console.log(`Found ${matchCount} matching logs, grouped into ${Object.keys(groupedLogs).length} log IDs`);
+      
+      // Convert to array and sort by date (newest first)
+      const searchResultsArray = Object.values(groupedLogs).sort((a, b) => {
+        // Convert to JavaScript Date objects if they're Firestore timestamps
+        const dateA = a.date && a.date.toDate ? a.date.toDate() : new Date(a.date);
+        const dateB = b.date && b.date.toDate ? b.date.toDate() : new Date(b.date);
+        return dateB - dateA;
+      });
+      
+      console.log(`Returning ${searchResultsArray.length} search results`);
+      setSearchResults(searchResultsArray);
+    } catch (error) {
+      console.error('Error searching dispatch logs:', error);
+      alert(`Search error: ${error.message}`);
+    } finally {
+      setIsSearchingLogs(false);
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
       <Navbar />
@@ -975,8 +1222,20 @@ const CreateSale = () => {
         <div className="bg-white rounded-lg shadow-md p-6 mb-6 overflow-x-auto">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-medium text-gray-900">Invoice Items</h2>
-            <div className="text-sm text-gray-500">
-              Showing {getVisibleRows().length} of {tableRows.length} rows
+            <div className="flex items-center">
+              <button
+                type="button"
+                onClick={() => setShowDispatchLogs(true)}
+                className="ml-2 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200 text-sm flex items-center"
+              >
+                <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                Import from Dispatch Log
+              </button>
+              <div className="text-sm text-gray-500 ml-4">
+                Showing {getVisibleRows().length} of {tableRows.length} rows
+              </div>
             </div>
           </div>
           
@@ -1424,6 +1683,179 @@ const CreateSale = () => {
                   >
                     Close
                   </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add Dispatch Logs Modal */}
+        {showDispatchLogs && (
+          <div className="fixed inset-0 overflow-y-auto z-50">
+            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+              </div>
+
+              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+              <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full">
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-lg leading-6 font-medium text-gray-900">
+                          Dispatch Logs
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => setShowDispatchLogs(false)}
+                          className="text-gray-400 hover:text-gray-500"
+                        >
+                          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                      
+                      <div className="mt-4 border-b border-gray-200 pb-4">
+                        <div className="flex flex-col md:flex-row md:items-center gap-3">
+                          <div className="flex-grow">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Search by Log ID, Optical Name, or Lens Name
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={searchLogQuery}
+                                onChange={(e) => setSearchLogQuery(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && searchDispatchLogs(searchLogQuery)}
+                                placeholder="Enter search term..."
+                                className="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => searchDispatchLogs(searchLogQuery)}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                              >
+                                Search
+                              </button>
+                            </div>
+                          </div>
+                          
+                          <div className="md:w-48">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Today's Logs
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSearchLogQuery('');
+                                setSearchResults([]);
+                              }}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-700 hover:bg-gray-100"
+                            >
+                              Show Today's Logs
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-4 max-h-[60vh] overflow-y-auto">
+                        {isSearchingLogs ? (
+                          <div className="flex justify-center py-8">
+                            <svg className="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          </div>
+                        ) : searchResults.length > 0 ? (
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-500 mb-2">Search Results:</h4>
+                            <ul className="space-y-3">
+                              {searchResults.map(log => (
+                                <li key={log.logId} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                                  <div className="flex justify-between items-start">
+                                    <div>
+                                      <h4 className="font-medium text-gray-900">{log.opticalName}</h4>
+                                      <p className="text-sm text-gray-500">
+                                        Log ID: {log.logId} ({log.entries.length} items) - 
+                                        {log.date && (log.date.toDate ? 
+                                          log.date.toDate().toLocaleDateString() : 
+                                          new Date(log.date).toLocaleDateString()
+                                        )}
+                                      </p>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => importDispatchLog(log)}
+                                      className="px-3 py-1 bg-green-100 text-green-700 rounded-md hover:bg-green-200 text-sm"
+                                    >
+                                      Import
+                                    </button>
+                                  </div>
+                                  <div className="mt-2">
+                                    <ul className="text-sm text-gray-600">
+                                      {log.entries.slice(0, 3).map((entry, idx) => (
+                                        <li key={idx} className="truncate">• {entry.lensName}</li>
+                                      ))}
+                                      {log.entries.length > 3 && (
+                                        <li className="text-gray-400">+ {log.entries.length - 3} more items</li>
+                                      )}
+                                    </ul>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : dispatchLogs.length === 0 ? (
+                          <p className="text-gray-500 text-center py-4">No dispatch logs found for {new Date(invoiceDate).toLocaleDateString()}</p>
+                        ) : (
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-500 mb-2">Today's Logs ({new Date(invoiceDate).toLocaleDateString()}):</h4>
+                            <ul className="space-y-3">
+                              {dispatchLogs.map(log => (
+                                <li key={log.logId} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                                  <div className="flex justify-between items-start">
+                                    <div>
+                                      <h4 className="font-medium text-gray-900">{log.opticalName}</h4>
+                                      <p className="text-sm text-gray-500">Log ID: {log.logId} ({log.entries.length} items)</p>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => importDispatchLog(log)}
+                                      className="px-3 py-1 bg-green-100 text-green-700 rounded-md hover:bg-green-200 text-sm"
+                                    >
+                                      Import
+                                    </button>
+                                  </div>
+                                  <div className="mt-2">
+                                    <ul className="text-sm text-gray-600">
+                                      {log.entries.slice(0, 3).map((entry, idx) => (
+                                        <li key={idx} className="truncate">• {entry.lensName}</li>
+                                      ))}
+                                      {log.entries.length > 3 && (
+                                        <li className="text-gray-400">+ {log.entries.length - 3} more items</li>
+                                      )}
+                                    </ul>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button
+                      type="button"
+                      onClick={() => setShowDispatchLogs(false)}
+                      className="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                    >
+                      Close
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
