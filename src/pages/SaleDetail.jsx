@@ -139,32 +139,32 @@ const SaleDetail = () => {
         ) : sale ? (
           <>
             {/* Invoice Header Card */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
               {/* Invoice Information */}
-              <div className="bg-white rounded-lg shadow-md p-6 border-t-4 border-blue-500">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Invoice Information</h2>
+              <div className="bg-white rounded-lg shadow-md p-4 border-t-4 border-blue-500">
+                <h2 className="text-md font-semibold text-gray-900 mb-3">Invoice Information</h2>
                 
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <div className="flex items-center">
-                    <span className="text-gray-500 w-1/3">Invoice #:</span>
-                    <span className="font-medium text-gray-900">{sale.invoiceNumber}</span>
+                    <span className="text-gray-500 w-1/3 text-sm">Invoice #:</span>
+                    <span className="font-medium text-gray-900 text-sm">{sale.invoiceNumber}</span>
                   </div>
                   
                   <div className="flex items-center">
-                    <span className="text-gray-500 w-1/3">Date:</span>
-                    <span className="text-gray-900">{formatDate(sale.invoiceDate)}</span>
+                    <span className="text-gray-500 w-1/3 text-sm">Date:</span>
+                    <span className="text-gray-900 text-sm">{formatDate(sale.invoiceDate)}</span>
                   </div>
                   
                   {sale.dueDate && (
                     <div className="flex items-center">
-                      <span className="text-gray-500 w-1/3">Due Date:</span>
-                      <span className="text-gray-900">{formatDate(sale.dueDate)}</span>
+                      <span className="text-gray-500 w-1/3 text-sm">Due Date:</span>
+                      <span className="text-gray-900 text-sm">{formatDate(sale.dueDate)}</span>
                     </div>
                   )}
                   
                   <div className="flex items-center">
-                    <span className="text-gray-500 w-1/3">Status:</span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(sale.paymentStatus)}`}>
+                    <span className="text-gray-500 w-1/3 text-sm">Status:</span>
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(sale.paymentStatus)}`}>
                       {sale.paymentStatus}
                     </span>
                   </div>
@@ -172,17 +172,17 @@ const SaleDetail = () => {
               </div>
               
               {/* Customer Information */}
-              <div className="bg-white rounded-lg shadow-md p-6 border-t-4 border-purple-500">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Customer</h2>
+              <div className="bg-white rounded-lg shadow-md p-4 border-t-4 border-purple-500">
+                <h2 className="text-md font-semibold text-gray-900 mb-3">Customer</h2>
                 
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <div>
-                    <h3 className="font-medium text-gray-900 text-lg">{sale.customerName}</h3>
+                    <h3 className="font-medium text-gray-900 text-md">{sale.customerName}</h3>
                     {sale.customerAddress && (
-                      <p className="text-gray-500 text-sm mt-1">{sale.customerAddress}</p>
+                      <p className="text-gray-500 text-xs mt-1">{sale.customerAddress}</p>
                     )}
                     {(sale.customerCity || sale.customerState) && (
-                      <p className="text-gray-500 text-sm">
+                      <p className="text-gray-500 text-xs">
                         {sale.customerCity}
                         {sale.customerState ? `, ${sale.customerState}` : ''}
                       </p>
@@ -191,48 +191,48 @@ const SaleDetail = () => {
                   
                   {sale.customerGst && (
                     <div className="pt-2 border-t border-gray-100">
-                      <span className="text-gray-500">GST Number:</span>
-                      <span className="text-gray-900 ml-2">{sale.customerGst}</span>
+                      <span className="text-gray-500 text-xs">GST Number:</span>
+                      <span className="text-gray-900 ml-1 text-xs">{sale.customerGst}</span>
                     </div>
                   )}
                 </div>
               </div>
               
               {/* Payment Summary */}
-              <div className="bg-white rounded-lg shadow-md p-6 border-t-4 border-green-500">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Payment</h2>
+              <div className="bg-white rounded-lg shadow-md p-4 border-t-4 border-green-500">
+                <h2 className="text-md font-semibold text-gray-900 mb-3">Payment</h2>
                 
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-500">Subtotal:</span>
-                    <span className="text-gray-900">{formatCurrency(sale.subtotal)}</span>
+                    <span className="text-gray-500 text-sm">Subtotal:</span>
+                    <span className="text-gray-900 text-sm">{formatCurrency(sale.subtotal)}</span>
                   </div>
                   
                   {sale.discountAmount > 0 && (
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-500">
+                      <span className="text-gray-500 text-sm">
                         Discount{sale.discountType === 'percentage' ? ` (${sale.discountValue}%)` : ''}:
                       </span>
-                      <span className="text-red-500">-{formatCurrency(sale.discountAmount)}</span>
+                      <span className="text-red-500 text-sm">-{formatCurrency(sale.discountAmount)}</span>
                     </div>
                   )}
                   
                   {sale.taxAmount > 0 && (
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-500">Tax ({sale.taxRate}%):</span>
-                      <span className="text-gray-900">{formatCurrency(sale.taxAmount)}</span>
+                      <span className="text-gray-500 text-sm">Tax ({sale.taxRate}%):</span>
+                      <span className="text-gray-900 text-sm">{formatCurrency(sale.taxAmount)}</span>
                     </div>
                   )}
                   
                   {sale.frieghtCharge > 0 && (
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-500">Freight:</span>
-                      <span className="text-gray-900">{formatCurrency(sale.frieghtCharge)}</span>
+                      <span className="text-gray-500 text-sm">Freight:</span>
+                      <span className="text-gray-900 text-sm">{formatCurrency(sale.frieghtCharge)}</span>
                     </div>
                   )}
                   
                   <div className="pt-2 border-t border-gray-200">
-                    <div className="flex justify-between items-center text-lg font-bold">
+                    <div className="flex justify-between items-center text-md font-bold">
                       <span>Total:</span>
                       <span className="text-blue-600">{formatCurrency(sale.totalAmount)}</span>
                     </div>
@@ -241,12 +241,12 @@ const SaleDetail = () => {
                   {sale.amountPaid > 0 && (
                     <>
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-500">Paid:</span>
-                        <span className="text-green-600">{formatCurrency(sale.amountPaid)}</span>
+                        <span className="text-gray-500 text-sm">Paid:</span>
+                        <span className="text-green-600 text-sm">{formatCurrency(sale.amountPaid)}</span>
                       </div>
                       <div className="flex justify-between items-center font-medium">
-                        <span>Balance:</span>
-                        <span className="text-red-600">{formatCurrency(sale.balanceDue)}</span>
+                        <span className="text-sm">Balance:</span>
+                        <span className="text-red-600 text-sm">{formatCurrency(sale.balanceDue)}</span>
                       </div>
                     </>
                   )}
@@ -255,35 +255,41 @@ const SaleDetail = () => {
             </div>
             
             {/* Invoice Items */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Invoice Items</h2>
+            <div className="bg-white rounded-lg shadow-md p-4 mb-4">
+              <h2 className="text-md font-semibold text-gray-900 mb-3">Invoice Items</h2>
               
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Order ID
+                      </th>
+                      <th scope="col" className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Item
                       </th>
-                      <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                         SPH
                       </th>
-                      <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                         CYL
                       </th>
-                      <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                         AXIS
                       </th>
-                      <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                         ADD
                       </th>
-                      <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                         QTY
                       </th>
-                      <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        UNIT
+                      </th>
+                      <th scope="col" className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Price
                       </th>
-                      <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Total
                       </th>
                     </tr>
@@ -291,31 +297,36 @@ const SaleDetail = () => {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {sale.items && sale.items.map((item, index) => (
                       <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        <td className="px-4 py-3 whitespace-nowrap">
+                        <td className="px-2 py-2 whitespace-nowrap text-xs text-left text-gray-500">
+                          {item.orderId || '-'}
+                        </td>
+                        <td className="px-2 py-2 whitespace-nowrap text-left">
                           <div>
-                            <div className="text-sm font-medium text-gray-900">{item.itemName}</div>
-                            {item.orderId && <div className="text-xs text-gray-500">Order ID: {item.orderId}</div>}
+                            <div className="text-xs font-medium text-gray-900">{item.itemName}</div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-500">
+                        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-gray-500">
                           {item.sph || '-'}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-500">
+                        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-gray-500">
                           {item.cyl || '-'}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-500">
+                        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-gray-500">
                           {item.axis || '-'}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-500">
+                        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-gray-500">
                           {item.add || '-'}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900">
+                        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-gray-900">
                           {item.qty}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">
+                        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-gray-500">
+                          {item.unit || 'Pairs'}
+                        </td>
+                        <td className="px-2 py-2 whitespace-nowrap text-xs text-right text-gray-900">
                           {formatCurrency(item.price)}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-medium text-gray-900">
+                        <td className="px-2 py-2 whitespace-nowrap text-xs text-right font-medium text-gray-900">
                           {formatCurrency(item.total)}
                         </td>
                       </tr>
@@ -323,10 +334,10 @@ const SaleDetail = () => {
                   </tbody>
                   <tfoot className="bg-gray-50">
                     <tr>
-                      <td colSpan="7" className="px-4 py-3 text-right text-sm font-medium text-gray-900">
+                      <td colSpan="9" className="px-2 py-2 text-right text-xs font-medium text-gray-900">
                         Subtotal:
                       </td>
-                      <td className="px-4 py-3 text-right text-sm font-medium text-gray-900">
+                      <td className="px-2 py-2 text-right text-xs font-medium text-gray-900">
                         {formatCurrency(sale.subtotal)}
                       </td>
                     </tr>
@@ -337,9 +348,9 @@ const SaleDetail = () => {
             
             {/* Notes */}
             {sale.notes && (
-              <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-2">Notes</h2>
-                <p className="text-gray-700 whitespace-pre-line">{sale.notes}</p>
+              <div className="bg-white rounded-lg shadow-md p-4 mb-4">
+                <h2 className="text-md font-semibold text-gray-900 mb-2">Notes</h2>
+                <p className="text-gray-700 whitespace-pre-line text-sm">{sale.notes}</p>
               </div>
             )}
             
