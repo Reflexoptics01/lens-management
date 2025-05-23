@@ -957,8 +957,8 @@ const CreateSale = () => {
         
         // Check if we have right eye data
         if (entry.rightSph || entry.rightCyl || entry.rightAxis || entry.rightAdd || entry.rightQty) {
-          importedRows[rightIdx].orderId = log.logId || ''; // Put log ID in orderId field
           importedRows[rightIdx].itemName = `${baseName} - RIGHT`;
+          importedRows[rightIdx].orderId = log.logId; // Put log ID in order ID field
           importedRows[rightIdx].sph = entry.rightSph || '';
           importedRows[rightIdx].cyl = entry.rightCyl || '';
           importedRows[rightIdx].axis = entry.rightAxis || '';
@@ -968,8 +968,8 @@ const CreateSale = () => {
         
         // Check if we have left eye data
         if (entry.leftSph || entry.leftCyl || entry.leftAxis || entry.leftAdd || entry.leftQty) {
-          importedRows[leftIdx].orderId = log.logId || ''; // Put log ID in orderId field
           importedRows[leftIdx].itemName = `${baseName} - LEFT`;
+          importedRows[leftIdx].orderId = log.logId; // Put log ID in order ID field
           importedRows[leftIdx].sph = entry.leftSph || '';
           importedRows[leftIdx].cyl = entry.leftCyl || '';
           importedRows[leftIdx].axis = entry.leftAxis || '';
@@ -1023,18 +1023,17 @@ const CreateSale = () => {
   };
 
   // Add function to fetch dispatch logs by search query
-  const searchDispatchLogs = async (searchTerm) => {
-    if (!searchTerm || searchTerm.trim() === '') {
+  const searchDispatchLogs = async (query) => {
+    if (!query || query.trim() === '') {
       setSearchResults([]);
       return;
     }
     
     try {
       setIsSearchingLogs(true);
-      console.log("Searching for logs with term:", searchTerm);
       
       // Normalize the search query to lowercase for case-insensitive comparison
-      const normalizedQuery = searchTerm.toLowerCase().trim();
+      const normalizedQuery = query.toLowerCase().trim();
       
       // Get all dispatch logs (limited to last 100 days to avoid too much data)
       const endDate = new Date();
@@ -1042,22 +1041,18 @@ const CreateSale = () => {
       startDate.setDate(startDate.getDate() - 100); // Last 100 days
       
       const dispatchRef = collection(db, 'dispatch_logs');
-      const querySnapshot = await getDocs(
-        query(
-          dispatchRef,
-          where('date', '>=', startDate),
-          where('date', '<=', endDate),
-          orderBy('date', 'desc')
-        )
+      const q = query(
+        dispatchRef,
+        where('date', '>=', startDate),
+        where('date', '<=', endDate),
+        orderBy('date', 'desc')
       );
       
-      console.log(`Found ${querySnapshot.docs.length} logs in date range`);
+      const snapshot = await getDocs(q);
       
-      // First group by logId and filter by search term
+      // First group by logId
       const groupedLogs = {};
-      let matchCount = 0;
-      
-      querySnapshot.docs.forEach(doc => {
+      snapshot.docs.forEach(doc => {
         const log = { id: doc.id, ...doc.data() };
         
         // Skip if this doesn't match our search
@@ -1068,8 +1063,6 @@ const CreateSale = () => {
         if (!matchesLogId && !matchesOpticalName && !matchesLensName) {
           return;
         }
-        
-        matchCount++;
         
         if (!groupedLogs[log.logId]) {
           groupedLogs[log.logId] = {
@@ -1083,8 +1076,6 @@ const CreateSale = () => {
         groupedLogs[log.logId].entries.push(log);
       });
       
-      console.log(`Found ${matchCount} matching logs, grouped into ${Object.keys(groupedLogs).length} log IDs`);
-      
       // Convert to array and sort by date (newest first)
       const searchResultsArray = Object.values(groupedLogs).sort((a, b) => {
         // Convert to JavaScript Date objects if they're Firestore timestamps
@@ -1093,11 +1084,9 @@ const CreateSale = () => {
         return dateB - dateA;
       });
       
-      console.log(`Returning ${searchResultsArray.length} search results`);
       setSearchResults(searchResultsArray);
     } catch (error) {
       console.error('Error searching dispatch logs:', error);
-      alert(`Search error: ${error.message}`);
     } finally {
       setIsSearchingLogs(false);
     }

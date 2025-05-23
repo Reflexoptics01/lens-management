@@ -1,35 +1,37 @@
+@tailwind components;
+@tailwind utilities;
+
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
+  padding: 0;
   min-height: 100vh;
+  background-color: #f9fafb;
+  color: #111827;
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   /* Ensure smooth scrolling on mobile */
   -webkit-overflow-scrolling: touch;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+a {
+  color: #3b82f6;
+  text-decoration: none;
+}
+a:hover {
+  color: #1d4ed8;
 }
 
 /* Add mobile bottom navigation spacing */
@@ -55,72 +57,235 @@ body {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+/* Mobile page layout */
+.mobile-page {
+  min-height: 100vh;
+  background-color: #f9fafb;
 }
 
+/* Reset button styles to not interfere with Tailwind */
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
   cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  outline: inherit;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+/* Fix SVG currentColor inheritance */
+svg {
+  color: inherit;
+}
+
+/* Fix navbar icon colors and states */
+.mobile-bottom-nav button {
+  transition: transform 0.3s ease;
+}
+
+.mobile-bottom-nav button:hover {
+  transform: scale(1.1);
+}
+
+/* Ensure icons inherit color properly */
+.mobile-bottom-nav svg,
+nav svg {
+  stroke: currentColor;
+  fill: none;
+}
+
+/* Fix icon visibility in active state */
+.mobile-bottom-nav .text-white svg {
+  stroke: white !important;
+  color: white !important;
+}
+
+.mobile-bottom-nav .text-gray-600 svg {
+  stroke: #4b5563 !important;
+  color: #4b5563 !important;
+}
+
+/* Desktop navbar icon fixes */
+nav .text-white svg {
+  stroke: white !important;
+  color: white !important;
+}
+
+nav .text-gray-600 svg {
+  stroke: #4b5563 !important;
+  color: #4b5563 !important;
+}
+
+/* Group hover states for desktop */
+nav .group:hover svg {
+  stroke: white !important;
+  color: white !important;
+}
+
+/* Ensure gradients work properly */
+.bg-gradient-to-r {
+  background-image: linear-gradient(to right, var(--tw-gradient-stops));
+}
+
+/* Define gradient color stops */
+.from-blue-500 {
+  --tw-gradient-from: #3b82f6;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(59, 130, 246, 0));
+}
+
+.to-cyan-400 {
+  --tw-gradient-to: #22d3ee;
+}
+
+.from-green-500 {
+  --tw-gradient-from: #10b981;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(16, 185, 129, 0));
+}
+
+.to-teal-400 {
+  --tw-gradient-to: #2dd4bf;
+}
+
+.from-purple-500 {
+  --tw-gradient-from: #8b5cf6;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(139, 92, 246, 0));
+}
+
+.to-indigo-400 {
+  --tw-gradient-to: #818cf8;
+}
+
+.from-pink-500 {
+  --tw-gradient-from: #ec4899;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(236, 72, 153, 0));
+}
+
+.to-red-400 {
+  --tw-gradient-to: #f87171;
+}
+
+.from-orange-500 {
+  --tw-gradient-from: #f97316;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(249, 115, 22, 0));
+}
+
+.to-yellow-400 {
+  --tw-gradient-to: #facc15;
+}
+
+.from-emerald-500 {
+  --tw-gradient-from: #10b981;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(16, 185, 129, 0));
+}
+
+.to-green-400 {
+  --tw-gradient-to: #4ade80;
+}
+
+.from-cyan-500 {
+  --tw-gradient-from: #06b6d4;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(6, 182, 212, 0));
+}
+
+.to-blue-400 {
+  --tw-gradient-to: #60a5fa;
+}
+
+.from-violet-500 {
+  --tw-gradient-from: #8b5cf6;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(139, 92, 246, 0));
+}
+
+.to-purple-400 {
+  --tw-gradient-to: #c084fc;
+}
+
+.from-amber-500 {
+  --tw-gradient-from: #f59e0b;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(245, 158, 11, 0));
+}
+
+.from-teal-500 {
+  --tw-gradient-from: #14b8a6;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(20, 184, 166, 0));
+}
+
+.to-emerald-400 {
+  --tw-gradient-to: #34d399;
+}
+
+/* Ensure text gradients work */
+.text-transparent {
+  color: transparent;
+}
+
+.bg-clip-text {
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+
+/* Fix hover animations */
+.transform {
+  transform: translateZ(0);
+}
+
+.hover\:scale-105:hover {
+  transform: scale(1.05);
+}
+
+.hover\:scale-110:hover {
+  transform: scale(1.1);
+}
+
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.duration-300 {
+  transition-duration: 300ms;
+}
+
+/* Animate pulse for active nav items */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
   }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
+  50% {
+    opacity: 0.8;
   }
 }
 
-/* Commenting out the entire @media print block to isolate CSS conflicts */
-/*
-@media print {
-  body {
-    background-color: white !important;
-    color: black !important;
-  }
-  
-  .print-only {
-    visibility: visible !important;
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-  }
-  
-  .no-print, .no-print * {
-    display: none !important;
-  }
-  
-  table, th, td {
-    border-color: #000 !important;
-  }
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
-*/
 
 /* Add a class for the print container */
 .print-container {
   background-color: white;
   padding: 20px;
   position: relative;
+}
+
+@media print {
+  .print-only, .print-only * {
+    visibility: visible !important;
+  }
+  .no-print, .no-print * {
+    display: none !important;
+  }
+  #root {
+    visibility: visible !important;
+    height: auto;
+    overflow: visible !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  @page {
+    size: auto;
+    margin: 10mm;
+  }
 }

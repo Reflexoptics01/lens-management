@@ -1,914 +1,454 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
-import { collection, getDocs, query, where, orderBy, limit, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, where, Timestamp } from 'firebase/firestore';
 import Navbar from '../components/Navbar';
 
-// Charting libraries
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
-         PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-
-// Helper functions to handle different timestamp formats after restore
-const isFirestoreTimestamp = (value) => {
-  return value && typeof value === 'object' && typeof value.toDate === 'function';
-};
-
-const isISODateString = (value) => {
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value);
-};
-
-const convertToDate = (value) => {
-  if (!value) return null;
-  
-  try {
-    if (isFirestoreTimestamp(value)) {
-      return value.toDate();
-    } else if (isISODateString(value)) {
-      return new Date(value);
-    } else if (value instanceof Date) {
-      return value;
-    }
-    return null;
-  } catch (error) {
-    console.error('Error converting timestamp:', error, value);
-    return null;
-  }
-};
-
-// Convert any value to a Firestore Timestamp safely
-const safeTimestamp = (value) => {
-  if (isFirestoreTimestamp(value)) {
-    return value;
-  }
-  
-  const date = convertToDate(value);
-  return date ? Timestamp.fromDate(date) : null;
-};
-
 const Dashboard = () => {
-  // Date state
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
     return today.toISOString().split('T')[0];
   });
   
-  // Analytics timeframe (yearly, quarterly, monthly)
-  const [timeframe, setTimeframe] = useState('yearly');
-  
-  // Loading and error states
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  
-  // Dashboard data states
   const [salesData, setSalesData] = useState({
-    todaySales: 0,
-    lastMonthSameDay: 0,
+    today: 0,
+    thisMonth: 0,
+    thisYear: 0,
     lastYearSameDay: 0,
-    monthlyProjection: 0
+    lastYearSameMonth: 0,
+    lastYear: 0,
+    monthlyProjection: 0,
+    yearlyProjection: 0
   });
   
-  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
-  const [pendingOrders, setPendingOrders] = useState([]);
-  const [showGSTReminder, setShowGSTReminder] = useState(false);
-  
-  // Product analytics
   const [topProducts, setTopProducts] = useState([]);
-  const [topLensPowers, setTopLensPowers] = useState([]);
-  const [monthlySales, setMonthlySales] = useState([]);
+  const [topPowers, setTopPowers] = useState([]);
+  const [topProfitProducts, setTopProfitProducts] = useState([]);
   
   useEffect(() => {
-    // Check if we should show GST reminder (after 4th and before 10th of month)
-    const today = new Date();
-    const dayOfMonth = today.getDate();
-    setShowGSTReminder(dayOfMonth >= 4 && dayOfMonth <= 10);
-    
-    // Logging to verify GST reminder logic
-    console.log('Day of month:', dayOfMonth);
-    console.log('Should show GST reminder:', dayOfMonth >= 4 && dayOfMonth <= 10);
-    
-    // Load dashboard data for initial view
-    loadDashboardData(selectedDate);
-  }, []);
-  
-  // Helper function to get a Firestore timestamp for a specific day
-  const getDayTimestamps = (date) => {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-    
-    return {
-      start: Timestamp.fromDate(startOfDay),
-      end: Timestamp.fromDate(endOfDay)
-    };
-  };
-  
-  // Handle date change
-  const handleDateChange = (date) => {
-    setSelectedDate(date);
-    loadDashboardData(date);
-    
-    // Check if we should show GST reminder (after 4th and before 10th of month)
-    const selectedDay = new Date(date).getDate();
-    setShowGSTReminder(selectedDay >= 4 && selectedDay <= 10);
-  };
-  
-  // Handle timeframe change
-  const handleTimeframeChange = (newTimeframe) => {
-    setTimeframe(newTimeframe);
-    fetchProductAnalytics(selectedDate, newTimeframe);
-  };
-  
-  // Main function to load all dashboard data
-  const loadDashboardData = async (dateString) => {
+    loadDashboardData();
+  }, [selectedDate]);
+
+  const loadDashboardData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      setError('');
-      
-      // Parse the selected date
-      const selectedDate = new Date(dateString);
-      
-      // Fetch today's sales
-      await fetchSalesData(selectedDate);
-      
-      // Fetch pending orders that haven't been updated in 3+ days
-      await fetchPendingOrders();
-      
-      // Fetch product analytics with current timeframe
-      await fetchProductAnalytics(selectedDate, timeframe);
-      
-      // Fetch monthly sales for trends
-      await fetchMonthlySales();
-      
+      await Promise.all([
+        fetchSalesData(),
+        fetchTopProducts(),
+        fetchTopPowers(),
+        fetchTopProfitProducts()
+      ]);
     } catch (error) {
-      console.error('Error loading dashboard data:', error);
-      setError('Failed to load dashboard data: ' + error.message);
+      console.error('Error loading dashboard:', error);
     } finally {
       setLoading(false);
     }
   };
   
-  // Fetch sales for today, same day last month, and same day last year
-  const fetchSalesData = async (selectedDate) => {
-    // Calculate comparison dates
-    const lastMonth = new Date(selectedDate);
-    lastMonth.setMonth(lastMonth.getMonth() - 1);
-    
-    const lastYear = new Date(selectedDate);
-    lastYear.setFullYear(lastYear.getFullYear() - 1);
-    
-    // Today's timestamp range
-    const todayTimestamps = getDayTimestamps(selectedDate);
-    
-    // Last month same day timestamp range
-    const lastMonthTimestamps = getDayTimestamps(lastMonth);
-    
-    // Last year same day timestamp range
-    const lastYearTimestamps = getDayTimestamps(lastYear);
-    
-    // Fetch today's sales
-    const salesRef = collection(db, 'sales');
-    
+  const fetchSalesData = async () => {
     try {
-      // Modified query approach to handle restored data
-      // Instead of relying on timestamp comparison queries that might fail with restored data,
-      // we'll fetch all sales and filter them in memory
-      
-      const allSalesQuery = query(salesRef, orderBy('invoiceDate', 'desc'));
-      const allSalesSnapshot = await getDocs(allSalesQuery);
-      
-      // Process all sales data
-      const allSales = allSalesSnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          // Convert timestamp to a Date object for easy comparison
-          dateObj: convertToDate(data.invoiceDate)
-        };
-      }).filter(sale => sale.dateObj !== null); // Filter out sales with invalid dates
-      
-      // Filter for today's sales
-      const todaySales = allSales.filter(sale => {
-        const saleDate = sale.dateObj;
-        return saleDate >= todayTimestamps.start.toDate() && saleDate <= todayTimestamps.end.toDate();
-      });
-      
-      // Filter for last month's same day sales
-      const lastMonthSales = allSales.filter(sale => {
-        const saleDate = sale.dateObj;
-        return saleDate >= lastMonthTimestamps.start.toDate() && saleDate <= lastMonthTimestamps.end.toDate();
-      });
-      
-      // Filter for last year's same day sales
-      const lastYearSales = allSales.filter(sale => {
-        const saleDate = sale.dateObj;
-        return saleDate >= lastYearTimestamps.start.toDate() && saleDate <= lastYearTimestamps.end.toDate();
-      });
-      
-      // Calculate totals
-      const todaySalesAmount = todaySales.reduce((total, sale) => total + (sale.totalAmount || 0), 0);
-      const lastMonthSalesAmount = lastMonthSales.reduce((total, sale) => total + (sale.totalAmount || 0), 0);
-      const lastYearSalesAmount = lastYearSales.reduce((total, sale) => total + (sale.totalAmount || 0), 0);
-      
-      // Filter for current month's sales
-      const currentMonthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-      const currentMonthEnd = new Date(selectedDate);
-      
-      const currentMonthSales = allSales.filter(sale => {
-        const saleDate = sale.dateObj;
-        return saleDate >= currentMonthStart && saleDate <= currentMonthEnd;
-      });
-      
-      const monthToDateSales = currentMonthSales.reduce((total, sale) => total + (sale.totalAmount || 0), 0);
-      
-      // Calculate monthly projection
-      const daysInMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate();
-      const daysPassed = selectedDate.getDate();
-      
-      // Project monthly sales (simple linear projection)
-      const monthlyProjection = daysPassed > 0 
-        ? (monthToDateSales / daysPassed) * daysInMonth 
-        : 0;
-      
-      setSalesData({
-        todaySales: todaySalesAmount,
-        lastMonthSameDay: lastMonthSalesAmount,
-        lastYearSameDay: lastYearSalesAmount,
-        monthlyProjection
-      });
-    } catch (error) {
-      console.error('Error processing sales data:', error);
-      setError('Error processing sales data: ' + error.message);
-    }
-  };
-  
-  // Fetch pending orders that haven't been updated in 3+ days
-  const fetchPendingOrders = async () => {
-    try {
-      const ordersRef = collection(db, 'orders');
-      // Get all non-delivered, non-cancelled orders
-      const pendingOrdersQuery = query(
-        ordersRef,
-        where('status', 'not-in', ['DELIVERED', 'CANCELLED', 'DECLINED'])
-      );
-      
-      const snapshot = await getDocs(pendingOrdersQuery);
-      
-      // Process orders, converting timestamps as needed
-      const pendingOrdersList = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          // Convert timestamps to Date objects
-          createdAt: convertToDate(data.createdAt),
-          updatedAt: convertToDate(data.updatedAt || data.createdAt) // Fall back to createdAt if updatedAt is missing
-        };
-      }).filter(order => order.createdAt !== null); // Filter out orders with invalid dates
-      
-      // Calculate today's date minus 3 days
-      const threeDaysAgo = new Date();
-      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-      
-      // Filter orders that haven't been updated in 3+ days
-      const oldPendingOrders = pendingOrdersList.filter(order => {
-        const lastUpdate = order.updatedAt || order.createdAt;
-        return lastUpdate < threeDaysAgo;
-      });
-      
-      // Sort by oldest first
-      oldPendingOrders.sort((a, b) => a.updatedAt - b.updatedAt);
-      
-      setPendingOrders(oldPendingOrders);
-      setPendingOrdersCount(oldPendingOrders.length);
-    } catch (error) {
-      console.error('Error fetching pending orders:', error);
-      setError('Failed to fetch pending orders: ' + error.message);
-    }
-  };
-  
-  // Calculate date range based on timeframe and selected date
-  const getTimeframeDateRange = (date, timeframeType) => {
-    const selectedDate = new Date(date);
-    let startDate = new Date(selectedDate);
-    const endDate = new Date(selectedDate);
-    
-    // Set end date to end of day
-    endDate.setHours(23, 59, 59, 999);
-    
-    switch (timeframeType) {
-      case 'monthly':
-        // Start from beginning of month
-        startDate.setDate(1);
-        startDate.setHours(0, 0, 0, 0);
-        break;
-        
-      case 'quarterly':
-        // Start from 3 months ago
-        startDate.setMonth(startDate.getMonth() - 2);
-        startDate.setDate(1);
-        startDate.setHours(0, 0, 0, 0);
-        break;
-        
-      case 'yearly':
-      default:
-        // Start from 1 year ago
-        startDate.setFullYear(startDate.getFullYear() - 1);
-        startDate.setHours(0, 0, 0, 0);
-        break;
-    }
-    
-    return { 
-      startDate,
-      endDate
-    };
-  };
-  
-  // Fetch product analytics (top selling products and lens powers)
-  const fetchProductAnalytics = async (selectedDate, currentTimeframe) => {
-    try {
-      // Get date range based on timeframe
-      const { startDate, endDate } = getTimeframeDateRange(selectedDate, currentTimeframe);
-      
-      const startTimestamp = Timestamp.fromDate(startDate);
-      const endTimestamp = Timestamp.fromDate(endDate);
-      
-      console.log(`Fetching products from ${startDate.toDateString()} to ${endDate.toDateString()} (${currentTimeframe})`);
-      
-      // Fetch all sales invoices for the selected timeframe with a simple range query
       const salesRef = collection(db, 'sales');
-      const salesQuery = query(
-        salesRef,
-        where('invoiceDate', '>=', startTimestamp),
-        orderBy('invoiceDate', 'asc')
-      );
+      const salesSnapshot = await getDocs(query(salesRef, orderBy('invoiceDate', 'desc')));
       
-      const salesSnapshot = await getDocs(salesQuery);
-      console.log('Found sales documents:', salesSnapshot.docs.length);
+      const selectedDateObj = new Date(selectedDate);
+      const today = new Date();
       
-      // Product frequency map
-      const productCounts = {};
-      const productRevenue = {};
-      const powerCounts = {};
+      // Date ranges
+      const startOfToday = new Date(selectedDateObj);
+      startOfToday.setHours(0, 0, 0, 0);
+      const endOfToday = new Date(selectedDateObj);
+      endOfToday.setHours(23, 59, 59, 999);
       
-      // Process all sales data but filter by end date in JavaScript
+      const startOfMonth = new Date(selectedDateObj.getFullYear(), selectedDateObj.getMonth(), 1);
+      const endOfMonth = new Date(selectedDateObj.getFullYear(), selectedDateObj.getMonth() + 1, 0);
+      
+      const startOfYear = new Date(selectedDateObj.getFullYear(), 0, 1);
+      const endOfYear = new Date(selectedDateObj.getFullYear(), 11, 31);
+      
+      // Last year dates
+      const lastYearSameDay = new Date(selectedDateObj);
+      lastYearSameDay.setFullYear(lastYearSameDay.getFullYear() - 1);
+      
+      const startOfLastYearSameMonth = new Date(selectedDateObj.getFullYear() - 1, selectedDateObj.getMonth(), 1);
+      const endOfLastYearSameMonth = new Date(selectedDateObj.getFullYear() - 1, selectedDateObj.getMonth() + 1, 0);
+      
+      const startOfLastYear = new Date(selectedDateObj.getFullYear() - 1, 0, 1);
+      const endOfLastYear = new Date(selectedDateObj.getFullYear() - 1, 11, 31);
+      
+      let todaySales = 0;
+      let monthSales = 0;
+      let yearSales = 0;
+      let lastYearSameDaySales = 0;
+      let lastYearSameMonthSales = 0;
+      let lastYearTotalSales = 0;
+      
       salesSnapshot.docs.forEach(doc => {
         const sale = doc.data();
-        const saleDate = sale.invoiceDate?.toDate();
+        if (!sale.invoiceDate || !sale.totalAmount) return;
         
-        // Skip sales after the end date
-        if (!saleDate || saleDate > endDate) {
-          return;
+        const saleDate = sale.invoiceDate.toDate();
+        const amount = parseFloat(sale.totalAmount) || 0;
+        
+        // Today's sales
+        if (saleDate >= startOfToday && saleDate <= endOfToday) {
+          todaySales += amount;
         }
         
+        // This month's sales
+        if (saleDate >= startOfMonth && saleDate <= endOfMonth) {
+          monthSales += amount;
+        }
+        
+        // This year's sales
+        if (saleDate >= startOfYear && saleDate <= endOfYear) {
+          yearSales += amount;
+        }
+        
+        // Last year same day
+        const lastYearSameDayStart = new Date(lastYearSameDay);
+        lastYearSameDayStart.setHours(0, 0, 0, 0);
+        const lastYearSameDayEnd = new Date(lastYearSameDay);
+        lastYearSameDayEnd.setHours(23, 59, 59, 999);
+        
+        if (saleDate >= lastYearSameDayStart && saleDate <= lastYearSameDayEnd) {
+          lastYearSameDaySales += amount;
+        }
+        
+        // Last year same month
+        if (saleDate >= startOfLastYearSameMonth && saleDate <= endOfLastYearSameMonth) {
+          lastYearSameMonthSales += amount;
+        }
+        
+        // Last year total
+        if (saleDate >= startOfLastYear && saleDate <= endOfLastYear) {
+          lastYearTotalSales += amount;
+        }
+      });
+      
+      // Calculate projections
+      const daysInMonth = new Date(selectedDateObj.getFullYear(), selectedDateObj.getMonth() + 1, 0).getDate();
+      const daysPassed = selectedDateObj.getDate();
+      const monthlyProjection = daysPassed > 0 ? (monthSales / daysPassed) * daysInMonth : 0;
+      
+      const daysInYear = new Date(selectedDateObj.getFullYear(), 11, 31).getDate() === 31 ? 366 : 365;
+      const dayOfYear = Math.floor((selectedDateObj - startOfYear) / (24 * 60 * 60 * 1000)) + 1;
+      const yearlyProjection = dayOfYear > 0 ? (yearSales / dayOfYear) * daysInYear : 0;
+      
+      setSalesData({
+        today: todaySales,
+        thisMonth: monthSales,
+        thisYear: yearSales,
+        lastYearSameDay: lastYearSameDaySales,
+        lastYearSameMonth: lastYearSameMonthSales,
+        lastYear: lastYearTotalSales,
+        monthlyProjection,
+        yearlyProjection
+      });
+      
+    } catch (error) {
+      console.error('Error fetching sales data:', error);
+    }
+  };
+
+  const fetchTopProducts = async () => {
+    try {
+      const salesRef = collection(db, 'sales');
+      const salesSnapshot = await getDocs(salesRef);
+      
+      const productCounts = {};
+      
+      salesSnapshot.docs.forEach(doc => {
+        const sale = doc.data();
         if (sale.items && Array.isArray(sale.items)) {
           sale.items.forEach(item => {
-            // Count product frequencies - use itemName instead of productName
-            const productName = item.itemName || 'Unknown Product';
+            const productName = item.itemName || item.productName || 'Unknown Product';
+            const qty = parseInt(item.qty) || 1;
+            
             if (!productCounts[productName]) {
               productCounts[productName] = 0;
-              productRevenue[productName] = 0;
             }
-            productCounts[productName] += parseInt(item.qty) || 1;
-            productRevenue[productName] += (parseFloat(item.price) * (parseInt(item.qty) || 1)) || 0;
-            
-            // Count lens power frequencies - use SPH value as primary lens power
+            productCounts[productName] += qty;
+          });
+        }
+      });
+      
+      const sortedProducts = Object.entries(productCounts)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 20);
+      
+      setTopProducts(sortedProducts);
+    } catch (error) {
+      console.error('Error fetching top products:', error);
+    }
+  };
+
+  const fetchTopPowers = async () => {
+    try {
+      const salesRef = collection(db, 'sales');
+      const salesSnapshot = await getDocs(salesRef);
+      
+      const powerCounts = {};
+      
+      salesSnapshot.docs.forEach(doc => {
+        const sale = doc.data();
+        if (sale.items && Array.isArray(sale.items)) {
+          sale.items.forEach(item => {
             if (item.sph) {
               const power = item.sph.toString();
+              const qty = parseInt(item.qty) || 1;
+              
               if (!powerCounts[power]) {
                 powerCounts[power] = 0;
               }
-              powerCounts[power] += parseInt(item.qty) || 1;
+              powerCounts[power] += qty;
             }
           });
         }
       });
       
-      console.log('Product counts:', productCounts);
-      console.log('Product revenue:', productRevenue);
-      console.log('Power counts:', powerCounts);
+      const sortedPowers = Object.entries(powerCounts)
+        .map(([power, count]) => ({ power, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 20);
       
-      // Convert to array and sort by frequency for top products
-      const topProductsArray = Object.keys(productCounts).map(name => ({
-        name,
-        count: productCounts[name],
-        revenue: productRevenue[name]
-      })).sort((a, b) => b.revenue - a.revenue);
-      
-      // Convert lens powers to array and sort by frequency
-      const topLensPowersArray = Object.keys(powerCounts).map(power => ({
-        power,
-        count: powerCounts[power]
-      })).sort((a, b) => b.count - a.count);
-      
-      // Set state with top 10 products and lens powers
-      setTopProducts(topProductsArray.slice(0, 10));
-      setTopLensPowers(topLensPowersArray.slice(0, 10));
-      
-      console.log('Top products:', topProductsArray.slice(0, 10));
-      console.log('Top lens powers:', topLensPowersArray.slice(0, 10));
-      
+      setTopPowers(sortedPowers);
     } catch (error) {
-      console.error('Error fetching product analytics:', error);
-      setError('Failed to load product analytics: ' + error.message);
-    }
-  };
-  
-  // Fetch monthly sales trends
-  const fetchMonthlySales = async () => {
-    try {
-      // Get data for previous 6 months
-      const endDate = new Date(selectedDate);
-      const startDate = new Date(endDate);
-      startDate.setMonth(startDate.getMonth() - 5); // Get 6 months of data
-      
-      // Set to start of first month
-      startDate.setDate(1);
-      startDate.setHours(0, 0, 0, 0);
-      
-      const startTimestamp = Timestamp.fromDate(startDate);
-      const endTimestamp = Timestamp.fromDate(endDate);
-      
-      // Fetch all sales in the 6-month period with a simpler query
-      const salesRef = collection(db, 'sales');
-      const salesQuery = query(
-        salesRef,
-        where('invoiceDate', '>=', startTimestamp),
-        orderBy('invoiceDate', 'asc')
-      );
-      
-      const salesSnapshot = await getDocs(salesQuery);
-      
-      // Group sales by month
-      const monthlyData = {};
-      
-      // Initialize all 6 months with zero values
-      for (let i = 0; i < 6; i++) {
-        const monthDate = new Date(startDate);
-        monthDate.setMonth(monthDate.getMonth() + i);
-        const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
-        const monthName = monthDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-        
-        monthlyData[monthKey] = {
-          month: monthName,
-          sales: 0,
-          invoiceCount: 0
-        };
-      }
-      
-      // Process all sales data and filter by end date in JavaScript
-      salesSnapshot.docs.forEach(doc => {
-        const sale = doc.data();
-        if (sale.invoiceDate) {
-          const date = sale.invoiceDate.toDate();
-          
-          // Skip sales after the end date
-          if (date > endDate) {
-            return;
-          }
-          
-          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-          
-          if (monthlyData[monthKey]) {
-            monthlyData[monthKey].sales += sale.totalAmount || 0;
-            monthlyData[monthKey].invoiceCount += 1;
-          }
-        }
-      });
-      
-      // Convert to array for chart
-      const monthlySalesArray = Object.values(monthlyData);
-      setMonthlySales(monthlySalesArray);
-      
-      console.log('Monthly sales data:', monthlySalesArray);
-      
-    } catch (error) {
-      console.error('Error fetching monthly sales:', error);
-      setError('Failed to load monthly sales trends: ' + error.message);
+      console.error('Error fetching top powers:', error);
     }
   };
 
+  const fetchTopProfitProducts = async () => {
+    try {
+      const salesRef = collection(db, 'sales');
+      const salesSnapshot = await getDocs(salesRef);
+      
+      const productProfits = {};
+      
+      salesSnapshot.docs.forEach(doc => {
+        const sale = doc.data();
+        if (sale.items && Array.isArray(sale.items)) {
+          sale.items.forEach(item => {
+            const productName = item.itemName || item.productName || 'Unknown Product';
+            const qty = parseInt(item.qty) || 1;
+            const price = parseFloat(item.price) || 0;
+            const cost = parseFloat(item.cost) || parseFloat(item.costPrice) || 0;
+            const profit = (price - cost) * qty;
+            
+            if (!productProfits[productName]) {
+              productProfits[productName] = { profit: 0, revenue: 0 };
+            }
+            productProfits[productName].profit += profit;
+            productProfits[productName].revenue += price * qty;
+          });
+        }
+      });
+      
+      const sortedProfitProducts = Object.entries(productProfits)
+        .map(([name, data]) => ({ 
+          name, 
+          profit: data.profit, 
+          revenue: data.revenue,
+          profitMargin: data.revenue > 0 ? (data.profit / data.revenue * 100) : 0
+        }))
+        .sort((a, b) => b.profit - a.profit)
+        .slice(0, 20);
+      
+      setTopProfitProducts(sortedProfitProducts);
+    } catch (error) {
+      console.error('Error fetching top profit products:', error);
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  const getChangePercentage = (current, previous) => {
+    if (previous === 0) return 'N/A';
+    return `${Math.round(((current - previous) / previous) * 100)}%`;
+  };
+
+  const getChangeColor = (current, previous) => {
+    if (previous === 0) return 'text-gray-500';
+    return current >= previous ? 'text-green-600' : 'text-red-600';
+  };
+
   return (
-    <div className="mobile-page">
+    <div className="min-h-screen bg-gray-50">
       <Navbar />
       
-      <div className="mobile-content">
-        <div className="mb-4">
-          <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-500">Business metrics and insights</p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <p className="mt-2 text-gray-600">Business overview and key metrics</p>
         </div>
         
         {/* Date Selector */}
-        <div className="bg-white rounded-lg shadow p-4 mb-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Select Date</label>
+        <div className="mb-6 bg-white rounded-lg shadow p-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Select Date for Analysis
+          </label>
               <input
                 type="date"
                 value={selectedDate}
-                onChange={(e) => handleDateChange(e.target.value)}
-                className="rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2"
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
               />
+          {loading && (
+            <span className="ml-4 text-sm text-gray-500">Loading data...</span>
+          )}
             </div>
-            <div className="flex items-center">
-              <span className="text-sm text-gray-500 mr-2">
-                {loading ? 'Loading data...' : 'Data updated'}
+
+        {/* Sales Overview Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {/* Today's Sales */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Today's Sales</h3>
+            <p className="text-3xl font-bold text-blue-600">{formatCurrency(salesData.today)}</p>
+            <div className="mt-2 flex items-center">
+              <span className="text-sm text-gray-500 mr-2">vs Last Year Same Day:</span>
+              <span className={`text-sm font-medium ${getChangeColor(salesData.today, salesData.lastYearSameDay)}`}>
+                {getChangePercentage(salesData.today, salesData.lastYearSameDay)}
               </span>
             </div>
-          </div>
+            <p className="text-sm text-gray-500 mt-1">
+              Last Year: {formatCurrency(salesData.lastYearSameDay)}
+            </p>
         </div>
         
-        {/* Error message */}
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-md">
-            {error}
-          </div>
-        )}
-        
-        {/* GST Filing Reminder */}
-        {showGSTReminder && (
-          <div className="mb-4 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-md">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-yellow-800">GST Filing Reminder</h3>
-                <div className="mt-2 text-sm text-yellow-700">
-                  <p>It's time to generate GST returns and send them to your CA. The last date for filing without penalty is the 10th of this month.</p>
-                </div>
-                <div className="mt-3">
-                  <a
-                    href="/gst-returns"
-                    className="text-sm font-medium text-yellow-800 hover:text-yellow-900"
-                  >
-                    Generate GST Returns →
-                  </a>
-                </div>
-              </div>
+          {/* This Month */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">This Month</h3>
+            <p className="text-3xl font-bold text-green-600">{formatCurrency(salesData.thisMonth)}</p>
+            <div className="mt-2 flex items-center">
+              <span className="text-sm text-gray-500 mr-2">vs Last Year Same Month:</span>
+              <span className={`text-sm font-medium ${getChangeColor(salesData.thisMonth, salesData.lastYearSameMonth)}`}>
+                {getChangePercentage(salesData.thisMonth, salesData.lastYearSameMonth)}
+              </span>
             </div>
+            <p className="text-sm text-gray-500 mt-1">
+              Last Year: {formatCurrency(salesData.lastYearSameMonth)}
+            </p>
           </div>
-        )}
-        
-        {/* Sales Comparison Cards */}
-        <div className="mb-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-3">Sales Comparison</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Today's Sales Card */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="px-4 py-3 bg-blue-50 border-b border-blue-100">
-                <h3 className="text-sm font-medium text-blue-800">
-                  Sales on {new Date(selectedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </h3>
-              </div>
-              <div className="p-4">
-                <p className="text-2xl font-bold text-gray-900">
-                  ₹{salesData.todaySales.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-                
-                <div className="mt-4 space-y-3">
-                  {/* Comparison with Last Month */}
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">Last Month (Same Day)</span>
-                    <div className="flex items-center">
-                      <span className="text-sm font-medium">
-                        ₹{salesData.lastMonthSameDay.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                      
-                      {salesData.lastMonthSameDay > 0 && (
-                        <span className={`ml-2 text-xs font-medium px-2 py-0.5 rounded-full ${
-                          salesData.todaySales >= salesData.lastMonthSameDay
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {salesData.lastMonthSameDay > 0
-                            ? `${Math.round((salesData.todaySales / salesData.lastMonthSameDay - 1) * 100)}%`
-                            : 'N/A'}
+
+          {/* This Year */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">This Year</h3>
+            <p className="text-3xl font-bold text-purple-600">{formatCurrency(salesData.thisYear)}</p>
+            <div className="mt-2 flex items-center">
+              <span className="text-sm text-gray-500 mr-2">vs Last Year:</span>
+              <span className={`text-sm font-medium ${getChangeColor(salesData.thisYear, salesData.lastYear)}`}>
+                {getChangePercentage(salesData.thisYear, salesData.lastYear)}
                         </span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Comparison with Last Year */}
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">Last Year (Same Day)</span>
-                    <div className="flex items-center">
-                      <span className="text-sm font-medium">
-                        ₹{salesData.lastYearSameDay.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                      
-                      {salesData.lastYearSameDay > 0 && (
-                        <span className={`ml-2 text-xs font-medium px-2 py-0.5 rounded-full ${
-                          salesData.todaySales >= salesData.lastYearSameDay
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {salesData.lastYearSameDay > 0
-                            ? `${Math.round((salesData.todaySales / salesData.lastYearSameDay - 1) * 100)}%`
-                            : 'N/A'}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
-            
-            {/* Monthly Projection Card */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="px-4 py-3 bg-purple-50 border-b border-purple-100">
-                <h3 className="text-sm font-medium text-purple-800">
-                  Monthly Sales Projection
-                </h3>
-              </div>
-              <div className="p-4">
-                <p className="text-2xl font-bold text-gray-900">
-                  ₹{salesData.monthlyProjection.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-                
-                <div className="mt-2">
-                  <p className="text-sm text-gray-500">
-                    Based on sales from {new Date(selectedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} and earlier this month
+            <p className="text-sm text-gray-500 mt-1">
+              Last Year Total: {formatCurrency(salesData.lastYear)}
                   </p>
                 </div>
                 
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="font-medium text-gray-800">
-                      Progress: {new Date(selectedDate).getDate()} of {new Date(new Date(selectedDate).getFullYear(), new Date(selectedDate).getMonth() + 1, 0).getDate()} days
-                    </span>
-                    <span className="text-gray-600">
-                      {Math.round((new Date(selectedDate).getDate() / new Date(new Date(selectedDate).getFullYear(), new Date(selectedDate).getMonth() + 1, 0).getDate()) * 100)}%
-                    </span>
+          {/* Projections */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Projections</h3>
+            <div className="space-y-2">
+              <div>
+                <p className="text-sm text-gray-600">Monthly Projection:</p>
+                <p className="text-xl font-bold text-orange-600">{formatCurrency(salesData.monthlyProjection)}</p>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
-                    <div 
-                      className="bg-purple-600 h-2.5 rounded-full" 
-                      style={{ 
-                        width: `${Math.round((new Date(selectedDate).getDate() / new Date(new Date(selectedDate).getFullYear(), new Date(selectedDate).getMonth() + 1, 0).getDate()) * 100)}%` 
-                      }}
-                    ></div>
-                  </div>
-                </div>
+              <div>
+                <p className="text-sm text-gray-600">Yearly Projection:</p>
+                <p className="text-xl font-bold text-red-600">{formatCurrency(salesData.yearlyProjection)}</p>
               </div>
             </div>
           </div>
         </div>
         
-        {/* Pending Orders Reminder */}
-        <div className="mb-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-3">Order Status Reminders</h2>
-          
-          {pendingOrders.length > 0 ? (
+        {/* Top Products Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Top Products by Quantity */}
             <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="px-4 py-3 bg-orange-50 border-b border-orange-100">
-                <h3 className="text-sm font-medium text-orange-800">
-                  Orders without status update for 3+ days ({pendingOrders.length})
-                </h3>
+            <div className="px-6 py-4 bg-blue-50 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Top 20 Products by Sales</h3>
               </div>
-              
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
-                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Updated</th>
-                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {pendingOrders.slice(0, 5).map((order) => (
-                      <tr key={order.id} className="hover:bg-gray-50">
-                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{order.id.substring(0, 8)}</td>
-                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{order.customerName}</td>
-                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
-                          {order.updatedAt 
-                            ? new Date(order.updatedAt.toDate()).toLocaleDateString('en-US', { 
-                                month: 'short', 
-                                day: 'numeric'
-                              }) 
-                            : 'N/A'}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-sm">
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                            {order.status}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-sm text-right">
-                          <a 
-                            href={`/orders/${order.id}`} 
-                            className="text-blue-600 hover:text-blue-900"
-                          >
-                            View
-                          </a>
-                        </td>
+            <div className="max-h-96 overflow-y-auto">
+              <table className="min-w-full">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qty</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {topProducts.map((product, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 text-sm text-gray-900">{index + 1}</td>
+                      <td className="px-4 py-2 text-sm text-gray-900">{product.name}</td>
+                      <td className="px-4 py-2 text-sm text-gray-900 text-right">{product.count}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
-              
-              {pendingOrders.length > 5 && (
-                <div className="px-4 py-2 text-sm text-center border-t border-gray-200">
-                  <a href="/orders" className="text-blue-600 hover:text-blue-900">
-                    View all {pendingOrders.length} pending orders
-                  </a>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="bg-white rounded-lg shadow p-4 text-center">
-              <p className="text-sm text-gray-500">No orders need attention at this time</p>
-            </div>
-          )}
-        </div>
-        
-        {/* Analytics Section */}
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-3">
-            <h2 className="text-lg font-medium text-gray-900">Analytics</h2>
-            <div className="flex space-x-1 text-xs">
-              <button 
-                onClick={() => handleTimeframeChange('monthly')}
-                className={`px-3 py-1 rounded-md ${
-                  timeframe === 'monthly' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Month
-              </button>
-              <button 
-                onClick={() => handleTimeframeChange('quarterly')}
-                className={`px-3 py-1 rounded-md ${
-                  timeframe === 'quarterly' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Quarter
-              </button>
-              <button 
-                onClick={() => handleTimeframeChange('yearly')}
-                className={`px-3 py-1 rounded-md ${
-                  timeframe === 'yearly' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Year
-              </button>
             </div>
           </div>
           
-          {/* Monthly Sales Trend Chart */}
-          <div className="bg-white rounded-lg shadow overflow-hidden mb-4">
-            <div className="px-4 py-3 bg-blue-50 border-b border-blue-100">
-              <h3 className="text-sm font-medium text-blue-800">Monthly Sales Trend</h3>
-            </div>
-            <div className="p-4">
-              {monthlySales.length > 0 ? (
-                <ResponsiveContainer width="100%" height={200}>
-                  <LineChart data={monthlySales}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis 
-                      tickFormatter={(value) => `₹${value/1000}K`}
-                    />
-                    <Tooltip 
-                      formatter={(value) => [`₹${value.toLocaleString('en-IN')}`, 'Sales']}
-                      labelFormatter={(label) => `Month: ${label}`}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="sales" 
-                      stroke="#4F46E5" 
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-500">No sales data available</p>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          {/* Product Analysis Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            {/* Top Products Chart */}
+          {/* Top Powers */}
             <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="px-4 py-3 bg-green-50 border-b border-green-100">
-                <h3 className="text-sm font-medium text-green-800">
-                  Top Products by Revenue ({timeframe === 'yearly' ? 'Year' : timeframe === 'quarterly' ? 'Quarter' : 'Month'})
-                </h3>
-              </div>
-              <div className="p-4">
-                {topProducts && topProducts.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={topProducts.slice(0, 10)} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" tickFormatter={(value) => `₹${value/1000}K`} />
-                      <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={100} />
-                      <Tooltip 
-                        formatter={(value) => [`₹${value.toLocaleString('en-IN')}`, 'Revenue']}
-                      />
-                      <Bar dataKey="revenue" fill="#10B981" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500">No product data available for this period</p>
-                    <p className="text-sm text-gray-400 mt-2">Make sure you have sales with products in the selected date range</p>
-                  </div>
-                )}
-              </div>
+            <div className="px-6 py-4 bg-green-50 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Top 20 SPH Powers</h3>
             </div>
-            
-            {/* Top Lens Powers Chart */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="px-4 py-3 bg-indigo-50 border-b border-indigo-100">
-                <h3 className="text-sm font-medium text-indigo-800">
-                  Popular SPH Powers ({timeframe === 'yearly' ? 'Year' : timeframe === 'quarterly' ? 'Quarter' : 'Month'})
-                </h3>
-              </div>
-              <div className="p-4">
-                {topLensPowers && topLensPowers.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={topLensPowers.slice(0, 10)}
-                        dataKey="count"
-                        nameKey="power"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        innerRadius={30}
-                        fill="#8884d8"
-                        label={({name, percent}) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                      >
-                        {topLensPowers.slice(0, 10).map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={['#8884d8', '#83a6ed', '#8dd1e1', '#82ca9d', '#a4de6c', '#ffc658', '#ff8042', '#d0ed57', '#59a14f', '#4e79a7'][index % 10]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => [`${value} units`, 'Quantity']} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500">No SPH power data available for this period</p>
-                    <p className="text-sm text-gray-400 mt-2">Make sure you have sales with SPH values in the selected date range</p>
-                  </div>
-                )}
-              </div>
+            <div className="max-h-96 overflow-y-auto">
+              <table className="min-w-full">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Power</th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Count</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {topPowers.map((power, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 text-sm text-gray-900">{index + 1}</td>
+                      <td className="px-4 py-2 text-sm text-gray-900">{power.power}</td>
+                      <td className="px-4 py-2 text-sm text-gray-900 text-right">{power.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
           
-          {/* Top Products Table */}
+          {/* Top Profit Products */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="px-4 py-3 bg-emerald-50 border-b border-emerald-100">
-              <h3 className="text-sm font-medium text-emerald-800">
-                Top Selling Products ({timeframe === 'yearly' ? 'Year' : timeframe === 'quarterly' ? 'Quarter' : 'Month'})
-              </h3>
+            <div className="px-6 py-4 bg-yellow-50 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Top 20 Profit Products</h3>
             </div>
-            <div className="overflow-x-auto">
-              {topProducts && topProducts.length > 0 ? (
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
-                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product Name</th>
-                      <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Units Sold</th>
-                      <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
+            <div className="max-h-96 overflow-y-auto">
+              <table className="min-w-full">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Profit</th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Margin</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {topProducts.slice(0, 10).map((product, index) => (
+                <tbody className="divide-y divide-gray-200">
+                  {topProfitProducts.map((product, index) => (
                       <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{product.name}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{product.count}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
-                          ₹{product.revenue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      <td className="px-4 py-2 text-sm text-gray-900">{index + 1}</td>
+                      <td className="px-4 py-2 text-sm text-gray-900">{product.name}</td>
+                      <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                        {formatCurrency(product.profit)}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                        {product.profitMargin.toFixed(1)}%
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              ) : (
-                <div className="p-4 text-center">
-                  <p className="text-gray-500">No product data available for this period</p>
-                  <p className="text-sm text-gray-400 mt-2">Try selecting a different date range</p>
-                </div>
-              )}
             </div>
           </div>
         </div>

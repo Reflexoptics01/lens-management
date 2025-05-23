@@ -1,10 +1,12 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import Orders from './pages/Orders';
 import OrderDetail from './pages/OrderDetail';
 import CreateOrder from './pages/CreateOrder';
 import EditOrder from './pages/EditOrder';
+import DailyDispatchLog from './pages/DailyDispatchLog';
 import Customers from './pages/Customers';
 import CreateCustomer from './pages/CreateCustomer';
 import Sales from './pages/Sales';
@@ -29,6 +31,15 @@ import PurchaseReturn from "./pages/PurchaseReturn";
 import './App.css';
 
 function App() {
+  useEffect(() => {
+    console.log('App component mounted');
+    console.log('Environment variables loaded:', {
+      apiKey: import.meta.env.VITE_FIREBASE_API_KEY ? 'Present' : 'Missing',
+      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ? 'Present' : 'Missing',
+      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID ? 'Present' : 'Missing'
+    });
+  }, []);
+
   return (
     <div className="app-container">
       <Router>
@@ -40,6 +51,7 @@ function App() {
           <Route path="/orders/new" element={<CreateOrder />} />
           <Route path="/orders/:orderId" element={<OrderDetail />} />
           <Route path="/orders/edit/:orderId" element={<EditOrder />} />
+          <Route path="/daily-dispatch-log" element={<DailyDispatchLog />} />
           <Route path="/customers" element={<Customers />} />
           <Route path="/customers/new" element={<CreateCustomer />} />
           <Route path="/add-vendor" element={<CreateCustomer isVendor={true} />} />

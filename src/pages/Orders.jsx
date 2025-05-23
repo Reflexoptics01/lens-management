@@ -559,6 +559,17 @@ const Orders = () => {
             </button>
           )}
           
+          {/* Daily Dispatch Log Button */}
+          <button
+            onClick={() => navigate('/daily-dispatch-log')}
+            className="h-[38px] btn-secondary inline-flex items-center space-x-2 px-4 py-1.5 border border-gray-300 hover:bg-gray-50"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <span>Daily Dispatch Log</span>
+          </button>
+          
           {/* Add New Order Button */}
           <button
             onClick={() => navigate('/orders/new')}
@@ -796,11 +807,24 @@ const Orders = () => {
         )}
       </div>
 
-      {/* Mobile FAB */}
-      <div className="fixed right-4 bottom-20 mobile-only">
+      {/* Mobile FABs */}
+      <div className="fixed right-4 bottom-20 mobile-only flex flex-col space-y-3">
+        {/* Daily Dispatch Log FAB */}
+        <button
+          onClick={() => navigate('/daily-dispatch-log')}
+          className="h-14 w-14 rounded-full bg-[#3154b3] text-white shadow-lg flex items-center justify-center"
+          title="Daily Dispatch Log"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+        </button>
+        
+        {/* Add New Order FAB */}
         <button
           onClick={() => navigate('/orders/new')}
           className="h-14 w-14 rounded-full bg-[#4169E1] text-white shadow-lg flex items-center justify-center"
+          title="Add New Order"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
