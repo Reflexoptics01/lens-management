@@ -499,33 +499,33 @@ const Orders = () => {
           {/* Date Range */}
           <div className="flex gap-2 items-center">
             <div className="w-[140px]">
-              <label className="block text-xs font-medium text-gray-500 mb-1">From</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">From</label>
               <input
                 type="date"
                 value={fromDate}
                 onChange={(e) => setFromDate(e.target.value)}
-                className="w-full rounded-md border-gray-300 border shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1.5"
+                className="w-full rounded-md border-gray-300 dark:border-gray-600 border shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1.5 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
             </div>
             
             <div className="w-[140px]">
-              <label className="block text-xs font-medium text-gray-500 mb-1">To</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">To</label>
               <input
                 type="date"
                 value={toDate}
                 onChange={(e) => setToDate(e.target.value)}
-                className="w-full rounded-md border-gray-300 border shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1.5"
+                className="w-full rounded-md border-gray-300 dark:border-gray-600 border shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1.5 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
             </div>
           </div>
           
           {/* Status Filter */}
           <div className="w-[160px]">
-            <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Status</label>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full rounded-md border-gray-300 border shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1.5"
+              className="w-full rounded-md border-gray-300 dark:border-gray-600 border shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1.5 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
               <option value="">All Statuses</option>
               {ORDER_STATUSES.map(status => (
@@ -536,13 +536,13 @@ const Orders = () => {
           
           {/* Search Box - Grows to fill available space */}
           <div className="flex-grow min-w-[200px]">
-            <label className="block text-xs font-medium text-gray-500 mb-1">Search by Name or Order ID</label>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Search by Name or Order ID</label>
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search orders by optical name or order ID..."
-              className="w-full rounded-md border-gray-300 border shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1.5"
+              className="w-full rounded-md border-gray-300 dark:border-gray-600 border shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1.5 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
             />
           </div>
           
@@ -550,7 +550,7 @@ const Orders = () => {
           {(fromDate || toDate || searchTerm || statusFilter) && (
             <button 
               onClick={resetFilters}
-              className="h-[38px] px-3 py-2 text-sm text-indigo-600 hover:text-indigo-800 flex items-center hover:bg-indigo-50 rounded-md transition-colors"
+              className="h-[38px] px-3 py-2 text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 flex items-center hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-md transition-colors"
             >
               <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -562,7 +562,7 @@ const Orders = () => {
           {/* Daily Dispatch Log Button */}
           <button
             onClick={() => navigate('/daily-dispatch-log')}
-            className="h-[38px] btn-secondary inline-flex items-center space-x-2 px-4 py-1.5 border border-gray-300 hover:bg-gray-50"
+            className="h-[38px] btn-secondary inline-flex items-center space-x-2 px-4 py-1.5 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -573,7 +573,7 @@ const Orders = () => {
           {/* Add New Order Button */}
           <button
             onClick={() => navigate('/orders/new')}
-            className="h-[38px] btn-primary inline-flex items-center space-x-2 px-4 py-1.5 bg-[#4169E1] hover:bg-[#3154b3]"
+            className="h-[38px] btn-primary inline-flex items-center space-x-2 px-4 py-1.5 bg-[#4169E1] hover:bg-[#3154b3] dark:bg-[#4169E1] dark:hover:bg-[#3154b3]"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
@@ -585,54 +585,54 @@ const Orders = () => {
         {/* Orders List */}
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <div className="animate-spin w-8 h-8 border-4 border-[#4169E1] border-t-transparent rounded-full"></div>
+            <div className="animate-spin w-8 h-8 border-4 border-[#4169E1] dark:border-[#4169E1] border-t-transparent rounded-full"></div>
           </div>
         ) : error ? (
-          <div className="p-4 text-center text-red-500">{error}</div>
+          <div className="p-4 text-center text-red-500 dark:text-red-400">{error}</div>
         ) : orders.length === 0 ? (
           <div className="text-center py-8">
-            <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-16 h-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
-            <p className="text-gray-500">No orders found</p>
+            <p className="text-gray-500 dark:text-gray-400">No orders found</p>
           </div>
         ) : filteredOrders.length === 0 ? (
           <div className="text-center py-8">
-            <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-16 h-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
-            <p className="text-gray-500">No matching orders for your filters</p>
+            <p className="text-gray-500 dark:text-gray-400">No matching orders for your filters</p>
           </div>
         ) : (
           <>
             {/* Desktop Table View */}
             <div className="desktop-only">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-700">
                       <tr>
-                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px]">
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[100px]">
                           Order ID
                         </th>
-                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-[140px]">
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[140px]">
                           Date
                         </th>
-                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider pl-6">
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider pl-6">
                           Optical Details
                         </th>
-                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider pl-6">
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider pl-6">
                           Brand
                         </th>
-                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-[120px]">
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[120px]">
                           Status
                         </th>
-                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px] text-center">
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[100px] text-center">
                           Actions
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                       {filteredOrders.map((order) => {
                         const { date, time } = formatDate(order.createdAt);
                         const customerDetails = getCustomerDetails(order.customerName);
@@ -640,27 +640,27 @@ const Orders = () => {
                           <tr 
                             key={order.id} 
                             onClick={() => navigate(`/orders/${order.id}`)}
-                            className="hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+                            className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors duration-150"
                           >
                             <td className="px-6 py-4">
-                              <span className="text-sm font-medium text-[#4169E1]">#{order.displayId}</span>
+                              <span className="text-sm font-medium text-[#4169E1] dark:text-[#4169E1]">#{order.displayId}</span>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="text-sm text-gray-900">{date}</div>
-                              <div className="text-sm text-gray-500">{time}</div>
+                              <div className="text-sm text-gray-900 dark:text-white">{date}</div>
+                              <div className="text-sm text-gray-500 dark:text-gray-400">{time}</div>
                             </td>
                             <td className="px-6 py-4">
                               <div className="flex flex-col">
-                                <span className="text-sm font-medium text-gray-900">{order.customerName}</span>
+                                <span className="text-sm font-medium text-gray-900 dark:text-white">{order.customerName}</span>
                                 {customerDetails?.city && (
-                                  <span className="text-xs text-gray-500">
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
                                     {customerDetails.city}
                                   </span>
                                 )}
                               </div>
                             </td>
                             <td className="px-6 py-4">
-                              <span className="text-sm text-gray-900">{order.brandName}</span>
+                              <span className="text-sm text-gray-900 dark:text-white">{order.brandName}</span>
                             </td>
                             <td className="px-6 py-4">
                               {editingStatus === order.id ? (
@@ -670,7 +670,7 @@ const Orders = () => {
                                   onBlur={() => setEditingStatus(null)}
                                   onClick={(e) => e.stopPropagation()}
                                   autoFocus
-                                  className="text-sm rounded-lg border-gray-300 focus:border-[#4169E1] focus:ring-[#4169E1] w-full"
+                                  className="text-sm rounded-lg border-gray-300 dark:border-gray-600 focus:border-[#4169E1] focus:ring-[#4169E1] w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                 >
                                   {ORDER_STATUSES.map(status => (
                                     <option key={status} value={status}>
@@ -697,7 +697,7 @@ const Orders = () => {
                                     e.stopPropagation();
                                     navigate(`/orders/edit/${order.id}`);
                                   }}
-                                  className="text-[#4169E1] hover:text-[#3154b3] transition-colors duration-150"
+                                  className="text-[#4169E1] dark:text-[#4169E1] hover:text-[#3154b3] dark:hover:text-[#3154b3] transition-colors duration-150"
                                   title="Edit Order"
                                 >
                                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -706,7 +706,7 @@ const Orders = () => {
                                 </button>
                                 <button
                                   onClick={(e) => handleDeleteOrder(e, order.id)}
-                                  className="text-red-600 hover:text-red-900 transition-colors duration-150"
+                                  className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 transition-colors duration-150"
                                   title="Delete Order"
                                 >
                                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -733,10 +733,10 @@ const Orders = () => {
                   <div
                     key={order.id}
                     onClick={() => navigate(`/orders/${order.id}`)}
-                    className="mobile-card"
+                    className="mobile-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 cursor-pointer"
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <span className="text-sm font-medium text-[#4169E1]">#{order.displayId}</span>
+                      <span className="text-sm font-medium text-[#4169E1] dark:text-[#4169E1]">#{order.displayId}</span>
                       {editingStatus === order.id ? (
                         <select
                           value={order.status}
@@ -745,7 +745,7 @@ const Orders = () => {
                           onClick={(e) => { e.stopPropagation(); }}
                           onTouchStart={(e) => e.stopPropagation()}
                           autoFocus
-                          className="text-sm rounded-lg border-gray-300 focus:border-[#4169E1] focus:ring-[#4169E1]"
+                          className="text-sm rounded-lg border-gray-300 dark:border-gray-600 focus:border-[#4169E1] focus:ring-[#4169E1] bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                         >
                           {ORDER_STATUSES.map(status => (
                             <option key={status} value={status}>
@@ -765,16 +765,16 @@ const Orders = () => {
                     </div>
                     
                     <div className="mb-3">
-                      <h3 className="text-base font-medium text-gray-900">{order.customerName}</h3>
+                      <h3 className="text-base font-medium text-gray-900 dark:text-white">{order.customerName}</h3>
                       {customerDetails?.city && (
-                        <p className="text-sm text-gray-500">{customerDetails.city}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{customerDetails.city}</p>
                       )}
                     </div>
 
                     <div className="flex justify-between items-end">
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{order.brandName}</p>
-                        <p className="text-xs text-gray-500">{date} • {time}</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{order.brandName}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{date} • {time}</p>
                       </div>
                       
                       <div className="flex space-x-2">
@@ -783,7 +783,7 @@ const Orders = () => {
                             e.stopPropagation();
                             navigate(`/orders/edit/${order.id}`);
                           }}
-                          className="p-2 text-gray-600 hover:text-[#4169E1]"
+                          className="p-2 text-gray-600 dark:text-gray-400 hover:text-[#4169E1] dark:hover:text-[#4169E1]"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -791,7 +791,7 @@ const Orders = () => {
                         </button>
                         <button
                           onClick={(e) => handleDeleteOrder(e, order.id)}
-                          className="p-2 text-gray-600 hover:text-red-600"
+                          className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -812,7 +812,7 @@ const Orders = () => {
         {/* Daily Dispatch Log FAB */}
         <button
           onClick={() => navigate('/daily-dispatch-log')}
-          className="h-14 w-14 rounded-full bg-[#3154b3] text-white shadow-lg flex items-center justify-center"
+          className="h-14 w-14 rounded-full bg-[#3154b3] dark:bg-[#3154b3] text-white shadow-lg flex items-center justify-center"
           title="Daily Dispatch Log"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -823,7 +823,7 @@ const Orders = () => {
         {/* Add New Order FAB */}
         <button
           onClick={() => navigate('/orders/new')}
-          className="h-14 w-14 rounded-full bg-[#4169E1] text-white shadow-lg flex items-center justify-center"
+          className="h-14 w-14 rounded-full bg-[#4169E1] dark:bg-[#4169E1] text-white shadow-lg flex items-center justify-center"
           title="Add New Order"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
