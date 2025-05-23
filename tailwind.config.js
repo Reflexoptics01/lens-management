@@ -4,6 +4,7 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       fontFamily: {
@@ -33,10 +34,27 @@ export default {
           800: '#1F2937',
           900: '#111827',
         },
+        dark: {
+          bg: {
+            primary: '#0F172A',
+            secondary: '#1E293B',
+            tertiary: '#334155',
+          },
+          text: {
+            primary: '#F1F5F9',
+            secondary: '#CBD5E1',
+            muted: '#94A3B8',
+          },
+          border: {
+            primary: '#334155',
+            secondary: '#475569',
+          }
+        }
       },
       boxShadow: {
         'custom': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
         'custom-md': '0 4px 6px -1px rgba(65, 105, 225, 0.1), 0 2px 4px -1px rgba(65, 105, 225, 0.06)',
+        'dark': '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)',
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-in',

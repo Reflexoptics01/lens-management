@@ -4,6 +4,7 @@ import { auth, db } from '../firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import React from 'react';
+import ThemeToggle from './ThemeToggle';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -304,11 +305,18 @@ const Navbar = () => {
   return (
     <>
       {/* Mobile Navbar */}
-      <nav className="mobile-header mobile-only bg-white shadow-md z-50">
+      <nav className="mobile-header mobile-only z-50" 
+           style={{ 
+             backgroundColor: 'var(--bg-secondary)', 
+             boxShadow: '0 1px 3px var(--shadow-secondary)' 
+           }}>
         <div className="flex items-center justify-between px-4 py-2">
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="p-2 text-gray-600 hover:text-indigo-600 transition-colors duration-300"
+            className="p-2 transition-colors duration-300"
+            style={{ color: 'var(--text-muted)' }}
+            onMouseEnter={(e) => e.target.style.color = 'var(--primary-blue)'}
+            onMouseLeave={(e) => e.target.style.color = 'var(--text-muted)'}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -334,18 +342,30 @@ const Navbar = () => {
       {isMenuOpen && (
         <div className="fixed inset-0 z-50 mobile-only">
           <div 
-            className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm transition-opacity duration-300 ease-in-out"
+            className="fixed inset-0 backdrop-blur-sm transition-opacity duration-300 ease-in-out"
+            style={{ backgroundColor: 'var(--overlay)' }}
             onClick={() => setIsMenuOpen(false)}
           />
-          <div className="fixed inset-y-0 left-0 w-72 bg-white shadow-xl transform transition-all duration-300 ease-in-out rounded-r-2xl">
+          <div className="fixed inset-y-0 left-0 w-72 shadow-xl transform transition-all duration-300 ease-in-out rounded-r-2xl"
+               style={{ backgroundColor: 'var(--bg-secondary)' }}>
             <div className="flex flex-col h-full">
-              <div className="p-4 border-b flex items-center justify-between">
+              <div className="p-4 flex items-center justify-between"
+                   style={{ borderBottomColor: 'var(--border-primary)', borderBottomWidth: '1px' }}>
                 <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-600">
                   Menu
                 </h2>
                 <button
                   onClick={() => setIsMenuOpen(false)}
-                  className="p-1.5 text-gray-600 hover:text-indigo-600 transition-colors duration-300 rounded-full hover:bg-gray-100"
+                  className="p-1.5 transition-colors duration-300 rounded-full"
+                  style={{ color: 'var(--text-muted)' }}
+                  onMouseEnter={(e) => {
+                    e.target.style.color = 'var(--primary-blue)';
+                    e.target.style.backgroundColor = 'var(--bg-tertiary)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.color = 'var(--text-muted)';
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -364,8 +384,26 @@ const Navbar = () => {
                       className={`w-full px-3 py-2.5 text-left rounded-xl flex items-center space-x-3 transform transition-all duration-300 hover:scale-105 ${
                         location.pathname === item.path || location.pathname.startsWith(item.path + '/')
                           ? `bg-gradient-to-r ${item.color} text-white shadow-md` 
-                          : 'text-gray-700 hover:bg-gray-50'
+                          : ''
                       }`}
+                      style={{
+                        color: location.pathname === item.path || location.pathname.startsWith(item.path + '/')
+                          ? 'white'
+                          : 'var(--text-secondary)',
+                        backgroundColor: location.pathname === item.path || location.pathname.startsWith(item.path + '/')
+                          ? undefined
+                          : 'transparent'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!(location.pathname === item.path || location.pathname.startsWith(item.path + '/'))) {
+                          e.target.style.backgroundColor = 'var(--bg-tertiary)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!(location.pathname === item.path || location.pathname.startsWith(item.path + '/'))) {
+                          e.target.style.backgroundColor = 'transparent';
+                        }
+                      }}
                     >
                       <div className={`${
                         location.pathname === item.path || location.pathname.startsWith(item.path + '/')
@@ -379,10 +417,15 @@ const Navbar = () => {
                   ))}
                 </div>
               </div>
-              <div className="p-4 border-t">
+              <div className="p-4" style={{ borderTopColor: 'var(--border-primary)', borderTopWidth: '1px' }}>
+                <div className="mb-3">
+                  <ThemeToggle className="w-full justify-center" />
+                </div>
                 <button
                   onClick={handleLogout}
-                  className="w-full px-3 py-2.5 text-left rounded-xl flex items-center space-x-3 text-red-600 hover:bg-red-50 transform transition-all duration-300 hover:scale-105"
+                  className="w-full px-3 py-2.5 text-left rounded-xl flex items-center space-x-3 text-red-600 transform transition-all duration-300 hover:scale-105"
+                  onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--bg-tertiary)'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -396,7 +439,7 @@ const Navbar = () => {
       )}
 
       {/* Desktop Navbar */}
-      <nav className="bg-white shadow-md desktop-only">
+      <nav className="desktop-only" style={{ backgroundColor: 'var(--bg-secondary)', boxShadow: '0 1px 3px var(--shadow-secondary)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-20">
             <div className="flex">
@@ -413,21 +456,36 @@ const Navbar = () => {
                     className={`group flex flex-col items-center justify-center px-3 py-1 transition-all duration-300 hover:scale-105 ${
                       location.pathname === item.path || location.pathname.startsWith(item.path + '/')
                         ? 'text-transparent bg-clip-text bg-gradient-to-r ' + item.color
-                        : 'text-gray-600 hover:text-gray-900'
+                        : 'hover:text-gray-900'
                     }`}
+                    style={{
+                      color: location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
+                        ? 'transparent' 
+                        : 'var(--text-muted)'
+                    }}
                   >
                     <div className={`p-2 rounded-full ${
                       location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
                         ? 'bg-gradient-to-r ' + item.color + ' text-white shadow-md' 
-                        : 'text-gray-600 group-hover:bg-gradient-to-r group-hover:' + item.color + ' group-hover:text-white'
-                    } transition-all duration-300`}>
+                        : 'group-hover:bg-gradient-to-r group-hover:' + item.color + ' group-hover:text-white'
+                    } transition-all duration-300`}
+                    style={{
+                      color: location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
+                        ? 'white' 
+                        : 'var(--text-muted)'
+                    }}>
                       {item.icon}
                     </div>
                     <span className={`mt-1 text-xs font-medium ${
                       location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
                         ? 'text-transparent bg-clip-text bg-gradient-to-r ' + item.color
-                        : 'text-gray-600'
-                    }`}>
+                        : ''
+                    }`}
+                    style={{
+                      color: location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
+                        ? 'transparent' 
+                        : 'var(--text-muted)'
+                    }}>
                       {item.title}
                     </span>
                   </button>
@@ -436,10 +494,18 @@ const Navbar = () => {
             </div>
             
             {/* Sign Out Button */}
-            <div className="hidden sm:flex sm:items-center">
+            <div className="hidden sm:flex sm:items-center space-x-3">
+              <ThemeToggle />
               <button
                 onClick={handleLogout}
-                className="flex items-center px-3 py-1 text-red-600 bg-white hover:bg-red-50 rounded-lg border border-red-200 transition-all duration-300 hover:scale-105 hover:shadow-md text-xs"
+                className="flex items-center px-3 py-1 text-red-600 rounded-lg border border-red-200 transition-all duration-300 hover:scale-105 hover:shadow-md text-xs"
+                style={{ 
+                  backgroundColor: 'var(--bg-secondary)', 
+                  borderColor: 'var(--border-primary)',
+                  color: '#dc2626'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--bg-tertiary)'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--bg-secondary)'}
               >
                 <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -452,7 +518,12 @@ const Navbar = () => {
       </nav>
 
       {/* Mobile Bottom Navigation */}
-      <div className="mobile-bottom-nav mobile-only fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
+      <div className="mobile-bottom-nav mobile-only fixed bottom-0 left-0 right-0 border-t z-50" 
+           style={{ 
+             backgroundColor: 'var(--bg-secondary)', 
+             borderTopColor: 'var(--border-primary)',
+             boxShadow: '0 -4px 10px var(--shadow-secondary)'
+           }}>
         <div className="overflow-x-auto scrollbar-hide" ref={bottomNavRef} onScroll={handleNavScroll}>
           <div className="flex p-1 min-w-max">
             {getAccessibleMenuItems().map((item) => (
@@ -468,21 +539,36 @@ const Navbar = () => {
                 <div className={`p-1.5 rounded-full mb-1 ${
                   location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
                     ? 'bg-gradient-to-r ' + item.color + ' shadow-md animate-pulse' 
-                    : 'bg-gray-100'
-                } transition-all duration-300`}>
+                    : ''
+                } transition-all duration-300`}
+                style={{
+                  backgroundColor: location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
+                    ? undefined 
+                    : 'var(--bg-tertiary)'
+                }}>
                   <div className={`${
                     location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
                       ? 'text-white' 
-                      : 'text-gray-600'
-                  }`}>
+                      : ''
+                  }`}
+                  style={{
+                    color: location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
+                      ? 'white' 
+                      : 'var(--text-muted)'
+                  }}>
                     {React.cloneElement(item.icon, { className: 'w-5 h-5' })}
                   </div>
                 </div>
                 <span className={`text-[10px] font-medium ${
                   location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
                     ? 'text-transparent bg-clip-text bg-gradient-to-r ' + item.color
-                    : 'text-gray-600'
-                }`}>
+                    : ''
+                }`}
+                style={{
+                  color: location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
+                    ? 'transparent' 
+                    : 'var(--text-muted)'
+                }}>
                   {item.shortTitle || item.title}
                 </span>
                 {(location.pathname === item.path || location.pathname.startsWith(item.path + '/')) && (

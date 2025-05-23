@@ -4,6 +4,7 @@ import { collection, getDocs, addDoc, serverTimestamp, query, where, doc, getDoc
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import CustomerForm from '../components/CustomerForm';
+import ItemSuggestions from '../components/ItemSuggestions';
 
 const TAX_OPTIONS = [
   { id: 'TAX_FREE', label: 'Tax Free', rate: 0 },
@@ -34,7 +35,6 @@ const LENS_TYPES = [
 const EMPTY_ROW = {
   itemName: '',
   description: '',
-  powerRange: '',
   lensType: 'Stock Lens',
   qty: 1,
   unit: 'Pairs',
@@ -71,9 +71,13 @@ const CreatePurchase = () => {
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
   const [vendorSearchTerm, setVendorSearchTerm] = useState('');
 
+  // Add item suggestions state
+  const [itemSuggestions, setItemSuggestions] = useState([]);
+
   useEffect(() => {
     fetchVendors();
     generatePurchaseNumber();
+    fetchItems();
   }, []);
 
   // Listen for messages from popup windows
@@ -128,6 +132,79 @@ const CreatePurchase = () => {
     } catch (error) {
       console.error('Error generating purchase number:', error);
       setPurchaseNumber('P-0001');
+    }
+  };
+
+  // Add function to fetch items and services for suggestions
+  const fetchItems = async () => {
+    try {
+      // Only fetch items from 'lens_inventory' collection to restrict suggestions
+      const lensRef = collection(db, 'lens_inventory');
+      const lensSnapshot = await getDocs(lensRef);
+      
+      // Create a map to deduplicate items by name
+      const uniqueItems = {};
+      
+      // Add lens inventory items to the unique items
+      lensSnapshot.docs.forEach(doc => {
+        const lens = { id: doc.id, ...doc.data() };
+        
+        let itemName = '';
+        let displayName = '';
+        
+        if (lens.type === 'stock' && lens.brandName) {
+          // For stock lenses, separate brand name and power series
+          itemName = lens.brandName; // Just the brand name for the item field
+          displayName = lens.powerSeries ? `${lens.brandName} (${lens.powerSeries})` : lens.brandName; // Display name with power range for suggestions
+        } else if (lens.type === 'service' && (lens.serviceName || lens.brandName)) {
+          itemName = lens.serviceName || lens.brandName;
+          displayName = itemName;
+        } else if (lens.type === 'contact' && lens.brandName) {
+          itemName = lens.brandName;
+          displayName = lens.powerSeries ? `${lens.brandName} (${lens.powerSeries})` : lens.brandName;
+        } else if (lens.brandName) {
+          itemName = lens.brandName;
+          displayName = itemName;
+        }
+        
+        if (itemName) {
+          const normalizedName = displayName.toLowerCase(); // Use display name for uniqueness
+          
+          // Add to uniqueItems if it doesn't exist or if this is a newer entry
+          if (!uniqueItems[normalizedName] || 
+              (lens.createdAt && uniqueItems[normalizedName].createdAt && 
+               lens.createdAt.toDate() > uniqueItems[normalizedName].createdAt.toDate())) {
+            uniqueItems[normalizedName] = {
+              id: lens.id,
+              name: displayName, // For showing in suggestions with power range
+              itemName: itemName, // Actual item name (brand only)
+              price: lens.salePrice || lens.purchasePrice || lens.servicePrice || 0,
+              createdAt: lens.createdAt,
+              isStockLens: lens.type === 'stock',
+              isService: lens.type === 'service',
+              isContactLens: lens.type === 'contact',
+              stockData: lens.type === 'stock' ? lens : null,
+              serviceData: lens.type === 'service' ? lens : null,
+              contactData: lens.type === 'contact' ? lens : null,
+              type: lens.type,
+              // Separate fields for proper form filling
+              brandName: lens.brandName,
+              powerSeries: lens.powerSeries,
+              serviceDescription: lens.serviceDescription,
+              ...lens
+            };
+          }
+        }
+      });
+      
+      // Convert to array and sort by name
+      const itemsList = Object.values(uniqueItems).sort((a, b) => 
+        a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+      );
+      
+      setItemSuggestions(itemsList);
+    } catch (error) {
+      console.error('Error fetching items for purchase:', error);
     }
   };
 
@@ -186,6 +263,23 @@ const CreatePurchase = () => {
     setShowVendorDropdown(false);
   };
 
+  // Add function to handle item selection from suggestions
+  const handleItemSelect = (index, itemData) => {
+    const updatedRows = [...tableRows];
+    
+    // Update the item with the selected data
+    updatedRows[index] = {
+      ...updatedRows[index],
+      itemName: itemData.name || itemData.itemName || '',
+      price: parseFloat(itemData.price || 0),
+      description: itemData.serviceDescription || itemData.description || '',
+      lensType: itemData.isService ? 'Not Lens' : (itemData.type === 'stock' ? 'Stock Lens' : itemData.type === 'contact' ? 'Contact Lens' : 'Stock Lens'),
+      total: parseFloat(itemData.price || 0) * parseInt(updatedRows[index].qty || 1)
+    };
+    
+    setTableRows(updatedRows);
+  };
+
   const handleTableRowChange = (index, field, value) => {
     const updatedRows = [...tableRows];
     
@@ -229,15 +323,23 @@ const CreatePurchase = () => {
       // Filter out lens items from the purchase
       tableRows.forEach(row => {
         if (row.itemName && row.qty > 0 && (row.lensType === 'Stock Lens' || row.lensType === 'Contact Lens')) {
+          // Try to extract power series from item name if it's in parentheses
+          let powerSeries = 'N/A';
+          const powerMatch = row.itemName.match(/\(([^)]+)\)$/);
+          if (powerMatch) {
+            powerSeries = powerMatch[1].trim();
+          }
+          
           const lensData = {
             brandName: row.itemName,
-            powerSeries: row.powerRange || 'N/A',
+            powerSeries: powerSeries, // Extract from item name or default to N/A
             purchasePrice: parseFloat(row.price) || 0,
             salePrice: (parseFloat(row.price) * 1.3) || 0, // 30% markup for sale price
             qty: parseInt(row.qty) || 1,
             createdAt: serverTimestamp(),
             purchaseId: purchaseId,
-            notes: `Added from Purchase #${purchaseNumber}`
+            notes: `Added from Purchase #${purchaseNumber}`,
+            location: 'Main Cabinet'
           };
           
           if (row.lensType === 'Stock Lens') {
@@ -245,11 +347,14 @@ const CreatePurchase = () => {
               ...lensData,
               type: 'stock'
             });
-          } else {
+          } else if (row.lensType === 'Contact Lens') {
             contactLenses.push({
               ...lensData,
               type: 'contact',
-              category: row.description || 'Standard'
+              category: row.description || 'Standard',
+              contactType: 'Standard', // Default contact type
+              color: 'Clear', // Default color
+              disposalFrequency: 'Daily' // Default disposal frequency
             });
           }
         }
@@ -506,9 +611,6 @@ const CreatePurchase = () => {
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Item Details
                   </th>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Power Range
-                  </th>
                   <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
                     Lens Type
                   </th>
@@ -539,12 +641,15 @@ const CreatePurchase = () => {
                       {index + 1}
                     </td>
                     <td className="px-3 py-2">
-                      <input 
-                        type="text" 
+                      <ItemSuggestions
+                        items={itemSuggestions}
                         value={row.itemName}
-                        onChange={(e) => handleTableRowChange(index, 'itemName', e.target.value)}
-                        className="block w-full border-0 bg-transparent focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm font-medium"
+                        onChange={handleTableRowChange}
+                        onSelect={handleItemSelect}
+                        index={index}
                         placeholder="Item name"
+                        className="block w-full border-0 bg-transparent focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm font-medium"
+                        currentPrice={parseFloat(row.price) || 0}
                       />
                       <input 
                         type="text" 
@@ -552,16 +657,6 @@ const CreatePurchase = () => {
                         onChange={(e) => handleTableRowChange(index, 'description', e.target.value)}
                         className="block w-full border-0 bg-transparent text-gray-500 text-xs focus:ring-0 focus:border-b focus:border-sky-400 mt-1"
                         placeholder="Description (optional)"
-                      />
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <input 
-                        type="text" 
-                        value={row.powerRange}
-                        onChange={(e) => handleTableRowChange(index, 'powerRange', e.target.value)}
-                        className="block w-full border-0 bg-transparent focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm"
-                        placeholder={row.lensType !== 'Not Lens' ? "e.g. -1.00 to -6.00" : ""}
-                        disabled={row.lensType === 'Not Lens'}
                       />
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">

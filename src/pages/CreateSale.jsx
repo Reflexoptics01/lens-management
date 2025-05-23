@@ -584,6 +584,9 @@ const CreateSale = () => {
       // Process all order IDs to mark lenses as sold in inventory
       await processOrderIdsForInventory(filledRows);
       
+      // Also deduct any inventory items that match the sold items
+      await deductInventoryItems(filledRows);
+      
       setSavedSaleId(docRef.id);
       setShowSuccessModal(true);
       setSuccess(true);
@@ -604,41 +607,29 @@ const CreateSale = () => {
         .map(item => item.orderId);
       
       if (orderIds.length === 0) {
-        console.log('No order IDs to process for inventory');
         return;
       }
-      
-      console.log(`Processing ${orderIds.length} order IDs for inventory:`, orderIds);
       
       // For each order ID, find the actual order document
       for (const displayId of orderIds) {
         try {
-          console.log(`Looking up order by displayId: "${displayId}"`);
-          
           // Find the order by displayId
           const ordersRef = collection(db, 'orders');
           const q = query(ordersRef, where('displayId', '==', displayId));
           const snapshot = await getDocs(q);
           
           if (snapshot.empty) {
-            console.log(`No order found with display ID: "${displayId}"`);
-            
             // Try with padding to see if that helps
             const paddedDisplayId = displayId.toString().padStart(3, '0');
-            console.log(`Trying with padded display ID: "${paddedDisplayId}"`);
             
             const q2 = query(ordersRef, where('displayId', '==', paddedDisplayId));
             const snapshot2 = await getDocs(q2);
             
             if (snapshot2.empty) {
-              console.log(`No order found with padded display ID: "${paddedDisplayId}" either`);
               continue;
             } else {
-              console.log(`Found order with padded display ID: "${paddedDisplayId}"`);
               const orderDoc = snapshot2.docs[0];
               const orderData = { id: orderDoc.id, ...orderDoc.data() };
-              
-              console.log(`Order details: ID=${orderData.id}, Status=${orderData.status}, DisplayID=${orderData.displayId}`);
               
               // Skip orders with invalid statuses
               const invalidStatuses = ['PENDING', 'PLACED', 'CANCELLED', 'DECLINED'];
@@ -694,6 +685,190 @@ const CreateSale = () => {
     }
   };
 
+  // New comprehensive function to deduct inventory items
+  const deductInventoryItems = async (saleItems) => {
+    try {
+      for (const item of saleItems) {
+        try {
+          // Skip items with order IDs as they are handled by processOrderIdsForInventory
+          if (item.orderId && item.orderId.trim() !== '') {
+            continue;
+          }
+          
+          // Validate item has necessary data
+          if (!item.itemName || item.itemName.trim() === '') {
+            continue;
+          }
+          
+          if (!item.qty || parseInt(item.qty) <= 0) {
+            continue;
+          }
+          
+          // Search for matching items in lens_inventory
+          const lensRef = collection(db, 'lens_inventory');
+          let matchingLenses = [];
+          
+          // Method 1: Try to find exact matches by brand name
+          if (item.itemName && item.itemName.trim() !== '') {
+            console.log(`🔍 Method 1: Searching by brand name: "${item.itemName.trim()}"`);
+            const brandQuery = query(lensRef, where('brandName', '==', item.itemName.trim()));
+            const brandSnapshot = await getDocs(brandQuery);
+            
+            console.log(`Found ${brandSnapshot.docs.length} matches by brand name`);
+            brandSnapshot.docs.forEach(doc => {
+              const lensData = doc.data();
+              console.log(`  - Match: ${doc.id} (${lensData.brandName}, Qty: ${lensData.qty}, Type: ${lensData.type})`);
+              matchingLenses.push({
+                id: doc.id,
+                ...lensData
+              });
+            });
+          }
+          
+          // Method 2: If no matches by brand name, try searching by service name for services
+          if (matchingLenses.length === 0 && item.itemName && item.itemName.trim() !== '') {
+            console.log(`🔍 Method 2: Searching by service name: "${item.itemName.trim()}"`);
+            const serviceQuery = query(lensRef, where('serviceName', '==', item.itemName.trim()));
+            const serviceSnapshot = await getDocs(serviceQuery);
+            
+            console.log(`Found ${serviceSnapshot.docs.length} matches by service name`);
+            serviceSnapshot.docs.forEach(doc => {
+              const lensData = doc.data();
+              console.log(`  - Match: ${doc.id} (${lensData.serviceName}, Qty: ${lensData.qty}, Type: ${lensData.type})`);
+              matchingLenses.push({
+                id: doc.id,
+                ...lensData
+              });
+            });
+          }
+          
+          // Method 3: If we have prescription details, try to match RX lenses
+          if (matchingLenses.length === 0 && (item.sph || item.cyl)) {
+            console.log(`🔍 Method 3: Searching for RX lens matches - SPH: ${item.sph}, CYL: ${item.cyl}`);
+            
+            // Get all prescription lenses
+            const rxQuery = query(lensRef, where('type', '==', 'prescription'));
+            const rxSnapshot = await getDocs(rxQuery);
+            
+            console.log(`Found ${rxSnapshot.docs.length} prescription lenses to check`);
+            
+            rxSnapshot.docs.forEach(doc => {
+              const lensData = doc.data();
+              
+              // Check if prescription matches (with some tolerance)
+              const sphMatch = !item.sph || !lensData.sph || Math.abs(parseFloat(item.sph) - parseFloat(lensData.sph)) <= 0.25;
+              const cylMatch = !item.cyl || !lensData.cyl || Math.abs(parseFloat(item.cyl) - parseFloat(lensData.cyl)) <= 0.25;
+              
+              // Also check brand name if provided
+              const brandMatch = !item.itemName || !lensData.brandName || 
+                               lensData.brandName.toLowerCase().includes(item.itemName.toLowerCase()) ||
+                               item.itemName.toLowerCase().includes(lensData.brandName.toLowerCase());
+              
+              if (sphMatch && cylMatch && brandMatch) {
+                console.log(`  - RX Match: ${doc.id} (${lensData.brandName}, SPH: ${lensData.sph}, CYL: ${lensData.cyl}, Qty: ${lensData.qty})`);
+                matchingLenses.push({
+                  id: doc.id,
+                  ...lensData
+                });
+              }
+            });
+          }
+          
+          // Method 4: Try partial name matching for other inventory types
+          if (matchingLenses.length === 0) {
+            console.log(`🔍 Method 4: Trying partial name matching`);
+            const allQuery = query(lensRef);
+            const allSnapshot = await getDocs(allQuery);
+            
+            const searchTerm = item.itemName.toLowerCase().trim();
+            allSnapshot.docs.forEach(doc => {
+              const lensData = doc.data();
+              const brandName = (lensData.brandName || '').toLowerCase();
+              const serviceName = (lensData.serviceName || '').toLowerCase();
+              
+              if (brandName.includes(searchTerm) || searchTerm.includes(brandName) ||
+                  serviceName.includes(searchTerm) || searchTerm.includes(serviceName)) {
+                console.log(`  - Partial Match: ${doc.id} (${lensData.brandName || lensData.serviceName}, Qty: ${lensData.qty}, Type: ${lensData.type})`);
+                matchingLenses.push({
+                  id: doc.id,
+                  ...lensData
+                });
+              }
+            });
+          }
+          
+          console.log(`📊 Total matching lenses found: ${matchingLenses.length}`);
+          
+          if (matchingLenses.length === 0) {
+            console.log(`❌ No inventory matches found for item: "${item.itemName}"`);
+            continue;
+          }
+          
+          // Deduct the sold quantity from matching lenses
+          let remainingQtyToDeduct = parseInt(item.qty) || 1;
+          console.log(`📉 Need to deduct total quantity: ${remainingQtyToDeduct}`);
+          
+          for (const lens of matchingLenses) {
+            if (remainingQtyToDeduct <= 0) {
+              console.log(`✅ All quantity deducted, stopping`);
+              break;
+            }
+            
+            const currentQty = parseInt(lens.qty) || 0;
+            
+            if (currentQty <= 0) {
+              console.log(`⏭️ Lens ${lens.id} has no stock (${currentQty}), skipping`);
+              continue;
+            }
+            
+            const qtyToDeductFromThisLens = Math.min(remainingQtyToDeduct, currentQty);
+            const newQty = currentQty - qtyToDeductFromThisLens;
+            
+            console.log(`📉 Deducting ${qtyToDeductFromThisLens} from lens ${lens.id} (${currentQty} → ${newQty})`);
+            
+            try {
+              if (newQty <= 0) {
+                // Remove the lens from inventory if quantity becomes zero or negative
+                await deleteDoc(doc(db, 'lens_inventory', lens.id));
+                console.log(`🗑️ Removed lens ${lens.id} from inventory (quantity depleted)`);
+              } else {
+                // Update the quantity
+                await updateDoc(doc(db, 'lens_inventory', lens.id), {
+                  qty: newQty,
+                  updatedAt: serverTimestamp()
+                });
+                console.log(`✅ Updated lens ${lens.id} quantity to ${newQty}`);
+              }
+              
+              remainingQtyToDeduct -= qtyToDeductFromThisLens;
+              console.log(`📊 Remaining to deduct: ${remainingQtyToDeduct}`);
+              
+            } catch (dbError) {
+              console.error(`❌ Database error updating lens ${lens.id}:`, dbError);
+              throw dbError; // Re-throw to be caught by outer try-catch
+            }
+          }
+          
+          if (remainingQtyToDeduct > 0) {
+            console.warn(`⚠️ Could not deduct full quantity for item "${item.itemName}". Remaining: ${remainingQtyToDeduct}`);
+          } else {
+            console.log(`✅ Successfully deducted all quantity for item "${item.itemName}"`);
+          }
+          
+        } catch (itemError) {
+          console.error(`❌ Error processing inventory for item "${item.itemName}":`, itemError);
+          // Don't throw error for individual items - continue processing others
+        }
+      }
+      
+      console.log('✅ Completed inventory deduction for all sale items');
+      
+    } catch (error) {
+      console.error('❌ Critical error in deductInventoryItems:', error);
+      throw error; // Re-throw critical errors
+    }
+  };
+
   const handlePrintBill = () => {
     if (savedSaleId) {
       // Use the FallbackInvoicePrint component for printing
@@ -744,50 +919,56 @@ const CreateSale = () => {
   // Add function to fetch saved items
   const fetchItems = async () => {
     try {
-      // Fetch regular items from 'items' collection
-      const itemsRef = collection(db, 'items');
-      const itemsSnapshot = await getDocs(itemsRef);
+      // Only fetch items from 'lens_inventory' collection to restrict suggestions
+      const lensRef = collection(db, 'lens_inventory');
+      const allSnapshot = await getDocs(lensRef);
       
       // Create a map to deduplicate items by name
       const uniqueItems = {};
       
-      itemsSnapshot.docs.forEach(doc => {
-        const item = { id: doc.id, ...doc.data() };
-        const normalizedName = item.name.trim().toLowerCase();
-        
-        // Only keep the latest version of each item (by name)
-        if (!uniqueItems[normalizedName] || 
-            (item.updatedAt && uniqueItems[normalizedName].updatedAt && 
-             item.updatedAt.toDate() > uniqueItems[normalizedName].updatedAt.toDate())) {
-          uniqueItems[normalizedName] = item;
-        }
-      });
-
-      // Fetch stock lenses from 'lens_inventory' collection
-      const lensRef = collection(db, 'lens_inventory');
-      const q = query(lensRef, where('type', '==', 'stock'));
-      const lensSnapshot = await getDocs(q);
-      
-      // Add stock lenses to the unique items
-      lensSnapshot.docs.forEach(doc => {
+      // Process all items from lens_inventory
+      allSnapshot.docs.forEach(doc => {
         const lens = { id: doc.id, ...doc.data() };
         
-        // Create a unique name that includes brand and power series
-        const itemName = `${lens.brandName || ''} ${lens.powerSeries || ''}`.trim();
-        if (itemName) {
+        let itemName = '';
+        let itemPrice = 0;
+        
+        // Determine item name and price based on lens type
+        if (lens.type === 'stock') {
+          itemName = `${lens.brandName || ''} ${lens.powerSeries || ''}`.trim();
+          itemPrice = lens.salePrice || 0;
+        } else if (lens.type === 'service') {
+          itemName = lens.serviceName || lens.brandName || '';
+          itemPrice = lens.salePrice || lens.servicePrice || 0;
+        } else if (lens.type === 'prescription') {
+          itemName = lens.brandName || '';
+          itemPrice = lens.salePrice || 0;
+        } else if (lens.type === 'contact') {
+          itemName = `${lens.brandName || ''} ${lens.powerSeries || ''}`.trim();
+          itemPrice = lens.salePrice || 0;
+        }
+        
+        if (itemName.trim()) {
           const normalizedName = itemName.toLowerCase();
           
           // Add to uniqueItems if it doesn't exist or if this is a newer entry
           if (!uniqueItems[normalizedName] || 
               (lens.createdAt && uniqueItems[normalizedName].createdAt && 
                lens.createdAt.toDate() > uniqueItems[normalizedName].createdAt.toDate())) {
+            
             uniqueItems[normalizedName] = {
               id: lens.id,
               name: itemName,
-              price: lens.salePrice || 0,
+              price: itemPrice,
               createdAt: lens.createdAt,
-              isStockLens: true,
-              stockData: lens
+              isStockLens: lens.type === 'stock',
+              isService: lens.type === 'service',
+              isContactLens: lens.type === 'contact',
+              isPrescription: lens.type === 'prescription',
+              stockData: lens.type === 'stock' ? lens : null,
+              serviceData: lens.type === 'service' ? lens : null,
+              contactData: lens.type === 'contact' ? lens : null,
+              prescriptionData: lens.type === 'prescription' ? lens : null
             };
           }
         }
@@ -798,7 +979,6 @@ const CreateSale = () => {
         a.name.toLowerCase().localeCompare(b.name.toLowerCase())
       );
       
-      console.log("Fetched unique items:", itemsList.length);
       setItemSuggestions(itemsList);
     } catch (error) {
       console.error('Error fetching items:', error);
@@ -824,7 +1004,6 @@ const CreateSale = () => {
           price: parseFloat(price) || 0,
           createdAt: serverTimestamp()
         });
-        console.log(`Created new item: ${normalizedName} - ₹${price}`);
       } else {
         // Update existing item
         const existingItem = snapshot.docs[0];
@@ -832,7 +1011,6 @@ const CreateSale = () => {
           price: parseFloat(price) || 0,
           updatedAt: serverTimestamp()
         });
-        console.log(`Updated existing item: ${normalizedName} - ₹${price}`);
       }
       
       // Refresh items list
@@ -844,70 +1022,95 @@ const CreateSale = () => {
 
   // Handle item selection from the ItemSuggestions component
   const handleItemSelect = (index, itemData) => {
-    const updatedRows = [...tableRows];
+    // Get the price - prioritize the main price field that ItemSuggestions passes
+    let itemPrice = parseFloat(itemData.price || 0);
     
-    // Check if this is a stock lens item
-    if (itemData.isStockLens && itemData.stockData) {
-      const stockData = itemData.stockData;
-      
-      // For stock lenses, we can pre-populate power series info
-      updatedRows[index] = {
-        ...updatedRows[index],
-        itemName: itemData.name,
-        price: parseFloat(stockData.salePrice || 0),
-        total: parseFloat(stockData.salePrice || 0) * parseInt(updatedRows[index].qty || 1),
-        // Additional stock lens info that might be useful
-        powerSeries: stockData.powerSeries || ''
-      };
-    } else {
-      // Regular item handling (unchanged)
-      updatedRows[index] = {
-        ...updatedRows[index],
-        ...itemData // This contains itemName, price, and total
-      };
+    // If no price in main field, try service-specific fields
+    if (itemPrice === 0 && itemData.isService && itemData.serviceData) {
+      itemPrice = parseFloat(
+        itemData.serviceData.salePrice || 
+        itemData.serviceData.servicePrice || 
+        0
+      );
     }
     
-    setTableRows(updatedRows);
+    // If still no price, try stock lens fields
+    if (itemPrice === 0 && itemData.isStockLens && itemData.stockData) {
+      itemPrice = parseFloat(itemData.stockData.salePrice || 0);
+    }
+    
+    // First update the item name
+    handleTableRowChange(index, 'itemName', itemData.name || itemData.itemName);
+    
+    // Then update the price, which will trigger total calculation
+    if (itemPrice > 0) {
+      setTimeout(() => {
+        handleTableRowChange(index, 'price', itemPrice.toString());
+      }, 10);
+    }
+    
+    // Set appropriate unit for services
+    if (itemData.isService) {
+      setTimeout(() => {
+        handleTableRowChange(index, 'unit', 'Service');
+        // Clear optical values for services as they don't apply
+        handleTableRowChange(index, 'sph', '');
+        handleTableRowChange(index, 'cyl', '');
+        handleTableRowChange(index, 'axis', '');
+        handleTableRowChange(index, 'add', '');
+      }, 20);
+    }
+    
+    // Add power series info for stock lenses
+    if (itemData.isStockLens && itemData.stockData) {
+      // This will be shown in the UI below the input
+      const updatedRows = [...tableRows];
+      updatedRows[index].powerSeries = itemData.stockData.powerSeries || '';
+      setTableRows(updatedRows);
+    }
   };
 
   // Add function to fetch dispatch logs
   const fetchDispatchLogs = async (date) => {
     try {
-      const startDate = new Date(date);
-      startDate.setHours(0, 0, 0, 0);
-      
-      const endDate = new Date(date);
-      endDate.setHours(23, 59, 59, 999);
+      console.log(`Fetching dispatch logs for date: ${date}`);
       
       const dispatchRef = collection(db, 'dispatch_logs');
-      const q = query(
-        dispatchRef,
-        where('date', '>=', startDate),
-        where('date', '<=', endDate),
-        orderBy('date', 'desc')
-      );
       
-      const snapshot = await getDocs(q);
+      // Try without orderBy first to see if we get any results
+      const simpleQuery = query(dispatchRef, where('date', '==', date));
+      const snapshot = await getDocs(simpleQuery);
       
-      // Group entries by logId
-      const groupedLogs = {};
-      snapshot.docs.forEach(doc => {
-        const log = { id: doc.id, ...doc.data() };
-        if (!groupedLogs[log.logId]) {
-          groupedLogs[log.logId] = {
-            logId: log.logId,
-            opticalName: log.opticalName,
-            entries: []
-          };
-        }
-        groupedLogs[log.logId].entries.push(log);
-      });
-      
-      // Convert to array for rendering
-      const logsArray = Object.values(groupedLogs);
-      setDispatchLogs(logsArray);
+      if (snapshot.empty) {
+        console.log(`No logs found for exact date match: ${date}`);
+        // Try getting all logs and filter in memory to debug
+        const allSnapshot = await getDocs(dispatchRef);
+        console.log(`Total dispatch logs in database: ${allSnapshot.docs.length}`);
+        
+        allSnapshot.docs.forEach(doc => {
+          const data = doc.data();
+          console.log(`Log ${data.logId}: date=${data.date}, type=${typeof data.date}`);
+        });
+        
+        // Filter manually
+        const logsList = allSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(log => log.date === date);
+        
+        console.log(`Manually filtered logs for ${date}:`, logsList);
+        setDispatchLogs(logsList);
+      } else {
+        const logsList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        console.log(`Fetched ${logsList.length} dispatch logs for date ${date}:`, logsList);
+        setDispatchLogs(logsList);
+      }
     } catch (error) {
       console.error('Error fetching dispatch logs:', error);
+      setDispatchLogs([]);
     }
   };
   
@@ -915,107 +1118,96 @@ const CreateSale = () => {
   const importDispatchLog = (log) => {
     console.log("Importing dispatch log:", log);
     
-    // First check if we have a customer selected
+    // First check if we have a customer selected, if not try to find matching customer
     if (!selectedCustomer) {
-      // Check if the optical name matches one of our customers
       const matchingCustomer = customers.find(
-        customer => customer.opticalName === log.opticalName
+        customer => customer.opticalName && log.opticalShop && 
+        customer.opticalName.toLowerCase() === log.opticalShop.toLowerCase()
       );
       
       if (matchingCustomer) {
         handleCustomerSelect(matchingCustomer);
+        console.log("Auto-selected matching customer:", matchingCustomer.opticalName);
       } else {
-        setError(`Please select a customer first or ensure the optical name "${log.opticalName}" matches a customer in your system.`);
+        setError(`Please select a customer first. Could not find customer matching "${log.opticalShop}"`);
         return;
       }
     }
     
     try {
-      // Create blank rows just like when we initialize the form
-      // Using the exact same structure as when we initialize tableRows in the component
-      const importedRows = Array(log.entries.length * 2).fill().map(() => ({
-        orderId: '',
-        orderDetails: null,
-        itemName: '',
-        sph: '',
-        cyl: '',
-        axis: '',
-        add: '',
-        qty: 1,
-        unit: 'Pairs',
-        price: 0,
-        total: 0
-      }));
-      
-      // Now fill in the data from log entries
-      log.entries.forEach((entry, index) => {
-        const rightIdx = index * 2;
-        const leftIdx = index * 2 + 1;
-        
-        // Base item name without log reference
-        const baseName = entry.lensName || 'Lens';
-        
-        // Check if we have right eye data
-        if (entry.rightSph || entry.rightCyl || entry.rightAxis || entry.rightAdd || entry.rightQty) {
-          importedRows[rightIdx].itemName = `${baseName} - RIGHT`;
-          importedRows[rightIdx].orderId = log.logId; // Put log ID in order ID field
-          importedRows[rightIdx].sph = entry.rightSph || '';
-          importedRows[rightIdx].cyl = entry.rightCyl || '';
-          importedRows[rightIdx].axis = entry.rightAxis || '';
-          importedRows[rightIdx].add = entry.rightAdd || '';
-          importedRows[rightIdx].qty = parseInt(entry.rightQty || 1);
-        }
-        
-        // Check if we have left eye data
-        if (entry.leftSph || entry.leftCyl || entry.leftAxis || entry.leftAdd || entry.leftQty) {
-          importedRows[leftIdx].itemName = `${baseName} - LEFT`;
-          importedRows[leftIdx].orderId = log.logId; // Put log ID in order ID field
-          importedRows[leftIdx].sph = entry.leftSph || '';
-          importedRows[leftIdx].cyl = entry.leftCyl || '';
-          importedRows[leftIdx].axis = entry.leftAxis || '';
-          importedRows[leftIdx].add = entry.leftAdd || '';
-          importedRows[leftIdx].qty = parseInt(entry.leftQty || 1);
-        }
-      });
-      
-      // Filter out empty rows (where itemName is still empty)
-      const validRows = importedRows.filter(row => row.itemName !== '');
-      
-      console.log("Valid imported rows:", validRows);
-      
-      // Add imported rows to the top of the table
-      // First check if we have any existing filled rows
-      const existingFilledRows = tableRows.filter(row => row.itemName.trim() !== '');
-      const existingEmptyRows = tableRows.filter(row => row.itemName.trim() === '');
-      
-      // If we have some filled rows, put new rows after them, otherwise at the top
-      let newTableRows;
-      
-      if (existingFilledRows.length > 0) {
-        // Add the imported rows after the last filled row
-        newTableRows = [
-          ...existingFilledRows,
-          ...validRows,
-          ...existingEmptyRows
-        ];
-      } else {
-        // Add imported rows at the top, then the empty rows
-        newTableRows = [
-          ...validRows,
-          ...existingEmptyRows
-        ];
+      if (!log.items || !Array.isArray(log.items) || log.items.length === 0) {
+        setError("No items found in this dispatch log");
+        return;
       }
       
-      // Update state with the new combined array
-      setTableRows(newTableRows);
+      // Find the first empty row index in the current table
+      let insertIndex = tableRows.findIndex(row => row.itemName.trim() === '');
+      if (insertIndex === -1) {
+        // If no empty rows, add new ones
+        insertIndex = tableRows.length;
+        addMoreRows(log.items.length);
+      }
       
-      // Give a success message
-      console.log(`Successfully imported ${validRows.length} items from dispatch log`);
-      setError(''); // Clear any previous errors
+      // Create updated rows array
+      const updatedRows = [...tableRows];
+      
+      // Import each item from the dispatch log
+      log.items.forEach((item, index) => {
+        const targetIndex = insertIndex + index;
+        
+        // Ensure we have enough rows
+        if (targetIndex >= updatedRows.length) {
+          // Add more empty rows if needed
+          const newRowsNeeded = targetIndex - updatedRows.length + 1;
+          for (let i = 0; i < newRowsNeeded; i++) {
+            updatedRows.push({
+              orderId: '',
+              orderDetails: null,
+              itemName: '',
+              sph: '',
+              cyl: '',
+              axis: '',
+              add: '',
+              qty: 1,
+              unit: 'Pairs',
+              price: 0, // Price will need to be filled manually
+              total: 0
+            });
+          }
+        }
+        
+        // Import the item data
+        updatedRows[targetIndex] = {
+          ...updatedRows[targetIndex],
+          orderId: log.logId || '', // Put log ID in order ID column
+          itemName: item.itemName || '',
+          sph: item.sph || '',
+          cyl: item.cyl || '',
+          axis: item.axis || '',
+          add: item.add || '',
+          qty: parseFloat(item.qty) || 1, // Use parseFloat to handle decimal quantities like 0.5
+          unit: 'Pairs',
+          price: 0, // Price will need to be filled manually
+          total: 0
+        };
+        
+        console.log(`Imported item ${index + 1}:`, updatedRows[targetIndex]);
+      });
+      
+      // Update the table with imported data
+      setTableRows(updatedRows);
+      
+      // Set success message instead of error
+      setTimeout(() => {
+        const importedItemDetails = log.items.map(item => 
+          `${item.itemName} (Qty: ${item.qty})`
+        ).join(', ');
+        alert(`Successfully imported ${log.items.length} items from dispatch log ${log.logId}:\n${importedItemDetails}`);
+      }, 100);
       
     } catch (error) {
       console.error("Error importing dispatch log:", error);
-      setError(`Failed to import: ${error.message}`);
+      setError(`Failed to import dispatch log: ${error.message}`);
     }
     
     // Close the dispatch logs modal
@@ -1032,61 +1224,45 @@ const CreateSale = () => {
     try {
       setIsSearchingLogs(true);
       
-      // Normalize the search query to lowercase for case-insensitive comparison
       const normalizedQuery = query.toLowerCase().trim();
       
-      // Get all dispatch logs (limited to last 100 days to avoid too much data)
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - 100); // Last 100 days
-      
+      // Search in dispatch logs
       const dispatchRef = collection(db, 'dispatch_logs');
-      const q = query(
-        dispatchRef,
-        where('date', '>=', startDate),
-        where('date', '<=', endDate),
-        orderBy('date', 'desc')
-      );
+      const snapshot = await getDocs(dispatchRef);
       
-      const snapshot = await getDocs(q);
-      
-      // First group by logId
-      const groupedLogs = {};
+      const matchingLogs = [];
       snapshot.docs.forEach(doc => {
         const log = { id: doc.id, ...doc.data() };
         
-        // Skip if this doesn't match our search
+        // Check if log matches search criteria
         const matchesLogId = log.logId && log.logId.toLowerCase().includes(normalizedQuery);
-        const matchesOpticalName = log.opticalName && log.opticalName.toLowerCase().includes(normalizedQuery);
-        const matchesLensName = log.lensName && log.lensName.toLowerCase().includes(normalizedQuery);
+        const matchesOpticalShop = log.opticalShop && log.opticalShop.toLowerCase().includes(normalizedQuery);
         
-        if (!matchesLogId && !matchesOpticalName && !matchesLensName) {
-          return;
+        // Check if any item name matches
+        let matchesItemName = false;
+        if (log.items && Array.isArray(log.items)) {
+          matchesItemName = log.items.some(item => 
+            item.itemName && item.itemName.toLowerCase().includes(normalizedQuery)
+          );
         }
         
-        if (!groupedLogs[log.logId]) {
-          groupedLogs[log.logId] = {
-            logId: log.logId,
-            opticalName: log.opticalName,
-            date: log.date,
-            entries: []
-          };
+        if (matchesLogId || matchesOpticalShop || matchesItemName) {
+          matchingLogs.push(log);
         }
-        
-        groupedLogs[log.logId].entries.push(log);
       });
       
-      // Convert to array and sort by date (newest first)
-      const searchResultsArray = Object.values(groupedLogs).sort((a, b) => {
-        // Convert to JavaScript Date objects if they're Firestore timestamps
-        const dateA = a.date && a.date.toDate ? a.date.toDate() : new Date(a.date);
-        const dateB = b.date && b.date.toDate ? b.date.toDate() : new Date(b.date);
+      // Sort by creation date (newest first)
+      matchingLogs.sort((a, b) => {
+        const dateA = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+        const dateB = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
         return dateB - dateA;
       });
       
-      setSearchResults(searchResultsArray);
+      console.log(`Found ${matchingLogs.length} matching dispatch logs for query: "${query}"`);
+      setSearchResults(matchingLogs);
     } catch (error) {
       console.error('Error searching dispatch logs:', error);
+      setSearchResults([]);
     } finally {
       setIsSearchingLogs(false);
     }
@@ -1286,6 +1462,7 @@ const CreateSale = () => {
                       index={index}
                       rowQty={row.qty}
                       saveItemToDatabase={saveItemToDatabase}
+                      currentPrice={parseFloat(row.price) || 0}
                     />
                     {row.powerSeries && (
                       <div className="text-xs text-emerald-600 mt-1">
@@ -1566,24 +1743,26 @@ const CreateSale = () => {
             
             {/* Replace the button with BottomActionBar on mobile */}
             <div className="mt-6 desktop-only">
-              <button
-                type="button"
-                onClick={handleSaveSale}
-                disabled={loading}
-                className="w-full px-4 py-3 bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors disabled:opacity-50"
-              >
-                {loading ? (
-                  <span className="flex items-center justify-center">
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Saving...
-                  </span>
-                ) : (
-                  'Save Invoice'
-                )}
-              </button>
+              <div className="flex flex-col gap-3">
+                <button
+                  type="button"
+                  onClick={handleSaveSale}
+                  disabled={loading}
+                  className="w-full px-4 py-3 bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors disabled:opacity-50"
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Saving...
+                    </span>
+                  ) : (
+                    'Save Invoice'
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1766,13 +1945,10 @@ const CreateSale = () => {
                                 <li key={log.logId} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
                                   <div className="flex justify-between items-start">
                                     <div>
-                                      <h4 className="font-medium text-gray-900">{log.opticalName}</h4>
+                                      <h4 className="font-medium text-gray-900">{log.opticalShop}</h4>
                                       <p className="text-sm text-gray-500">
-                                        Log ID: {log.logId} ({log.entries.length} items) - 
-                                        {log.date && (log.date.toDate ? 
-                                          log.date.toDate().toLocaleDateString() : 
-                                          new Date(log.date).toLocaleDateString()
-                                        )}
+                                        Log ID: {log.logId} ({log.items ? log.items.length : 0} items) - 
+                                        {log.date}
                                       </p>
                                     </div>
                                     <button
@@ -1785,11 +1961,13 @@ const CreateSale = () => {
                                   </div>
                                   <div className="mt-2">
                                     <ul className="text-sm text-gray-600">
-                                      {log.entries.slice(0, 3).map((entry, idx) => (
-                                        <li key={idx} className="truncate">• {entry.lensName}</li>
+                                      {log.items && log.items.slice(0, 3).map((item, idx) => (
+                                        <li key={idx} className="truncate">
+                                          • {item.itemName} {item.sph && `(SPH: ${item.sph})`} {item.qty && `- Qty: ${item.qty}`}
+                                        </li>
                                       ))}
-                                      {log.entries.length > 3 && (
-                                        <li className="text-gray-400">+ {log.entries.length - 3} more items</li>
+                                      {log.items && log.items.length > 3 && (
+                                        <li className="text-gray-400">+ {log.items.length - 3} more items</li>
                                       )}
                                     </ul>
                                   </div>
@@ -1807,8 +1985,10 @@ const CreateSale = () => {
                                 <li key={log.logId} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
                                   <div className="flex justify-between items-start">
                                     <div>
-                                      <h4 className="font-medium text-gray-900">{log.opticalName}</h4>
-                                      <p className="text-sm text-gray-500">Log ID: {log.logId} ({log.entries.length} items)</p>
+                                      <h4 className="font-medium text-gray-900">{log.opticalShop}</h4>
+                                      <p className="text-sm text-gray-500">
+                                        Log ID: {log.logId} ({log.items ? log.items.length : 0} items)
+                                      </p>
                                     </div>
                                     <button
                                       type="button"
@@ -1820,11 +2000,13 @@ const CreateSale = () => {
                                   </div>
                                   <div className="mt-2">
                                     <ul className="text-sm text-gray-600">
-                                      {log.entries.slice(0, 3).map((entry, idx) => (
-                                        <li key={idx} className="truncate">• {entry.lensName}</li>
+                                      {log.items && log.items.slice(0, 3).map((item, idx) => (
+                                        <li key={idx} className="truncate">
+                                          • {item.itemName} {item.sph && `(SPH: ${item.sph})`} {item.qty && `- Qty: ${item.qty}`}
+                                        </li>
                                       ))}
-                                      {log.entries.length > 3 && (
-                                        <li className="text-gray-400">+ {log.entries.length - 3} more items</li>
+                                      {log.items && log.items.length > 3 && (
+                                        <li className="text-gray-400">+ {log.items.length - 3} more items</li>
                                       )}
                                     </ul>
                                   </div>

@@ -15,11 +15,12 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background-color: #f9fafb;
-  color: #111827;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   /* Ensure smooth scrolling on mobile */
   -webkit-overflow-scrolling: touch;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 #root {
@@ -29,9 +30,17 @@ body {
 a {
   color: #3b82f6;
   text-decoration: none;
+  transition: color 0.3s ease;
 }
 a:hover {
   color: #1d4ed8;
+}
+
+.dark a {
+  color: #60a5fa;
+}
+.dark a:hover {
+  color: #93c5fd;
 }
 
 /* Add mobile bottom navigation spacing */
@@ -50,17 +59,19 @@ a:hover {
   bottom: 0;
   left: 0;
   right: 0;
-  background-color: #ffffff;
-  border-top: 1px solid #e5e7eb;
-  box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
+  background-color: var(--bg-secondary);
+  border-top: 1px solid var(--border-primary);
+  box-shadow: 0 -4px 10px var(--shadow-secondary);
   z-index: 50;
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* Mobile page layout */
 .mobile-page {
   min-height: 100vh;
-  background-color: #f9fafb;
+  background-color: var(--bg-primary);
+  transition: background-color 0.3s ease;
 }
 
 /* Reset button styles to not interfere with Tailwind */
@@ -101,8 +112,8 @@ nav svg {
 }
 
 .mobile-bottom-nav .text-gray-600 svg {
-  stroke: #4b5563 !important;
-  color: #4b5563 !important;
+  stroke: var(--text-muted) !important;
+  color: var(--text-muted) !important;
 }
 
 /* Desktop navbar icon fixes */
@@ -112,8 +123,8 @@ nav .text-white svg {
 }
 
 nav .text-gray-600 svg {
-  stroke: #4b5563 !important;
-  color: #4b5563 !important;
+  stroke: var(--text-muted) !important;
+  color: var(--text-muted) !important;
 }
 
 /* Group hover states for desktop */

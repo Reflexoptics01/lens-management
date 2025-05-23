@@ -307,34 +307,34 @@ const Customers = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50">
+    <div className="flex flex-col min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
       <Navbar />
       
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Vendors & Customers</h1>
-            <p className="mt-1 text-sm text-gray-500">Manage your business relationships</p>
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Vendors & Customers</h1>
+            <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>Manage your business relationships</p>
           </div>
           
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+                <MagnifyingGlassIcon className="h-5 w-5" style={{ color: 'var(--text-muted)' }} />
               </div>
               <input
                 type="text"
                 placeholder={`Search ${activeTab === 'customers' ? 'customers' : 'vendors'}...`}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500 block w-full sm:w-auto"
+                className="pl-10 pr-4 py-2 form-input block w-full sm:w-auto"
               />
             </div>
             
             <button
               onClick={handleAddNew}
-              className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+              className="btn-primary inline-flex items-center justify-center px-4 py-2"
             >
               <PlusIcon className="w-5 h-5 mr-2 -ml-1" />
               <span>Add {activeTab === 'customers' ? 'Customer' : 'Vendor'}</span>
@@ -343,7 +343,7 @@ const Customers = () => {
         </div>
         
         {/* Tabs */}
-        <div className="mb-6 border-b border-gray-200">
+        <div className="mb-6" style={{ borderBottom: '1px solid var(--border-primary)' }}>
           <div className="flex -mb-px">
             <button
               onClick={() => {
@@ -352,9 +352,14 @@ const Customers = () => {
               }}
               className={`py-3 px-6 text-sm font-medium rounded-t-lg focus:outline-none ${
                 activeTab === 'customers'
-                  ? 'bg-white text-sky-600 border-t border-l border-r border-gray-200'
-                  : 'text-gray-600 hover:text-gray-800 bg-gray-50 hover:bg-gray-100'
+                  ? 'text-sky-600 border-t border-l border-r'
+                  : 'hover:bg-opacity-50'
               }`}
+              style={{
+                backgroundColor: activeTab === 'customers' ? 'var(--bg-secondary)' : 'var(--bg-tertiary)',
+                color: activeTab === 'customers' ? 'var(--text-primary)' : 'var(--text-muted)',
+                borderColor: activeTab === 'customers' ? 'var(--border-primary)' : 'transparent'
+              }}
             >
               <div className="flex items-center space-x-2">
                 <UserGroupIcon className="w-5 h-5" />
@@ -371,9 +376,14 @@ const Customers = () => {
               }}
               className={`py-3 px-6 text-sm font-medium rounded-t-lg focus:outline-none ${
                 activeTab === 'vendors'
-                  ? 'bg-white text-sky-600 border-t border-l border-r border-gray-200'
-                  : 'text-gray-600 hover:text-gray-800 bg-gray-50 hover:bg-gray-100'
+                  ? 'text-sky-600 border-t border-l border-r'
+                  : 'hover:bg-opacity-50'
               }`}
+              style={{
+                backgroundColor: activeTab === 'vendors' ? 'var(--bg-secondary)' : 'var(--bg-tertiary)',
+                color: activeTab === 'vendors' ? 'var(--text-primary)' : 'var(--text-muted)',
+                borderColor: activeTab === 'vendors' ? 'var(--border-primary)' : 'transparent'
+              }}
             >
               <div className="flex items-center space-x-2">
                 <BuildingStorefrontIcon className="w-5 h-5" />
@@ -387,7 +397,7 @@ const Customers = () => {
         </div>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-400 text-red-700 rounded-md">
+          <div className="mb-6 p-4 border-l-4 border-red-400 text-red-700 rounded-md" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
             <p className="font-medium">Error</p>
             <p className="text-sm">{error}</p>
           </div>
@@ -395,18 +405,18 @@ const Customers = () => {
         
         {/* No Items State */}
         {!filteredItems || filteredItems.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
+          <div className="card p-8 text-center">
             {activeTab === 'customers' ? (
-              <UserGroupIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <UserGroupIcon className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
             ) : (
-              <BuildingStorefrontIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <BuildingStorefrontIcon className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
             )}
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+            <h3 className="text-lg font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
               {searchTerm 
                 ? `No ${activeTab === 'customers' ? 'customers' : 'vendors'} matching "${searchTerm}"` 
                 : `No ${activeTab === 'customers' ? 'customers' : 'vendors'} found`}
             </h3>
-            <p className="text-gray-500 mb-6">
+            <p className="mb-6" style={{ color: 'var(--text-muted)' }}>
               {searchTerm 
                 ? (
                   <button 
@@ -421,7 +431,7 @@ const Customers = () => {
             {!searchTerm && (
               <button
                 onClick={handleAddNew}
-                className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                className="btn-primary inline-flex items-center justify-center px-4 py-2"
               >
                 <PlusIcon className="w-5 h-5 mr-2 -ml-1" />
                 Add New {activeTab === 'customers' ? 'Customer' : 'Vendor'}
@@ -432,7 +442,7 @@ const Customers = () => {
           <>
             {/* Search Results Summary */}
             {searchTerm && (
-              <div className="mb-4 text-sm text-gray-500">
+              <div className="mb-4 text-sm" style={{ color: 'var(--text-muted)' }}>
                 Found {filteredItems.length} {filteredItems.length === 1 
                   ? (activeTab === 'customers' ? 'customer' : 'vendor') 
                   : (activeTab === 'customers' ? 'customers' : 'vendors')} 
@@ -448,43 +458,43 @@ const Customers = () => {
 
             {/* Desktop Table View */}
             <div className="hidden md:block mb-8">
-              <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div className="card overflow-hidden p-0">
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                  <table className="min-w-full divide-y" style={{ borderColor: 'var(--border-primary)' }}>
+                    <thead style={{ backgroundColor: 'var(--bg-tertiary)' }}>
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                           {activeTab === 'customers' ? 'Optical Name' : 'Business Name'}
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                           Contact Person
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                           Phone / City
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                           Financial
                         </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                           Actions
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="divide-y" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
                       {filteredItems.map((item) => (
-                        <tr key={item.id} className="hover:bg-gray-50">
+                        <tr key={item.id} className="hover:bg-opacity-50" style={{ ':hover': { backgroundColor: 'var(--bg-tertiary)' } }}>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">
+                            <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                               {safeGet(item, 'opticalName', '[No Name]')}
                             </div>
                             {item.gstNumber && (
-                              <div className="text-xs text-gray-500 mt-1">
+                              <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
                                 <span className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded">GST</span> {item.gstNumber}
                               </div>
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
+                            <div className="text-sm" style={{ color: 'var(--text-primary)' }}>
                               {safeGet(item, 'contactPerson')}
                             </div>
                             {item.email && (
@@ -497,7 +507,7 @@ const Customers = () => {
                             <div className="text-sm text-sky-600">
                               {item.phone && <a href={`tel:${item.phone}`}>{item.phone}</a>}
                             </div>
-                            <div className="text-sm text-gray-500">
+                            <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
                               {safeGet(item, 'city')}{item.state ? `, ${item.state}` : ''}
                             </div>
                           </td>
@@ -506,20 +516,20 @@ const Customers = () => {
                               <div className="space-y-1 text-sm">
                                 {item.creditLimit !== undefined && (
                                   <div className="flex justify-between">
-                                    <span className="text-gray-500">Credit Limit:</span>
-                                    <span className="font-medium">{formatCurrency(item.creditLimit)}</span>
+                                    <span style={{ color: 'var(--text-muted)' }}>Credit Limit:</span>
+                                    <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{formatCurrency(item.creditLimit)}</span>
                                   </div>
                                 )}
                                 {item.openingBalance !== undefined && (
                                   <div className="flex justify-between">
-                                    <span className="text-gray-500">Opening Bal:</span>
-                                    <span className="font-medium">{formatCurrency(item.openingBalance)}</span>
+                                    <span style={{ color: 'var(--text-muted)' }}>Opening Bal:</span>
+                                    <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{formatCurrency(item.openingBalance)}</span>
                                   </div>
                                 )}
                                 {item.creditPeriod !== undefined && (
                                   <div className="flex justify-between">
-                                    <span className="text-gray-500">Credit Period:</span>
-                                    <span className="font-medium">{item.creditPeriod} days</span>
+                                    <span style={{ color: 'var(--text-muted)' }}>Credit Period:</span>
+                                    <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{item.creditPeriod} days</span>
                                   </div>
                                 )}
                               </div>

@@ -275,88 +275,88 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
       <Navbar />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="mt-2 text-gray-600">Business overview and key metrics</p>
+          <h1 className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>Dashboard</h1>
+          <p className="mt-2" style={{ color: 'var(--text-muted)' }}>Business overview and key metrics</p>
         </div>
         
         {/* Date Selector */}
-        <div className="mb-6 bg-white rounded-lg shadow p-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="mb-6 rounded-lg shadow p-4" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+          <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
             Select Date for Analysis
           </label>
               <input
                 type="date"
                 value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+            className="form-input"
               />
           {loading && (
-            <span className="ml-4 text-sm text-gray-500">Loading data...</span>
+            <span className="ml-4 text-sm" style={{ color: 'var(--text-muted)' }}>Loading data...</span>
           )}
             </div>
 
         {/* Sales Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Today's Sales */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Today's Sales</h3>
+          <div className="card">
+            <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>Today's Sales</h3>
             <p className="text-3xl font-bold text-blue-600">{formatCurrency(salesData.today)}</p>
             <div className="mt-2 flex items-center">
-              <span className="text-sm text-gray-500 mr-2">vs Last Year Same Day:</span>
+              <span className="text-sm mr-2" style={{ color: 'var(--text-muted)' }}>vs Last Year Same Day:</span>
               <span className={`text-sm font-medium ${getChangeColor(salesData.today, salesData.lastYearSameDay)}`}>
                 {getChangePercentage(salesData.today, salesData.lastYearSameDay)}
               </span>
             </div>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
               Last Year: {formatCurrency(salesData.lastYearSameDay)}
             </p>
         </div>
         
           {/* This Month */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">This Month</h3>
+          <div className="card">
+            <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>This Month</h3>
             <p className="text-3xl font-bold text-green-600">{formatCurrency(salesData.thisMonth)}</p>
             <div className="mt-2 flex items-center">
-              <span className="text-sm text-gray-500 mr-2">vs Last Year Same Month:</span>
+              <span className="text-sm mr-2" style={{ color: 'var(--text-muted)' }}>vs Last Year Same Month:</span>
               <span className={`text-sm font-medium ${getChangeColor(salesData.thisMonth, salesData.lastYearSameMonth)}`}>
                 {getChangePercentage(salesData.thisMonth, salesData.lastYearSameMonth)}
               </span>
             </div>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
               Last Year: {formatCurrency(salesData.lastYearSameMonth)}
             </p>
           </div>
 
           {/* This Year */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">This Year</h3>
+          <div className="card">
+            <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>This Year</h3>
             <p className="text-3xl font-bold text-purple-600">{formatCurrency(salesData.thisYear)}</p>
             <div className="mt-2 flex items-center">
-              <span className="text-sm text-gray-500 mr-2">vs Last Year:</span>
+              <span className="text-sm mr-2" style={{ color: 'var(--text-muted)' }}>vs Last Year:</span>
               <span className={`text-sm font-medium ${getChangeColor(salesData.thisYear, salesData.lastYear)}`}>
                 {getChangePercentage(salesData.thisYear, salesData.lastYear)}
                         </span>
             </div>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
               Last Year Total: {formatCurrency(salesData.lastYear)}
                   </p>
                 </div>
                 
           {/* Projections */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Projections</h3>
+          <div className="card">
+            <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>Projections</h3>
             <div className="space-y-2">
               <div>
-                <p className="text-sm text-gray-600">Monthly Projection:</p>
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Monthly Projection:</p>
                 <p className="text-xl font-bold text-orange-600">{formatCurrency(salesData.monthlyProjection)}</p>
                   </div>
               <div>
-                <p className="text-sm text-gray-600">Yearly Projection:</p>
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Yearly Projection:</p>
                 <p className="text-xl font-bold text-red-600">{formatCurrency(salesData.yearlyProjection)}</p>
               </div>
             </div>
@@ -366,25 +366,25 @@ const Dashboard = () => {
         {/* Top Products Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Top Products by Quantity */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="px-6 py-4 bg-blue-50 border-b">
-              <h3 className="text-lg font-semibold text-gray-900">Top 20 Products by Sales</h3>
+            <div className="card overflow-hidden p-0">
+            <div className="px-6 py-4 border-b" style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-primary)' }}>
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Top 20 Products by Sales</h3>
               </div>
             <div className="max-h-96 overflow-y-auto">
               <table className="min-w-full">
-                <thead className="bg-gray-50 sticky top-0">
+                <thead className="sticky top-0" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qty</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>#</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Product</th>
+                    <th className="px-4 py-2 text-right text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Qty</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y" style={{ borderColor: 'var(--border-primary)' }}>
                   {topProducts.map((product, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 text-sm text-gray-900">{index + 1}</td>
-                      <td className="px-4 py-2 text-sm text-gray-900">{product.name}</td>
-                      <td className="px-4 py-2 text-sm text-gray-900 text-right">{product.count}</td>
+                    <tr key={index} className="hover:bg-opacity-50" style={{ ':hover': { backgroundColor: 'var(--bg-tertiary)' } }}>
+                      <td className="px-4 py-2 text-sm" style={{ color: 'var(--text-primary)' }}>{index + 1}</td>
+                      <td className="px-4 py-2 text-sm" style={{ color: 'var(--text-primary)' }}>{product.name}</td>
+                      <td className="px-4 py-2 text-sm text-right" style={{ color: 'var(--text-primary)' }}>{product.count}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -393,25 +393,25 @@ const Dashboard = () => {
           </div>
           
           {/* Top Powers */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="px-6 py-4 bg-green-50 border-b">
-              <h3 className="text-lg font-semibold text-gray-900">Top 20 SPH Powers</h3>
+            <div className="card overflow-hidden p-0">
+            <div className="px-6 py-4 border-b" style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-primary)' }}>
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Top 20 SPH Powers</h3>
             </div>
             <div className="max-h-96 overflow-y-auto">
               <table className="min-w-full">
-                <thead className="bg-gray-50 sticky top-0">
+                <thead className="sticky top-0" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Power</th>
-                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Count</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>#</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Power</th>
+                    <th className="px-4 py-2 text-right text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Count</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y" style={{ borderColor: 'var(--border-primary)' }}>
                   {topPowers.map((power, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 text-sm text-gray-900">{index + 1}</td>
-                      <td className="px-4 py-2 text-sm text-gray-900">{power.power}</td>
-                      <td className="px-4 py-2 text-sm text-gray-900 text-right">{power.count}</td>
+                    <tr key={index} className="hover:bg-opacity-50" style={{ ':hover': { backgroundColor: 'var(--bg-tertiary)' } }}>
+                      <td className="px-4 py-2 text-sm" style={{ color: 'var(--text-primary)' }}>{index + 1}</td>
+                      <td className="px-4 py-2 text-sm" style={{ color: 'var(--text-primary)' }}>{power.power}</td>
+                      <td className="px-4 py-2 text-sm text-right" style={{ color: 'var(--text-primary)' }}>{power.count}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -420,35 +420,35 @@ const Dashboard = () => {
           </div>
           
           {/* Top Profit Products */}
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="px-6 py-4 bg-yellow-50 border-b">
-              <h3 className="text-lg font-semibold text-gray-900">Top 20 Profit Products</h3>
+          <div className="card overflow-hidden p-0">
+            <div className="px-6 py-4 border-b" style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-primary)' }}>
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Top 20 Profit Products</h3>
             </div>
             <div className="max-h-96 overflow-y-auto">
               <table className="min-w-full">
-                <thead className="bg-gray-50 sticky top-0">
+                <thead className="sticky top-0" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Profit</th>
-                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Margin</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>#</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Product</th>
+                    <th className="px-4 py-2 text-right text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Profit</th>
+                    <th className="px-4 py-2 text-right text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Margin</th>
                     </tr>
                   </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y" style={{ borderColor: 'var(--border-primary)' }}>
                   {topProfitProducts.map((product, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 text-sm text-gray-900">{index + 1}</td>
-                      <td className="px-4 py-2 text-sm text-gray-900">{product.name}</td>
-                      <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                      <tr key={index} className="hover:bg-opacity-50" style={{ ':hover': { backgroundColor: 'var(--bg-tertiary)' } }}>
+                      <td className="px-4 py-2 text-sm" style={{ color: 'var(--text-primary)' }}>{index + 1}</td>
+                      <td className="px-4 py-2 text-sm" style={{ color: 'var(--text-primary)' }}>{product.name}</td>
+                      <td className="px-4 py-2 text-sm text-right" style={{ color: 'var(--text-primary)' }}>
                         {formatCurrency(product.profit)}
                       </td>
-                      <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                      <td className="px-4 py-2 text-sm text-right" style={{ color: 'var(--text-primary)' }}>
                         {product.profitMargin.toFixed(1)}%
                         </td>
                       </tr>
                     ))}
-                  </tbody>
-                </table>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
