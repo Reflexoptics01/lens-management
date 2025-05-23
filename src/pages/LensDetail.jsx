@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
-import { doc, getDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, orderBy, updateDoc, addDoc, Timestamp } from 'firebase/firestore';
 import Navbar from '../components/Navbar';
 import { 
   LineChart, 
@@ -39,6 +39,16 @@ const LensDetail = () => {
     totalRevenue: 0,
     averageSellingPrice: 0
   });
+
+  // Add states for inventory deduction
+  const [showDeductionModal, setShowDeductionModal] = useState(false);
+  const [deductionData, setDeductionData] = useState({
+    quantity: 1,
+    reason: '',
+    notes: '',
+    customReason: ''
+  });
+  const [deductionLoading, setDeductionLoading] = useState(false);
 
   useEffect(() => {
     fetchLensDetails();
@@ -243,6 +253,94 @@ const LensDetail = () => {
     })}`;
   };
 
+  const handleInventoryDeduction = async () => {
+    try {
+      setDeductionLoading(true);
+      setError('');
+
+      // Validate input
+      const deductQty = parseInt(deductionData.quantity);
+      const currentQty = parseInt(lens.qty || 0);
+
+      if (deductQty <= 0) {
+        setError('Deduction quantity must be greater than 0');
+        return;
+      }
+
+      if (deductQty > currentQty) {
+        setError(`Cannot deduct ${deductQty} units. Only ${currentQty} units available in inventory.`);
+        return;
+      }
+
+      if (!deductionData.reason && !deductionData.customReason) {
+        setError('Please select or enter a reason for the deduction');
+        return;
+      }
+
+      const newQty = currentQty - deductQty;
+      const finalReason = deductionData.reason === 'other' ? deductionData.customReason : deductionData.reason;
+
+      // Update the lens quantity in Firestore
+      const lensRef = doc(db, 'lens_inventory', id);
+      await updateDoc(lensRef, {
+        qty: newQty,
+        updatedAt: Timestamp.now()
+      });
+
+      // Log the deduction in a separate collection for audit trail
+      await addDoc(collection(db, 'inventory_deductions'), {
+        lensId: id,
+        lensName: lens.brandName,
+        lensType: lens.type,
+        deductedQuantity: deductQty,
+        previousQuantity: currentQty,
+        newQuantity: newQty,
+        reason: finalReason,
+        notes: deductionData.notes,
+        deductedAt: Timestamp.now(),
+        deductedBy: 'current_user' // You can replace this with actual user info
+      });
+
+      // Update local state
+      setLens(prev => ({
+        ...prev,
+        qty: newQty
+      }));
+
+      // Reset modal and show success
+      setShowDeductionModal(false);
+      setDeductionData({
+        quantity: 1,
+        reason: '',
+        notes: '',
+        customReason: ''
+      });
+
+      // Show success message temporarily
+      const successMessage = `Successfully deducted ${deductQty} units. New quantity: ${newQty}`;
+      setError(''); // Clear any previous errors
+      
+      // You could add a success state here if you want to show success messages differently
+      alert(successMessage); // Simple alert for now
+
+    } catch (error) {
+      console.error('Error deducting inventory:', error);
+      setError(`Failed to deduct inventory: ${error.message}`);
+    } finally {
+      setDeductionLoading(false);
+    }
+  };
+
+  const resetDeductionModal = () => {
+    setShowDeductionModal(false);
+    setDeductionData({
+      quantity: 1,
+      reason: '',
+      notes: '',
+      customReason: ''
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col min-h-screen bg-slate-50">
@@ -320,12 +418,20 @@ const LensDetail = () => {
               )}
             </p>
           </div>
-          <button
-            onClick={() => navigate('/lens-inventory')}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50"
-          >
-            Back to Inventory
-          </button>
+          <div className="flex space-x-3">
+            <button
+              onClick={() => setShowDeductionModal(true)}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none shadow-sm transition-colors"
+            >
+              Deduce Inventory
+            </button>
+            <button
+              onClick={() => navigate('/lens-inventory')}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50"
+            >
+              Back to Inventory
+            </button>
+          </div>
         </div>
 
         {/* Lens Details Card */}
@@ -682,6 +788,153 @@ const LensDetail = () => {
           </div>
         </div>
       </main>
+
+      {/* Inventory Deduction Modal */}
+      {showDeductionModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Deduce Inventory</h3>
+                <button
+                  onClick={resetDeductionModal}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Current Quantity Display */}
+                <div className="bg-blue-50 p-3 rounded-md">
+                  <p className="text-sm text-blue-700">
+                    <span className="font-medium">Current Quantity in Stock:</span> {lens.qty || 0} units
+                  </p>
+                </div>
+
+                {/* Quantity to Deduct */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Quantity to Deduct <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={lens.qty || 0}
+                    value={deductionData.quantity}
+                    onChange={(e) => setDeductionData(prev => ({
+                      ...prev,
+                      quantity: e.target.value
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                    placeholder="Enter quantity to deduct"
+                  />
+                </div>
+
+                {/* Reason for Deduction */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Reason for Deduction <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={deductionData.reason}
+                    onChange={(e) => setDeductionData(prev => ({
+                      ...prev,
+                      reason: e.target.value,
+                      customReason: e.target.value !== 'other' ? '' : prev.customReason
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                  >
+                    <option value="">Select a reason</option>
+                    <option value="damaged">Damaged/Broken</option>
+                    <option value="wrong_power">Wrong Power/Prescription</option>
+                    <option value="quality_issue">Quality Issue/Defect</option>
+                    <option value="expired">Expired/Outdated</option>
+                    <option value="customer_return">Customer Return</option>
+                    <option value="lost">Lost/Misplaced</option>
+                    <option value="other">Other (specify below)</option>
+                  </select>
+                </div>
+
+                {/* Custom Reason Input */}
+                {deductionData.reason === 'other' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Specify Reason <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={deductionData.customReason}
+                      onChange={(e) => setDeductionData(prev => ({
+                        ...prev,
+                        customReason: e.target.value
+                      }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                      placeholder="Enter custom reason"
+                    />
+                  </div>
+                )}
+
+                {/* Additional Notes */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Additional Notes (Optional)
+                  </label>
+                  <textarea
+                    value={deductionData.notes}
+                    onChange={(e) => setDeductionData(prev => ({
+                      ...prev,
+                      notes: e.target.value
+                    }))}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                    placeholder="Enter any additional details about the deduction"
+                  />
+                </div>
+
+                {/* Calculation Display */}
+                {deductionData.quantity && parseInt(deductionData.quantity) > 0 && (
+                  <div className="bg-gray-50 p-3 rounded-md">
+                    <p className="text-sm text-gray-700">
+                      <span className="font-medium">After deduction:</span> {(lens.qty || 0) - parseInt(deductionData.quantity)} units will remain
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex space-x-3 mt-6">
+                <button
+                  onClick={handleInventoryDeduction}
+                  disabled={deductionLoading}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {deductionLoading ? (
+                    <div className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Processing...
+                    </div>
+                  ) : (
+                    'Confirm Deduction'
+                  )}
+                </button>
+                <button
+                  onClick={resetDeductionModal}
+                  disabled={deductionLoading}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
