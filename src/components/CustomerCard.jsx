@@ -35,17 +35,17 @@ const CustomerCard = ({ customer, onEdit, onDelete, formatCurrency, isVendor = f
   const EntityIcon = isVendor ? BuildingStorefrontIcon : UserIcon;
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
       <div className="p-4 sm:p-6">
         <div className="flex justify-between items-start">
           <div className="space-y-1">
             <div className="flex items-center">
-              <EntityIcon className="w-5 h-5 mr-2 text-gray-500" />
-              <h3 className="text-lg font-semibold text-gray-900">{opticalName}</h3>
+              <EntityIcon className="w-5 h-5 mr-2 text-gray-500 dark:text-gray-400" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{opticalName}</h3>
             </div>
             {contactPerson && (
-              <p className="text-sm text-gray-600 flex items-center">
-                <IdentificationIcon className="w-4 h-4 mr-1 text-gray-400" />
+              <p className="text-sm text-gray-600 dark:text-gray-300 flex items-center">
+                <IdentificationIcon className="w-4 h-4 mr-1 text-gray-400 dark:text-gray-500" />
                 {contactPerson}
               </p>
             )}
@@ -53,14 +53,14 @@ const CustomerCard = ({ customer, onEdit, onDelete, formatCurrency, isVendor = f
           <div className="flex space-x-1">
             <button
               onClick={() => onEdit()}
-              className="p-2 text-gray-400 hover:text-sky-600 rounded-full hover:bg-sky-50 transition-colors"
+              className="p-2 text-gray-400 hover:text-sky-600 dark:text-gray-500 dark:hover:text-sky-400 rounded-full hover:bg-sky-50 dark:hover:bg-sky-900/50 transition-colors"
               aria-label={`Edit ${isVendor ? 'vendor' : 'customer'}`}
             >
               <PencilIcon className="w-5 h-5" />
             </button>
             <button
               onClick={() => onDelete()}
-              className="p-2 text-gray-400 hover:text-red-600 rounded-full hover:bg-red-50 transition-colors"
+              className="p-2 text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400 rounded-full hover:bg-red-50 dark:hover:bg-red-900/50 transition-colors"
               aria-label={`Delete ${isVendor ? 'vendor' : 'customer'}`}
             >
               <TrashIcon className="w-5 h-5" />
@@ -72,8 +72,8 @@ const CustomerCard = ({ customer, onEdit, onDelete, formatCurrency, isVendor = f
           <div className="col-span-1">
             {phone && (
               <div className="flex items-center text-sm">
-                <PhoneIcon className="w-4 h-4 mr-2 text-gray-400" />
-                <a href={`tel:${phone}`} className="text-sky-600 hover:text-sky-800">
+                <PhoneIcon className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" />
+                <a href={`tel:${phone}`} className="text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300">
                   {phone}
                 </a>
               </div>
@@ -81,8 +81,8 @@ const CustomerCard = ({ customer, onEdit, onDelete, formatCurrency, isVendor = f
             
             {email && (
               <div className="flex items-center text-sm mt-2">
-                <EnvelopeIcon className="w-4 h-4 mr-2 text-gray-400" />
-                <a href={`mailto:${email}`} className="text-sky-600 hover:text-sky-800 truncate max-w-xs">
+                <EnvelopeIcon className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" />
+                <a href={`mailto:${email}`} className="text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300 truncate max-w-xs">
                   {email}
                 </a>
               </div>
@@ -90,8 +90,8 @@ const CustomerCard = ({ customer, onEdit, onDelete, formatCurrency, isVendor = f
 
             {(city || state) && (
               <div className="flex items-start text-sm mt-2">
-                <MapPinIcon className="w-4 h-4 mr-2 text-gray-400 mt-0.5" />
-                <span className="text-gray-600">
+                <MapPinIcon className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500 mt-0.5" />
+                <span className="text-gray-600 dark:text-gray-300">
                   {[city, state].filter(Boolean).join(', ')}
                 </span>
               </div>
@@ -101,9 +101,9 @@ const CustomerCard = ({ customer, onEdit, onDelete, formatCurrency, isVendor = f
           <div className="col-span-1 space-y-2">
             {(creditLimit || creditLimit === 0) && (
               <div className="flex items-center text-sm">
-                <BanknotesIcon className="w-4 h-4 mr-2 text-gray-400" />
-                <span className="text-gray-600">
-                  <span className="text-gray-500">Credit: </span>
+                <BanknotesIcon className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" />
+                <span className="text-gray-600 dark:text-gray-300">
+                  <span className="text-gray-500 dark:text-gray-400">Credit: </span>
                   {formatAmount(creditLimit)}
                 </span>
               </div>
@@ -111,9 +111,9 @@ const CustomerCard = ({ customer, onEdit, onDelete, formatCurrency, isVendor = f
             
             {(openingBalance || openingBalance === 0) && (
               <div className="flex items-center text-sm">
-                <BanknotesIcon className="w-4 h-4 mr-2 text-gray-400" />
-                <span className="text-gray-600">
-                  <span className="text-gray-500">Balance: </span>
+                <BanknotesIcon className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" />
+                <span className="text-gray-600 dark:text-gray-300">
+                  <span className="text-gray-500 dark:text-gray-400">Balance: </span>
                   {formatAmount(openingBalance)}
                 </span>
               </div>
@@ -121,9 +121,9 @@ const CustomerCard = ({ customer, onEdit, onDelete, formatCurrency, isVendor = f
             
             {(creditPeriod || creditPeriod === 0) && (
               <div className="flex items-center text-sm">
-                <ClockIcon className="w-4 h-4 mr-2 text-gray-400" />
-                <span className="text-gray-600">
-                  <span className="text-gray-500">Terms: </span>
+                <ClockIcon className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" />
+                <span className="text-gray-600 dark:text-gray-300">
+                  <span className="text-gray-500 dark:text-gray-400">Terms: </span>
                   {creditPeriod} days
                 </span>
               </div>
@@ -131,8 +131,8 @@ const CustomerCard = ({ customer, onEdit, onDelete, formatCurrency, isVendor = f
             
             {gstNumber && (
               <div className="flex items-center text-sm">
-                <span className="mr-2 text-xs font-medium bg-gray-100 text-gray-800 py-0.5 px-1.5 rounded">GST</span>
-                <span className="text-gray-600">{gstNumber}</span>
+                <span className="mr-2 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 py-0.5 px-1.5 rounded">GST</span>
+                <span className="text-gray-600 dark:text-gray-300">{gstNumber}</span>
               </div>
             )}
           </div>

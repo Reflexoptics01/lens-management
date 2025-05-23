@@ -127,22 +127,21 @@ const AddServiceForm = ({ editMode, lensToEdit, onSubmit, onCancel }) => {
   };
 
   return (
-    <div className="card p-6 mb-8">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
           {editMode ? 'Edit Service' : 'Add New Service'}
         </h2>
         <button
           onClick={onCancel}
-          className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 focus:outline-none text-sm"
+          className="px-4 py-2 bg-gray-500 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-700 text-white rounded-lg focus:outline-none text-sm"
         >
           Cancel
         </button>
       </div>
 
       {error && (
-        <div className="mb-6 p-4 border-l-4 border-red-400 rounded-r-md text-red-700" 
-             style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+        <div className="mb-6 p-4 border-l-4 border-red-400 dark:border-red-500 rounded-r-md text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20">
           <div className="flex">
             <div className="flex-shrink-0">
               <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -157,8 +156,7 @@ const AddServiceForm = ({ editMode, lensToEdit, onSubmit, onCancel }) => {
       )}
 
       {success && (
-        <div className="mb-6 p-4 border-l-4 border-green-400 rounded-r-md text-green-700" 
-             style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+        <div className="mb-6 p-4 border-l-4 border-green-400 dark:border-green-500 rounded-r-md text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20">
           <div className="flex">
             <div className="flex-shrink-0">
               <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
@@ -176,7 +174,7 @@ const AddServiceForm = ({ editMode, lensToEdit, onSubmit, onCancel }) => {
         {/* Basic Service Information */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
               Service Name *
             </label>
             <input
@@ -184,21 +182,21 @@ const AddServiceForm = ({ editMode, lensToEdit, onSubmit, onCancel }) => {
               name="serviceName"
               value={serviceData.serviceName}
               onChange={handleInputChange}
-              className="form-input w-full"
+              className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-sky-500 dark:focus:border-sky-400 focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 px-3 py-2"
               placeholder="e.g., Basic Eye Examination"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
               Service Type
             </label>
             <select
               name="serviceType"
               value={serviceData.serviceType}
               onChange={handleInputChange}
-              className="form-input w-full"
+              className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-sky-500 dark:focus:border-sky-400 focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 px-3 py-2"
             >
               <option value="">Select Service Type</option>
               {SERVICE_TYPES.map(type => (
@@ -209,14 +207,14 @@ const AddServiceForm = ({ editMode, lensToEdit, onSubmit, onCancel }) => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+          <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
             Service Description
           </label>
           <textarea
             name="serviceDescription"
             value={serviceData.serviceDescription}
             onChange={handleInputChange}
-            className="form-input w-full"
+            className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-sky-500 dark:focus:border-sky-400 focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 px-3 py-2"
             rows="3"
             placeholder="Detailed description of the service provided..."
           />
@@ -224,7 +222,7 @@ const AddServiceForm = ({ editMode, lensToEdit, onSubmit, onCancel }) => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
               Service Price (₹) *
             </label>
             <input
@@ -232,7 +230,7 @@ const AddServiceForm = ({ editMode, lensToEdit, onSubmit, onCancel }) => {
               name="servicePrice"
               value={serviceData.servicePrice}
               onChange={handleInputChange}
-              className="form-input w-full"
+              className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-sky-500 dark:focus:border-sky-400 focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 px-3 py-2"
               placeholder="0.00"
               min="0"
               step="0.01"
@@ -248,9 +246,9 @@ const AddServiceForm = ({ editMode, lensToEdit, onSubmit, onCancel }) => {
                   name="isActive"
                   checked={serviceData.isActive}
                   onChange={handleInputChange}
-                  className="rounded border-gray-300 text-sky-600 shadow-sm focus:border-sky-300 focus:ring focus:ring-sky-200 focus:ring-opacity-50"
+                  className="rounded border-gray-300 dark:border-gray-600 text-sky-600 dark:text-sky-400 shadow-sm focus:border-sky-300 dark:focus:border-sky-500 focus:ring focus:ring-sky-200 dark:focus:ring-sky-800 focus:ring-opacity-50"
                 />
-                <span className="ml-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
                   Service is active
                 </span>
               </label>
@@ -259,14 +257,14 @@ const AddServiceForm = ({ editMode, lensToEdit, onSubmit, onCancel }) => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+          <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
             Additional Notes
           </label>
           <textarea
             name="notes"
             value={serviceData.notes}
             onChange={handleInputChange}
-            className="form-input w-full"
+            className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-sky-500 dark:focus:border-sky-400 focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 px-3 py-2"
             rows="2"
             placeholder="Any additional information about this service..."
           />
@@ -277,14 +275,14 @@ const AddServiceForm = ({ editMode, lensToEdit, onSubmit, onCancel }) => {
           <button
             type="button"
             onClick={onCancel}
-            className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+            className="px-6 py-2 bg-gray-500 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-gray-500 dark:focus:ring-gray-400"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="inline-flex items-center px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50"
+            className="inline-flex items-center px-6 py-2 bg-teal-600 hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-teal-500 dark:focus:ring-teal-400 disabled:opacity-50"
           >
             {loading && (
               <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

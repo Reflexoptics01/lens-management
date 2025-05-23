@@ -495,17 +495,17 @@ const Ledger = () => {
   }, [viewMode, ledgerData]);
   
   return (
-    <div className="mobile-page">
+    <div className="mobile-page dark:bg-gray-900">
       <Navbar />
       
-      <div className="mobile-content">
+      <div className="mobile-content dark:bg-gray-900">
         {/* View Toggle Buttons */}
-        <div className="my-2 flex bg-gray-100 rounded-lg p-1">
+        <div className="my-2 flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
           <button
             className={`flex-1 py-1 px-2 rounded-md text-sm font-medium ${
               viewMode === 'accountStatement' 
-                ? 'bg-white text-blue-700 shadow-sm' 
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-300 shadow-sm' 
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
             }`}
             onClick={() => {
               setViewMode('accountStatement');
@@ -517,8 +517,8 @@ const Ledger = () => {
           <button
             className={`flex-1 py-1 px-2 rounded-md text-sm font-medium ${
               viewMode === 'invoiceOnly' 
-                ? 'bg-white text-blue-700 shadow-sm' 
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-300 shadow-sm' 
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
             }`}
             onClick={() => {
               setViewMode('invoiceOnly');
@@ -530,8 +530,8 @@ const Ledger = () => {
           <button
             className={`flex-1 py-1 px-2 rounded-md text-sm font-medium ${
               viewMode === 'balanceView' 
-                ? 'bg-white text-blue-700 shadow-sm' 
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-300 shadow-sm' 
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
             }`}
             onClick={() => {
               setViewMode('balanceView');
@@ -544,7 +544,7 @@ const Ledger = () => {
         
         {/* Error Messages */}
         {error && (
-          <div className="mb-2 p-2 bg-red-100 text-red-700 rounded-md text-sm">
+          <div className="mb-2 p-2 bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-200 rounded-md text-sm border border-red-200 dark:border-red-700">
             {error}
           </div>
         )}
@@ -566,8 +566,8 @@ const Ledger = () => {
         {/* Account Statement View */}
         {viewMode === 'accountStatement' && ledgerData.length > 0 && (
           <div>
-            <div className="p-2 border-b border-gray-200 bg-white rounded-t-lg shadow-md">
-              <h3 className="text-sm font-medium text-gray-900">
+            <div className="p-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-t-lg shadow-md">
+              <h3 className="text-sm font-medium text-gray-900 dark:text-white">
                 {selectedEntity?.opticalName} • {formatDate(new Date(fromDate))} to {formatDate(new Date(toDate))}
               </h3>
             </div>
@@ -586,8 +586,8 @@ const Ledger = () => {
         {/* Invoice Ledger View */}
         {viewMode === 'invoiceOnly' && ledgerData.length > 0 && (
           <div>
-            <div className="p-2 border-b border-gray-200 bg-white rounded-t-lg shadow-md">
-              <h3 className="text-sm font-medium text-gray-900">
+            <div className="p-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-t-lg shadow-md">
+              <h3 className="text-sm font-medium text-gray-900 dark:text-white">
                 {selectedEntity?.opticalName} • {formatDate(new Date(fromDate))} to {formatDate(new Date(toDate))}
               </h3>
             </div>
@@ -612,18 +612,18 @@ const Ledger = () => {
         
         {/* No Data Message */}
         {viewMode !== 'balanceView' && !loading && ledgerData.length === 0 && selectedEntity && (
-          <div className="text-center py-4 bg-white rounded-lg shadow-md">
-            <svg className="w-10 h-10 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="text-center py-4 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+            <svg className="w-10 h-10 text-gray-400 dark:text-gray-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <p className="text-gray-500 text-sm">No transactions found for selected criteria</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">No transactions found for selected criteria</p>
           </div>
         )}
         
         {/* Loading Indicator */}
         {loading && (
           <div className="flex items-center justify-center py-4">
-            <div className="animate-spin w-6 h-6 border-3 border-blue-600 border-t-transparent rounded-full"></div>
+            <div className="animate-spin w-6 h-6 border-3 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full"></div>
           </div>
         )}
       </div>

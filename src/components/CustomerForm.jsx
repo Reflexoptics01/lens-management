@@ -157,8 +157,8 @@ const CustomerForm = ({ onClose, customer, isVendor = false }) => {
     onClose(false);
   };
 
-  const inputClassName = "mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-700 shadow-sm focus:border-sky-500 focus:ring-2 focus:ring-sky-500 text-sm focus:outline-none";
-  const labelClassName = "block text-sm font-medium text-gray-700 mb-1";
+  const inputClassName = "mt-1 block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2.5 text-gray-700 dark:text-gray-100 shadow-sm focus:border-sky-500 dark:focus:border-sky-400 focus:ring-2 focus:ring-sky-500 dark:focus:ring-sky-400 text-sm focus:outline-none";
+  const labelClassName = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1";
   const sectionClassName = "transition-all duration-200 ease-in-out";
 
   // Set entity-specific labels
@@ -168,43 +168,43 @@ const CustomerForm = ({ onClose, customer, isVendor = false }) => {
 
   return (
     <div 
-      className="fixed inset-0 bg-gray-800 bg-opacity-75 backdrop-blur-sm flex items-start justify-center p-4 z-50 transition-opacity duration-300 ease-in-out opacity-100 overflow-y-auto"
+      className="fixed inset-0 bg-gray-800 dark:bg-gray-900 bg-opacity-75 dark:bg-opacity-85 backdrop-blur-sm flex items-start justify-center p-4 z-50 transition-opacity duration-300 ease-in-out opacity-100 overflow-y-auto"
       onClick={handleBackdropClick}
     >
       <div 
         ref={modalRef}
-        className="bg-white rounded-xl shadow-2xl w-full max-w-2xl my-8 transform transition-all duration-300 ease-in-out scale-100"
+        className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl my-8 transform transition-all duration-300 ease-in-out scale-100"
         style={{ maxHeight: 'calc(100vh - 4rem)' }}
       >
         <div className="p-6 overflow-y-auto max-h-[calc(100vh-4rem)]">
-          <div className="flex justify-between items-center mb-8 sticky top-0 bg-white z-10 pb-3">
-            <h3 className="text-2xl font-semibold text-gray-800">
+          <div className="flex justify-between items-center mb-8 sticky top-0 bg-white dark:bg-gray-800 z-10 pb-3">
+            <h3 className="text-2xl font-semibold text-gray-800 dark:text-white">
               {customer ? `Edit ${entityName}` : `Add New ${entityName}`}
             </h3>
             <button
               onClick={() => onClose(false)}
-              className="text-gray-400 hover:text-gray-600 transition-colors rounded-full p-1 hover:bg-gray-100"
+              className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors rounded-full p-1 hover:bg-gray-100 dark:hover:bg-gray-700"
             >
               <XMarkIcon className="w-6 h-6" />
             </button>
           </div>
           
           {error && (
-            <div className="mb-6 p-3 bg-red-50 border-l-4 border-red-400 text-red-700 rounded-md">
+            <div className="mb-6 p-3 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400 dark:border-red-500 text-red-700 dark:text-red-400 rounded-md">
               <p className="font-medium">Error</p>
               <p className="text-sm">{error}</p>
             </div>
           )}
 
           {/* Navigation Tabs */}
-          <div className="flex border-b mb-6">
+          <div className="flex border-b border-gray-200 dark:border-gray-600 mb-6">
             <button 
               type="button" 
               onClick={() => setActiveSection('business')}
               className={`px-4 py-2 text-sm font-medium transition-colors ${
                 activeSection === 'business' 
-                  ? 'text-sky-600 border-b-2 border-sky-600 -mb-px' 
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'text-sky-600 dark:text-sky-400 border-b-2 border-sky-600 dark:border-sky-400 -mb-px' 
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
             >
               Business & Contact
@@ -214,8 +214,8 @@ const CustomerForm = ({ onClose, customer, isVendor = false }) => {
               onClick={() => setActiveSection('address')}
               className={`px-4 py-2 text-sm font-medium transition-colors ${
                 activeSection === 'address' 
-                  ? 'text-sky-600 border-b-2 border-sky-600 -mb-px' 
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'text-sky-600 dark:text-sky-400 border-b-2 border-sky-600 dark:border-sky-400 -mb-px' 
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
             >
               Address Details
@@ -225,8 +225,8 @@ const CustomerForm = ({ onClose, customer, isVendor = false }) => {
               onClick={() => setActiveSection('financial')}
               className={`px-4 py-2 text-sm font-medium transition-colors ${
                 activeSection === 'financial' 
-                  ? 'text-sky-600 border-b-2 border-sky-600 -mb-px' 
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'text-sky-600 dark:text-sky-400 border-b-2 border-sky-600 dark:border-sky-400 -mb-px' 
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
             >
               Financial Details
@@ -315,7 +315,7 @@ const CustomerForm = ({ onClose, customer, isVendor = false }) => {
                 <button
                   type="button"
                   onClick={() => setActiveSection('address')}
-                  className="px-4 py-2 text-sm font-medium bg-sky-600 text-white rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                  className="px-4 py-2 text-sm font-medium bg-sky-600 hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-sky-500 dark:focus:ring-sky-400 transition-colors"
                 >
                   Next: Address Details
                 </button>
@@ -387,14 +387,14 @@ const CustomerForm = ({ onClose, customer, isVendor = false }) => {
                 <button
                   type="button"
                   onClick={() => setActiveSection('business')}
-                  className="px-4 py-2 text-sm font-medium bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                  className="px-4 py-2 text-sm font-medium bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-gray-500 dark:focus:ring-gray-400 transition-colors"
                 >
                   Back
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveSection('financial')}
-                  className="px-4 py-2 text-sm font-medium bg-sky-600 text-white rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                  className="px-4 py-2 text-sm font-medium bg-sky-600 hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-sky-500 dark:focus:ring-sky-400 transition-colors"
                 >
                   Next: Financial Details
                 </button>
@@ -453,7 +453,7 @@ const CustomerForm = ({ onClose, customer, isVendor = false }) => {
                 <button
                   type="button"
                   onClick={() => setActiveSection('address')}
-                  className="px-4 py-2 text-sm font-medium bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                  className="px-4 py-2 text-sm font-medium bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-gray-500 dark:focus:ring-gray-400 transition-colors"
                 >
                   Back
                 </button>
@@ -461,14 +461,14 @@ const CustomerForm = ({ onClose, customer, isVendor = false }) => {
                   <button
                     type="button"
                     onClick={handleCancelClick}
-                    className="px-4 py-2 text-sm font-medium bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                    className="px-4 py-2 text-sm font-medium bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-sky-500 dark:focus:ring-sky-400 transition-colors"
                     disabled={loading}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 text-sm font-medium bg-sky-600 text-white rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 text-sm font-medium bg-sky-600 hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-sky-500 dark:focus:ring-sky-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     disabled={loading}
                   >
                     {loading ? 'Saving...' : (customer ? `Update ${entityName}` : `Save ${entityName}`)}

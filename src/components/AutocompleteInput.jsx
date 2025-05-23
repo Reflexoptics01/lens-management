@@ -164,13 +164,13 @@ const AutocompleteInput = ({
   const defaultRenderItem = (item, index) => (
     <div
       key={index}
-      className={`px-3 py-2 cursor-pointer border-b border-gray-100 last:border-b-0 ${
-        selectedIndex === index ? 'bg-sky-50' : 'hover:bg-gray-50'
+      className={`px-3 py-2 cursor-pointer border-b border-gray-100 dark:border-gray-600 last:border-b-0 ${
+        selectedIndex === index ? 'bg-sky-50 dark:bg-sky-900/50' : 'hover:bg-gray-50 dark:hover:bg-gray-700'
       }`}
       onClick={(e) => handleItemClick(e, item)}
       onMouseEnter={() => setSelectedIndex(index)}
     >
-      <span className="text-sm">{getDisplayValue(item)}</span>
+      <span className="text-sm text-gray-900 dark:text-gray-100">{getDisplayValue(item)}</span>
     </div>
   );
 
@@ -190,7 +190,7 @@ const AutocompleteInput = ({
         autoComplete="off"
       />
       {showSuggestions && filteredItems.length > 0 && (
-        <div className={`absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 shadow-lg rounded-md py-1 ${maxHeight} overflow-y-auto`}>
+        <div className={`absolute z-50 left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 shadow-lg rounded-md py-1 ${maxHeight} overflow-y-auto`}>
           <div ref={suggestionsRef}>
             {filteredItems.map((item, index) => 
               renderItem ? renderItem(item, index, selectedIndex === index) : defaultRenderItem(item, index)

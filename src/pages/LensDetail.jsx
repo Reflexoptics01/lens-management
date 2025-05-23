@@ -343,11 +343,11 @@ const LensDetail = () => {
 
   if (loading) {
     return (
-      <div className="flex flex-col min-h-screen bg-slate-50">
+      <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-gray-900">
         <Navbar />
         <main className="flex-grow p-4 max-w-7xl mx-auto w-full">
           <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500 dark:border-sky-400"></div>
           </div>
         </main>
       </div>
@@ -356,18 +356,18 @@ const LensDetail = () => {
 
   if (error) {
     return (
-      <div className="flex flex-col min-h-screen bg-slate-50">
+      <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-gray-900">
         <Navbar />
         <main className="flex-grow p-4 max-w-7xl mx-auto w-full">
-          <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4 rounded-r">
+          <div className="bg-red-50 dark:bg-red-900/50 border-l-4 border-red-400 dark:border-red-500 p-4 mb-4 rounded-r">
             <div className="flex">
               <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <svg className="h-5 w-5 text-red-400 dark:text-red-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
               </div>
               <div className="ml-3">
-                <p className="text-sm text-red-700">{error}</p>
+                <p className="text-sm text-red-700 dark:text-red-200">{error}</p>
               </div>
             </div>
           </div>
@@ -384,12 +384,12 @@ const LensDetail = () => {
 
   if (!lens) {
     return (
-      <div className="flex flex-col min-h-screen bg-slate-50">
+      <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-gray-900">
         <Navbar />
         <main className="flex-grow p-4 max-w-7xl mx-auto w-full">
           <div className="text-center py-10">
-            <h2 className="text-xl font-semibold text-gray-800">Lens not found</h2>
-            <p className="mt-2 text-gray-600">The requested lens could not be found.</p>
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">Lens not found</h2>
+            <p className="mt-2 text-gray-600 dark:text-gray-400">The requested lens could not be found.</p>
             <button 
               onClick={() => navigate('/lens-inventory')}
               className="mt-4 px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 focus:outline-none shadow-sm transition-colors"
@@ -403,14 +403,14 @@ const LensDetail = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50">
+    <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-gray-900">
       <Navbar />
       
       <main className="flex-grow p-4 max-w-7xl mx-auto w-full">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{lens.brandName}</h1>
-            <p className="text-sm text-gray-500">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{lens.brandName}</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               {lens.type === 'stock' ? (
                 <>Stock Lens - {lens.powerSeries}</>
               ) : (
@@ -427,7 +427,7 @@ const LensDetail = () => {
             </button>
             <button
               onClick={() => navigate('/lens-inventory')}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
             >
               Back to Inventory
             </button>
@@ -435,44 +435,44 @@ const LensDetail = () => {
         </div>
 
         {/* Lens Details Card */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Lens Details</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 border border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Lens Details</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Basic Information</h3>
+              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">Basic Information</h3>
               <div className="space-y-2">
                 <div>
-                  <span className="text-sm text-gray-500">Brand Name:</span>
-                  <span className="ml-2 font-medium">{lens.brandName || 'N/A'}</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Brand Name:</span>
+                  <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.brandName || 'N/A'}</span>
                 </div>
                 <div>
-                  <span className="text-sm text-gray-500">Type:</span>
-                  <span className="ml-2 font-medium capitalize">{lens.type || 'N/A'}</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Type:</span>
+                  <span className="ml-2 font-medium capitalize text-gray-900 dark:text-white">{lens.type || 'N/A'}</span>
                 </div>
                 {lens.type === 'stock' && (
                   <div>
-                    <span className="text-sm text-gray-500">Power Series:</span>
-                    <span className="ml-2 font-medium">{lens.powerSeries || 'N/A'}</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Power Series:</span>
+                    <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.powerSeries || 'N/A'}</span>
                   </div>
                 )}
                 {lens.type === 'prescription' && (
                   <>
                     <div>
-                      <span className="text-sm text-gray-500">SPH:</span>
-                      <span className="ml-2 font-medium">{lens.sph || 'N/A'}</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">SPH:</span>
+                      <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.sph || 'N/A'}</span>
                     </div>
                     <div>
-                      <span className="text-sm text-gray-500">CYL:</span>
-                      <span className="ml-2 font-medium">{lens.cyl || 'N/A'}</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">CYL:</span>
+                      <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.cyl || 'N/A'}</span>
                     </div>
                     <div>
-                      <span className="text-sm text-gray-500">AXIS:</span>
-                      <span className="ml-2 font-medium">{lens.axis || 'N/A'}</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">AXIS:</span>
+                      <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.axis || 'N/A'}</span>
                     </div>
                     <div>
-                      <span className="text-sm text-gray-500">ADD:</span>
-                      <span className="ml-2 font-medium">{lens.add || 'N/A'}</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">ADD:</span>
+                      <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.add || 'N/A'}</span>
                     </div>
                   </>
                 )}
@@ -480,29 +480,29 @@ const LensDetail = () => {
             </div>
             
             <div>
-              <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Specifications</h3>
+              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">Specifications</h3>
               <div className="space-y-2">
                 {lens.type === 'prescription' && (
                   <>
                     <div>
-                      <span className="text-sm text-gray-500">Material:</span>
-                      <span className="ml-2 font-medium">{lens.material || 'N/A'}</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Material:</span>
+                      <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.material || 'N/A'}</span>
                     </div>
                     <div>
-                      <span className="text-sm text-gray-500">Index:</span>
-                      <span className="ml-2 font-medium">{lens.index || 'N/A'}</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Index:</span>
+                      <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.index || 'N/A'}</span>
                     </div>
                     <div>
-                      <span className="text-sm text-gray-500">Coating:</span>
-                      <span className="ml-2 font-medium">{lens.coatingType || 'N/A'} {lens.coatingColor ? `(${lens.coatingColor})` : ''}</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Coating:</span>
+                      <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.coatingType || 'N/A'} {lens.coatingColor ? `(${lens.coatingColor})` : ''}</span>
                     </div>
                     <div>
-                      <span className="text-sm text-gray-500">Base Tint:</span>
-                      <span className="ml-2 font-medium">{lens.baseTint || 'N/A'}</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Base Tint:</span>
+                      <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.baseTint || 'N/A'}</span>
                     </div>
                     <div>
-                      <span className="text-sm text-gray-500">Diameter:</span>
-                      <span className="ml-2 font-medium">{lens.diameter ? `${lens.diameter}mm` : 'N/A'}</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Diameter:</span>
+                      <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.diameter ? `${lens.diameter}mm` : 'N/A'}</span>
                     </div>
                   </>
                 )}
@@ -510,30 +510,30 @@ const LensDetail = () => {
             </div>
             
             <div>
-              <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Inventory & Pricing</h3>
+              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">Inventory & Pricing</h3>
               <div className="space-y-2">
                 <div>
-                  <span className="text-sm text-gray-500">Quantity in Stock:</span>
-                  <span className="ml-2 font-medium">{lens.qty || '0'}</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Quantity in Stock:</span>
+                  <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.qty || '0'}</span>
                 </div>
                 <div>
-                  <span className="text-sm text-gray-500">Purchase Price:</span>
-                  <span className="ml-2 font-medium">{formatCurrency(lens.purchasePrice || 0)}</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Purchase Price:</span>
+                  <span className="ml-2 font-medium text-gray-900 dark:text-white">{formatCurrency(lens.purchasePrice || 0)}</span>
                 </div>
                 <div>
-                  <span className="text-sm text-gray-500">Sale Price:</span>
-                  <span className="ml-2 font-medium">{formatCurrency(lens.salePrice || 0)}</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Sale Price:</span>
+                  <span className="ml-2 font-medium text-gray-900 dark:text-white">{formatCurrency(lens.salePrice || 0)}</span>
                 </div>
                 {lens.type === 'prescription' && (
                   <div>
-                    <span className="text-sm text-gray-500">Storage Location:</span>
-                    <span className="ml-2 font-medium">{lens.location || 'N/A'}</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Storage Location:</span>
+                    <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.location || 'N/A'}</span>
                   </div>
                 )}
                 {lens.notes && (
                   <div>
-                    <span className="text-sm text-gray-500">Notes:</span>
-                    <span className="ml-2 font-medium">{lens.notes}</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Notes:</span>
+                    <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.notes}</span>
                   </div>
                 )}
               </div>
@@ -542,63 +542,63 @@ const LensDetail = () => {
         </div>
         
         {/* Financial Analysis Card */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Financial Analysis</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 border border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Financial Analysis</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="text-sm font-semibold text-blue-700 uppercase mb-2">Inventory Value</h3>
-              <div className="text-2xl font-bold text-blue-700">{formatCurrency(financialMetrics.totalValue)}</div>
-              <p className="text-sm text-blue-600 mt-1">Total value of {lens.qty || 0} units in stock</p>
+            <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg border border-blue-200 dark:border-blue-700">
+              <h3 className="text-sm font-semibold text-blue-700 dark:text-blue-300 uppercase mb-2">Inventory Value</h3>
+              <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{formatCurrency(financialMetrics.totalValue)}</div>
+              <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">Total value of {lens.qty || 0} units in stock</p>
             </div>
             
-            <div className={`${financialMetrics.breakEvenQty === Infinity ? 'bg-red-50' : 'bg-green-50'} p-4 rounded-lg`}>
-              <h3 className={`text-sm font-semibold ${financialMetrics.breakEvenQty === Infinity ? 'text-red-700' : 'text-green-700'} uppercase mb-2`}>Break-Even Point</h3>
-              <div className={`text-2xl font-bold ${financialMetrics.breakEvenQty === Infinity ? 'text-red-700' : 'text-green-700'}`}>
+            <div className={`${financialMetrics.breakEvenQty === Infinity ? 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700' : 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-700'} p-4 rounded-lg border`}>
+              <h3 className={`text-sm font-semibold ${financialMetrics.breakEvenQty === Infinity ? 'text-red-700 dark:text-red-300' : 'text-green-700 dark:text-green-300'} uppercase mb-2`}>Break-Even Point</h3>
+              <div className={`text-2xl font-bold ${financialMetrics.breakEvenQty === Infinity ? 'text-red-700 dark:text-red-300' : 'text-green-700 dark:text-green-300'}`}>
                 {financialMetrics.breakEvenQty === Infinity ? 
                   "Not achievable" : 
                   `${financialMetrics.breakEvenQty} units`}
               </div>
-              <p className={`text-sm ${financialMetrics.breakEvenQty === Infinity ? 'text-red-600' : 'text-green-600'} mt-1`}>
+              <p className={`text-sm ${financialMetrics.breakEvenQty === Infinity ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'} mt-1`}>
                 {financialMetrics.breakEvenQty === Infinity ?
                   "Cannot recover investment with current stock" :
                   "Units needed to recover your total investment"}
               </p>
             </div>
             
-            <div className="bg-purple-50 p-4 rounded-lg">
-              <h3 className="text-sm font-semibold text-purple-700 uppercase mb-2">Potential Profit</h3>
-              <div className="text-2xl font-bold text-purple-700">{formatCurrency(financialMetrics.potentialProfit)}</div>
-              <p className="text-sm text-purple-600 mt-1">If all units are sold at set price</p>
+            <div className="bg-purple-50 dark:bg-purple-900/30 p-4 rounded-lg border border-purple-200 dark:border-purple-700">
+              <h3 className="text-sm font-semibold text-purple-700 dark:text-purple-300 uppercase mb-2">Potential Profit</h3>
+              <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">{formatCurrency(financialMetrics.potentialProfit)}</div>
+              <p className="text-sm text-purple-600 dark:text-purple-400 mt-1">If all units are sold at set price</p>
             </div>
             
-            <div className="bg-amber-50 p-4 rounded-lg">
-              <h3 className="text-sm font-semibold text-amber-700 uppercase mb-2">Total Units Sold (Year)</h3>
-              <div className="text-2xl font-bold text-amber-700">{financialMetrics.totalUnitsSold}</div>
-              <p className="text-sm text-amber-600 mt-1">Units sold in the last 12 months</p>
+            <div className="bg-amber-50 dark:bg-amber-900/30 p-4 rounded-lg border border-amber-200 dark:border-amber-700">
+              <h3 className="text-sm font-semibold text-amber-700 dark:text-amber-300 uppercase mb-2">Total Units Sold (Year)</h3>
+              <div className="text-2xl font-bold text-amber-700 dark:text-amber-300">{financialMetrics.totalUnitsSold}</div>
+              <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">Units sold in the last 12 months</p>
             </div>
             
-            <div className="bg-sky-50 p-4 rounded-lg">
-              <h3 className="text-sm font-semibold text-sky-700 uppercase mb-2">Total Revenue (Year)</h3>
-              <div className="text-2xl font-bold text-sky-700">{formatCurrency(financialMetrics.totalRevenue)}</div>
-              <p className="text-sm text-sky-600 mt-1">Revenue generated in the last 12 months</p>
+            <div className="bg-sky-50 dark:bg-sky-900/30 p-4 rounded-lg border border-sky-200 dark:border-sky-700">
+              <h3 className="text-sm font-semibold text-sky-700 dark:text-sky-300 uppercase mb-2">Total Revenue (Year)</h3>
+              <div className="text-2xl font-bold text-sky-700 dark:text-sky-300">{formatCurrency(financialMetrics.totalRevenue)}</div>
+              <p className="text-sm text-sky-600 dark:text-sky-400 mt-1">Revenue generated in the last 12 months</p>
             </div>
             
-            <div className="bg-rose-50 p-4 rounded-lg">
-              <h3 className="text-sm font-semibold text-rose-700 uppercase mb-2">Average Selling Price</h3>
-              <div className="text-2xl font-bold text-rose-700">{formatCurrency(financialMetrics.averageSellingPrice)}</div>
-              <p className="text-sm text-rose-600 mt-1">Average price per unit sold</p>
+            <div className="bg-rose-50 dark:bg-rose-900/30 p-4 rounded-lg border border-rose-200 dark:border-rose-700">
+              <h3 className="text-sm font-semibold text-rose-700 dark:text-rose-300 uppercase mb-2">Average Selling Price</h3>
+              <div className="text-2xl font-bold text-rose-700 dark:text-rose-300">{formatCurrency(financialMetrics.averageSellingPrice)}</div>
+              <p className="text-sm text-rose-600 dark:text-rose-400 mt-1">Average price per unit sold</p>
             </div>
           </div>
         </div>
         
         {/* Sales Trends Card */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Sales Trends</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 border border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Sales Trends</h2>
           
           {/* Monthly Sales Chart */}
           <div className="mb-8">
-            <h3 className="text-md font-semibold text-gray-700 mb-4">Monthly Sales (Last 30 Days)</h3>
+            <h3 className="text-md font-semibold text-gray-700 dark:text-gray-300 mb-4">Monthly Sales (Last 30 Days)</h3>
             {salesData.monthly.length > 0 ? (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
@@ -618,7 +618,7 @@ const LensDetail = () => {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 No sales data available for this period
               </div>
             )}
@@ -626,7 +626,7 @@ const LensDetail = () => {
           
           {/* Quarterly Sales Chart */}
           <div className="mb-8">
-            <h3 className="text-md font-semibold text-gray-700 mb-4">Quarterly Sales (Last 3 Months)</h3>
+            <h3 className="text-md font-semibold text-gray-700 dark:text-gray-300 mb-4">Quarterly Sales (Last 3 Months)</h3>
             {salesData.quarterly.length > 0 ? (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
@@ -646,7 +646,7 @@ const LensDetail = () => {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 No sales data available for this period
               </div>
             )}
@@ -654,7 +654,7 @@ const LensDetail = () => {
           
           {/* Yearly Sales Chart */}
           <div>
-            <h3 className="text-md font-semibold text-gray-700 mb-4">Yearly Sales (Last 12 Months)</h3>
+            <h3 className="text-md font-semibold text-gray-700 dark:text-gray-300 mb-4">Yearly Sales (Last 12 Months)</h3>
             {salesData.yearly.length > 0 ? (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
@@ -674,7 +674,7 @@ const LensDetail = () => {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 No sales data available for this period
               </div>
             )}
@@ -682,12 +682,12 @@ const LensDetail = () => {
         </div>
 
         {/* Trend Analysis Card */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Trend Analysis</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 border border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Trend Analysis</h2>
           
           {/* Sales Velocity Chart */}
           <div className="mb-8">
-            <h3 className="text-md font-semibold text-gray-700 mb-4">Sales Velocity (Units per Month)</h3>
+            <h3 className="text-md font-semibold text-gray-700 dark:text-gray-300 mb-4">Sales Velocity (Units per Month)</h3>
             {salesData.yearly.length > 0 ? (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
@@ -708,7 +708,7 @@ const LensDetail = () => {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 No trend data available
               </div>
             )}
@@ -716,7 +716,7 @@ const LensDetail = () => {
           
           {/* Profit Margin Trend */}
           <div className="mb-8">
-            <h3 className="text-md font-semibold text-gray-700 mb-4">Profit Margin Trend</h3>
+            <h3 className="text-md font-semibold text-gray-700 dark:text-gray-300 mb-4">Profit Margin Trend</h3>
             {salesData.yearly.length > 0 ? (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
@@ -744,7 +744,7 @@ const LensDetail = () => {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 No trend data available
               </div>
             )}
@@ -752,7 +752,7 @@ const LensDetail = () => {
           
           {/* Inventory Turnover Analysis */}
           <div>
-            <h3 className="text-md font-semibold text-gray-700 mb-4">Inventory Turnover Analysis</h3>
+            <h3 className="text-md font-semibold text-gray-700 dark:text-gray-300 mb-4">Inventory Turnover Analysis</h3>
             {salesData.quarterly.length > 0 ? (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
@@ -781,7 +781,7 @@ const LensDetail = () => {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 No inventory turnover data available
               </div>
             )}
@@ -791,14 +791,14 @@ const LensDetail = () => {
 
       {/* Inventory Deduction Modal */}
       {showDeductionModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div className="fixed inset-0 bg-gray-600 dark:bg-gray-900 bg-opacity-50 dark:bg-opacity-70 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border border-gray-200 dark:border-gray-700 w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
             <div className="mt-3">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Deduce Inventory</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Deduce Inventory</h3>
                 <button
                   onClick={resetDeductionModal}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -808,15 +808,15 @@ const LensDetail = () => {
 
               <div className="space-y-4">
                 {/* Current Quantity Display */}
-                <div className="bg-blue-50 p-3 rounded-md">
-                  <p className="text-sm text-blue-700">
+                <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-md border border-blue-200 dark:border-blue-700">
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
                     <span className="font-medium">Current Quantity in Stock:</span> {lens.qty || 0} units
                   </p>
                 </div>
 
                 {/* Quantity to Deduct */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Quantity to Deduct <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -828,14 +828,14 @@ const LensDetail = () => {
                       ...prev,
                       quantity: e.target.value
                     }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:focus:ring-red-400 dark:focus:border-red-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     placeholder="Enter quantity to deduct"
                   />
                 </div>
 
                 {/* Reason for Deduction */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Reason for Deduction <span className="text-red-500">*</span>
                   </label>
                   <select
@@ -845,7 +845,7 @@ const LensDetail = () => {
                       reason: e.target.value,
                       customReason: e.target.value !== 'other' ? '' : prev.customReason
                     }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:focus:ring-red-400 dark:focus:border-red-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
                     <option value="">Select a reason</option>
                     <option value="damaged">Damaged/Broken</option>
@@ -861,7 +861,7 @@ const LensDetail = () => {
                 {/* Custom Reason Input */}
                 {deductionData.reason === 'other' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Specify Reason <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -871,7 +871,7 @@ const LensDetail = () => {
                         ...prev,
                         customReason: e.target.value
                       }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:focus:ring-red-400 dark:focus:border-red-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       placeholder="Enter custom reason"
                     />
                   </div>
@@ -879,7 +879,7 @@ const LensDetail = () => {
 
                 {/* Additional Notes */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Additional Notes (Optional)
                   </label>
                   <textarea
@@ -889,15 +889,15 @@ const LensDetail = () => {
                       notes: e.target.value
                     }))}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:focus:ring-red-400 dark:focus:border-red-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     placeholder="Enter any additional details about the deduction"
                   />
                 </div>
 
                 {/* Calculation Display */}
                 {deductionData.quantity && parseInt(deductionData.quantity) > 0 && (
-                  <div className="bg-gray-50 p-3 rounded-md">
-                    <p className="text-sm text-gray-700">
+                  <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md border border-gray-200 dark:border-gray-600">
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
                       <span className="font-medium">After deduction:</span> {(lens.qty || 0) - parseInt(deductionData.quantity)} units will remain
                     </p>
                   </div>
@@ -909,7 +909,7 @@ const LensDetail = () => {
                 <button
                   onClick={handleInventoryDeduction}
                   disabled={deductionLoading}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {deductionLoading ? (
                     <div className="flex items-center justify-center">
@@ -926,7 +926,7 @@ const LensDetail = () => {
                 <button
                   onClick={resetDeductionModal}
                   disabled={deductionLoading}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed bg-white dark:bg-gray-800"
                 >
                   Cancel
                 </button>

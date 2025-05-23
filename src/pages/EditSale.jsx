@@ -546,26 +546,35 @@ const EditSale = () => {
     setTableRows(updatedRows);
   };
 
+  const getStatusColor = (status) => {
+    switch(status) {
+      case 'PAID': return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-300 dark:border-green-600';
+      case 'PARTIAL': return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-600';
+      case 'UNPAID': return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-600';
+      default: return 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-600';
+    }
+  };
+
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50">
+    <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-gray-900">
       <Navbar />
       
       <main className="flex-grow p-4 max-w-7xl mx-auto w-full">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Edit Invoice</h1>
-            <p className="text-sm text-gray-500">Update sales invoice details</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Edit Invoice</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Update sales invoice details</p>
           </div>
           <button
             onClick={() => navigate('/sales')}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50"
+            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
           >
             Cancel
           </button>
         </div>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-400 text-red-700">
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 border-l-4 border-red-400 text-red-700 dark:text-red-300">
             <p>{error}</p>
           </div>
         )}
@@ -576,12 +585,12 @@ const EditSale = () => {
           </div>
         ) : (
           <>
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <h2 className="text-lg font-medium text-gray-900 mb-4">Customer Information</h2>
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Customer Information</h2>
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Select Customer</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Customer</label>
                     <CustomerSearch 
                       customers={customers}
                       value={selectedCustomer?.opticalName || ''}
@@ -592,25 +601,25 @@ const EditSale = () => {
                   </div>
 
                   {selectedCustomer && (
-                    <div className="border border-gray-200 rounded-md p-4 bg-gray-50">
-                      <h3 className="font-medium text-gray-900">{selectedCustomer.opticalName}</h3>
+                    <div className="border border-gray-200 dark:border-gray-600 rounded-md p-4 bg-gray-50 dark:bg-gray-700">
+                      <h3 className="font-medium text-gray-900 dark:text-white">{selectedCustomer.opticalName}</h3>
                       {selectedCustomer.address && (
-                        <p className="text-sm text-gray-500 mt-1">{selectedCustomer.address}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{selectedCustomer.address}</p>
                       )}
                       {(selectedCustomer.city || selectedCustomer.state) && (
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
                           {selectedCustomer.city}{selectedCustomer.state ? `, ${selectedCustomer.state}` : ''}
                         </p>
                       )}
                       {selectedCustomer.gstNumber && (
-                        <p className="text-sm text-gray-500 mt-1">
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                           <span className="font-medium">GST:</span> {selectedCustomer.gstNumber}
                         </p>
                       )}
-                      <div className="mt-3 pt-3 border-t border-gray-200">
+                      <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
                         <p className="text-sm">
-                          <span className="font-medium">Previous Balance:</span> 
-                          <span className={`ml-2 ${customerBalance < 0 ? 'text-red-600' : customerBalance > 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                          <span className="font-medium text-gray-700 dark:text-gray-300">Previous Balance:</span> 
+                          <span className={`ml-2 ${customerBalance < 0 ? 'text-red-600 dark:text-red-400' : customerBalance > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
                             {formatCurrency(customerBalance)}
                           </span>
                         </p>
@@ -620,42 +629,42 @@ const EditSale = () => {
                 </div>
 
                 <div>
-                  <h2 className="text-lg font-medium text-gray-900 mb-4">Invoice Information</h2>
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Invoice Information</h2>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700">Invoice Number</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Invoice Number</label>
                       <input
                         type="text"
                         value={invoiceNumber}
                         onChange={(e) => setInvoiceNumber(e.target.value)}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500"
+                        className="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400"
                         readOnly
                       />
                     </div>
                     <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700">Invoice Date</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Invoice Date</label>
                       <input
                         type="date"
                         value={invoiceDate}
                         onChange={(e) => setInvoiceDate(e.target.value)}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500"
+                        className="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400"
                       />
                     </div>
                     <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700">Due Date (Optional)</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Due Date (Optional)</label>
                       <input
                         type="date"
                         value={dueDate}
                         onChange={(e) => setDueDate(e.target.value)}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500"
+                        className="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400"
                       />
                     </div>
                     <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700">Payment Status</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Status</label>
                       <select
                         value={paymentStatus}
                         onChange={(e) => setPaymentStatus(e.target.value)}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500"
+                        className="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400"
                       >
                         <option value="UNPAID">Unpaid</option>
                         <option value="PARTIAL">Partially Paid</option>
@@ -668,56 +677,56 @@ const EditSale = () => {
             </div>
 
             {/* Invoice Items */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6 overflow-x-auto">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 overflow-x-auto">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium text-gray-900">Invoice Items</h2>
-                <div className="text-sm text-gray-500">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">Invoice Items</h2>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
                   Showing {getVisibleRows().length} of {tableRows.length} rows
                 </div>
               </div>
               
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+                <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
-                    <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px]">
+                    <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[100px]">
                       Order ID
                     </th>
-                    <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[260px]">
+                    <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[260px]">
                       Item Name
                     </th>
-                    <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       SPH
                     </th>
-                    <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       CYL
                     </th>
-                    <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       AXIS
                     </th>
-                    <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       ADD
                     </th>
-                    <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       QTY
                     </th>
-                    <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Price
                     </th>
-                    <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Total
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
                   {getVisibleRows().map((row, index) => (
-                    <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <tr key={index} className={index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700'}>
                       <td className="px-3 py-2 whitespace-nowrap">
                         <input
                           type="text"
                           value={row.orderId}
                           onChange={(e) => handleTableRowChange(index, 'orderId', e.target.value)}
                           onBlur={(e) => fetchOrderDetails(e.target.value, index)}
-                          className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                          className="block w-full border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm"
                           placeholder="Order ID"
                         />
                       </td>
@@ -739,7 +748,7 @@ const EditSale = () => {
                           type="text"
                           value={row.sph}
                           onChange={(e) => handleTableRowChange(index, 'sph', e.target.value)}
-                          className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center"
+                          className="block w-full border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm text-center"
                           placeholder="SPH"
                         />
                       </td>
@@ -748,7 +757,7 @@ const EditSale = () => {
                           type="text"
                           value={row.cyl}
                           onChange={(e) => handleTableRowChange(index, 'cyl', e.target.value)}
-                          className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center"
+                          className="block w-full border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm text-center"
                           placeholder="CYL"
                         />
                       </td>
@@ -757,7 +766,7 @@ const EditSale = () => {
                           type="text"
                           value={row.axis}
                           onChange={(e) => handleTableRowChange(index, 'axis', e.target.value)}
-                          className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center"
+                          className="block w-full border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm text-center"
                           placeholder="AXIS"
                         />
                       </td>
@@ -766,7 +775,7 @@ const EditSale = () => {
                           type="text"
                           value={row.add}
                           onChange={(e) => handleTableRowChange(index, 'add', e.target.value)}
-                          className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center"
+                          className="block w-full border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm text-center"
                           placeholder="ADD"
                         />
                       </td>
@@ -775,7 +784,7 @@ const EditSale = () => {
                           type="number"
                           value={row.qty}
                           onChange={(e) => handleTableRowChange(index, 'qty', e.target.value)}
-                          className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center"
+                          className="block w-full border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm text-center"
                           placeholder="QTY"
                           min="1"
                         />
@@ -785,13 +794,13 @@ const EditSale = () => {
                           type="number"
                           value={row.price}
                           onChange={(e) => handleTableRowChange(index, 'price', e.target.value)}
-                          className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-right"
+                          className="block w-full border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm text-right"
                           placeholder="Price"
                           min="0"
                           step="0.01"
                         />
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-right">
+                      <td className="px-3 py-2 whitespace-nowrap text-right text-gray-900 dark:text-gray-100">
                         {formatCurrency(row.total)}
                       </td>
                     </tr>
@@ -805,9 +814,9 @@ const EditSale = () => {
                   <button
                     type="button"
                     onClick={() => setShowAllRows(true)}
-                    className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                    className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-sky-500"
                   >
-                    <svg className="mr-2 h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="mr-2 h-4 w-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                     Show All Rows ({tableRows.length})
@@ -818,9 +827,9 @@ const EditSale = () => {
                   <button
                     type="button"
                     onClick={() => setShowAllRows(false)}
-                    className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                    className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-sky-500"
                   >
-                    <svg className="mr-2 h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="mr-2 h-4 w-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
                     </svg>
                     Show Less
@@ -830,9 +839,9 @@ const EditSale = () => {
                 <button
                   type="button"
                   onClick={() => addMoreRows(5)}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-sky-500"
                 >
-                  <svg className="mr-2 h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="mr-2 h-4 w-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                   </svg>
                   Add 5 More Rows
@@ -842,9 +851,9 @@ const EditSale = () => {
                   <button
                     type="button"
                     onClick={() => addMoreRows(10)}
-                    className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                    className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-sky-500"
                   >
-                    <svg className="mr-2 h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="mr-2 h-4 w-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
                     Add 10 More Rows
@@ -856,16 +865,16 @@ const EditSale = () => {
             {/* Invoice Summary */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               {/* Tax and Discount Section */}
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-lg font-medium text-gray-900 mb-4">Additional Charges</h2>
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Additional Charges</h2>
                 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Tax Option</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tax Option</label>
                     <select
                       value={selectedTaxOption}
                       onChange={(e) => setSelectedTaxOption(e.target.value)}
-                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      className="block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm"
                     >
                       {TAX_OPTIONS.map(option => (
                         <option key={option.id} value={option.id}>
@@ -876,12 +885,12 @@ const EditSale = () => {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Discount</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Discount</label>
                     <div className="flex space-x-2">
                       <select
                         value={discountType}
                         onChange={(e) => setDiscountType(e.target.value)}
-                        className="block w-1/3 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                        className="block w-1/3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm"
                       >
                         <option value="amount">Amount</option>
                         <option value="percentage">Percentage</option>
@@ -890,7 +899,7 @@ const EditSale = () => {
                         type="number"
                         value={discountValue}
                         onChange={(e) => setDiscountValue(e.target.value)}
-                        className="block w-2/3 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                        className="block w-2/3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm"
                         placeholder={discountType === 'amount' ? "Discount Amount" : "Discount %"}
                         min="0"
                         step={discountType === 'amount' ? "0.01" : "0.1"}
@@ -899,12 +908,12 @@ const EditSale = () => {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Freight Charge</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Freight Charge</label>
                     <input
                       type="number"
                       value={frieghtCharge}
                       onChange={(e) => setFrieghtCharge(e.target.value)}
-                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      className="block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm"
                       placeholder="Freight/Shipping Charge"
                       min="0"
                       step="0.01"
@@ -913,12 +922,12 @@ const EditSale = () => {
 
                   {paymentStatus !== 'UNPAID' && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Amount Paid</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount Paid</label>
                       <input
                         type="number"
                         value={amountPaid}
                         onChange={(e) => setAmountPaid(e.target.value)}
-                        className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                        className="block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm"
                         placeholder="Amount Paid"
                         min="0"
                         step="0.01"
@@ -927,11 +936,11 @@ const EditSale = () => {
                   )}
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes (Optional)</label>
                     <textarea
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
-                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      className="block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm"
                       placeholder="Additional information or special instructions"
                       rows="3"
                     ></textarea>
@@ -940,47 +949,47 @@ const EditSale = () => {
               </div>
               
               {/* Summary Section */}
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-lg font-medium text-gray-900 mb-4">Invoice Summary</h2>
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Invoice Summary</h2>
                 
                 <div className="space-y-3">
-                  <div className="flex justify-between py-2 border-b border-gray-100">
-                    <span className="text-gray-600">Subtotal:</span>
-                    <span className="font-medium">{formatCurrency(calculateSubtotal())}</span>
+                  <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                    <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">{formatCurrency(calculateSubtotal())}</span>
                   </div>
                   
-                  <div className="flex justify-between py-2 border-b border-gray-100">
-                    <span className="text-gray-600">Discount:</span>
-                    <span className="text-red-500">-{formatCurrency(calculateDiscountAmount())}</span>
+                  <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                    <span className="text-gray-600 dark:text-gray-400">Discount:</span>
+                    <span className="text-red-500 dark:text-red-400">-{formatCurrency(calculateDiscountAmount())}</span>
                   </div>
                   
-                  <div className="flex justify-between py-2 border-b border-gray-100">
-                    <span className="text-gray-600">
+                  <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                    <span className="text-gray-600 dark:text-gray-400">
                       Tax ({getTaxOption(selectedTaxOption).label}):
                     </span>
-                    <span className="text-gray-800">{formatCurrency(calculateTaxAmount())}</span>
+                    <span className="text-gray-800 dark:text-gray-200">{formatCurrency(calculateTaxAmount())}</span>
                   </div>
                   
-                  <div className="flex justify-between py-2 border-b border-gray-100">
-                    <span className="text-gray-600">Freight Charge:</span>
-                    <span className="text-gray-800">{formatCurrency(parseFloat(frieghtCharge || 0))}</span>
+                  <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                    <span className="text-gray-600 dark:text-gray-400">Freight Charge:</span>
+                    <span className="text-gray-800 dark:text-gray-200">{formatCurrency(parseFloat(frieghtCharge || 0))}</span>
                   </div>
                   
-                  <div className="flex justify-between py-3 border-b border-gray-200 text-lg">
-                    <span className="font-semibold text-gray-900">Total:</span>
-                    <span className="font-bold text-sky-700">{formatCurrency(calculateTotal())}</span>
+                  <div className="flex justify-between py-3 border-b border-gray-200 dark:border-gray-600 text-lg">
+                    <span className="font-semibold text-gray-900 dark:text-white">Total:</span>
+                    <span className="font-bold text-sky-700 dark:text-sky-400">{formatCurrency(calculateTotal())}</span>
                   </div>
                   
                   {paymentStatus !== 'UNPAID' && (
                     <>
-                      <div className="flex justify-between py-2 border-b border-gray-100">
-                        <span className="text-gray-600">Amount Paid:</span>
-                        <span className="text-green-600">{formatCurrency(parseFloat(amountPaid || 0))}</span>
+                      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                        <span className="text-gray-600 dark:text-gray-400">Amount Paid:</span>
+                        <span className="text-green-600 dark:text-green-400">{formatCurrency(parseFloat(amountPaid || 0))}</span>
                       </div>
                       
-                      <div className="flex justify-between py-2 border-b border-gray-100">
-                        <span className="text-gray-600">Balance Due:</span>
-                        <span className="font-semibold text-red-600">
+                      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                        <span className="text-gray-600 dark:text-gray-400">Balance Due:</span>
+                        <span className="font-semibold text-red-600 dark:text-red-400">
                           {formatCurrency(Math.max(0, calculateTotal() - parseFloat(amountPaid || 0)))}
                         </span>
                       </div>
@@ -993,7 +1002,7 @@ const EditSale = () => {
                     type="button"
                     onClick={handleUpdateSale}
                     disabled={loading}
-                    className="w-full px-4 py-3 bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors disabled:opacity-50"
+                    className="w-full px-4 py-3 bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-sky-500 transition-colors disabled:opacity-50"
                   >
                     {loading ? (
                       <span className="flex items-center justify-center">
@@ -1016,12 +1025,12 @@ const EditSale = () => {
         {/* Mobile Update Button - Fixed at bottom */}
         {!loading && (
           <div className="mobile-only">
-            <BottomActionBar fixed={true} bgColor="bg-gray-50">
+            <BottomActionBar fixed={true} bgColor="bg-gray-50 dark:bg-gray-900">
               <button
                 type="button"
                 onClick={handleUpdateSale}
                 disabled={loading}
-                className="w-full px-4 py-3 bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors disabled:opacity-50"
+                className="w-full px-4 py-3 bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-sky-500 transition-colors disabled:opacity-50"
               >
                 {loading ? (
                   <span className="flex items-center justify-center">
@@ -1053,36 +1062,36 @@ const EditSale = () => {
         <div className="fixed inset-0 overflow-y-auto z-50">
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+              <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
             </div>
 
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+            <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="sm:flex sm:items-start">
-                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100 sm:mx-0 sm:h-10 sm:w-10">
-                    <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/30 sm:mx-0 sm:h-10 sm:w-10">
+                    <svg className="h-6 w-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
                   <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
                       Invoice Updated Successfully
                     </h3>
                     <div className="mt-2">
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
                         Your invoice has been successfully updated and saved.
                       </p>
                     </div>
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-wrap gap-2">
+              <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={handlePrintBill}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:w-auto sm:text-sm"
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-blue-500 sm:w-auto sm:text-sm"
                   disabled={loading}
                 >
                   <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1093,7 +1102,7 @@ const EditSale = () => {
                 <button
                   type="button"
                   onClick={handleSendWhatsApp}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-teal-600 text-base font-medium text-white hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 sm:mt-0 sm:w-auto sm:text-sm"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-teal-600 text-base font-medium text-white hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-teal-500 sm:mt-0 sm:w-auto sm:text-sm"
                   disabled={loading}
                 >
                   <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1104,7 +1113,7 @@ const EditSale = () => {
                 <button
                   type="button"
                   onClick={() => navigate('/sales')}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 sm:mt-0 sm:w-auto sm:text-sm"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-sky-500 sm:mt-0 sm:w-auto sm:text-sm"
                 >
                   Close
                 </button>

@@ -16,6 +16,13 @@ const SECTION_COLORS = {
   delivery: { gradient: 'from-amber-600 to-orange-600', bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' }
 };
 
+// Helper function to get date 3 days from today in YYYY-MM-DD format
+const getDateThreeDaysFromNow = () => {
+  const today = new Date();
+  const threeDaysFromNow = new Date(today.getTime() + (3 * 24 * 60 * 60 * 1000));
+  return threeDaysFromNow.toISOString().split('T')[0];
+};
+
 const CreateOrder = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -41,7 +48,7 @@ const CreateOrder = () => {
     leftAxis: '',
     leftAdd: '',
     leftQty: '1',
-    expectedDeliveryDate: '',
+    expectedDeliveryDate: getDateThreeDaysFromNow(),
     price: '',
     specialNotes: ''
   });
@@ -64,6 +71,30 @@ const CreateOrder = () => {
     fetchCustomers();
     calculateNextOrderDisplayId();
   }, []);
+
+  // Add useEffect to update the expected delivery date to always be 3 days from today
+  useEffect(() => {
+    // Update the date immediately
+    const updateDeliveryDate = () => {
+      const newDate = getDateThreeDaysFromNow();
+      if (formData.expectedDeliveryDate !== newDate) {
+        setFormData(prev => ({
+          ...prev,
+          expectedDeliveryDate: newDate
+        }));
+      }
+    };
+
+    // Update immediately
+    updateDeliveryDate();
+
+    // Set up interval to check for date changes (check every hour)
+    const interval = setInterval(() => {
+      updateDeliveryDate();
+    }, 60 * 60 * 1000); // Check every hour
+
+    return () => clearInterval(interval);
+  }, []); // Run only once on mount
 
   // Modify useEffect to search every time formData changes for prescription fields
   useEffect(() => {
@@ -620,7 +651,7 @@ const CreateOrder = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
       <Navbar />
       
       <main className="flex-grow pb-28">
@@ -630,7 +661,7 @@ const CreateOrder = () => {
             <div>
               <button
                 onClick={() => navigate('/orders')}
-                className="flex items-center text-sm font-medium mb-4 px-4 py-2 rounded-lg bg-white shadow-sm hover:shadow-md transition-all text-gray-700 hover:text-indigo-700 border border-gray-100 hover:border-indigo-200 transform hover:scale-[1.02] duration-200"
+                className="flex items-center text-sm font-medium mb-4 px-4 py-2 rounded-lg bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-all text-gray-700 dark:text-gray-300 hover:text-indigo-700 dark:hover:text-indigo-400 border border-gray-100 dark:border-gray-700 hover:border-indigo-200 dark:hover:border-indigo-600 transform hover:scale-[1.02] duration-200"
               >
                 <ArrowLeftIcon className="w-4 h-4 mr-2" />
                 Back to Orders
@@ -641,7 +672,7 @@ const CreateOrder = () => {
                 </div>
                 <div>
                   <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-700 to-indigo-700 bg-clip-text text-transparent">Create New Order</h1>
-                  <p className="text-gray-500 text-sm mt-1">Fill in the details below to create a new order</p>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Fill in the details below to create a new order</p>
                 </div>
                 {nextOrderDisplayId && (
                   <span className="ml-4 px-4 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-full text-sm font-medium shadow-sm">
@@ -653,12 +684,12 @@ const CreateOrder = () => {
           </div>
 
           {/* Main Content Area for OrderForm */}
-          <div className="bg-white shadow-lg rounded-xl p-6 sm:p-8 border-t-4 border-blue-500">
+          <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 sm:p-8 border-t-4 border-blue-500">
             {/* Error message display - stays above form */}
             {error && (
-              <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-md text-red-700 shadow-sm animate-pulse">
+              <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 rounded-md text-red-700 dark:text-red-200 shadow-sm animate-pulse">
                 <div className="flex items-center">
-                  <svg className="w-5 h-5 mr-2 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <svg className="w-5 h-5 mr-2 text-red-500 dark:text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
                   {error}
@@ -743,16 +774,16 @@ const CreateOrder = () => {
       {/* WhatsApp Modal */}
       {showWhatsAppModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity duration-300 ease-in-out">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 ease-in-out scale-100 p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 ease-in-out scale-100 p-6">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-semibold text-gray-900">Send Order Details</h3>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Send Order Details</h3>
               <button 
                 onClick={() => { 
                   setShowWhatsAppModal(false); 
                   setVendorPhone(''); 
                   navigate('/orders');
                 }} 
-                className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-md hover:bg-gray-100"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -762,7 +793,7 @@ const CreateOrder = () => {
             
             <div className="space-y-4 mb-6">
               <div>
-                <label htmlFor="vendorPhone" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="vendorPhone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Vendor's Phone Number (Optional)
                 </label>
                 <input
@@ -771,9 +802,9 @@ const CreateOrder = () => {
                   value={vendorPhone}
                   onChange={(e) => setVendorPhone(e.target.value)}
                   placeholder="Enter with country code (e.g., +911234567890)"
-                  className="w-full rounded-lg border-gray-300 bg-white px-3 py-2.5 text-gray-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 text-sm transition-colors"
+                  className="w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2.5 text-gray-900 dark:text-white shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 text-sm transition-colors"
                 />
-                <p className="mt-1 text-xs text-gray-500">Leave blank if you don't want to message the vendor.</p>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Leave blank if you don't want to message the vendor.</p>
               </div>
             </div>
 
@@ -814,7 +845,7 @@ const CreateOrder = () => {
                   setVendorPhone('');
                   navigate('/orders');
                 }}
-                className="w-full px-4 py-3 text-sm font-medium rounded-lg text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-all duration-200"
+                className="w-full px-4 py-3 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-all duration-200"
               >
                 Skip & Close
               </button>

@@ -97,36 +97,36 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
 
   // Dynamic class for input fields
   const getInputClass = (fieldName, section) => {
-    const baseClass = "w-full rounded-lg shadow-sm bg-white px-3 py-2.5 text-gray-900 text-sm transition-all duration-200";
+    const baseClass = "w-full rounded-lg shadow-sm bg-white dark:bg-gray-700 px-3 py-2.5 text-gray-900 dark:text-white text-sm transition-all duration-200";
     
     // Field validation style
     const validationClass = fieldName && formData[fieldName] === '' && 
       ['customerName', 'brandName', 'expectedDeliveryDate'].includes(fieldName)
-      ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-      : `border-gray-200 focus:border-${section}-500 focus:ring-${section}-500`;
+      ? 'border-red-300 dark:border-red-600 focus:border-red-500 dark:focus:border-red-400 focus:ring-red-500 dark:focus:ring-red-400'
+      : `border-gray-200 dark:border-gray-600 focus:border-${section}-500 dark:focus:border-${section}-400 focus:ring-${section}-500 dark:focus:ring-${section}-400`;
     
     // Active section highlight
-    const activeClass = activeSection === section ? `border-${section}-400` : '';
+    const activeClass = activeSection === section ? `border-${section}-400 dark:border-${section}-500` : '';
     
     return `${baseClass} ${validationClass} ${activeClass}`;
   };
 
   // Section styles
   const getSectionClass = (section) => {
-    const baseClass = "bg-white rounded-lg shadow-sm p-5 transition-all duration-300 border-l-4";
-    const borderColor = `border-${section}-500`;
-    const hoverEffect = `hover:shadow-md hover:border-${section}-600`;
-    const activeClass = activeSection === section ? `border-${section}-600 shadow-md` : '';
+    const baseClass = "bg-white dark:bg-gray-800 rounded-lg shadow-sm p-5 transition-all duration-300 border-l-4 border border-gray-200 dark:border-gray-700";
+    const borderColor = `border-${section}-500 dark:border-${section}-400`;
+    const hoverEffect = `hover:shadow-md hover:border-${section}-600 dark:hover:border-${section}-300`;
+    const activeClass = activeSection === section ? `border-${section}-600 dark:border-${section}-300 shadow-md` : '';
     
     return `${baseClass} ${borderColor} ${hoverEffect} ${activeClass}`;
   };
 
   const getSectionHeaderClass = (section) => {
-    return `flex items-center gap-2 mb-4 text-${section}-600 font-medium`;
+    return `flex items-center gap-2 mb-4 text-${section}-600 dark:text-${section}-400 font-medium`;
   };
 
   const getLabelClass = (section) => {
-    return `block text-xs font-semibold tracking-wide text-${section}-700 mb-1.5`;
+    return `block text-xs font-semibold tracking-wide text-${section}-700 dark:text-${section}-300 mb-1.5`;
   };
 
   return (
@@ -160,7 +160,7 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
               className={formData.customerName ? getInputClass('customerName', 'blue') : `${getInputClass('customerName', 'blue')} ring-1 ring-red-300`}
             />
             {!formData.customerName && (
-              <p className="mt-1 text-xs text-red-500">This field is required</p>
+              <p className="mt-1 text-xs text-red-500 dark:text-red-400">This field is required</p>
             )}
           </div>
           <div>
@@ -196,7 +196,7 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           <div>
             <label className={getLabelClass('purple')}>
-              Brand Name <span className="text-red-500">*</span>
+              Brand Name <span className="text-red-500 dark:text-red-400">*</span>
             </label>
             <input
               type="text"
@@ -205,12 +205,12 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
               onChange={onChange}
               required
               aria-required="true"
-              className={formData.brandName ? getInputClass('brandName', 'purple') : `${getInputClass('brandName', 'purple')} ring-1 ring-red-300`}
+              className={formData.brandName ? getInputClass('brandName', 'purple') : `${getInputClass('brandName', 'purple')} ring-1 ring-red-300 dark:ring-red-600`}
               placeholder="Enter brand name"
               onFocus={() => handleSectionFocus('lens')}
             />
             {!formData.brandName && (
-              <p className="mt-1 text-xs text-red-500">This field is required</p>
+              <p className="mt-1 text-xs text-red-500 dark:text-red-400">This field is required</p>
             )}
           </div>
           <div>
@@ -364,8 +364,8 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
                 className="sr-only peer"
                 onFocus={() => handleSectionFocus('coating')}
               />
-              <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-teal-600"></div>
-              <span className="ml-3 text-sm font-medium text-gray-700">Fog Mark</span>
+              <div className="w-9 h-5 bg-gray-200 dark:bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-teal-300 dark:peer-focus:ring-teal-800 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 dark:after:border-gray-500 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-teal-600 dark:peer-checked:bg-teal-500"></div>
+              <span className="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">Fog Mark</span>
             </label>
           </div>
         </div>
@@ -386,7 +386,7 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
           <h3 className="text-base font-medium">Prescription Details</h3>
         </div>
         
-        <div className="bg-gradient-to-br from-white via-white to-green-50 p-4 rounded-lg border border-green-100 shadow-sm">
+        <div className="bg-gradient-to-br from-white via-white to-green-50 dark:from-gray-800 dark:via-gray-800 dark:to-green-900/20 p-4 rounded-lg border border-green-100 dark:border-green-700/50 shadow-sm">
           <LensPrescription formData={formData} onChange={onChange} matchingLenses={matchingLenses} />
         </div>
       </div>
@@ -409,7 +409,7 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div>
             <label className={getLabelClass('amber')}>
-              Expected Delivery Date <span className="text-red-500">*</span>
+              Expected Delivery Date <span className="text-red-500 dark:text-red-400">*</span>
             </label>
             <input
               type="date"
@@ -418,17 +418,17 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
               onChange={onChange}
               required
               aria-required="true"
-              className={formData.expectedDeliveryDate ? getInputClass('expectedDeliveryDate', 'amber') : `${getInputClass('expectedDeliveryDate', 'amber')} ring-1 ring-red-300`}
+              className={formData.expectedDeliveryDate ? getInputClass('expectedDeliveryDate', 'amber') : `${getInputClass('expectedDeliveryDate', 'amber')} ring-1 ring-red-300 dark:ring-red-600`}
               onFocus={() => handleSectionFocus('delivery')}
             />
             {!formData.expectedDeliveryDate && (
-              <p className="mt-1 text-xs text-red-500">This field is required</p>
+              <p className="mt-1 text-xs text-red-500 dark:text-red-400">This field is required</p>
             )}
           </div>
           <div>
             <label className={getLabelClass('amber')}>Price</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₹</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">₹</span>
               <input
                 type="number"
                 name="price"
@@ -456,15 +456,15 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
       </div>
 
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-md shadow-sm animate-pulse">
+        <div className="bg-red-50 dark:bg-red-900/50 border-l-4 border-red-400 dark:border-red-600 p-4 rounded-md shadow-sm animate-pulse">
           <div className="flex">
             <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+              <svg className="h-5 w-5 text-red-400 dark:text-red-300" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-red-800">{error}</p>
+              <p className="text-sm font-medium text-red-800 dark:text-red-200">{error}</p>
             </div>
           </div>
         </div>
@@ -476,7 +476,7 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
           <button
             type="submit"
             disabled={loading}
-            className="inline-flex items-center px-6 py-3 border border-transparent text-sm font-medium rounded-lg shadow-md text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-all transform hover:scale-[1.02] duration-300"
+            className="inline-flex items-center px-6 py-3 border border-transparent text-sm font-medium rounded-lg shadow-md text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 disabled:opacity-50 transition-all transform hover:scale-[1.02] duration-300"
           >
             {loading ? (
               <>

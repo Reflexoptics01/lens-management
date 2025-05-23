@@ -463,37 +463,37 @@ const CreatePurchase = () => {
     : vendors;
 
   return (
-    <div className="mobile-page">
+    <div className="mobile-page bg-gray-50 dark:bg-gray-900">
       <Navbar />
       
       <div className="mobile-content">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Create Purchase</h1>
-            <p className="mt-1 text-sm text-gray-500">Add new purchase details</p>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Create Purchase</h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Add new purchase details</p>
           </div>
           <button
             onClick={() => navigate('/purchases')}
-            className="btn-secondary inline-flex items-center space-x-2"
+            className="btn-secondary inline-flex items-center space-x-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
           >
             <span>Cancel</span>
           </button>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-400 text-red-700 rounded-md">
+          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/50 border-l-4 border-red-400 dark:border-red-500 text-red-700 dark:text-red-200 rounded-md">
             {error}
           </div>
         )}
 
         {/* Purchase Form */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-          <h2 className="text-lg font-medium text-gray-800 mb-4">Purchase Information</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
+          <h2 className="text-lg font-medium text-gray-800 dark:text-white mb-4">Purchase Information</h2>
           
           {/* Vendor Selection */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Vendor *
             </label>
             <div className="flex space-x-2">
@@ -507,24 +507,24 @@ const CreatePurchase = () => {
                     setShowVendorDropdown(true);
                   }}
                   onClick={() => setShowVendorDropdown(true)}
-                  className="block w-full rounded border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
+                  className="block w-full rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   placeholder="Search for vendor..."
                 />
                 
                 {showVendorDropdown && (
-                  <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5">
+                  <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 border border-gray-200 dark:border-gray-600">
                     {filteredVendors.length === 0 ? (
-                      <div className="py-2 px-3 text-gray-500">No vendors found</div>
+                      <div className="py-2 px-3 text-gray-500 dark:text-gray-400">No vendors found</div>
                     ) : (
                       filteredVendors.map(vendor => (
                         <div
                           key={vendor.id}
-                          className="cursor-pointer py-2 px-3 hover:bg-gray-100"
+                          className="cursor-pointer py-2 px-3 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
                           onClick={() => handleVendorSelect(vendor)}
                         >
                           <div className="font-medium">{vendor.opticalName}</div>
                           {vendor.contactPerson && (
-                            <div className="text-xs text-gray-500">{vendor.contactPerson}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">{vendor.contactPerson}</div>
                           )}
                         </div>
                       ))
@@ -534,7 +534,7 @@ const CreatePurchase = () => {
               </div>
               <button
                 onClick={() => setShowVendorModal(true)}
-                className="flex items-center justify-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-sky-600 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                className="flex items-center justify-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-sky-600 dark:text-sky-400 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
               >
                 + Add Vendor
               </button>
@@ -544,47 +544,47 @@ const CreatePurchase = () => {
           {/* Purchase Details */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Purchase Number
               </label>
               <input 
                 type="text" 
                 value={purchaseNumber}
                 onChange={(e) => setPurchaseNumber(e.target.value)}
-                className="block w-full rounded border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-gray-50"
+                className="block w-full rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white"
                 readOnly
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Vendor Invoice Number
               </label>
               <input 
                 type="text" 
                 value={vendorInvoiceNumber}
                 onChange={(e) => setVendorInvoiceNumber(e.target.value)}
-                className="block w-full rounded border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
+                className="block w-full rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 placeholder="Enter vendor's invoice number"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Purchase Date
               </label>
               <input 
                 type="date" 
                 value={purchaseDate}
                 onChange={(e) => setPurchaseDate(e.target.value)}
-                className="block w-full rounded border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
+                className="block w-full rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
             </div>
           </div>
         </div>
 
         {/* Purchase Items */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6 overflow-x-auto">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6 overflow-x-auto">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-medium text-gray-800">Purchase Items</h2>
+            <h2 className="text-lg font-medium text-gray-800 dark:text-white">Purchase Items</h2>
             <div>
               <button
                 onClick={() => {
@@ -601,43 +601,43 @@ const CreatePurchase = () => {
             </div>
           </div>
           
-          <div className="border rounded-lg overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+          <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-12">
                     #
                   </th>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Item Details
                   </th>
-                  <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+                  <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-28">
                     Lens Type
                   </th>
-                  <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                  <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20">
                     Qty
                   </th>
-                  <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                  <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
                     Unit
                   </th>
-                  <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+                  <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-28">
                     Discount
                   </th>
-                  <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                  <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
                     Price
                   </th>
-                  <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+                  <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-28">
                     Total
                   </th>
-                  <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                  <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-16">
                     Action
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {tableRows.map((row, index) => (
-                  <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 text-center">
+                  <tr key={index} className={index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700'}>
+                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-center">
                       {index + 1}
                     </td>
                     <td className="px-3 py-2">
@@ -648,14 +648,14 @@ const CreatePurchase = () => {
                         onSelect={handleItemSelect}
                         index={index}
                         placeholder="Item name"
-                        className="block w-full border-0 bg-transparent focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm font-medium"
+                        className="block w-full border-0 bg-transparent focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm font-medium text-gray-900 dark:text-white"
                         currentPrice={parseFloat(row.price) || 0}
                       />
                       <input 
                         type="text" 
                         value={row.description}
                         onChange={(e) => handleTableRowChange(index, 'description', e.target.value)}
-                        className="block w-full border-0 bg-transparent text-gray-500 text-xs focus:ring-0 focus:border-b focus:border-sky-400 mt-1"
+                        className="block w-full border-0 bg-transparent text-gray-500 dark:text-gray-400 text-xs focus:ring-0 focus:border-b focus:border-sky-400 mt-1"
                         placeholder="Description (optional)"
                       />
                     </td>
@@ -663,7 +663,7 @@ const CreatePurchase = () => {
                       <select
                         value={row.lensType}
                         onChange={(e) => handleTableRowChange(index, 'lensType', e.target.value)}
-                        className="block w-full border-0 bg-transparent focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-center"
+                        className="block w-full border-0 bg-transparent focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-center text-gray-900 dark:text-white dark:bg-gray-700"
                       >
                         {LENS_TYPES.map(type => (
                           <option key={type} value={type}>{type}</option>
@@ -675,7 +675,7 @@ const CreatePurchase = () => {
                         type="number" 
                         value={row.qty}
                         onChange={(e) => handleTableRowChange(index, 'qty', e.target.value)}
-                        className="block w-full border-0 bg-transparent text-right focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm"
+                        className="block w-full border-0 bg-transparent text-right focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-gray-900 dark:text-white"
                         min="1"
                       />
                     </td>
@@ -683,7 +683,7 @@ const CreatePurchase = () => {
                       <select
                         value={row.unit}
                         onChange={(e) => handleTableRowChange(index, 'unit', e.target.value)}
-                        className="block w-full border-0 bg-transparent focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-center"
+                        className="block w-full border-0 bg-transparent focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-center text-gray-900 dark:text-white dark:bg-gray-700"
                       >
                         {UNIT_OPTIONS.map(unit => (
                           <option key={unit} value={unit}>{unit}</option>
@@ -695,7 +695,7 @@ const CreatePurchase = () => {
                         <select
                           value={row.itemDiscountType}
                           onChange={(e) => handleTableRowChange(index, 'itemDiscountType', e.target.value)}
-                          className="w-12 border-0 bg-transparent focus:ring-0 focus:border-b-2 focus:border-sky-500 text-xs pr-0"
+                          className="w-12 border-0 bg-transparent focus:ring-0 focus:border-b-2 focus:border-sky-500 text-xs pr-0 text-gray-900 dark:text-white dark:bg-gray-700"
                         >
                           <option value="amount">₹</option>
                           <option value="percentage">%</option>
@@ -704,7 +704,7 @@ const CreatePurchase = () => {
                           type="number" 
                           value={row.itemDiscount}
                           onChange={(e) => handleTableRowChange(index, 'itemDiscount', e.target.value)}
-                          className="block w-full border-0 bg-transparent text-right focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm"
+                          className="block w-full border-0 bg-transparent text-right focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-gray-900 dark:text-white"
                           min="0"
                           step="0.01"
                         />
@@ -715,12 +715,12 @@ const CreatePurchase = () => {
                         type="number" 
                         value={row.price}
                         onChange={(e) => handleTableRowChange(index, 'price', e.target.value)}
-                        className="block w-full border-0 bg-transparent text-right focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm"
+                        className="block w-full border-0 bg-transparent text-right focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-gray-900 dark:text-white"
                         min="0"
                         step="0.01"
                       />
                     </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-right font-medium text-gray-900">
+                    <td className="px-3 py-2 whitespace-nowrap text-right font-medium text-gray-900 dark:text-white">
                       {formatCurrency(row.total)}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap text-center">
@@ -730,7 +730,7 @@ const CreatePurchase = () => {
                           updatedRows.splice(index, 1);
                           setTableRows(updatedRows);
                         }}
-                        className="text-red-500 hover:text-red-700 focus:outline-none"
+                        className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 focus:outline-none"
                         title="Remove item"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -742,7 +742,7 @@ const CreatePurchase = () => {
                 ))}
                 {tableRows.length === 0 && (
                   <tr>
-                    <td colSpan="8" className="px-3 py-4 text-center text-gray-500">
+                    <td colSpan="8" className="px-3 py-4 text-center text-gray-500 dark:text-gray-400">
                       No items added yet. Click the "Add 5 Rows" button to add purchase items.
                     </td>
                   </tr>
@@ -752,7 +752,7 @@ const CreatePurchase = () => {
           </div>
           
           <div className="mt-4 flex justify-between">
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-gray-500 dark:text-gray-400">
               {tableRows.length} items
             </div>
             <button
@@ -760,7 +760,7 @@ const CreatePurchase = () => {
                 const newRows = Array(5).fill().map(() => ({...EMPTY_ROW}));
                 setTableRows([...tableRows, ...newRows]);
               }}
-              className="text-sm text-sky-600 hover:text-sky-800 flex items-center"
+              className="text-sm text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 flex items-center"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -771,21 +771,21 @@ const CreatePurchase = () => {
         </div>
 
         {/* Summary */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-          <h2 className="text-lg font-medium text-gray-800 mb-4">Summary</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
+          <h2 className="text-lg font-medium text-gray-800 dark:text-white mb-4">Summary</h2>
           
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span className="text-gray-500">Subtotal:</span>
-              <span>{formatCurrency(calculateSubtotal())}</span>
+              <span className="text-gray-500 dark:text-gray-400">Subtotal:</span>
+              <span className="text-gray-900 dark:text-white">{formatCurrency(calculateSubtotal())}</span>
             </div>
             
             <div className="flex items-center gap-2 pb-2">
-              <span className="text-gray-500">Discount:</span>
+              <span className="text-gray-500 dark:text-gray-400">Discount:</span>
               <select
                 value={discountType}
                 onChange={(e) => setDiscountType(e.target.value)}
-                className="rounded border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
+                className="rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
                 <option value="amount">₹</option>
                 <option value="percentage">%</option>
@@ -794,20 +794,20 @@ const CreatePurchase = () => {
                 type="number" 
                 value={discountValue}
                 onChange={(e) => setDiscountValue(e.target.value)}
-                className="block w-24 rounded border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
+                className="block w-24 rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 min="0"
                 step={discountType === 'percentage' ? "0.01" : "1"}
               />
-              <span className="ml-auto">{formatCurrency(calculateDiscountAmount())}</span>
+              <span className="ml-auto text-gray-900 dark:text-white">{formatCurrency(calculateDiscountAmount())}</span>
             </div>
             
             <div className="flex justify-between items-center pb-2">
               <div className="flex gap-2 items-center">
-                <span className="text-gray-500">Tax:</span>
+                <span className="text-gray-500 dark:text-gray-400">Tax:</span>
                 <select
                   value={selectedTaxOption}
                   onChange={(e) => setSelectedTaxOption(e.target.value)}
-                  className="rounded border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
+                  className="rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
                   {TAX_OPTIONS.map(option => (
                     <option key={option.id} value={option.id}>
@@ -816,37 +816,37 @@ const CreatePurchase = () => {
                   ))}
                 </select>
               </div>
-              <span>{formatCurrency(calculateTaxAmount())}</span>
+              <span className="text-gray-900 dark:text-white">{formatCurrency(calculateTaxAmount())}</span>
             </div>
             
-            <div className="flex justify-between items-center pb-2 border-b">
+            <div className="flex justify-between items-center pb-2 border-b border-gray-200 dark:border-gray-600">
               <div className="flex gap-2 items-center">
-                <span className="text-gray-500">Freight Charges:</span>
+                <span className="text-gray-500 dark:text-gray-400">Freight Charges:</span>
                 <input 
                   type="number" 
                   value={frieghtCharge}
                   onChange={(e) => setFrieghtCharge(e.target.value)}
-                  className="block w-24 rounded border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
+                  className="block w-24 rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   min="0"
                 />
               </div>
-              <span>{formatCurrency(parseFloat(frieghtCharge) || 0)}</span>
+              <span className="text-gray-900 dark:text-white">{formatCurrency(parseFloat(frieghtCharge) || 0)}</span>
             </div>
             
             <div className="flex justify-between font-medium text-lg pt-2">
-              <span>Total:</span>
-              <span>{formatCurrency(calculateTotal())}</span>
+              <span className="text-gray-900 dark:text-white">Total:</span>
+              <span className="text-gray-900 dark:text-white">{formatCurrency(calculateTotal())}</span>
             </div>
           </div>
         </div>
 
         {/* Payment Details */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-          <h2 className="text-lg font-medium text-gray-800 mb-4">Payment Details</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
+          <h2 className="text-lg font-medium text-gray-800 dark:text-white mb-4">Payment Details</h2>
           
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Payment Status
               </label>
               <select
@@ -859,7 +859,7 @@ const CreatePurchase = () => {
                     setAmountPaid(0);
                   }
                 }}
-                className="block w-full rounded border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
+                className="block w-full rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
                 <option value="UNPAID">Unpaid</option>
                 <option value="PARTIAL">Partially Paid</option>
@@ -869,14 +869,14 @@ const CreatePurchase = () => {
             
             {paymentStatus !== 'UNPAID' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Amount Paid
                 </label>
                 <input 
                   type="number" 
                   value={amountPaid}
                   onChange={(e) => setAmountPaid(e.target.value)}
-                  className="block w-full rounded border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
+                  className="block w-full rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   min="0"
                   max={calculateTotal()}
                   step="0.01"
@@ -885,13 +885,13 @@ const CreatePurchase = () => {
             )}
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Notes (Optional)
               </label>
               <textarea 
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="block w-full rounded border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
+                className="block w-full rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 rows="2"
                 placeholder="Additional notes about this purchase"
               ></textarea>
@@ -903,7 +903,7 @@ const CreatePurchase = () => {
         <div className="flex justify-end space-x-3 mb-10">
           <button
             onClick={() => navigate('/purchases')}
-            className="px-4 py-2 text-sm font-medium rounded-lg text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+            className="px-4 py-2 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
           >
             Cancel
           </button>

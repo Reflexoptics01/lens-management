@@ -15,12 +15,12 @@ const PrintInvoiceModal = ({ isOpen, onClose, saleId, title }) => {
           aria-hidden="true"
           onClick={onClose}
         >
-          <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+          <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75 dark:opacity-85"></div>
         </div>
         
         {/* Modal panel */}
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-          <div className="bg-white p-6">
+        <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+          <div className="bg-white dark:bg-gray-800 p-6">
             {/* Directly render the FallbackInvoicePrint component */}
             <FallbackInvoicePrint saleId={saleId} onClose={onClose} />
           </div>

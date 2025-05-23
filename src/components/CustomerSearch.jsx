@@ -207,10 +207,10 @@ const CustomerSearch = ({ customers, value, onChange, onSelect, onAddNew, isOrde
             placeholder="Start typing customer name..."
             required
             aria-required="true"
-            className={`w-full rounded-lg border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm ${className}`}
+            className={`w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 shadow-sm focus:border-sky-500 dark:focus:border-sky-400 focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 text-sm ${className}`}
           />
           {showSuggestions && filteredCustomers.length > 0 && (
-            <div className="absolute z-10 w-full mt-1 bg-white rounded-md shadow-lg max-h-48 overflow-auto border border-sky-100">
+            <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 rounded-md shadow-lg max-h-48 overflow-auto border border-sky-100 dark:border-gray-600">
               <div 
                 ref={suggestionsRef}
                 className="py-1"
@@ -218,13 +218,13 @@ const CustomerSearch = ({ customers, value, onChange, onSelect, onAddNew, isOrde
                 {filteredCustomers.map((customer, idx) => (
                   <div
                     key={customer.id}
-                    className={`px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 ${selectedIndex === idx ? 'bg-sky-50' : ''}`}
+                    className={`px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-600 last:border-b-0 ${selectedIndex === idx ? 'bg-sky-50 dark:bg-sky-900/50' : ''}`}
                     onClick={(e) => handleCustomerClick(e, customer)}
                     onMouseEnter={() => setSelectedIndex(idx)}
                     tabIndex="0"
                   >
-                    <div className="font-medium text-sm">{customer.opticalName}</div>
-                    <div className="text-xs text-gray-500">
+                    <div className="font-medium text-sm text-gray-900 dark:text-gray-100">{customer.opticalName}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
                       {customer.phone} • {customer.city || 'No city'}
                     </div>
                   </div>
@@ -236,13 +236,13 @@ const CustomerSearch = ({ customers, value, onChange, onSelect, onAddNew, isOrde
         <button
           type="button"
           onClick={handleAddNew}
-          className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+          className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-sky-600 hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-sky-500 dark:focus:ring-sky-400 transition-colors"
         >
           Add New
         </button>
       </div>
       {value && (
-        <div className="mt-1 text-xs font-semibold text-sky-700">
+        <div className="mt-1 text-xs font-semibold text-sky-700 dark:text-sky-300">
           <span className="inline-flex items-center">
             <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />

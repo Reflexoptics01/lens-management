@@ -101,32 +101,32 @@ const LedgerFilters = ({ fromDate, setFromDate, toDate, setToDate, selectedEntit
   };
   
   return (
-    <div className="bg-white rounded-lg shadow p-2 mb-2">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-2 mb-2">
       <div className="flex flex-wrap items-end gap-2">
         {/* Date Range */}
         <div className="flex-none w-[160px]">
-          <label className="block text-xs font-medium text-gray-700 mb-1">From</label>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">From</label>
           <input
             type="date"
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
-            className="w-full rounded-md border-gray-300 border border-gray-400 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1"
+            className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-400 dark:border-gray-500 shadow-sm focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 text-sm py-1"
           />
         </div>
         
         <div className="flex-none w-[160px]">
-          <label className="block text-xs font-medium text-gray-700 mb-1">To</label>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">To</label>
           <input
             type="date"
             value={toDate}
             onChange={(e) => setToDate(e.target.value)}
-            className="w-full rounded-md border-gray-300 border border-gray-400 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1"
+            className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-400 dark:border-gray-500 shadow-sm focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 text-sm py-1"
           />
         </div>
         
         {/* Party Selection */}
         <div className="flex-1 min-w-[300px] max-w-[400px] relative">
-          <label className="block text-xs font-medium text-gray-700 mb-1">Party</label>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Party</label>
           <input
             type="text"
             value={searchTerm}
@@ -141,23 +141,23 @@ const LedgerFilters = ({ fromDate, setFromDate, toDate, setToDate, selectedEntit
               }
             }}
             placeholder="Search party..."
-            className="w-full rounded-md border-gray-300 border border-gray-400 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1"
+            className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-400 dark:border-gray-500 shadow-sm focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 text-sm py-1"
           />
           
           {showEntityList && filteredEntities.length > 0 && (
-            <div className="absolute z-50 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-sm overflow-auto border border-gray-300">
+            <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 shadow-lg max-h-60 rounded-md py-1 text-sm overflow-auto border border-gray-300 dark:border-gray-600">
               {filteredEntities.map((entity, idx) => (
                 <div
                   key={entity.id}
                   onClick={() => handleEntitySelect(entity)}
                   onMouseEnter={() => setSelectedEntityIndex(idx)}
-                  className={`cursor-pointer py-1 pl-3 pr-9 hover:bg-gray-100 ${
-                    selectedEntityIndex === idx ? 'bg-blue-50 text-blue-700' : ''
+                  className={`cursor-pointer py-1 pl-3 pr-9 hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                    selectedEntityIndex === idx ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-gray-100'
                   }`}
                 >
                   <span className="font-medium block truncate">{entity.opticalName}</span>
                   {entity.contactPerson && (
-                    <span className="text-gray-500 block truncate text-xs">{entity.contactPerson}</span>
+                    <span className="text-gray-500 dark:text-gray-400 block truncate text-xs">{entity.contactPerson}</span>
                   )}
                 </div>
               ))}
@@ -171,7 +171,7 @@ const LedgerFilters = ({ fromDate, setFromDate, toDate, setToDate, selectedEntit
           <button
             onClick={handleSearch}
             disabled={loading || !selectedEntity}
-            className="bg-blue-600 text-white py-1 px-14 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400 text-sm h-[32px] flex items-center"
+            className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white py-1 px-14 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:bg-gray-400 dark:disabled:bg-gray-600 text-sm h-[32px] flex items-center transition-colors"
           >
             {loading ? (
               <svg className="animate-spin h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -190,7 +190,7 @@ const LedgerFilters = ({ fromDate, setFromDate, toDate, setToDate, selectedEntit
           <button 
             onClick={() => window.printLedger && window.printLedger()}
             disabled={!selectedEntity}
-            className="flex items-center px-4 py-1 bg-gray-100 text-gray-800 rounded border border-gray-300 text-sm hover:bg-gray-200 h-[32px] disabled:opacity-50"
+            className="flex items-center px-4 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded border border-gray-300 dark:border-gray-600 text-sm hover:bg-gray-200 dark:hover:bg-gray-600 h-[32px] disabled:opacity-50 transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -202,7 +202,7 @@ const LedgerFilters = ({ fromDate, setFromDate, toDate, setToDate, selectedEntit
           <button 
             onClick={() => window.exportToExcel && window.exportToExcel()}
             disabled={!selectedEntity}
-            className="flex items-center px-4 py-1 bg-green-100 text-green-800 rounded border border-green-300 text-sm hover:bg-green-200 h-[32px] disabled:opacity-50"
+            className="flex items-center px-4 py-1 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 rounded border border-green-300 dark:border-green-700 text-sm hover:bg-green-200 dark:hover:bg-green-900/70 h-[32px] disabled:opacity-50 transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -214,7 +214,7 @@ const LedgerFilters = ({ fromDate, setFromDate, toDate, setToDate, selectedEntit
           <button 
             onClick={() => window.shareViaWhatsApp && window.shareViaWhatsApp()}
             disabled={!selectedEntity}
-            className="flex items-center px-4 py-1 bg-green-600 text-white rounded border border-green-700 text-sm hover:bg-green-700 h-[32px] disabled:opacity-50"
+            className="flex items-center px-4 py-1 bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white rounded border border-green-700 dark:border-green-600 text-sm h-[32px] disabled:opacity-50 transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.274.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564c.173.087.288.131.332.202.043.72.043.433-.101.824z"/>

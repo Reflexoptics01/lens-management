@@ -525,25 +525,25 @@ const GSTReturns = () => {
   };
   
   return (
-    <div className="mobile-page">
+    <div className="mobile-page bg-gray-50 dark:bg-gray-900">
       <Navbar />
       
       <div className="mobile-content">
         <div className="mb-4">
-          <h1 className="text-xl font-semibold text-gray-900">GST Returns</h1>
-          <p className="mt-1 text-sm text-gray-500">Generate GST returns data for GSTR-1 and GSTR-3B</p>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">GST Returns</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Generate GST returns data for GSTR-1 and GSTR-3B</p>
         </div>
 
         {/* Tab Navigation */}
-        <div className="bg-white rounded-lg shadow mb-4">
-          <div className="border-b border-gray-200">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-4">
+          <div className="border-b border-gray-200 dark:border-gray-700">
             <nav className="-mb-px flex space-x-8 px-4">
               <button
                 onClick={() => setActiveTab('gstr1')}
                 className={`${
                   activeTab === 'gstr1'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                 } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
               >
                 GSTR-1 (B2B/B2C)
@@ -552,8 +552,8 @@ const GSTReturns = () => {
                 onClick={() => setActiveTab('gstr3b')}
                 className={`${
                   activeTab === 'gstr3b'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                 } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
               >
                 GSTR-3B (Summary)
@@ -563,25 +563,25 @@ const GSTReturns = () => {
         </div>
         
         {/* Filter Section */}
-        <div className="bg-white rounded-lg shadow p-4 mb-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4">
           <div className="flex flex-wrap gap-4 items-end">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">From Date</label>
               <input
                 type="date"
                 value={fromDate}
                 onChange={(e) => setFromDate(e.target.value)}
-                className="rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2"
+                className="rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">To Date</label>
               <input
                 type="date"
                 value={toDate}
                 onChange={(e) => setToDate(e.target.value)}
-                className="rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2"
+                className="rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
             </div>
             
@@ -589,7 +589,7 @@ const GSTReturns = () => {
               <button
                 onClick={generateReports}
                 disabled={loading}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
               >
                 {loading ? 'Generating...' : 'Generate Reports'}
               </button>
@@ -599,13 +599,13 @@ const GSTReturns = () => {
         
         {/* Messages */}
         {error && (
-          <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-md">
+          <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/50 text-red-700 dark:text-red-200 rounded-md border border-red-200 dark:border-red-700">
             {error}
           </div>
         )}
         
         {success && (
-          <div className="mb-4 p-4 bg-green-50 text-green-700 rounded-md">
+          <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/50 text-green-700 dark:text-green-200 rounded-md border border-green-200 dark:border-green-700">
             {success}
           </div>
         )}
@@ -628,53 +628,53 @@ const GSTReturns = () => {
           <>
             {/* Summary Section */}
             {(reportData.b2bInvoices.length > 0 || reportData.b2cInvoices.length > 0) && (
-              <div className="bg-white rounded-lg shadow mb-4">
-                <div className="p-4 border-b">
-                  <h2 className="text-lg font-medium text-gray-900">Summary</h2>
-                  <p className="text-sm text-gray-500">Data for period: {formatDate(fromDate)} to {formatDate(toDate)}</p>
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-4">
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white">Summary</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Data for period: {formatDate(fromDate)} to {formatDate(toDate)}</p>
                 </div>
                 
                 <div className="p-4">
-                  <h3 className="text-md font-medium text-gray-800 mb-3">Overall Totals</h3>
+                  <h3 className="text-md font-medium text-gray-800 dark:text-white mb-3">Overall Totals</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-                    <div className="bg-blue-50 p-3 rounded-lg">
-                      <p className="text-sm text-blue-800 font-medium">Total Invoices</p>
-                      <p className="text-xl font-bold text-blue-900">{reportData.invoiceCount}</p>
+                    <div className="bg-blue-50 dark:bg-blue-900/50 p-3 rounded-lg border border-blue-200 dark:border-blue-700">
+                      <p className="text-sm text-blue-800 dark:text-blue-200 font-medium">Total Invoices</p>
+                      <p className="text-xl font-bold text-blue-900 dark:text-blue-100">{reportData.invoiceCount}</p>
                     </div>
                     
-                    <div className="bg-green-50 p-3 rounded-lg">
-                      <p className="text-sm text-green-800 font-medium">Total Receipts</p>
-                      <p className="text-xl font-bold text-green-900">{reportData.receiptCount}</p>
+                    <div className="bg-green-50 dark:bg-green-900/50 p-3 rounded-lg border border-green-200 dark:border-green-700">
+                      <p className="text-sm text-green-800 dark:text-green-200 font-medium">Total Receipts</p>
+                      <p className="text-xl font-bold text-green-900 dark:text-green-100">{reportData.receiptCount}</p>
                     </div>
                     
-                    <div className="bg-purple-50 p-3 rounded-lg">
-                      <p className="text-sm text-purple-800 font-medium">Total Amount</p>
-                      <p className="text-xl font-bold text-purple-900">{formatCurrency(reportData.totalAmount)}</p>
+                    <div className="bg-purple-50 dark:bg-purple-900/50 p-3 rounded-lg border border-purple-200 dark:border-purple-700">
+                      <p className="text-sm text-purple-800 dark:text-purple-200 font-medium">Total Amount</p>
+                      <p className="text-xl font-bold text-purple-900 dark:text-purple-100">{formatCurrency(reportData.totalAmount)}</p>
                     </div>
                     
-                    <div className="bg-yellow-50 p-3 rounded-lg">
-                      <p className="text-sm text-yellow-800 font-medium">Total Tax</p>
-                      <p className="text-xl font-bold text-yellow-900">{formatCurrency(reportData.totalTaxAmount)}</p>
+                    <div className="bg-yellow-50 dark:bg-yellow-900/50 p-3 rounded-lg border border-yellow-200 dark:border-yellow-700">
+                      <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">Total Tax</p>
+                      <p className="text-xl font-bold text-yellow-900 dark:text-yellow-100">{formatCurrency(reportData.totalTaxAmount)}</p>
                     </div>
                   </div>
 
                   <div className="flex flex-col md:flex-row gap-4">
                     {/* B2B Summary */}
                     {reportData.b2bInvoices.length > 0 && (
-                      <div className="flex-1 border border-gray-200 rounded-lg p-3">
-                        <h3 className="text-md font-medium text-gray-800 mb-2">B2B (With GST)</h3>
+                      <div className="flex-1 border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-gray-700">
+                        <h3 className="text-md font-medium text-gray-800 dark:text-white mb-2">B2B (With GST)</h3>
                         <div className="space-y-2">
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Invoices:</span>
-                            <span className="text-sm font-medium">{reportData.b2bInvoices.length}</span>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">Invoices:</span>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">{reportData.b2bInvoices.length}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Total Amount:</span>
-                            <span className="text-sm font-medium">{formatCurrency(reportData.b2bTotalAmount)}</span>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">Total Amount:</span>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">{formatCurrency(reportData.b2bTotalAmount)}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Total Tax:</span>
-                            <span className="text-sm font-medium">{formatCurrency(reportData.b2bTaxAmount)}</span>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">Total Tax:</span>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">{formatCurrency(reportData.b2bTaxAmount)}</span>
                           </div>
                         </div>
                       </div>
@@ -682,20 +682,20 @@ const GSTReturns = () => {
 
                     {/* B2C Summary */}
                     {reportData.b2cInvoices.length > 0 && (
-                      <div className="flex-1 border border-gray-200 rounded-lg p-3">
-                        <h3 className="text-md font-medium text-gray-800 mb-2">B2C (Without GST)</h3>
+                      <div className="flex-1 border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-gray-700">
+                        <h3 className="text-md font-medium text-gray-800 dark:text-white mb-2">B2C (Without GST)</h3>
                         <div className="space-y-2">
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Invoices:</span>
-                            <span className="text-sm font-medium">{reportData.b2cInvoices.length}</span>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">Invoices:</span>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">{reportData.b2cInvoices.length}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Total Amount:</span>
-                            <span className="text-sm font-medium">{formatCurrency(reportData.b2cTotalAmount)}</span>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">Total Amount:</span>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">{formatCurrency(reportData.b2cTotalAmount)}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Total Tax:</span>
-                            <span className="text-sm font-medium">{formatCurrency(reportData.b2cTaxAmount)}</span>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">Total Tax:</span>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">{formatCurrency(reportData.b2cTaxAmount)}</span>
                           </div>
                         </div>
                       </div>
@@ -707,43 +707,43 @@ const GSTReturns = () => {
             
             {/* B2B Data */}
             {reportData.b2bInvoices.length > 0 && (
-              <div className="bg-white rounded-lg shadow mb-4">
-                <div className="p-4 border-b flex justify-between items-center">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-4 overflow-hidden">
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                   <div>
-                    <h2 className="text-lg font-medium text-gray-900">B2B Invoices (with GST)</h2>
-                    <p className="text-sm text-gray-500">{reportData.b2bInvoices.length} invoices - Preview of data (Sheet 1 in Excel export)</p>
+                    <h2 className="text-lg font-medium text-gray-900 dark:text-white">B2B Invoices (with GST)</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{reportData.b2bInvoices.length} invoices - Preview of data (Sheet 1 in Excel export)</p>
                   </div>
                 </div>
                 
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-700">
                       <tr>
-                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice #</th>
-                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Party</th>
-                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">GSTIN</th>
-                        <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Taxable Value</th>
-                        <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Tax Amount</th>
-                        <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Invoice #</th>
+                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Party</th>
+                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">GSTIN</th>
+                        <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Taxable Value</th>
+                        <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tax Amount</th>
+                        <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                       {reportData.b2bInvoices.slice(0, 10).map((invoice) => (
-                        <tr key={invoice.id} className="hover:bg-gray-50">
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{invoice.invoiceNumber}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">{formatDate(invoice.invoiceDate)}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{invoice.customerName}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">{invoice.customerGst}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-900">{formatCurrency(invoice.subtotal)}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-900">{formatCurrency(invoice.taxAmount)}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-right font-medium text-gray-900">{formatCurrency(invoice.totalAmount)}</td>
+                        <tr key={invoice.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white">{invoice.invoiceNumber}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{formatDate(invoice.invoiceDate)}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white">{invoice.customerName}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{invoice.customerGst}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-900 dark:text-white">{formatCurrency(invoice.subtotal)}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-900 dark:text-white">{formatCurrency(invoice.taxAmount)}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-right font-medium text-gray-900 dark:text-white">{formatCurrency(invoice.totalAmount)}</td>
                         </tr>
                       ))}
                       
                       {reportData.b2bInvoices.length > 10 && (
                         <tr>
-                          <td colSpan="7" className="px-3 py-2 text-sm text-gray-500 text-center">
+                          <td colSpan="7" className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-center">
                             {reportData.b2bInvoices.length - 10} more invoices not shown. Export to see all data.
                           </td>
                         </tr>
@@ -756,41 +756,41 @@ const GSTReturns = () => {
             
             {/* B2C Data */}
             {reportData.b2cInvoices.length > 0 && (
-              <div className="bg-white rounded-lg shadow mb-4">
-                <div className="p-4 border-b flex justify-between items-center">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-4 overflow-hidden">
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                   <div>
-                    <h2 className="text-lg font-medium text-gray-900">B2C Invoices (without GST)</h2>
-                    <p className="text-sm text-gray-500">{reportData.b2cInvoices.length} invoices - Preview of data (Sheet 2 in Excel export)</p>
+                    <h2 className="text-lg font-medium text-gray-900 dark:text-white">B2C Invoices (without GST)</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{reportData.b2cInvoices.length} invoices - Preview of data (Sheet 2 in Excel export)</p>
                   </div>
                 </div>
                 
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-700">
                       <tr>
-                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice #</th>
-                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Party</th>
-                        <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Taxable Value</th>
-                        <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Tax Amount</th>
-                        <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Invoice #</th>
+                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Party</th>
+                        <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Taxable Value</th>
+                        <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tax Amount</th>
+                        <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                       {reportData.b2cInvoices.slice(0, 10).map((invoice) => (
-                        <tr key={invoice.id} className="hover:bg-gray-50">
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{invoice.invoiceNumber}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">{formatDate(invoice.invoiceDate)}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{invoice.customerName}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-900">{formatCurrency(invoice.subtotal)}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-900">{formatCurrency(invoice.taxAmount)}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-right font-medium text-gray-900">{formatCurrency(invoice.totalAmount)}</td>
+                        <tr key={invoice.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white">{invoice.invoiceNumber}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{formatDate(invoice.invoiceDate)}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white">{invoice.customerName}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-900 dark:text-white">{formatCurrency(invoice.subtotal)}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-900 dark:text-white">{formatCurrency(invoice.taxAmount)}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-right font-medium text-gray-900 dark:text-white">{formatCurrency(invoice.totalAmount)}</td>
                         </tr>
                       ))}
                       
                       {reportData.b2cInvoices.length > 10 && (
                         <tr>
-                          <td colSpan="6" className="px-3 py-2 text-sm text-gray-500 text-center">
+                          <td colSpan="6" className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-center">
                             {reportData.b2cInvoices.length - 10} more invoices not shown. Export to see all data.
                           </td>
                         </tr>
@@ -807,16 +807,16 @@ const GSTReturns = () => {
         {activeTab === 'gstr3b' && (
           <>
             {/* GSTR-3B Form Header */}
-            <div className="bg-white rounded-lg shadow mb-4">
-              <div className="p-4 border-b bg-blue-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-4">
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/50">
                 <div className="flex justify-between items-center">
                   <div>
-                    <h2 className="text-lg font-medium text-gray-900">FORM GSTR-3B</h2>
-                    <p className="text-sm text-gray-600">[See rule 61(5)]</p>
+                    <h2 className="text-lg font-medium text-gray-900 dark:text-white">FORM GSTR-3B</h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">[See rule 61(5)]</p>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm text-gray-600">Year: {new Date(fromDate).getFullYear()}</div>
-                    <div className="text-sm text-gray-600">Month: {new Date(fromDate).toLocaleDateString('en-US', { month: 'long' })}</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Year: {new Date(fromDate).getFullYear()}</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Month: {new Date(fromDate).toLocaleDateString('en-US', { month: 'long' })}</div>
                   </div>
                 </div>
               </div>
@@ -825,71 +825,71 @@ const GSTReturns = () => {
             {gstr3bData.outwardSupplies.taxableSupplies.taxableValue > 0 && (
               <>
                 {/* 3.1 Details of Outward Supplies */}
-                <div className="bg-white rounded-lg shadow mb-4">
-                  <div className="p-4 border-b">
-                    <h3 className="text-lg font-medium text-gray-900">3.1 Details of Outward Supplies and inward supplies liable to reverse charge</h3>
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-4 overflow-hidden">
+                  <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">3.1 Details of Outward Supplies and inward supplies liable to reverse charge</h3>
                   </div>
                   
                   <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-blue-50">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                      <thead className="bg-blue-50 dark:bg-blue-900/50">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nature of Supplies</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Total Taxable Value</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Integrated Tax</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Central Tax</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">State/UT Tax</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Cess</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Nature of Supplies</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Taxable Value</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Integrated Tax</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Central Tax</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">State/UT Tax</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cess</th>
                         </tr>
-                        <tr className="bg-blue-100">
-                          <td className="px-4 py-2 text-xs text-center font-medium">1</td>
-                          <td className="px-4 py-2 text-xs text-center font-medium">2</td>
-                          <td className="px-4 py-2 text-xs text-center font-medium">3</td>
-                          <td className="px-4 py-2 text-xs text-center font-medium">4</td>
-                          <td className="px-4 py-2 text-xs text-center font-medium">5</td>
-                          <td className="px-4 py-2 text-xs text-center font-medium">6</td>
+                        <tr className="bg-blue-100 dark:bg-blue-800/50">
+                          <td className="px-4 py-2 text-xs text-center font-medium text-gray-700 dark:text-gray-300">1</td>
+                          <td className="px-4 py-2 text-xs text-center font-medium text-gray-700 dark:text-gray-300">2</td>
+                          <td className="px-4 py-2 text-xs text-center font-medium text-gray-700 dark:text-gray-300">3</td>
+                          <td className="px-4 py-2 text-xs text-center font-medium text-gray-700 dark:text-gray-300">4</td>
+                          <td className="px-4 py-2 text-xs text-center font-medium text-gray-700 dark:text-gray-300">5</td>
+                          <td className="px-4 py-2 text-xs text-center font-medium text-gray-700 dark:text-gray-300">6</td>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         <tr>
-                          <td className="px-4 py-2 text-sm text-gray-900">(a) Outward taxable supplies (other than zero rated, nil rated and exempted)</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.outwardSupplies.taxableSupplies.taxableValue)}</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.outwardSupplies.taxableSupplies.integratedTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.outwardSupplies.taxableSupplies.centralTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.outwardSupplies.taxableSupplies.stateTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.outwardSupplies.taxableSupplies.cess)}</td>
+                          <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">(a) Outward taxable supplies (other than zero rated, nil rated and exempted)</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.outwardSupplies.taxableSupplies.taxableValue)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.outwardSupplies.taxableSupplies.integratedTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.outwardSupplies.taxableSupplies.centralTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.outwardSupplies.taxableSupplies.stateTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.outwardSupplies.taxableSupplies.cess)}</td>
                         </tr>
-                        <tr className="bg-gray-50">
-                          <td className="px-4 py-2 text-sm text-gray-900">(b) Outward taxable supplies (zero rated)</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.outwardSupplies.zeroRatedSupplies.taxableValue)}</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.outwardSupplies.zeroRatedSupplies.integratedTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.outwardSupplies.zeroRatedSupplies.centralTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.outwardSupplies.zeroRatedSupplies.stateTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.outwardSupplies.zeroRatedSupplies.cess)}</td>
-                        </tr>
-                        <tr>
-                          <td className="px-4 py-2 text-sm text-gray-900">(c) Other outward supplies (Nil rated, exempted)</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.outwardSupplies.exemptSupplies.taxableValue)}</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.outwardSupplies.exemptSupplies.integratedTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.outwardSupplies.exemptSupplies.centralTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.outwardSupplies.exemptSupplies.stateTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.outwardSupplies.exemptSupplies.cess)}</td>
-                        </tr>
-                        <tr className="bg-gray-50">
-                          <td className="px-4 py-2 text-sm text-gray-900">(d) Inward supplies (liable to reverse charge)</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
+                        <tr className="bg-gray-50 dark:bg-gray-700">
+                          <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">(b) Outward taxable supplies (zero rated)</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.outwardSupplies.zeroRatedSupplies.taxableValue)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.outwardSupplies.zeroRatedSupplies.integratedTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.outwardSupplies.zeroRatedSupplies.centralTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.outwardSupplies.zeroRatedSupplies.stateTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.outwardSupplies.zeroRatedSupplies.cess)}</td>
                         </tr>
                         <tr>
-                          <td className="px-4 py-2 text-sm text-gray-900">(e) Non-GST outward supplies</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">(c) Other outward supplies (Nil rated, exempted)</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.outwardSupplies.exemptSupplies.taxableValue)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.outwardSupplies.exemptSupplies.integratedTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.outwardSupplies.exemptSupplies.centralTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.outwardSupplies.exemptSupplies.stateTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.outwardSupplies.exemptSupplies.cess)}</td>
+                        </tr>
+                        <tr className="bg-gray-50 dark:bg-gray-700">
+                          <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">(d) Inward supplies (liable to reverse charge)</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
+                        </tr>
+                        <tr>
+                          <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">(e) Non-GST outward supplies</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
                         </tr>
                       </tbody>
                     </table>
@@ -897,57 +897,57 @@ const GSTReturns = () => {
                 </div>
 
                 {/* 4. Eligible ITC */}
-                <div className="bg-white rounded-lg shadow mb-4">
-                  <div className="p-4 border-b">
-                    <h3 className="text-lg font-medium text-gray-900">4. Eligible ITC</h3>
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-4 overflow-hidden">
+                  <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">4. Eligible ITC</h3>
                   </div>
                   
                   <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-green-50">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                      <thead className="bg-green-50 dark:bg-green-900/50">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Integrated Tax</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Central Tax</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">State/UT Tax</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Cess</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Details</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Integrated Tax</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Central Tax</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">State/UT Tax</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cess</th>
                         </tr>
-                        <tr className="bg-green-100">
-                          <td className="px-4 py-2 text-xs text-center font-medium">1</td>
-                          <td className="px-4 py-2 text-xs text-center font-medium">2</td>
-                          <td className="px-4 py-2 text-xs text-center font-medium">3</td>
-                          <td className="px-4 py-2 text-xs text-center font-medium">4</td>
-                          <td className="px-4 py-2 text-xs text-center font-medium">5</td>
+                        <tr className="bg-green-100 dark:bg-green-800/50">
+                          <td className="px-4 py-2 text-xs text-center font-medium text-gray-700 dark:text-gray-300">1</td>
+                          <td className="px-4 py-2 text-xs text-center font-medium text-gray-700 dark:text-gray-300">2</td>
+                          <td className="px-4 py-2 text-xs text-center font-medium text-gray-700 dark:text-gray-300">3</td>
+                          <td className="px-4 py-2 text-xs text-center font-medium text-gray-700 dark:text-gray-300">4</td>
+                          <td className="px-4 py-2 text-xs text-center font-medium text-gray-700 dark:text-gray-300">5</td>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         <tr>
-                          <td className="px-4 py-2 text-sm text-gray-900">(A) ITC Available (whether in full or part)</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.inputTaxCredit.inwardSupplies.integratedTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.inputTaxCredit.inwardSupplies.centralTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.inputTaxCredit.inwardSupplies.stateTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.inputTaxCredit.inwardSupplies.cess)}</td>
+                          <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">(A) ITC Available (whether in full or part)</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.inputTaxCredit.inwardSupplies.integratedTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.inputTaxCredit.inwardSupplies.centralTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.inputTaxCredit.inwardSupplies.stateTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.inputTaxCredit.inwardSupplies.cess)}</td>
                         </tr>
-                        <tr className="bg-gray-50">
-                          <td className="px-4 py-2 text-sm text-gray-900">(B) ITC Reversed</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
+                        <tr className="bg-gray-50 dark:bg-gray-700">
+                          <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">(B) ITC Reversed</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
                         </tr>
                         <tr>
-                          <td className="px-4 py-2 text-sm text-gray-900">(C) Net ITC Available (A) - (B)</td>
-                          <td className="px-4 py-2 text-sm text-right font-medium">{formatCurrency(gstr3bData.inputTaxCredit.netItc.integratedTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right font-medium">{formatCurrency(gstr3bData.inputTaxCredit.netItc.centralTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right font-medium">{formatCurrency(gstr3bData.inputTaxCredit.netItc.stateTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right font-medium">{formatCurrency(gstr3bData.inputTaxCredit.netItc.cess)}</td>
+                          <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">(C) Net ITC Available (A) - (B)</td>
+                          <td className="px-4 py-2 text-sm text-right font-medium text-gray-900 dark:text-white">{formatCurrency(gstr3bData.inputTaxCredit.netItc.integratedTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right font-medium text-gray-900 dark:text-white">{formatCurrency(gstr3bData.inputTaxCredit.netItc.centralTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right font-medium text-gray-900 dark:text-white">{formatCurrency(gstr3bData.inputTaxCredit.netItc.stateTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right font-medium text-gray-900 dark:text-white">{formatCurrency(gstr3bData.inputTaxCredit.netItc.cess)}</td>
                         </tr>
-                        <tr className="bg-gray-50">
-                          <td className="px-4 py-2 text-sm text-gray-900">(D) Ineligible ITC</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.inputTaxCredit.reversalItc.integratedTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.inputTaxCredit.reversalItc.centralTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.inputTaxCredit.reversalItc.stateTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.inputTaxCredit.reversalItc.cess)}</td>
+                        <tr className="bg-gray-50 dark:bg-gray-700">
+                          <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">(D) Ineligible ITC</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.inputTaxCredit.reversalItc.integratedTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.inputTaxCredit.reversalItc.centralTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.inputTaxCredit.reversalItc.stateTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.inputTaxCredit.reversalItc.cess)}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -955,63 +955,63 @@ const GSTReturns = () => {
                 </div>
 
                 {/* 6.1 Payment of Tax */}
-                <div className="bg-white rounded-lg shadow mb-4">
-                  <div className="p-4 border-b">
-                    <h3 className="text-lg font-medium text-gray-900">6.1 Payment of tax</h3>
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-4 overflow-hidden">
+                  <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">6.1 Payment of tax</h3>
                   </div>
                   
                   <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-yellow-50">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                      <thead className="bg-yellow-50 dark:bg-yellow-900/50">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Tax payable</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Integrated Tax</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Central Tax</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">State/UT Tax</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Cess</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Description</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tax payable</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Integrated Tax</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Central Tax</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">State/UT Tax</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cess</th>
                         </tr>
-                        <tr className="bg-yellow-100">
-                          <td className="px-4 py-2 text-xs text-center font-medium">1</td>
-                          <td className="px-4 py-2 text-xs text-center font-medium">2</td>
-                          <td className="px-4 py-2 text-xs text-center font-medium">3</td>
-                          <td className="px-4 py-2 text-xs text-center font-medium">4</td>
-                          <td className="px-4 py-2 text-xs text-center font-medium">5</td>
-                          <td className="px-4 py-2 text-xs text-center font-medium">6</td>
+                        <tr className="bg-yellow-100 dark:bg-yellow-800/50">
+                          <td className="px-4 py-2 text-xs text-center font-medium text-gray-700 dark:text-gray-300">1</td>
+                          <td className="px-4 py-2 text-xs text-center font-medium text-gray-700 dark:text-gray-300">2</td>
+                          <td className="px-4 py-2 text-xs text-center font-medium text-gray-700 dark:text-gray-300">3</td>
+                          <td className="px-4 py-2 text-xs text-center font-medium text-gray-700 dark:text-gray-300">4</td>
+                          <td className="px-4 py-2 text-xs text-center font-medium text-gray-700 dark:text-gray-300">5</td>
+                          <td className="px-4 py-2 text-xs text-center font-medium text-gray-700 dark:text-gray-300">6</td>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         <tr>
-                          <td className="px-4 py-2 text-sm text-gray-900">Integrated Tax</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.taxPayable.integratedTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.taxPayable.integratedTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">Integrated Tax</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.taxPayable.integratedTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.taxPayable.integratedTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
                         </tr>
-                        <tr className="bg-gray-50">
-                          <td className="px-4 py-2 text-sm text-gray-900">Central Tax</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.taxPayable.centralTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.taxPayable.centralTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
+                        <tr className="bg-gray-50 dark:bg-gray-700">
+                          <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">Central Tax</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.taxPayable.centralTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.taxPayable.centralTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
                         </tr>
                         <tr>
-                          <td className="px-4 py-2 text-sm text-gray-900">State/UT Tax</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.taxPayable.stateTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.taxPayable.stateTax)}</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">State/UT Tax</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.taxPayable.stateTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.taxPayable.stateTax)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
                         </tr>
-                        <tr className="bg-gray-50">
-                          <td className="px-4 py-2 text-sm text-gray-900">Cess</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.taxPayable.cess)}</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
-                          <td className="px-4 py-2 text-sm text-right">₹0.00</td>
-                          <td className="px-4 py-2 text-sm text-right">{formatCurrency(gstr3bData.taxPayable.cess)}</td>
+                        <tr className="bg-gray-50 dark:bg-gray-700">
+                          <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">Cess</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.taxPayable.cess)}</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">₹0.00</td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">{formatCurrency(gstr3bData.taxPayable.cess)}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -1019,24 +1019,24 @@ const GSTReturns = () => {
                 </div>
 
                 {/* Interest and Late Fees */}
-                <div className="bg-white rounded-lg shadow mb-4">
-                  <div className="p-4 border-b">
-                    <h3 className="text-lg font-medium text-gray-900">Interest and Late Fees</h3>
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-4">
+                  <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">Interest and Late Fees</h3>
                   </div>
                   
                   <div className="p-4">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="bg-red-50 p-4 rounded-lg">
-                        <h4 className="text-sm font-medium text-red-800 mb-2">Interest on delayed payment</h4>
-                        <p className="text-lg font-bold text-red-900">{formatCurrency(gstr3bData.interestAndFees.interestOnDelay)}</p>
+                      <div className="bg-red-50 dark:bg-red-900/50 p-4 rounded-lg border border-red-200 dark:border-red-700">
+                        <h4 className="text-sm font-medium text-red-800 dark:text-red-200 mb-2">Interest on delayed payment</h4>
+                        <p className="text-lg font-bold text-red-900 dark:text-red-100">{formatCurrency(gstr3bData.interestAndFees.interestOnDelay)}</p>
                       </div>
-                      <div className="bg-orange-50 p-4 rounded-lg">
-                        <h4 className="text-sm font-medium text-orange-800 mb-2">Late fees</h4>
-                        <p className="text-lg font-bold text-orange-900">{formatCurrency(gstr3bData.interestAndFees.lateFees)}</p>
+                      <div className="bg-orange-50 dark:bg-orange-900/50 p-4 rounded-lg border border-orange-200 dark:border-orange-700">
+                        <h4 className="text-sm font-medium text-orange-800 dark:text-orange-200 mb-2">Late fees</h4>
+                        <p className="text-lg font-bold text-orange-900 dark:text-orange-100">{formatCurrency(gstr3bData.interestAndFees.lateFees)}</p>
                       </div>
-                      <div className="bg-purple-50 p-4 rounded-lg">
-                        <h4 className="text-sm font-medium text-purple-800 mb-2">Penalty</h4>
-                        <p className="text-lg font-bold text-purple-900">{formatCurrency(gstr3bData.interestAndFees.penaltyAmount)}</p>
+                      <div className="bg-purple-50 dark:bg-purple-900/50 p-4 rounded-lg border border-purple-200 dark:border-purple-700">
+                        <h4 className="text-sm font-medium text-purple-800 dark:text-purple-200 mb-2">Penalty</h4>
+                        <p className="text-lg font-bold text-purple-900 dark:text-purple-100">{formatCurrency(gstr3bData.interestAndFees.penaltyAmount)}</p>
                       </div>
                     </div>
                   </div>
@@ -1048,12 +1048,12 @@ const GSTReturns = () => {
         
         {/* Empty State */}
         {!loading && activeTab === 'gstr1' && reportData.b2bInvoices.length === 0 && reportData.b2cInvoices.length === 0 && (
-          <div className="bg-white p-6 text-center rounded-lg shadow">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="bg-white dark:bg-gray-800 p-6 text-center rounded-lg shadow">
+            <svg className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No GST data</h3>
-            <p className="mt-1 text-sm text-gray-500">
+            <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No GST data</h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Select a date range and generate reports to view GST return data.
             </p>
           </div>
@@ -1061,12 +1061,12 @@ const GSTReturns = () => {
 
         {/* Empty State for GSTR-3B */}
         {!loading && activeTab === 'gstr3b' && gstr3bData.outwardSupplies.taxableSupplies.taxableValue === 0 && (
-          <div className="bg-white p-6 text-center rounded-lg shadow">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="bg-white dark:bg-gray-800 p-6 text-center rounded-lg shadow">
+            <svg className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No GSTR-3B data</h3>
-            <p className="mt-1 text-sm text-gray-500">
+            <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No GSTR-3B data</h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Select a date range and generate reports to view GSTR-3B summary data.
             </p>
           </div>

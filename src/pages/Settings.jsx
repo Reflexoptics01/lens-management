@@ -1363,7 +1363,7 @@ const Settings = () => {
                 setShowBackupConfirmModal(false);
                 setShowPasswordConfirmModal(true);
               }}
-              className="mt-3 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:mt-0 sm:w-auto sm:text-sm"
+              className="mt-3 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
             >
               🗑️ Skip Backup & Delete
             </button>
@@ -1383,43 +1383,45 @@ const Settings = () => {
   // Password Confirmation Modal
   const PasswordConfirmModal = () => (
     <div className="fixed inset-0 overflow-y-auto z-50">
-      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center">
+      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
         <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-          <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+          <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
         </div>
-        
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+
+        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+        <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+          <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="sm:flex sm:items-start">
-              <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/50 sm:mx-0 sm:h-10 sm:w-10">
+                <svg className="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
-              <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                <h3 className="text-lg leading-6 font-medium text-gray-900">
+              <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
                   🔐 Admin Password Required
                 </h3>
                 <div className="mt-2">
-                  <p className="text-sm text-gray-500 mb-4">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                     Please enter your admin password to confirm this destructive action.
                   </p>
                   
                   {passwordConfirmError && (
-                    <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
-                      <p className="text-sm text-red-700">{passwordConfirmError}</p>
+                    <div className="bg-red-50 dark:bg-red-900/50 border border-red-200 dark:border-red-700 rounded-md p-3 mb-4">
+                      <p className="text-sm text-red-700 dark:text-red-200">{passwordConfirmError}</p>
                     </div>
                   )}
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Admin Password
                     </label>
                     <input
                       type="password"
                       value={adminPassword}
                       onChange={(e) => setAdminPassword(e.target.value)}
-                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                      className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 dark:focus:ring-red-400 dark:focus:border-red-400 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       placeholder="Enter your password"
                       onKeyPress={(e) => {
                         if (e.key === 'Enter' && adminPassword) {
@@ -1429,8 +1431,8 @@ const Settings = () => {
                     />
                   </div>
                   
-                  <div className="mt-4 bg-red-50 border border-red-200 rounded-md p-3">
-                    <p className="text-xs text-red-700 font-medium">
+                  <div className="mt-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-md p-3">
+                    <p className="text-xs text-red-700 dark:text-red-200 font-medium">
                       ⚠️ FINAL WARNING: This will permanently delete ALL your business data. 
                       This action cannot be undone.
                     </p>
@@ -1439,18 +1441,18 @@ const Settings = () => {
               </div>
             </div>
           </div>
-          <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+          <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
             <button
               type="button"
               onClick={handlePasswordConfirm}
               disabled={!adminPassword || loading}
-              className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 sm:ml-3 sm:w-auto sm:text-sm"
+              className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-red-500 disabled:opacity-50 sm:ml-3 sm:w-auto sm:text-sm"
             >
               {loading ? (
                 <>
                   <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                   Deleting...
                 </>
@@ -1463,7 +1465,7 @@ const Settings = () => {
                 setAdminPassword('');
                 setPasswordConfirmError('');
               }}
-              className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+              className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-sky-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
             >
               Cancel
             </button>
@@ -1474,18 +1476,18 @@ const Settings = () => {
   );
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50">
+    <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-gray-900">
       <Navbar />
       
       <div className="flex-grow p-4 pb-24">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Settings</h1>
         
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6 text-red-700 flex justify-between items-center">
+          <div className="bg-red-50 dark:bg-red-900/50 border-l-4 border-red-400 dark:border-red-600 p-4 mb-6 text-red-700 dark:text-red-200 flex justify-between items-center">
             <p>{error}</p>
             <button 
               onClick={() => setError('')}
-              className="ml-4 text-red-700 hover:text-red-900"
+              className="ml-4 text-red-700 dark:text-red-200 hover:text-red-900 dark:hover:text-red-100"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -1495,181 +1497,181 @@ const Settings = () => {
         )}
         
         {success && (
-          <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-6 text-green-700">
+          <div className="bg-green-50 dark:bg-green-900/50 border-l-4 border-green-400 dark:border-green-600 p-4 mb-6 text-green-700 dark:text-green-200">
             <p>{success}</p>
           </div>
         )}
         
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
           {/* Tabs */}
-          <div className="flex border-b border-gray-200 overflow-x-auto">
+          <div className="flex border-b border-gray-200 dark:border-gray-700 overflow-x-auto bg-gray-50 dark:bg-gray-800/50">
             <button
-              className={`px-4 py-3 text-sm font-medium ${activeTab === 'shop' ? 'text-sky-600 border-b-2 border-sky-500' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-4 py-3 text-sm font-medium ${activeTab === 'shop' ? 'text-sky-600 dark:text-sky-400 border-b-2 border-sky-500 dark:border-sky-400 bg-white dark:bg-gray-800' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}
               onClick={() => setActiveTab('shop')}
             >
               Shop Information
             </button>
             <button
-              className={`px-4 py-3 text-sm font-medium ${activeTab === 'bank' ? 'text-sky-600 border-b-2 border-sky-500' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-4 py-3 text-sm font-medium ${activeTab === 'bank' ? 'text-sky-600 dark:text-sky-400 border-b-2 border-sky-500 dark:border-sky-400 bg-white dark:bg-gray-800' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}
               onClick={() => setActiveTab('bank')}
             >
               Bank Details
             </button>
             <button
-              className={`px-4 py-3 text-sm font-medium ${activeTab === 'financial' ? 'text-sky-600 border-b-2 border-sky-500' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-4 py-3 text-sm font-medium ${activeTab === 'financial' ? 'text-sky-600 dark:text-sky-400 border-b-2 border-sky-500 dark:border-sky-400 bg-white dark:bg-gray-800' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}
               onClick={() => setActiveTab('financial')}
             >
               Financial Year
             </button>
             <button
-              className={`px-4 py-3 text-sm font-medium ${activeTab === 'backup' ? 'text-sky-600 border-b-2 border-sky-500' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-4 py-3 text-sm font-medium ${activeTab === 'backup' ? 'text-sky-600 dark:text-sky-400 border-b-2 border-sky-500 dark:border-sky-400 bg-white dark:bg-gray-800' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}
               onClick={() => setActiveTab('backup')}
             >
               Backup & Restore
             </button>
             <button
-              className={`px-4 py-3 text-sm font-medium ${activeTab === 'users' ? 'text-sky-600 border-b-2 border-sky-500' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-4 py-3 text-sm font-medium ${activeTab === 'users' ? 'text-sky-600 dark:text-sky-400 border-b-2 border-sky-500 dark:border-sky-400 bg-white dark:bg-gray-800' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}
               onClick={() => setActiveTab('users')}
             >
               Users
             </button>
             <button
-              className={`px-4 py-3 text-sm font-medium ${activeTab === 'password' ? 'text-sky-600 border-b-2 border-sky-500' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-4 py-3 text-sm font-medium ${activeTab === 'password' ? 'text-sky-600 dark:text-sky-400 border-b-2 border-sky-500 dark:border-sky-400 bg-white dark:bg-gray-800' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}
               onClick={() => setActiveTab('password')}
             >
               Change Password
             </button>
           </div>
           
-          <div className="p-6">
+          <div className="p-6 bg-white dark:bg-gray-800">
             {/* Shop Information Tab */}
             {activeTab === 'shop' && (
               <div className="space-y-6">
-                <h2 className="text-lg font-medium text-gray-900">Shop Information</h2>
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">Shop Information</h2>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Shop Name *</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Shop Name *</label>
                     <input
                       type="text"
                       value={shopName}
                       onChange={(e) => setShopName(e.target.value)}
-                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       required
                     />
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">GST Number</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">GST Number</label>
                     <input
                       type="text"
                       value={gstNumber}
                       onChange={(e) => setGstNumber(e.target.value)}
-                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
                   </div>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Address</label>
                   <textarea
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                     rows={3}
-                    className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                    className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">City</label>
                     <input
                       type="text"
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
-                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">State</label>
                     <input
                       type="text"
                       value={state}
                       onChange={(e) => setState(e.target.value)}
-                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Pincode</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pincode</label>
                     <input
                       type="text"
                       value={pincode}
                       onChange={(e) => setPincode(e.target.value)}
-                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
                   </div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone Number</label>
                     <input
                       type="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
                     <input
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
                   </div>
                 </div>
                 
                 {/* Shop Logo Section */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Shop Logo (Optional)</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Shop Logo (Optional)</label>
                   <div className="mt-1 flex items-center">
                     {logoDataURL ? (
                       <div className="relative">
                         <img 
                           src={logoDataURL} 
                           alt="Shop Logo" 
-                          className="h-32 w-32 object-contain bg-gray-100 rounded-md"
+                          className="h-32 w-32 object-contain bg-gray-100 dark:bg-gray-600 rounded-md"
                         />
                         <button
                           type="button"
                           onClick={removeLogo}
-                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                          className="absolute top-1 right-1 bg-red-500 dark:bg-red-600 text-white rounded-full p-1 w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 dark:hover:bg-red-700"
                         >
                           ×
                         </button>
                       </div>
                     ) : loading ? (
-                      <div className="flex justify-center items-center border-2 border-dashed border-gray-300 rounded-md h-32 w-32 p-2">
+                      <div className="flex justify-center items-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md h-32 w-32 p-2 bg-gray-50 dark:bg-gray-700">
                         <div className="text-center">
-                          <svg className="animate-spin mx-auto h-8 w-8 text-sky-500" fill="none" viewBox="0 0 24 24">
+                          <svg className="animate-spin mx-auto h-8 w-8 text-sky-500 dark:text-sky-400" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
-                          <p className="text-xs text-sky-500 mt-1">Processing...</p>
+                          <p className="text-xs text-sky-500 dark:text-sky-400 mt-1">Processing...</p>
                         </div>
                       </div>
                     ) : (
-                      <div className="flex justify-center items-center border-2 border-dashed border-gray-300 rounded-md h-32 w-32 p-2">
+                      <div className="flex justify-center items-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md h-32 w-32 p-2 bg-gray-50 dark:bg-gray-700">
                         <div className="text-center">
-                          <svg className="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="mx-auto h-8 w-8 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                           </svg>
-                          <p className="text-xs text-gray-500 mt-1">Upload Logo</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Upload Logo</p>
                         </div>
                       </div>
                     )}
@@ -1685,7 +1687,7 @@ const Settings = () => {
                     <div className="ml-4 flex flex-col space-y-2">
                       <label
                         htmlFor="logo-upload"
-                        className={`inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 cursor-pointer ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 dark:focus:ring-offset-gray-800 dark:focus:ring-sky-400 cursor-pointer ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         {loading ? 'Processing...' : logoDataURL ? 'Change Logo' : 'Upload Logo'}
                       </label>
@@ -1693,7 +1695,7 @@ const Settings = () => {
                         <button
                           type="button"
                           onClick={removeLogo}
-                          className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                          className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-red-600 dark:text-red-400 bg-white dark:bg-gray-700 hover:bg-red-50 dark:hover:bg-red-900/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 dark:focus:ring-offset-gray-800 dark:focus:ring-red-400"
                           disabled={loading}
                         >
                           Remove Logo
@@ -1701,49 +1703,49 @@ const Settings = () => {
                       )}
                     </div>
                   </div>
-                  <p className="mt-2 text-xs text-gray-500">
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                     Upload a logo for your shop. This will appear on invoices and other documents.<br />
-                    <span className="text-amber-600 font-medium">Note: Max file size 1MB. Supported formats: JPEG, PNG, GIF, WEBP, SVG.</span><br />
-                    <span className="text-gray-500 italic">Large images will be automatically compressed to fit size limits.</span>
+                    <span className="text-amber-600 dark:text-amber-400 font-medium">Note: Max file size 1MB. Supported formats: JPEG, PNG, GIF, WEBP, SVG.</span><br />
+                    <span className="text-gray-500 dark:text-gray-400 italic">Large images will be automatically compressed to fit size limits.</span>
                   </p>
                 </div>
                 
                 {/* QR Code Section */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">QR Code (Optional)</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">QR Code (Optional)</label>
                   <div className="mt-1 flex items-center">
                     {qrCodeDataURL ? (
                       <div className="relative">
                         <img 
                           src={qrCodeDataURL} 
                           alt="QR Code" 
-                          className="h-32 w-32 object-contain bg-gray-100 rounded-md"
+                          className="h-32 w-32 object-contain bg-gray-100 dark:bg-gray-600 rounded-md"
                         />
                         <button
                           type="button"
                           onClick={removeQRCode}
-                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                          className="absolute top-1 right-1 bg-red-500 dark:bg-red-600 text-white rounded-full p-1 w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 dark:hover:bg-red-700"
                         >
                           ×
                         </button>
                       </div>
                     ) : loading ? (
-                      <div className="flex justify-center items-center border-2 border-dashed border-gray-300 rounded-md h-32 w-32 p-2">
+                      <div className="flex justify-center items-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md h-32 w-32 p-2 bg-gray-50 dark:bg-gray-700">
                         <div className="text-center">
-                          <svg className="animate-spin mx-auto h-8 w-8 text-sky-500" fill="none" viewBox="0 0 24 24">
+                          <svg className="animate-spin mx-auto h-8 w-8 text-sky-500 dark:text-sky-400" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
-                          <p className="text-xs text-sky-500 mt-1">Processing...</p>
+                          <p className="text-xs text-sky-500 dark:text-sky-400 mt-1">Processing...</p>
                         </div>
                       </div>
                     ) : (
-                      <div className="flex justify-center items-center border-2 border-dashed border-gray-300 rounded-md h-32 w-32 p-2">
+                      <div className="flex justify-center items-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md h-32 w-32 p-2 bg-gray-50 dark:bg-gray-700">
                         <div className="text-center">
-                          <svg className="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="mx-auto h-8 w-8 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                           </svg>
-                          <p className="text-xs text-gray-500 mt-1">Upload QR Code</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Upload QR Code</p>
                         </div>
                       </div>
                     )}
@@ -1759,7 +1761,7 @@ const Settings = () => {
                     <div className="ml-4 flex flex-col space-y-2">
                       <label
                         htmlFor="qr-code-upload"
-                        className={`inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 cursor-pointer ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 dark:focus:ring-offset-gray-800 dark:focus:ring-sky-400 cursor-pointer ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         {loading ? 'Processing...' : qrCodeDataURL ? 'Change QR Code' : 'Upload QR Code'}
                       </label>
@@ -1767,7 +1769,7 @@ const Settings = () => {
                         <button
                           type="button"
                           onClick={removeQRCode}
-                          className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                          className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-red-600 dark:text-red-400 bg-white dark:bg-gray-700 hover:bg-red-50 dark:hover:bg-red-900/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 dark:focus:ring-offset-gray-800 dark:focus:ring-red-400"
                           disabled={loading}
                         >
                           Remove QR Code
@@ -1775,10 +1777,10 @@ const Settings = () => {
                       )}
                     </div>
                   </div>
-                  <p className="mt-2 text-xs text-gray-500">
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                     Upload a QR code for your shop. This will be used for various purposes.<br />
-                    <span className="text-amber-600 font-medium">Note: Max file size 1MB. Supported formats: JPEG, PNG, GIF, WEBP.</span><br />
-                    <span className="text-gray-500 italic">Large images will be automatically compressed to fit size limits.</span>
+                    <span className="text-amber-600 dark:text-amber-400 font-medium">Note: Max file size 1MB. Supported formats: JPEG, PNG, GIF, WEBP.</span><br />
+                    <span className="text-gray-500 dark:text-gray-400 italic">Large images will be automatically compressed to fit size limits.</span>
                   </p>
                 </div>
               </div>
@@ -1787,63 +1789,61 @@ const Settings = () => {
             {/* Bank Details Tab */}
             {activeTab === 'bank' && (
               <div className="space-y-6">
-                <h2 className="text-lg font-medium text-gray-900">Bank Details</h2>
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">Bank Details</h2>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Bank Name</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Bank Name</label>
                     <input
                       type="text"
                       value={bankName}
                       onChange={(e) => setBankName(e.target.value)}
-                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Account Holder Name</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Account Number</label>
                     <input
                       type="text"
-                      value={accountHolderName}
-                      onChange={(e) => setAccountHolderName(e.target.value)}
-                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      value={accountNumber}
+                      onChange={(e) => setAccountNumber(e.target.value)}
+                      className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
                   </div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
-                    <input
-                      type="text"
-                      value={accountNumber}
-                      onChange={(e) => setAccountNumber(e.target.value)}
-                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">IFSC Code</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">IFSC Code</label>
                     <input
                       type="text"
                       value={ifscCode}
                       onChange={(e) => setIfscCode(e.target.value)}
-                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Account Holder Name</label>
+                    <input
+                      type="text"
+                      value={accountHolderName}
+                      onChange={(e) => setAccountHolderName(e.target.value)}
+                      className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
                   </div>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">UPI ID</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">UPI ID (Optional)</label>
                   <input
                     type="text"
                     value={upiId}
                     onChange={(e) => setUpiId(e.target.value)}
-                    className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                    className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    placeholder="user@paytm"
                   />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Your UPI ID (e.g., yourname@upi) for receiving payments
-                  </p>
                 </div>
               </div>
             )}
@@ -1851,9 +1851,9 @@ const Settings = () => {
             {/* Financial Year Tab */}
             {activeTab === 'financial' && (
               <div className="space-y-6">
-                <h2 className="text-lg font-medium text-gray-900">Financial Year Settings</h2>
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">Financial Year Settings</h2>
                 
-                <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6 text-blue-700">
+                <div className="bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-400 dark:border-blue-500 p-4 mb-6 text-blue-700 dark:text-blue-200">
                   <h3 className="text-md font-medium">About Financial Year</h3>
                   <p className="text-sm mt-1">
                     In India, the financial year runs from April 1st to March 31st of the next calendar year. 
@@ -1863,11 +1863,11 @@ const Settings = () => {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Current Financial Year</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Current Financial Year</label>
                     <select
                       value={currentFinancialYear}
                       onChange={(e) => handleFinancialYearChange(e.target.value)}
-                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     >
                       <option value="">Select a financial year</option>
                       {financialYearOptions.map((option) => (
@@ -1879,12 +1879,12 @@ const Settings = () => {
                     
                     <div className="mt-4">
                       <div className="flex items-center">
-                        <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center mr-3 flex-shrink-0">
-                          <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center mr-3 flex-shrink-0">
+                          <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                         </div>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-600 dark:text-gray-300">
                           {currentFinancialYear 
                             ? `Your current financial year is set to ${currentFinancialYear}`
                             : 'Please select a financial year to continue'}
@@ -1897,7 +1897,7 @@ const Settings = () => {
                         <button
                           type="button"
                           onClick={() => setShowFinancialYearModal(true)}
-                          className="inline-flex items-center px-4 py-2 border border-amber-300 shadow-sm text-sm font-medium rounded-md text-amber-700 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
+                          className="inline-flex items-center px-4 py-2 border border-amber-300 dark:border-amber-600 shadow-sm text-sm font-medium rounded-md text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 hover:bg-amber-100 dark:hover:bg-amber-900/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 dark:focus:ring-offset-gray-800 dark:focus:ring-amber-400"
                         >
                           <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -1914,21 +1914,21 @@ const Settings = () => {
             {/* Backup & Restore Tab */}
             {activeTab === 'backup' && (
               <div className="space-y-6">
-                <h2 className="text-lg font-medium text-gray-900">Backup & Restore</h2>
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">Backup & Restore</h2>
                 
                 {backupError && (
-                  <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4 text-red-700">
+                  <div className="bg-red-50 dark:bg-red-900/50 border-l-4 border-red-400 dark:border-red-600 p-4 mb-4 text-red-700 dark:text-red-200">
                     <p>{backupError}</p>
                   </div>
                 )}
                 
                 {backupSuccess && (
-                  <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-4 text-green-700">
+                  <div className="bg-green-50 dark:bg-green-900/50 border-l-4 border-green-400 dark:border-green-600 p-4 mb-4 text-green-700 dark:text-green-200">
                     <p>{backupSuccess}</p>
                   </div>
                 )}
                 
-                <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6 text-blue-700">
+                <div className="bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-400 dark:border-blue-500 p-4 mb-6 text-blue-700 dark:text-blue-200">
                   <h3 className="text-md font-medium">About Backup & Restore</h3>
                   <p className="text-sm mt-1">
                     Backup your data to a local file that you can use to restore your shop's data in case of data loss.
@@ -1938,9 +1938,9 @@ const Settings = () => {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   {/* Backup Section */}
-                  <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Create Backup</h3>
-                    <p className="text-sm text-gray-600 mb-4">
+                  <div className="bg-white dark:bg-gray-700 p-6 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Create Backup</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
                       Download a backup file containing all your business data. Store this file safely.
                     </p>
                     
@@ -1955,7 +1955,7 @@ const Settings = () => {
                           <>
                             <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
                             Creating Backup...
                           </>
@@ -1982,39 +1982,45 @@ const Settings = () => {
                   </div>
                   
                   {/* Restore Section */}
-                  <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Restore from Backup</h3>
-                    <p className="text-sm text-gray-600 mb-4">
+                  <div className="bg-white dark:bg-gray-700 p-6 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Restore from Backup</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
                       Restore your data from a previously created backup file. This will overwrite your current data.
                     </p>
                     
                     <div className="mt-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Select Backup File</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select Backup File</label>
                       <input
                         type="file"
                         accept=".json"
                         onChange={handleFileChange}
-                        className="block w-full text-sm text-gray-500
+                        className="block w-full text-sm text-gray-500 dark:text-gray-400
                           file:mr-4 file:py-2 file:px-4
                           file:rounded-md file:border-0
                           file:text-sm file:font-medium
-                          file:bg-blue-50 file:text-blue-700
-                          hover:file:bg-blue-100"
+                          file:bg-blue-50 dark:file:bg-blue-900/50 file:text-blue-700 dark:file:text-blue-300
+                          hover:file:bg-blue-100 dark:hover:file:bg-blue-900/70"
                       />
+                      
+                      {backupFile && (
+                        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                          Selected file: {backupFile.name}
+                        </p>
+                      )}
                     </div>
                     
                     <div className="mt-4">
                       <button
                         type="button"
                         onClick={handleRestore}
-                        disabled={!backupFile || restoreLoading}
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50"
+                        disabled={restoreLoading || !backupFile}
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-amber-500 disabled:opacity-50"
                       >
                         {restoreLoading ? (
                           <>
                             <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
                             Restoring...
                           </>
@@ -2023,128 +2029,40 @@ const Settings = () => {
                             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                             </svg>
-                            Restore Backup
+                            Restore Data
                           </>
                         )}
                       </button>
                     </div>
                     
-                    <div className="mt-4 text-xs text-gray-500">
-                      <div className="flex items-center">
-                        <svg className="w-5 h-5 text-amber-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                        <p className="font-semibold">Important:</p>
-                      </div>
-                      <p className="mt-1">Restoring will overwrite your current data. Make sure to back up your current data first.</p>
+                    <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-md">
+                      <p className="text-xs text-red-700 dark:text-red-200 font-medium">
+                        ⚠️ Warning: This will permanently overwrite all your current data.
+                      </p>
                     </div>
                   </div>
                 </div>
                 
-                {/* Danger Zone - Clear All Data */}
-                <div className="mt-8 bg-red-50 border border-red-200 rounded-lg p-6">
-                  <h3 className="text-lg font-medium text-red-900 mb-4">🚨 Danger Zone</h3>
-                  <div className="bg-white border border-red-200 rounded-md p-4">
-                    <h4 className="text-md font-medium text-red-800 mb-2">Clear All Data</h4>
-                    <p className="text-sm text-red-700 mb-4">
-                      Permanently delete ALL data from your database. This includes customers, orders, sales, 
-                      purchases, invoices, inventory, and everything else. This action cannot be undone.
+                {/* Clear All Data Section */}
+                <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+                  <div className="bg-red-50 dark:bg-red-900/30 p-6 rounded-lg border border-red-200 dark:border-red-700">
+                    <h3 className="text-lg font-medium text-red-900 dark:text-red-200 mb-4">⚠️ Danger Zone</h3>
+                    <p className="text-sm text-red-700 dark:text-red-300 mb-4">
+                      This action will permanently delete ALL data from your shop including customers, orders, sales, transactions, and settings.
+                      This action cannot be undone.
                     </p>
-                    <p className="text-xs text-amber-700 mb-4 bg-amber-50 border border-amber-200 rounded p-2">
-                      💡 <strong>Smart Protection:</strong> This action will first ask if you want to create a backup, 
-                      then require your admin password for confirmation.
-                    </p>
+                    
                     <button
                       type="button"
-                      onClick={handleClearAllData}
-                      disabled={loading}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+                      onClick={() => setShowPasswordConfirmModal(true)}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-red-500"
                     >
-                      {loading ? (
-                        <>
-                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                          Clear All Data Permanently
-                        </>
-                      )}
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Delete All Data
                     </button>
                   </div>
-                </div>
-              </div>
-            )}
-            
-            {/* Password Change Tab */}
-            {activeTab === 'password' && (
-              <div className="space-y-6 max-w-md">
-                <h2 className="text-lg font-medium text-gray-900">Change Password</h2>
-                
-                {passwordError && (
-                  <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4 text-red-700">
-                    <p>{passwordError}</p>
-                  </div>
-                )}
-                
-                {passwordSuccess && (
-                  <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-4 text-green-700">
-                    <p>{passwordSuccess}</p>
-                  </div>
-                )}
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Current Password *</label>
-                  <input
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">New Password *</label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-                    required
-                    minLength={6}
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Password must be at least 6 characters long
-                  </p>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password *</label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <button
-                    type="button"
-                    onClick={handleChangePassword}
-                    disabled={loading || !currentPassword || !newPassword || !confirmPassword}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50"
-                  >
-                    {loading ? 'Changing...' : 'Change Password'}
-                  </button>
                 </div>
               </div>
             )}
@@ -2152,521 +2070,286 @@ const Settings = () => {
             {/* Users Tab */}
             {activeTab === 'users' && (
               <div className="space-y-6">
-                <h2 className="text-lg font-medium text-gray-900">User Management</h2>
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">User Management</h2>
                 
                 {userError && (
-                  <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6 text-red-700 flex justify-between items-center">
+                  <div className="bg-red-50 dark:bg-red-900/50 border-l-4 border-red-400 dark:border-red-600 p-4 mb-4 text-red-700 dark:text-red-200">
                     <p>{userError}</p>
-                    <button 
-                      onClick={() => setUserError('')}
-                      className="ml-4 text-red-700 hover:text-red-900"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
                   </div>
                 )}
                 
                 {userSuccess && (
-                  <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-6 text-green-700 flex justify-between items-center">
+                  <div className="bg-green-50 dark:bg-green-900/50 border-l-4 border-green-400 dark:border-green-600 p-4 mb-4 text-green-700 dark:text-green-200">
                     <p>{userSuccess}</p>
-                    <button 
-                      onClick={() => setUserSuccess('')}
-                      className="ml-4 text-green-700 hover:text-green-900"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
                   </div>
                 )}
                 
-                <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6 text-blue-700">
-                  <h3 className="text-md font-medium">About User Management</h3>
-                  <p className="text-sm mt-1">
-                    As an admin, you can create additional users with limited permissions. 
-                    Each user will have their own login credentials but will only be able to 
-                    access the features you grant them permission for.
-                  </p>
+                {/* Users Tabs */}
+                <div className="flex border-b border-gray-200 dark:border-gray-700">
+                  <button
+                    className={`px-4 py-2 text-sm font-medium ${usersTab === 'active' ? 'text-sky-600 dark:text-sky-400 border-b-2 border-sky-500 dark:border-sky-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                    onClick={() => setUsersTab('active')}
+                  >
+                    Active Users
+                  </button>
+                  <button
+                    className={`px-4 py-2 text-sm font-medium ${usersTab === 'inactive' ? 'text-sky-600 dark:text-sky-400 border-b-2 border-sky-500 dark:border-sky-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                    onClick={() => setUsersTab('inactive')}
+                  >
+                    Inactive Users
+                  </button>
                 </div>
                 
                 {/* Create New User Form */}
-                <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm mb-8">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Create New User</h3>
-                  
-                  <form onSubmit={handleCreateUser} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                        <input
-                          type="email"
-                          value={newUserEmail}
-                          onChange={(e) => setNewUserEmail(e.target.value)}
-                          className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-                          required
-                        />
+                {usersTab === 'active' && (
+                  <div className="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg border border-gray-200 dark:border-gray-600">
+                    <h3 className="text-md font-medium text-gray-900 dark:text-white mb-4">Create New User</h3>
+                    <form onSubmit={handleCreateUser} className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email Address</label>
+                          <input
+                            type="email"
+                            value={newUserEmail}
+                            onChange={(e) => setNewUserEmail(e.target.value)}
+                            className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 sm:text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                            required
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+                          <input
+                            type="password"
+                            value={newUserPassword}
+                            onChange={(e) => setNewUserPassword(e.target.value)}
+                            className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 sm:text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                            required
+                            minLength="6"
+                          />
+                        </div>
                       </div>
                       
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
-                        <input
-                          type="password"
-                          value={newUserPassword}
-                          onChange={(e) => setNewUserPassword(e.target.value)}
-                          className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-                          required
-                          minLength={6}
-                        />
-                        <p className="mt-1 text-xs text-gray-500">
-                          Password must be at least 6 characters long
-                        </p>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
+                        <select
+                          value={newUserRole}
+                          onChange={(e) => setNewUserRole(e.target.value)}
+                          className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 sm:text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                        >
+                          <option value="user">User</option>
+                          <option value="admin">Admin</option>
+                        </select>
                       </div>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                      <select
-                        value={newUserRole}
-                        onChange={(e) => setNewUserRole(e.target.value)}
-                        className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-                      >
-                        <option value="user">Standard User</option>
-                        <option value="admin">Administrator</option>
-                      </select>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Permissions</label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                        {menuItems.map((item) => (
-                          <label key={item.path} className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              checked={newUserPermissions[item.path] || false}
-                              onChange={(e) => setNewUserPermissions({
-                                ...newUserPermissions,
-                                [item.path]: e.target.checked
-                              })}
-                              className="h-4 w-4 text-sky-600 focus:ring-sky-500 border-gray-300 rounded"
-                            />
-                            <span className="text-sm text-gray-700">{item.title}</span>
-                          </label>
-                        ))}
+                      
+                      {/* Permissions */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Permissions</label>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          {menuItems.map((item) => (
+                            <label key={item.path} className="flex items-center">
+                              <input
+                                type="checkbox"
+                                checked={newUserPermissions[item.path] || false}
+                                onChange={(e) => setNewUserPermissions(prev => ({
+                                  ...prev,
+                                  [item.path]: e.target.checked
+                                }))}
+                                className="h-4 w-4 text-sky-600 focus:ring-sky-500 border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
+                              />
+                              <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">{item.title}</span>
+                            </label>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                    
-                    <div>
-                      <button
-                        type="submit"
-                        disabled={loading || !newUserEmail || !newUserPassword}
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50"
-                      >
-                        {loading ? (
-                          <>
-                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Creating...
-                          </>
-                        ) : 'Create User'}
-                      </button>
-                    </div>
-                  </form>
-                </div>
+                      
+                      <div className="flex justify-end">
+                        <button
+                          type="submit"
+                          disabled={loading}
+                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-sky-500 disabled:opacity-50"
+                        >
+                          {loading ? 'Creating...' : 'Create User'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
                 
-                {/* Existing Users List */}
-                <div>
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-medium text-gray-900">Existing Users</h3>
-                    <button
-                      onClick={fetchUsers}
-                      className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-sky-700 bg-sky-100 hover:bg-sky-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
-                    >
-                      <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      Refresh
-                    </button>
-                  </div>
-                  
-                  {/* User Tabs */}
-                  <div className="border-b border-gray-200 mb-4">
-                    <nav className="-mb-px flex space-x-8">
-                      <button
-                        onClick={() => setUsersTab('active')}
-                        className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm ${
-                          usersTab === 'active'
-                            ? 'border-sky-500 text-sky-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                        }`}
-                      >
-                        Active Users
-                        {users.length > 0 && (
-                          <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${
-                            usersTab === 'active' ? 'bg-sky-100 text-sky-600' : 'bg-gray-100 text-gray-600'
-                          }`}>
-                            {users.length}
-                          </span>
-                        )}
-                      </button>
-                      <button
-                        onClick={() => setUsersTab('inactive')}
-                        className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm ${
-                          usersTab === 'inactive'
-                            ? 'border-sky-500 text-sky-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                        }`}
-                      >
-                        Inactive Users
-                        {inactiveUsers.length > 0 && (
-                          <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${
-                            usersTab === 'inactive' ? 'bg-sky-100 text-sky-600' : 'bg-gray-100 text-gray-600'
-                          }`}>
-                            {inactiveUsers.length}
-                          </span>
-                        )}
-                      </button>
-                    </nav>
-                  </div>
-                  
-                  {loading && (
-                    <div className="flex justify-center my-8">
-                      <svg className="animate-spin h-8 w-8 text-sky-500" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                    </div>
-                  )}
-                  
-                  {/* Active Users Table */}
-                  {!loading && usersTab === 'active' && users.length === 0 && (
-                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 text-yellow-700">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                          <svg className="h-5 w-5 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        </div>
-                        <div className="ml-3">
-                          <p className="text-sm">No active users found other than the main admin. Try creating a new user.</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Inactive Users Table */}
-                  {!loading && usersTab === 'inactive' && inactiveUsers.length === 0 && (
-                    <div className="bg-gray-50 border-l-4 border-gray-400 p-4 text-gray-700">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                          <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        </div>
-                        <div className="ml-3">
-                          <p className="text-sm">No inactive users found. Deactivated users will appear here.</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Active Users Table */}
-                  {!loading && usersTab === 'active' && users.length > 0 && (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Email
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Role
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Permissions
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Actions
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {users.map((user) => (
-                            <tr key={user.id} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900">{user.email}</div>
-                                <div className="text-xs text-gray-500">
-                                  Created: {user.createdAt ? user.createdAt.toLocaleDateString() : 'N/A'}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                  user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
-                                }`}>
-                                  {user.role === 'admin' ? 'Administrator' : 'Standard User'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="flex flex-wrap gap-1">
-                                  {user.permissions && Object.entries(user.permissions)
-                                    .filter(([_, value]) => value)
-                                    .map(([path]) => {
-                                      const menuItem = menuItems.find(item => item.path === path);
-                                      return menuItem ? (
-                                        <span key={path} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                                          {menuItem.title}
-                                        </span>
-                                      ) : null;
-                                    })
-                                  }
-                                  {(!user.permissions || Object.values(user.permissions).filter(Boolean).length === 0) && (
-                                    <span className="text-xs text-gray-500 italic">No specific permissions</span>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <button
-                                  onClick={() => setSelectedUser(user)}
-                                  className="text-sky-600 hover:text-sky-900 mr-3"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteUser(user.id, user.email, user.uid)}
-                                  className="text-red-600 hover:text-red-900 mr-3"
-                                >
-                                  Deactivate
-                                </button>
+                {/* Users List */}
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                  {usersTab === 'active' ? (
+                    users.length > 0 ? (
+                      <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {users.map((user) => (
+                          <div key={user.uid} className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">{user.email}</p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                  Role: {user.role || 'user'} • 
+                                  Created: {user.createdAt ? new Date(user.createdAt.toDate()).toLocaleDateString() : 'N/A'}
+                                </p>
+                              </div>
+                              <div className="flex space-x-2">
                                 <button
                                   onClick={() => testUserLogin(user.email)}
-                                  className="text-amber-600 hover:text-amber-900"
+                                  className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm"
                                 >
                                   Test Login
                                 </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                  
-                  {/* Inactive Users Table */}
-                  {!loading && usersTab === 'inactive' && inactiveUsers.length > 0 && (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Email
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Role
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Deactivated
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Actions
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {inactiveUsers.map((user) => (
-                            <tr key={user.id} className="hover:bg-gray-50 bg-red-50">
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900">{user.email}</div>
-                                <div className="text-xs text-gray-500">
-                                  Created: {user.createdAt ? user.createdAt.toLocaleDateString() : 'N/A'}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                  user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
-                                }`}>
-                                  {user.role === 'admin' ? 'Administrator' : 'Standard User'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                {user.inactiveAt ? (
-                                  <div className="text-xs text-gray-500">
-                                    {user.inactiveAt.toLocaleDateString()} {user.inactiveAt.toLocaleTimeString()}
-                                  </div>
-                                ) : (
-                                  <div className="text-xs text-gray-500">Unknown</div>
-                                )}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <button
-                                  onClick={() => handleRestoreUser(user.id, user.email)}
-                                  className="text-green-600 hover:text-green-900"
+                                  onClick={() => handleDeleteUser(user.id, user.email, user.uid)}
+                                  className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm"
                                 >
-                                  Restore User
+                                  Delete
                                 </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Edit User Modal */}
-                {selectedUser && (
-                  <div className="fixed inset-0 overflow-y-auto z-50">
-                    <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center">
-                      <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-                        <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-                      </div>
-                      
-                      <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                        <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                          <div className="sm:flex sm:items-start">
-                            <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
-                              <h3 className="text-lg leading-6 font-medium text-gray-900">
-                                Edit User Permissions
-                              </h3>
-                              <div className="mt-2">
-                                <p className="text-sm text-gray-500 mb-4">
-                                  Update permissions for {selectedUser.email}
-                                </p>
-                                
-                                <div className="mt-4">
-                                  <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
-                                  <select
-                                    value={selectedUser.role}
-                                    onChange={(e) => setSelectedUser({
-                                      ...selectedUser,
-                                      role: e.target.value
-                                    })}
-                                    className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-                                  >
-                                    <option value="user">Standard User</option>
-                                    <option value="admin">Administrator</option>
-                                  </select>
-                                </div>
-                                
-                                <div className="mt-4">
-                                  <label className="block text-sm font-medium text-gray-700 mb-2">Permissions</label>
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto p-2">
-                                    {menuItems.map((item) => (
-                                      <label key={item.path} className="flex items-center space-x-2">
-                                        <input
-                                          type="checkbox"
-                                          checked={selectedUser.permissions?.[item.path] || false}
-                                          onChange={(e) => setSelectedUser({
-                                            ...selectedUser,
-                                            permissions: {
-                                              ...selectedUser.permissions,
-                                              [item.path]: e.target.checked
-                                            }
-                                          })}
-                                          className="h-4 w-4 text-sky-600 focus:ring-sky-500 border-gray-300 rounded"
-                                        />
-                                        <span className="text-sm text-gray-700">{item.title}</span>
-                                      </label>
-                                    ))}
-                                  </div>
-                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              handleUpdatePermissions(selectedUser.id, selectedUser.permissions);
-                              setSelectedUser(null);
-                            }}
-                            className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-sky-600 text-base font-medium text-white hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 sm:ml-3 sm:w-auto sm:text-sm"
-                          >
-                            Save Changes
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedUser(null)}
-                            className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 sm:mt-0 sm:w-auto sm:text-sm"
-                          >
-                            Cancel
-                          </button>
-                        </div>
+                        ))}
                       </div>
-                    </div>
+                    ) : (
+                      <div className="p-8 text-center">
+                        <p className="text-gray-500 dark:text-gray-400">No active users found</p>
+                      </div>
+                    )
+                  ) : (
+                    inactiveUsers.length > 0 ? (
+                      <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {inactiveUsers.map((user) => (
+                          <div key={user.id} className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">{user.email}</p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                  Role: {user.role || 'user'} • 
+                                  Deleted: {user.deletedAt ? new Date(user.deletedAt.toDate()).toLocaleDateString() : 'N/A'}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => handleRestoreUser(user.id, user.email)}
+                                className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 text-sm"
+                              >
+                                Restore
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-8 text-center">
+                        <p className="text-gray-500 dark:text-gray-400">No inactive users found</p>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* Password Change Tab */}
+            {activeTab === 'password' && (
+              <div className="space-y-6">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">Change Password</h2>
+                
+                {passwordError && (
+                  <div className="bg-red-50 dark:bg-red-900/50 border-l-4 border-red-400 dark:border-red-600 p-4 mb-4 text-red-700 dark:text-red-200">
+                    <p>{passwordError}</p>
                   </div>
                 )}
+                
+                {passwordSuccess && (
+                  <div className="bg-green-50 dark:bg-green-900/50 border-l-4 border-green-400 dark:border-green-600 p-4 mb-4 text-green-700 dark:text-green-200">
+                    <p>{passwordSuccess}</p>
+                  </div>
+                )}
+                
+                <div className="max-w-md">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Current Password</label>
+                      <input
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New Password</label>
+                      <input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        minLength="6"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirm New Password</label>
+                      <input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        minLength="6"
+                      />
+                    </div>
+                    
+                    <div className="pt-4">
+                      <button
+                        type="button"
+                        onClick={handleChangePassword}
+                        disabled={loading}
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-sky-500 disabled:opacity-50"
+                      >
+                        {loading ? 'Changing...' : 'Change Password'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Save Button */}
+            {(activeTab === 'shop' || activeTab === 'bank') && (
+              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleSaveSettings}
+                    disabled={loading}
+                    className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-sky-500 disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Settings'
+                    )}
+                  </button>
+                </div>
               </div>
             )}
           </div>
         </div>
-        
-        {/* Floating Save Button - only shown for tabs that need saving (MOBILE ONLY) */}
-        {(activeTab === 'shop' || activeTab === 'bank' || activeTab === 'financial') && (
-          <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-lg z-30 mb-[65px] sm:hidden">
-            <div className="max-w-6xl mx-auto">
-              <button
-                type="button"
-                onClick={handleSaveSettings}
-                disabled={loading || !shopName}
-                className="w-full flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50"
-              >
-                {loading ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Saving...
-                  </>
-                ) : 'Save Settings'}
-              </button>
-            </div>
-          </div>
-        )}
-        
-        {/* Desktop Save Button - add this right after the tab content */}
-        <div className="max-w-6xl mx-auto px-4 hidden sm:block">
-          {(activeTab === 'shop' || activeTab === 'bank' || activeTab === 'financial') && (
-            <div className="my-6 flex justify-end">
-              <button
-                type="button"
-                onClick={handleSaveSettings}
-                disabled={loading || !shopName}
-                className="flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50"
-              >
-                {loading ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Saving...
-                  </>
-                ) : 'Save Settings'}
-              </button>
-            </div>
-          )}
-        </div>
       </div>
+
+      {/* Financial Year Modal */}
+      {showFinancialYearModal && <FinancialYearModal />}
       
-      {showFinancialYearModal && (
-        <FinancialYearModal />
-      )}
+      {/* Backup Confirm Modal */}
+      {showBackupConfirmModal && <BackupConfirmModal />}
       
-      {showFinancialYearEndModal && (
-        <FinancialYearEndModal />
-      )}
-      
-      {showBackupConfirmModal && (
-        <BackupConfirmModal />
-      )}
-      
-      {showPasswordConfirmModal && (
-        <PasswordConfirmModal />
-      )}
+      {/* Password Confirm Modal */}
+      {showPasswordConfirmModal && <PasswordConfirmModal />}
     </div>
   );
 };

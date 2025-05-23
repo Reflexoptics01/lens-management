@@ -81,330 +81,266 @@ const SaleDetail = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navbar />
       
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Header with actions */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Invoice Details</h1>
-            <p className="text-sm text-gray-500 mt-1">View and manage invoice information</p>
-          </div>
-          
-          <div className="mt-4 md:mt-0 flex space-x-2">
-            <button
-              onClick={() => navigate('/sales')}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50 flex items-center"
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              Back
-            </button>
-            
-            <button
-              onClick={() => navigate(`/sales/edit/${saleId}`)}
-              className="px-4 py-2 border border-blue-500 rounded-lg text-blue-700 bg-blue-50 hover:bg-blue-100 flex items-center"
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-              </svg>
-              Edit
-            </button>
-            
-            <button
-              onClick={handlePrintInvoice}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center"
-              disabled={loading}
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-              </svg>
-              {loading ? 'Processing...' : 'Print'}
-            </button>
-          </div>
-        </div>
-        
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-400 text-red-700">
-            <p>{error}</p>
-          </div>
-        )}
-        
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full"></div>
-          </div>
-        ) : sale ? (
-          <>
-            {/* Invoice Header Card */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-              {/* Invoice Information */}
-              <div className="bg-white rounded-lg shadow-md p-4 border-t-4 border-blue-500">
-                <h2 className="text-md font-semibold text-gray-900 mb-3">Invoice Information</h2>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <span className="text-gray-500 w-1/3 text-sm">Invoice #:</span>
-                    <span className="font-medium text-gray-900 text-sm">{sale.invoiceNumber}</span>
-                  </div>
-                  
-                  <div className="flex items-center">
-                    <span className="text-gray-500 w-1/3 text-sm">Date:</span>
-                    <span className="text-gray-900 text-sm">{formatDate(sale.invoiceDate)}</span>
-                  </div>
-                  
-                  {sale.dueDate && (
-                    <div className="flex items-center">
-                      <span className="text-gray-500 w-1/3 text-sm">Due Date:</span>
-                      <span className="text-gray-900 text-sm">{formatDate(sale.dueDate)}</span>
-                    </div>
-                  )}
-                  
-                  <div className="flex items-center">
-                    <span className="text-gray-500 w-1/3 text-sm">Status:</span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(sale.paymentStatus)}`}>
-                      {sale.paymentStatus}
-                    </span>
-                  </div>
-                </div>
+      <main className="py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Header */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <button
+                  onClick={() => navigate('/sales')}
+                  className="inline-flex items-center text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 mb-2"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                  Back to Sales
+                </button>
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Invoice Details</h1>
+                <p className="text-gray-500 dark:text-gray-400">Invoice #{sale?.invoiceNumber}</p>
               </div>
               
-              {/* Customer Information */}
-              <div className="bg-white rounded-lg shadow-md p-4 border-t-4 border-purple-500">
-                <h2 className="text-md font-semibold text-gray-900 mb-3">Customer</h2>
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => navigate(`/sales/edit/${saleId}`)}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-sky-500"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  Edit Invoice
+                </button>
                 
-                <div className="space-y-2">
-                  <div>
-                    <h3 className="font-medium text-gray-900 text-md">{sale.customerName}</h3>
-                    {sale.customerAddress && (
-                      <p className="text-gray-500 text-xs mt-1">{sale.customerAddress}</p>
+                <button
+                  onClick={() => setShowPrintModal(true)}
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-sky-500"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  </svg>
+                  Print Invoice
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin w-8 h-8 border-4 border-sky-600 border-t-transparent rounded-full"></div>
+            </div>
+          ) : error ? (
+            <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-600 rounded-md p-4">
+              <div className="text-red-800 dark:text-red-200">{error}</div>
+            </div>
+          ) : sale ? (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Left Column - Main Content */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Invoice Information */}
+                <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Invoice Information</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Invoice Number</label>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">{sale.invoiceNumber}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Invoice Date</label>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">{sale.invoiceDate}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Due Date</label>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">{sale.dueDate || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Payment Status</label>
+                      <div className="mt-1">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(sale.paymentStatus)}`}>
+                          {sale.paymentStatus}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Customer Information */}
+                <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Customer Information</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Customer Name</label>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">{sale.customerName}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Address</label>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">{sale.customerAddress}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">City</label>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">{sale.customerCity}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">GST Number</label>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">{sale.customerGst}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Invoice Items */}
+                <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Invoice Items</h2>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+                      <thead className="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Order ID</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Item Name</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">SPH</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">CYL</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">AXIS</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">ADD</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">QTY</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Price</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
+                        {sale.items && sale.items.map((item, index) => (
+                          <tr key={index} className={index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700'}>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{item.orderId || '-'}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{item.itemName || '-'}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900 dark:text-gray-100">{item.sph || '-'}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900 dark:text-gray-100">{item.cyl || '-'}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900 dark:text-gray-100">{item.axis || '-'}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900 dark:text-gray-100">{item.add || '-'}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-900 dark:text-gray-100">{item.qty || 1}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900 dark:text-gray-100">{formatCurrency(item.price || 0)}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-medium text-gray-900 dark:text-gray-100">{formatCurrency(item.total || 0)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Notes */}
+                {sale.notes && (
+                  <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+                    <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Notes</h2>
+                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{sale.notes}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Right Column - Invoice Summary */}
+              <div className="space-y-6">
+                {/* Invoice Summary */}
+                <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Invoice Summary</h2>
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500 dark:text-gray-400">Subtotal:</span>
+                      <span className="text-gray-900 dark:text-gray-100">{formatCurrency(sale.subtotal)}</span>
+                    </div>
+                    {sale.discountAmount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500 dark:text-gray-400">Discount:</span>
+                        <span className="text-red-600 dark:text-red-400">-{formatCurrency(sale.discountAmount)}</span>
+                      </div>
                     )}
-                    {(sale.customerCity || sale.customerState) && (
-                      <p className="text-gray-500 text-xs">
-                        {sale.customerCity}
-                        {sale.customerState ? `, ${sale.customerState}` : ''}
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500 dark:text-gray-400">Tax ({sale.taxRate}%):</span>
+                      <span className="text-gray-900 dark:text-gray-100">{formatCurrency(sale.taxAmount)}</span>
+                    </div>
+                    {(sale.frieghtCharge || 0) > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500 dark:text-gray-400">Freight:</span>
+                        <span className="text-gray-900 dark:text-gray-100">{formatCurrency(sale.frieghtCharge || 0)}</span>
+                      </div>
+                    )}
+                    <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
+                      <div className="flex justify-between text-base font-medium">
+                        <span className="text-gray-900 dark:text-white">Total:</span>
+                        <span className="text-gray-900 dark:text-white">{formatCurrency(sale.totalAmount)}</span>
+                      </div>
+                    </div>
+                    {sale.amountPaid > 0 && (
+                      <>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500 dark:text-gray-400">Amount Paid:</span>
+                          <span className="text-green-600 dark:text-green-400">{formatCurrency(sale.amountPaid)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500 dark:text-gray-400">Balance:</span>
+                          <span className="text-red-600 dark:text-red-400">{formatCurrency(sale.balanceDue)}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Payment Information */}
+                {sale.paymentStatus !== 'UNPAID' && (
+                  <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+                    <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Payment Information</h2>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Payment Status</label>
+                        <div className="mt-1">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(sale.paymentStatus)}`}>
+                            {sale.paymentStatus}
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Amount Paid</label>
+                        <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">{formatCurrency(sale.amountPaid)}</p>
+                      </div>
+                      {sale.balanceDue > 0 && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Remaining Balance</label>
+                          <p className="mt-1 text-sm font-medium text-red-600 dark:text-red-400">{formatCurrency(sale.balanceDue)}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Additional Information */}
+                <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Additional Information</h2>
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Created Date</label>
+                      <p className="mt-1 text-gray-900 dark:text-gray-100">
+                        {sale.createdAt ? new Date(sale.createdAt.toDate()).toLocaleString() : 'N/A'}
                       </p>
-                    )}
-                  </div>
-                  
-                  {sale.customerGst && (
-                    <div className="pt-2 border-t border-gray-100">
-                      <span className="text-gray-500 text-xs">GST Number:</span>
-                      <span className="text-gray-900 ml-1 text-xs">{sale.customerGst}</span>
                     </div>
-                  )}
-                </div>
-              </div>
-              
-              {/* Payment Summary */}
-              <div className="bg-white rounded-lg shadow-md p-4 border-t-4 border-green-500">
-                <h2 className="text-md font-semibold text-gray-900 mb-3">Payment</h2>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-500 text-sm">Subtotal:</span>
-                    <span className="text-gray-900 text-sm">{formatCurrency(sale.subtotal)}</span>
-                  </div>
-                  
-                  {sale.discountAmount > 0 && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-500 text-sm">
-                        Discount{sale.discountType === 'percentage' ? ` (${sale.discountValue}%)` : ''}:
-                      </span>
-                      <span className="text-red-500 text-sm">-{formatCurrency(sale.discountAmount)}</span>
-                    </div>
-                  )}
-                  
-                  {sale.taxAmount > 0 && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-500 text-sm">Tax ({sale.taxRate}%):</span>
-                      <span className="text-gray-900 text-sm">{formatCurrency(sale.taxAmount)}</span>
-                    </div>
-                  )}
-                  
-                  {sale.frieghtCharge > 0 && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-500 text-sm">Freight:</span>
-                      <span className="text-gray-900 text-sm">{formatCurrency(sale.frieghtCharge)}</span>
-                    </div>
-                  )}
-                  
-                  <div className="pt-2 border-t border-gray-200">
-                    <div className="flex justify-between items-center text-md font-bold">
-                      <span>Total:</span>
-                      <span className="text-blue-600">{formatCurrency(sale.totalAmount)}</span>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Discount</label>
+                      <p className="mt-1 text-gray-900 dark:text-gray-100">
+                        {sale.discountType === 'percentage' ? `${sale.discountValue}%` : formatCurrency(sale.discountValue)}
+                      </p>
                     </div>
                   </div>
-                  
-                  {sale.amountPaid > 0 && (
-                    <>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-500 text-sm">Paid:</span>
-                        <span className="text-green-600 text-sm">{formatCurrency(sale.amountPaid)}</span>
-                      </div>
-                      <div className="flex justify-between items-center font-medium">
-                        <span className="text-sm">Balance:</span>
-                        <span className="text-red-600 text-sm">{formatCurrency(sale.balanceDue)}</span>
-                      </div>
-                    </>
-                  )}
                 </div>
               </div>
             </div>
-            
-            {/* Invoice Items */}
-            <div className="bg-white rounded-lg shadow-md p-4 mb-4">
-              <h2 className="text-md font-semibold text-gray-900 mb-3">Invoice Items</h2>
-              
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Order ID
-                      </th>
-                      <th scope="col" className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Item
-                      </th>
-                      <th scope="col" className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        SPH
-                      </th>
-                      <th scope="col" className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        CYL
-                      </th>
-                      <th scope="col" className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        AXIS
-                      </th>
-                      <th scope="col" className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        ADD
-                      </th>
-                      <th scope="col" className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        QTY
-                      </th>
-                      <th scope="col" className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        UNIT
-                      </th>
-                      <th scope="col" className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Price
-                      </th>
-                      <th scope="col" className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Total
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {sale.items && sale.items.map((item, index) => (
-                      <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        <td className="px-2 py-2 whitespace-nowrap text-xs text-left text-gray-500">
-                          {item.orderId || '-'}
-                        </td>
-                        <td className="px-2 py-2 whitespace-nowrap text-left">
-                          <div>
-                            <div className="text-xs font-medium text-gray-900">{item.itemName}</div>
-                          </div>
-                        </td>
-                        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-gray-500">
-                          {item.sph || '-'}
-                        </td>
-                        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-gray-500">
-                          {item.cyl || '-'}
-                        </td>
-                        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-gray-500">
-                          {item.axis || '-'}
-                        </td>
-                        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-gray-500">
-                          {item.add || '-'}
-                        </td>
-                        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-gray-900">
-                          {item.qty}
-                        </td>
-                        <td className="px-2 py-2 whitespace-nowrap text-xs text-center text-gray-500">
-                          {item.unit || 'Pairs'}
-                        </td>
-                        <td className="px-2 py-2 whitespace-nowrap text-xs text-right text-gray-900">
-                          {formatCurrency(item.price)}
-                        </td>
-                        <td className="px-2 py-2 whitespace-nowrap text-xs text-right font-medium text-gray-900">
-                          {formatCurrency(item.total)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-gray-50">
-                    <tr>
-                      <td colSpan="9" className="px-2 py-2 text-right text-xs font-medium text-gray-900">
-                        Subtotal:
-                      </td>
-                      <td className="px-2 py-2 text-right text-xs font-medium text-gray-900">
-                        {formatCurrency(sale.subtotal)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>
-            
-            {/* Notes */}
-            {sale.notes && (
-              <div className="bg-white rounded-lg shadow-md p-4 mb-4">
-                <h2 className="text-md font-semibold text-gray-900 mb-2">Notes</h2>
-                <p className="text-gray-700 whitespace-pre-line text-sm">{sale.notes}</p>
-              </div>
-            )}
-            
-            {/* Actions Footer */}
-            <div className="mt-8 flex justify-end space-x-4">
-              <button
-                onClick={() => navigate(`/sales/edit/${saleId}`)}
-                className="px-6 py-3 border border-blue-500 rounded-lg text-blue-700 bg-blue-50 hover:bg-blue-100 flex items-center"
-              >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-                Edit Invoice
-              </button>
-              
-              <button
-                onClick={handlePrintInvoice}
-                className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center"
-                disabled={loading}
-              >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                </svg>
-                {loading ? 'Processing...' : 'Print Invoice'}
-              </button>
-            </div>
-          </>
-        ) : (
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Invoice not found</h3>
-            <p className="text-gray-600 mb-4">The requested invoice could not be found or may have been deleted</p>
-            <button
-              onClick={() => navigate('/sales')}
-              className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              Return to Sales
-            </button>
-          </div>
-        )}
-      </div>
-      
-      {/* Print Invoice Modal */}
-      <PrintInvoiceModal
-        isOpen={showPrintModal}
-        onClose={() => setShowPrintModal(false)}
-        saleId={saleId}
-        title={sale ? `Invoice #${sale.invoiceNumber}` : 'Print Invoice'}
-      />
+          ) : null}
+        </div>
+      </main>
+
+      {/* Print Modal */}
+      {showPrintModal && (
+        <PrintInvoiceModal 
+          saleId={saleId}
+          onClose={() => setShowPrintModal(false)}
+        />
+      )}
     </div>
   );
 };

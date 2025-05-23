@@ -29,10 +29,10 @@ const AddContactLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onC
   );
   
   // Styling constants
-  const inputClassName = "block w-full rounded-md border-gray-300 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm py-1.5 px-2 text-center";
-  const selectClassName = "block w-full rounded-md border-gray-300 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm py-1.5 px-2";
-  const labelClassName = "block uppercase tracking-wide text-xs font-bold text-sky-700 mb-1";
-  const sectionClassName = "bg-white rounded-lg shadow-md p-6 mb-6";
+  const inputClassName = "block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-sky-500 dark:focus:border-sky-400 focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 text-sm py-1.5 px-2 text-center";
+  const selectClassName = "block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-sky-500 dark:focus:border-sky-400 focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 text-sm py-1.5 px-2";
+  const labelClassName = "block uppercase tracking-wide text-xs font-bold text-sky-700 dark:text-sky-300 mb-1";
+  const sectionClassName = "bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6";
   
   useEffect(() => {
     // If editing a lens, populate the form with a single row
@@ -198,19 +198,19 @@ const AddContactLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onC
   
   return (
     <div className={sectionClassName}>
-      <h2 className="text-xl font-semibold text-gray-800 mb-4">
+      <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
         {editMode ? 'Edit Contact Lens' : 'Add Contact Lenses in Batch'}
       </h2>
       
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-md font-semibold text-sky-800">Contact Lens Details</h3>
+            <h3 className="text-md font-semibold text-sky-800 dark:text-sky-300">Contact Lens Details</h3>
             {!editMode && (
               <button
                 type="button"
                 onClick={addContactLensRow}
-                className="flex items-center text-sm text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 px-3 py-1 rounded-md"
+                className="flex items-center text-sm text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300 bg-sky-50 hover:bg-sky-100 dark:bg-sky-900/50 dark:hover:bg-sky-900/70 px-3 py-1 rounded-md"
               >
                 <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -220,29 +220,29 @@ const AddContactLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onC
             )}
           </div>
           
-          <div className="overflow-x-auto shadow border-b border-gray-200 rounded-lg">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+          <div className="overflow-x-auto shadow border-b border-gray-200 dark:border-gray-600 rounded-lg">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+              <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
-                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SL No</th>
-                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Brand Name</th>
-                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Power Series</th>
-                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">SL No</th>
+                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Brand Name</th>
+                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Power Series</th>
+                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Category</th>
+                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Type</th>
                   {showColorOptions && (
-                    <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Color</th>
+                    <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Color</th>
                   )}
-                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Disposal Frequency</th>
-                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Purchase ₹</th>
-                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sale ₹</th>
-                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QTY</th>
-                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Disposal Frequency</th>
+                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Purchase ₹</th>
+                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Sale ₹</th>
+                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">QTY</th>
+                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Action</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
                 {contactLensRows.map((row, index) => (
-                  <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-2 py-2 whitespace-nowrap text-center text-sm text-gray-900">
+                  <tr key={index} className={index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700'}>
+                    <td className="px-2 py-2 whitespace-nowrap text-center text-sm text-gray-900 dark:text-gray-100">
                       {row.id}
                     </td>
                     <td className="px-2 py-2 whitespace-nowrap">
@@ -349,7 +349,7 @@ const AddContactLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onC
                       <button
                         type="button"
                         onClick={() => removeContactLensRow(index)}
-                        className="text-red-600 hover:text-red-800"
+                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
                         disabled={contactLensRows.length <= 1}
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -365,7 +365,7 @@ const AddContactLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onC
         </div>
         
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-400 p-3 rounded-r text-sm">
+          <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400 dark:border-red-500 p-3 rounded-r text-sm">
             <div className="flex">
               <div className="flex-shrink-0">
                 <svg className="h-4 w-4 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -373,7 +373,7 @@ const AddContactLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onC
                 </svg>
               </div>
               <div className="ml-2">
-                <p className="text-sm text-red-700">{error}</p>
+                <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
               </div>
             </div>
           </div>
@@ -383,14 +383,14 @@ const AddContactLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onC
           <button
             type="button"
             onClick={onCancel}
-            className="px-5 py-2 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 transition-colors shadow-sm"
+            className="px-5 py-2 bg-gray-500 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-700 text-white font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-gray-500 dark:focus:ring-gray-400 disabled:opacity-50 transition-colors shadow-sm"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="px-5 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 transition-colors shadow-sm"
+            className="px-5 py-2 bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600 text-white font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-purple-500 dark:focus:ring-purple-400 disabled:opacity-50 transition-colors shadow-sm"
           >
             {loading ? (
               <span className="flex items-center">

@@ -453,7 +453,7 @@ const ItemSuggestions = ({
         autoComplete="off"
       />
       {showSuggestions && filteredItems.length > 0 && (
-        <div className="absolute z-50 left-0 w-[150%] mt-1 bg-white border border-gray-200 shadow-md rounded-md py-1 max-h-48 overflow-y-auto overflow-x-hidden">
+        <div className="absolute z-50 left-0 w-[150%] mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 shadow-md rounded-md py-1 max-h-48 overflow-y-auto overflow-x-hidden">
           <div 
             ref={suggestionsRef}
             className="w-full"
@@ -472,7 +472,7 @@ const ItemSuggestions = ({
                 return (
                   <span>
                     {text.substring(0, index)}
-                    <span className="bg-yellow-200 font-semibold">
+                    <span className="bg-yellow-200 dark:bg-yellow-800 font-semibold">
                       {text.substring(index, index + searchTerm.length)}
                     </span>
                     {text.substring(index + searchTerm.length)}
@@ -484,23 +484,23 @@ const ItemSuggestions = ({
                 <div
                   key={item.id || idx}
                   tabIndex="0"
-                  className={`px-3 py-2 cursor-pointer border-b border-gray-100 last:border-b-0 flex justify-between items-center ${selectedIndex === idx ? 'bg-sky-50' : 'hover:bg-gray-50'}`}
+                  className={`px-3 py-2 cursor-pointer border-b border-gray-100 dark:border-gray-600 last:border-b-0 flex justify-between items-center ${selectedIndex === idx ? 'bg-sky-50 dark:bg-sky-900/50' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}`}
                   onClick={(e) => handleItemClick(e, item)}
                   onMouseDown={(e) => e.preventDefault()}
                   onMouseEnter={() => setSelectedIndex(idx)}
                 >
                   <div className="flex flex-col flex-1 truncate">
-                    <span className="font-medium text-sm truncate">
+                    <span className="font-medium text-sm truncate text-gray-900 dark:text-gray-100">
                       {highlightText(item.name, searchTerm)}
                     </span>
                     
                     {/* Show lens type and details */}
                     {item.type === 'stock' && item.powerSeries && (
-                      <span className="text-xs text-emerald-600">Stock Lens - {item.powerSeries}</span>
+                      <span className="text-xs text-emerald-600 dark:text-emerald-400">Stock Lens - {item.powerSeries}</span>
                     )}
                     
                     {item.type === 'prescription' && (
-                      <span className="text-xs text-blue-600">
+                      <span className="text-xs text-blue-600 dark:text-blue-400">
                         RX Lens - SPH: {item.sph || 'N/A'}, CYL: {item.cyl || 'N/A'}
                         {item.material && `, ${item.material}`}
                         {item.index && ` ${item.index}`}
@@ -508,35 +508,35 @@ const ItemSuggestions = ({
                     )}
                     
                     {item.type === 'contact' && (
-                      <span className="text-xs text-purple-600">
+                      <span className="text-xs text-purple-600 dark:text-purple-400">
                         Contact Lens - {item.powerSeries || 'N/A'}
                         {item.category && ` (${item.category})`}
                       </span>
                     )}
                     
                     {item.type === 'service' && (
-                      <span className="text-xs text-teal-600">
+                      <span className="text-xs text-teal-600 dark:text-teal-400">
                         Service - {item.serviceType || 'General Service'}
                       </span>
                     )}
                     
                     {/* Fallback for stock lens detection */}
                     {item.isStockLens && item.stockData && !item.type && (
-                      <span className="text-xs text-emerald-600">Stock Lens {item.stockData.powerSeries}</span>
+                      <span className="text-xs text-emerald-600 dark:text-emerald-400">Stock Lens {item.stockData.powerSeries}</span>
                     )}
                     
                     {/* Fallback for service detection */}
                     {item.isService && item.serviceData && !item.type && (
-                      <span className="text-xs text-teal-600">Service - {item.serviceData.serviceType || 'General Service'}</span>
+                      <span className="text-xs text-teal-600 dark:text-teal-400">Service - {item.serviceData.serviceType || 'General Service'}</span>
                     )}
                     
                     {/* Show quantity if available */}
                     {item.qty && parseInt(item.qty) !== 1 && (
-                      <span className="text-xs text-gray-500">Available: {item.qty} pcs</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">Available: {item.qty} pcs</span>
                     )}
                   </div>
                   {item.price && (
-                    <span className="text-xs text-gray-500 ml-2 whitespace-nowrap">₹{item.price}</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-2 whitespace-nowrap">₹{item.price}</span>
                   )}
                 </div>
               );
@@ -545,7 +545,7 @@ const ItemSuggestions = ({
             {/* Add "Create New Product" option at the bottom if there are suggestions */}
             {filteredItems.length > 0 && searchTerm.trim() && (
               <div
-                className="px-3 py-2 cursor-pointer border-t border-gray-200 bg-gray-50 hover:bg-gray-100 flex items-center justify-center"
+                className="px-3 py-2 cursor-pointer border-t border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center justify-center"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -556,10 +556,10 @@ const ItemSuggestions = ({
                 }}
                 onMouseDown={(e) => e.preventDefault()}
               >
-                <svg className="w-4 h-4 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
                 </svg>
-                <span className="text-sm font-medium text-blue-600">Add New Product "{searchTerm.trim()}"</span>
+                <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Add New Product "{searchTerm.trim()}"</span>
               </div>
             )}
           </div>
@@ -569,36 +569,36 @@ const ItemSuggestions = ({
       {/* Create New Product Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
             <div className="mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Create New Product</h3>
-              <p className="text-sm text-gray-600">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Create New Product</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-300">
                 Product "{newProductName}" doesn't exist in inventory. Would you like to create it?
               </p>
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Product Name
               </label>
               <input
                 type="text"
                 value={newProductName}
                 onChange={(e) => setNewProductName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 placeholder="Product name"
               />
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Price (₹)
               </label>
               <input
                 type="number"
                 value={newProductPrice}
                 onChange={(e) => setNewProductPrice(parseFloat(e.target.value) || 0)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 placeholder="0.00"
                 min="0"
                 step="0.01"
@@ -606,53 +606,53 @@ const ItemSuggestions = ({
             </div>
 
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-3">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                 Select Product Type
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => createNewProduct('prescription')}
                   disabled={creatingProduct}
-                  className="flex flex-col items-center p-3 border-2 border-blue-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors disabled:opacity-50"
+                  className="flex flex-col items-center p-3 border-2 border-blue-200 dark:border-blue-700 bg-white dark:bg-gray-700 rounded-lg hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors disabled:opacity-50"
                 >
-                  <svg className="w-8 h-8 text-blue-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-8 h-8 text-blue-600 dark:text-blue-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  <span className="text-sm font-medium text-blue-900">RX Lens</span>
+                  <span className="text-sm font-medium text-blue-900 dark:text-blue-100">RX Lens</span>
                 </button>
 
                 <button
                   onClick={() => createNewProduct('stock')}
                   disabled={creatingProduct}
-                  className="flex flex-col items-center p-3 border-2 border-emerald-200 rounded-lg hover:border-emerald-400 hover:bg-emerald-50 transition-colors disabled:opacity-50"
+                  className="flex flex-col items-center p-3 border-2 border-emerald-200 dark:border-emerald-700 bg-white dark:bg-gray-700 rounded-lg hover:border-emerald-400 dark:hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors disabled:opacity-50"
                 >
-                  <svg className="w-8 h-8 text-emerald-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-8 h-8 text-emerald-600 dark:text-emerald-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                   </svg>
-                  <span className="text-sm font-medium text-emerald-900">Stock Lens</span>
+                  <span className="text-sm font-medium text-emerald-900 dark:text-emerald-100">Stock Lens</span>
                 </button>
 
                 <button
                   onClick={() => createNewProduct('contact')}
                   disabled={creatingProduct}
-                  className="flex flex-col items-center p-3 border-2 border-purple-200 rounded-lg hover:border-purple-400 hover:bg-purple-50 transition-colors disabled:opacity-50"
+                  className="flex flex-col items-center p-3 border-2 border-purple-200 dark:border-purple-700 bg-white dark:bg-gray-700 rounded-lg hover:border-purple-400 dark:hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors disabled:opacity-50"
                 >
-                  <svg className="w-8 h-8 text-purple-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-8 h-8 text-purple-600 dark:text-purple-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                   </svg>
-                  <span className="text-sm font-medium text-purple-900">Contact Lens</span>
+                  <span className="text-sm font-medium text-purple-900 dark:text-purple-100">Contact Lens</span>
                 </button>
 
                 <button
                   onClick={() => createNewProduct('service')}
                   disabled={creatingProduct}
-                  className="flex flex-col items-center p-3 border-2 border-teal-200 rounded-lg hover:border-teal-400 hover:bg-teal-50 transition-colors disabled:opacity-50"
+                  className="flex flex-col items-center p-3 border-2 border-teal-200 dark:border-teal-700 bg-white dark:bg-gray-700 rounded-lg hover:border-teal-400 dark:hover:border-teal-500 hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-colors disabled:opacity-50"
                 >
-                  <svg className="w-8 h-8 text-teal-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-8 h-8 text-teal-600 dark:text-teal-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                   </svg>
-                  <span className="text-sm font-medium text-teal-900">Service</span>
+                  <span className="text-sm font-medium text-teal-900 dark:text-teal-100">Service</span>
                 </button>
               </div>
             </div>
@@ -661,20 +661,20 @@ const ItemSuggestions = ({
               <button
                 onClick={closeCreateModal}
                 disabled={creatingProduct}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md hover:bg-gray-200 dark:hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400 disabled:opacity-50 transition-colors"
               >
                 Cancel
               </button>
             </div>
 
             {creatingProduct && (
-              <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center rounded-lg">
+              <div className="absolute inset-0 bg-white dark:bg-gray-800 bg-opacity-75 dark:bg-opacity-75 flex items-center justify-center rounded-lg">
                 <div className="flex items-center">
-                  <svg className="animate-spin h-5 w-5 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400 mr-2" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  <span className="text-sm text-gray-600">Creating product...</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-300">Creating product...</span>
                 </div>
               </div>
             )}

@@ -648,18 +648,18 @@ const LensInventory = () => {
     if (loading) {
       return (
         <div className="flex justify-center items-center py-6">
-          <svg className="animate-spin h-6 w-6 text-sky-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <svg className="animate-spin h-6 w-6 text-sky-600 dark:border-sky-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <span className="ml-2 text-sm" style={{ color: 'var(--text-muted)' }}>Loading inventory...</span>
+          <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Loading inventory...</span>
         </div>
       );
     }
 
     if (filteredLenses.length === 0) {
       return (
-        <div className="border-l-4 border-yellow-400 p-3 sm:p-4 mb-4 rounded-r text-sm" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+        <div className="border-l-4 border-yellow-400 p-3 sm:p-4 mb-4 rounded-r text-sm bg-yellow-50 dark:bg-yellow-900/50">
           <div className="flex">
             <div className="flex-shrink-0">
               <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -667,7 +667,7 @@ const LensInventory = () => {
               </svg>
             </div>
             <div className="ml-3">
-              <p className="text-xs sm:text-sm text-yellow-700">
+              <p className="text-xs sm:text-sm text-yellow-700 dark:text-yellow-200">
                 {searchTerm ? 'No lenses match your search criteria.' : 'No lenses in inventory yet. Add your first lens to get started!'}
               </p>
             </div>
@@ -679,16 +679,12 @@ const LensInventory = () => {
     return (
       <div className="grid grid-cols-1 gap-3">
         {filteredLenses.map((lens, index) => (
-          <div key={lens.id} className={`p-3 rounded-lg border shadow-sm ${index % 2 === 0 ? '' : ''}`} 
-               style={{ 
-                 backgroundColor: index % 2 === 0 ? 'var(--bg-secondary)' : 'var(--bg-tertiary)',
-                 borderColor: 'var(--border-primary)'
-               }}>
+          <div key={lens.id} className={`p-3 rounded-lg border shadow-sm ${index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700'} border-gray-200 dark:border-gray-600`}>
             <div className="flex justify-between items-center mb-2">
               <div className="font-medium text-sky-600">
                 {lens.brandName || 'N/A'}
               </div>
-              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              <div className="text-xs text-gray-500 dark:text-gray-400">
                 Qty: {lens.qty || '1'}
               </div>
             </div>
@@ -697,34 +693,34 @@ const LensInventory = () => {
             {activeTab === 'rx' && (
               <div className="grid grid-cols-2 gap-2 text-xs mb-3">
                 <div>
-                  <span className="font-medium" style={{ color: 'var(--text-muted)' }}>Eye:</span>{' '}
-                  <span style={{ color: 'var(--text-primary)' }}>
+                  <span className="font-medium text-gray-500 dark:text-gray-400">Eye:</span>{' '}
+                  <span className="text-gray-900 dark:text-white">
                     {lens.eye === 'right' ? 'Right' : lens.eye === 'left' ? 'Left' : lens.eye === 'both' ? 'Both' : 'N/A'}
                   </span>
                 </div>
                 <div>
-                  <span className="font-medium" style={{ color: 'var(--text-muted)' }}>SPH:</span>{' '}
-                  <span style={{ color: 'var(--text-primary)' }}>{lens.sph || 'N/A'}</span>
+                  <span className="font-medium text-gray-500 dark:text-gray-400">SPH:</span>{' '}
+                  <span className="text-gray-900 dark:text-white">{lens.sph || 'N/A'}</span>
                 </div>
                 <div>
-                  <span className="font-medium" style={{ color: 'var(--text-muted)' }}>CYL:</span>{' '}
-                  <span style={{ color: 'var(--text-primary)' }}>{lens.cyl || 'N/A'}</span>
+                  <span className="font-medium text-gray-500 dark:text-gray-400">CYL:</span>{' '}
+                  <span className="text-gray-900 dark:text-white">{lens.cyl || 'N/A'}</span>
                 </div>
                 <div>
-                  <span className="font-medium" style={{ color: 'var(--text-muted)' }}>AXIS:</span>{' '}
-                  <span style={{ color: 'var(--text-primary)' }}>{lens.axis || 'N/A'}</span>
+                  <span className="font-medium text-gray-500 dark:text-gray-400">AXIS:</span>{' '}
+                  <span className="text-gray-900 dark:text-white">{lens.axis || 'N/A'}</span>
                 </div>
                 <div>
-                  <span className="font-medium" style={{ color: 'var(--text-muted)' }}>ADD:</span>{' '}
-                  <span style={{ color: 'var(--text-primary)' }}>{lens.add || 'N/A'}</span>
+                  <span className="font-medium text-gray-500 dark:text-gray-400">ADD:</span>{' '}
+                  <span className="text-gray-900 dark:text-white">{lens.add || 'N/A'}</span>
                 </div>
                 <div>
-                  <span className="font-medium" style={{ color: 'var(--text-muted)' }}>Material:</span>{' '}
-                  <span style={{ color: 'var(--text-primary)' }}>{lens.material || 'N/A'}</span>
+                  <span className="font-medium text-gray-500 dark:text-gray-400">Material:</span>{' '}
+                  <span className="text-gray-900 dark:text-white">{lens.material || 'N/A'}</span>
                 </div>
                 <div>
-                  <span className="font-medium" style={{ color: 'var(--text-muted)' }}>Index:</span>{' '}
-                  <span style={{ color: 'var(--text-primary)' }}>{lens.index || 'N/A'}</span>
+                  <span className="font-medium text-gray-500 dark:text-gray-400">Index:</span>{' '}
+                  <span className="text-gray-900 dark:text-white">{lens.index || 'N/A'}</span>
                 </div>
               </div>
             )}
@@ -733,8 +729,8 @@ const LensInventory = () => {
             {activeTab === 'stock' && (
               <div className="grid grid-cols-1 gap-2 text-xs mb-3">
                 <div>
-                  <span className="font-medium" style={{ color: 'var(--text-muted)' }}>Power Series:</span>{' '}
-                  <span style={{ color: 'var(--text-primary)' }}>{lens.powerSeries || 'N/A'}</span>
+                  <span className="font-medium text-gray-500 dark:text-gray-400">Power Series:</span>{' '}
+                  <span className="text-gray-900 dark:text-white">{lens.powerSeries || 'N/A'}</span>
                 </div>
               </div>
             )}
@@ -743,24 +739,24 @@ const LensInventory = () => {
             {activeTab === 'contact' && (
               <div className="grid grid-cols-2 gap-2 text-xs mb-3">
                 <div>
-                  <span className="font-medium" style={{ color: 'var(--text-muted)' }}>Power Series:</span>{' '}
-                  <span style={{ color: 'var(--text-primary)' }}>{lens.powerSeries || 'N/A'}</span>
+                  <span className="font-medium text-gray-500 dark:text-gray-400">Power Series:</span>{' '}
+                  <span className="text-gray-900 dark:text-white">{lens.powerSeries || 'N/A'}</span>
                 </div>
                 <div>
-                  <span className="font-medium" style={{ color: 'var(--text-muted)' }}>Category:</span>{' '}
-                  <span style={{ color: 'var(--text-primary)' }}>{lens.category || 'N/A'}</span>
+                  <span className="font-medium text-gray-500 dark:text-gray-400">Category:</span>{' '}
+                  <span className="text-gray-900 dark:text-white">{lens.category || 'N/A'}</span>
                 </div>
                 <div>
-                  <span className="font-medium" style={{ color: 'var(--text-muted)' }}>Type:</span>{' '}
-                  <span style={{ color: 'var(--text-primary)' }}>{lens.contactType || 'N/A'}</span>
+                  <span className="font-medium text-gray-500 dark:text-gray-400">Type:</span>{' '}
+                  <span className="text-gray-900 dark:text-white">{lens.contactType || 'N/A'}</span>
                 </div>
                 <div>
-                  <span className="font-medium" style={{ color: 'var(--text-muted)' }}>Color:</span>{' '}
-                  <span style={{ color: 'var(--text-primary)' }}>{lens.color || 'N/A'}</span>
+                  <span className="font-medium text-gray-500 dark:text-gray-400">Color:</span>{' '}
+                  <span className="text-gray-900 dark:text-white">{lens.color || 'N/A'}</span>
                 </div>
                 <div>
-                  <span className="font-medium" style={{ color: 'var(--text-muted)' }}>Disposal:</span>{' '}
-                  <span style={{ color: 'var(--text-primary)' }}>{lens.disposalFrequency || 'N/A'}</span>
+                  <span className="font-medium text-gray-500 dark:text-gray-400">Disposal:</span>{' '}
+                  <span className="text-gray-900 dark:text-white">{lens.disposalFrequency || 'N/A'}</span>
                 </div>
               </div>
             )}
@@ -769,12 +765,12 @@ const LensInventory = () => {
             {activeTab === 'services' && (
               <div className="grid grid-cols-2 gap-2 text-xs mb-3">
                 <div>
-                  <span className="font-medium" style={{ color: 'var(--text-muted)' }}>Service Type:</span>{' '}
-                  <span style={{ color: 'var(--text-primary)' }}>{lens.serviceType || 'N/A'}</span>
+                  <span className="font-medium text-gray-500 dark:text-gray-400">Service Type:</span>{' '}
+                  <span className="text-gray-900 dark:text-white">{lens.serviceType || 'N/A'}</span>
                 </div>
                 <div>
-                  <span className="font-medium" style={{ color: 'var(--text-muted)' }}>Service Description:</span>{' '}
-                  <span style={{ color: 'var(--text-primary)' }}>{lens.serviceDescription || 'N/A'}</span>
+                  <span className="font-medium text-gray-500 dark:text-gray-400">Service Description:</span>{' '}
+                  <span className="text-gray-900 dark:text-white">{lens.serviceDescription || 'N/A'}</span>
                 </div>
               </div>
             )}
@@ -782,14 +778,14 @@ const LensInventory = () => {
             <div className="flex justify-between items-center text-xs">
               <div>
                 <div>
-                  <span className="font-medium" style={{ color: 'var(--text-muted)' }}>Purchase:</span>{' '}
-                  <span style={{ color: 'var(--text-primary)' }}>
+                  <span className="font-medium text-gray-500 dark:text-gray-400">Purchase:</span>{' '}
+                  <span className="text-gray-900 dark:text-white">
                     {lens.purchasePrice ? `₹${parseFloat(lens.purchasePrice).toFixed(2)}` : 'N/A'}
                   </span>
                 </div>
                 <div>
-                  <span className="font-medium" style={{ color: 'var(--text-muted)' }}>Sale:</span>{' '}
-                  <span style={{ color: 'var(--text-primary)' }}>
+                  <span className="font-medium text-gray-500 dark:text-gray-400">Sale:</span>{' '}
+                  <span className="text-gray-900 dark:text-white">
                     {lens.salePrice ? `₹${parseFloat(lens.salePrice).toFixed(2)}` : 'N/A'}
                   </span>
                 </div>
@@ -797,13 +793,13 @@ const LensInventory = () => {
               <div className="flex gap-2">
                 <button
                   onClick={() => handleEditLens(lens)}
-                  className="text-sky-600 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 px-2 py-1 rounded text-xs"
+                  className="text-sky-600 hover:text-sky-900 bg-sky-50 dark:bg-sky-900/50 hover:bg-sky-100 dark:hover:bg-sky-900/70 px-2 py-1 rounded text-xs"
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => removeLens(lens.id)}
-                  className="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-2 py-1 rounded text-xs"
+                  className="text-red-600 hover:text-red-900 bg-red-50 dark:bg-red-900/50 hover:bg-red-100 dark:hover:bg-red-900/70 px-2 py-1 rounded text-xs"
                 >
                   Delete
                 </button>
@@ -816,13 +812,13 @@ const LensInventory = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
+    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navbar />
       
       <main className="flex-grow px-2 sm:px-4 py-4 sm:py-6 max-w-7xl mx-auto w-full">
         <div className="mb-4 sm:mb-8">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-2">
-            <h1 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-0" style={{ color: 'var(--text-primary)' }}>Lens Inventory</h1>
+            <h1 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-0 text-gray-900 dark:text-white">Lens Inventory</h1>
             <div className="flex flex-wrap gap-2">
               {(showAddForm || showStockLensForm || showContactLensForm || showServiceForm) ? (
                 <button
@@ -894,7 +890,7 @@ const LensInventory = () => {
         </div>
         
         {error && (
-          <div className="mb-4 sm:mb-6 p-3 sm:p-4 border-l-4 border-red-400 text-red-700 rounded-r-md shadow-sm text-sm" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+          <div className="mb-4 sm:mb-6 p-3 sm:p-4 border-l-4 border-red-400 text-red-700 dark:text-red-200 rounded-r-md shadow-sm text-sm bg-red-50 dark:bg-red-900/50">
             <p>{error}</p>
           </div>
         )}
@@ -941,30 +937,30 @@ const LensInventory = () => {
         
         {/* Inventory Table Section */}
         {(!showAddForm && !showStockLensForm && !showContactLensForm && !showServiceForm) && (
-          <div className="card p-3 sm:p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-3">
               <div className="flex flex-wrap gap-1 sm:gap-2 overflow-x-auto pb-1">
                 <button
                   onClick={() => setActiveTab('rx')}
-                  className={`${tabClassName} ${activeTab === 'rx' ? activeTabClassName : inactiveTabClassName} text-xs sm:text-sm`}
+                  className={`${tabClassName} ${activeTab === 'rx' ? 'bg-indigo-600 text-white rounded-lg shadow-sm' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg'} text-xs sm:text-sm`}
                 >
                   RX Lenses
                 </button>
                 <button
                   onClick={() => setActiveTab('stock')}
-                  className={`${tabClassName} ${activeTab === 'stock' ? activeTabClassName : inactiveTabClassName} text-xs sm:text-sm`}
+                  className={`${tabClassName} ${activeTab === 'stock' ? 'bg-indigo-600 text-white rounded-lg shadow-sm' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg'} text-xs sm:text-sm`}
                 >
                   Stock Lenses
                 </button>
                 <button
                   onClick={() => setActiveTab('contact')}
-                  className={`${tabClassName} ${activeTab === 'contact' ? activeTabClassName : inactiveTabClassName} text-xs sm:text-sm`}
+                  className={`${tabClassName} ${activeTab === 'contact' ? 'bg-indigo-600 text-white rounded-lg shadow-sm' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg'} text-xs sm:text-sm`}
                 >
                   Contact Lenses
                 </button>
                 <button
                   onClick={() => setActiveTab('services')}
-                  className={`${tabClassName} ${activeTab === 'services' ? activeTabClassName : inactiveTabClassName} text-xs sm:text-sm`}
+                  className={`${tabClassName} ${activeTab === 'services' ? 'bg-indigo-600 text-white rounded-lg shadow-sm' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg'} text-xs sm:text-sm`}
                 >
                   Services
                 </button>
@@ -977,9 +973,9 @@ const LensInventory = () => {
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Search lens inventory..."
-                    className="pl-10 pr-4 py-2 form-input w-full text-sm"
+                    className="pl-10 pr-4 py-2 w-full text-sm rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                   />
-                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2" style={{ color: 'var(--text-muted)' }}>
+                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
                     </svg>
@@ -988,7 +984,7 @@ const LensInventory = () => {
                 <div className="flex space-x-2">
                   <button
                     onClick={fetchLensInventory}
-                    className="flex items-center justify-center text-sm text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 px-3 py-1 rounded-md sm:ml-2"
+                    className="flex items-center justify-center text-sm text-sky-600 hover:text-sky-700 bg-sky-50 dark:bg-sky-900/50 hover:bg-sky-100 dark:hover:bg-sky-900/70 px-3 py-1 rounded-md sm:ml-2"
                   >
                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -997,7 +993,7 @@ const LensInventory = () => {
                   </button>
                   <button
                     onClick={() => setViewMode(viewMode === 'table' ? 'card' : 'table')}
-                    className="flex items-center justify-center text-sm text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 px-3 py-1 rounded-md"
+                    className="flex items-center justify-center text-sm text-purple-600 hover:text-purple-700 bg-purple-50 dark:bg-purple-900/50 hover:bg-purple-100 dark:hover:bg-purple-900/70 px-3 py-1 rounded-md"
                   >
                     {viewMode === 'table' ? (
                       <>
@@ -1025,7 +1021,7 @@ const LensInventory = () => {
             ) : (
               <>
                 {filteredLenses.length === 0 && !loading ? (
-                  <div className="border-l-4 border-yellow-400 p-3 sm:p-4 mb-4 rounded-r text-sm" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+                  <div className="border-l-4 border-yellow-400 p-3 sm:p-4 mb-4 rounded-r text-sm bg-yellow-50 dark:bg-yellow-900/50">
                     <div className="flex">
                       <div className="flex-shrink-0">
                         <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -1033,84 +1029,80 @@ const LensInventory = () => {
                         </svg>
                       </div>
                       <div className="ml-3">
-                        <p className="text-xs sm:text-sm text-yellow-700">
+                        <p className="text-xs sm:text-sm text-yellow-700 dark:text-yellow-200">
                           {searchTerm ? 'No lenses match your search criteria.' : 'No lenses in inventory yet. Add your first lens to get started!'}
                         </p>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto -mx-3 sm:mx-0 shadow border-b rounded-lg" style={{ borderColor: 'var(--border-primary)' }}>
-                    <table className="min-w-full divide-y text-xs sm:text-sm" style={{ borderColor: 'var(--border-primary)' }}>
-                      <thead style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+                  <div className="overflow-x-auto -mx-3 sm:mx-0 shadow border-b rounded-lg border-gray-200 dark:border-gray-700">
+                    <table className="min-w-full divide-y text-xs sm:text-sm divide-gray-200 dark:divide-gray-700">
+                      <thead className="bg-gray-50 dark:bg-gray-700">
                         <tr>
-                          <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Brand</th>
+                          <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Brand</th>
                           
                           {/* Columns for RX lenses */}
                           {activeTab === 'rx' && (
                             <>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Eye</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>SPH</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>CYL</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>AXIS</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>ADD</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Material</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Index</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Eye</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">SPH</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">CYL</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">AXIS</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">ADD</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Material</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Index</th>
                             </>
                           )}
                           
                           {/* Columns for Stock lenses */}
                           {activeTab === 'stock' && (
-                            <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Power Series</th>
+                            <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Power Series</th>
                           )}
                           
                           {/* Columns for Contact lenses */}
                           {activeTab === 'contact' && (
                             <>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Power Series</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Category</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Type</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Color</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Disposal</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Power Series</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Category</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Type</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Color</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Disposal</th>
                             </>
                           )}
                           
                           {/* Columns for Services */}
                           {activeTab === 'services' && (
                             <>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Service Type</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Service Description</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Service Type</th>
+                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Service Description</th>
                             </>
                           )}
                           
                           {/* Common columns for all lens types */}
-                          <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Purchase</th>
-                          <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Sale</th>
-                          <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Qty</th>
-                          <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Actions</th>
+                          <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Purchase</th>
+                          <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Sale</th>
+                          <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Qty</th>
+                          <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+                      <tbody className="divide-y bg-white dark:bg-gray-800 divide-gray-200 dark:divide-gray-700">
                         {loading ? (
                           <tr>
                             <td colSpan={activeTab === 'rx' ? 11 : activeTab === 'stock' ? 5 : activeTab === 'contact' ? 9 : activeTab === 'services' ? 7 : 4} className="px-2 sm:px-3 py-3 text-center">
                               <div className="flex justify-center items-center">
-                                <svg className="animate-spin h-5 w-5 text-sky-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <svg className="animate-spin h-5 w-5 text-sky-600 dark:border-sky-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
-                                <span className="ml-2 text-xs sm:text-sm" style={{ color: 'var(--text-muted)' }}>Loading inventory...</span>
+                                <span className="ml-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400">Loading inventory...</span>
                               </div>
                             </td>
                           </tr>
                         ) : (
                           filteredLenses.map((lens, index) => (
-                            <tr key={lens.id} className={index % 2 === 0 ? 'hover:bg-opacity-50' : 'hover:bg-opacity-50'} 
-                                style={{ 
-                                  backgroundColor: index % 2 === 0 ? 'var(--bg-secondary)' : 'var(--bg-tertiary)',
-                                  ':hover': { backgroundColor: 'var(--bg-tertiary)' }
-                                }}>
-                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm" style={{ color: 'var(--text-primary)' }}>
+                            <tr key={lens.id} className={`${index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700'} hover:bg-gray-100 dark:hover:bg-gray-600`}>
+                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">
                                 <a href={`/lens-inventory/${lens.id}`} className="text-sky-600 hover:text-sky-800 hover:underline">
                                   {lens.brandName || 'N/A'}
                                 </a>
@@ -1119,21 +1111,21 @@ const LensInventory = () => {
                               {/* Conditional rendering for RX lens columns */}
                               {activeTab === 'rx' && (
                                 <>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 font-medium">
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white font-medium">
                                     {lens.eye === 'right' ? 'Right' : lens.eye === 'left' ? 'Left' : lens.eye === 'both' ? 'Both' : 'N/A'}
                                   </td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.sph || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.cyl || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.axis || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.add || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.material || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.index || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.sph || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.cyl || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.axis || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.add || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.material || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.index || 'N/A'}</td>
                                 </>
                               )}
                               
                               {/* Power Series column for stock lenses */}
                               {activeTab === 'stock' && (
-                                <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">
+                                <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">
                                   {lens.powerSeries || 'N/A'}
                                 </td>
                               )}
@@ -1141,41 +1133,41 @@ const LensInventory = () => {
                               {/* Contact lens specific columns */}
                               {activeTab === 'contact' && (
                                 <>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.powerSeries || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.category || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.contactType || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.color || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.disposalFrequency || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.powerSeries || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.category || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.contactType || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.color || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.disposalFrequency || 'N/A'}</td>
                                 </>
                               )}
                               
                               {/* Service specific columns */}
                               {activeTab === 'services' && (
                                 <>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.serviceType || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.serviceDescription || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.serviceType || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.serviceDescription || 'N/A'}</td>
                                 </>
                               )}
                               
                               {/* Common columns for all lens types */}
-                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">
+                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">
                                 {lens.purchasePrice ? `₹${parseFloat(lens.purchasePrice).toFixed(2)}` : 'N/A'}
                               </td>
-                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">
+                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">
                                 {lens.salePrice ? `₹${parseFloat(lens.salePrice).toFixed(2)}` : 'N/A'}
                               </td>
-                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{lens.qty || '1'}</td>
+                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.qty || '1'}</td>
                               <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm font-medium">
                                 <div className="flex gap-1 sm:gap-2">
                                   <button
                                     onClick={() => handleEditLens(lens)}
-                                    className="text-sky-600 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 px-1.5 sm:px-2 py-1 rounded text-xs sm:text-sm"
+                                    className="text-sky-600 hover:text-sky-900 bg-sky-50 dark:bg-sky-900/50 hover:bg-sky-100 dark:hover:bg-sky-900/70 px-1.5 sm:px-2 py-1 rounded text-xs sm:text-sm"
                                   >
                                     Edit
                                   </button>
                                   <button
                                     onClick={() => removeLens(lens.id)}
-                                    className="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-1.5 sm:px-2 py-1 rounded text-xs sm:text-sm"
+                                    className="text-red-600 hover:text-red-900 bg-red-50 dark:bg-red-900/50 hover:bg-red-100 dark:hover:bg-red-900/70 px-1.5 sm:px-2 py-1 rounded text-xs sm:text-sm"
                                   >
                                     Delete
                                   </button>

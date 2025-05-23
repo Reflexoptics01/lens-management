@@ -293,18 +293,18 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
   };
 
   if (loading) {
-    return <div className="p-4">Loading invoice data...</div>;
+    return <div className="p-4 dark:text-gray-300">Loading invoice data...</div>;
   }
 
   if (error) {
-    return <div className="p-4 text-red-500">Error: {error}</div>;
+    return <div className="p-4 text-red-500 dark:text-red-400">Error: {error}</div>;
   }
 
   // saleData might be null here if there was an error before this point or if loading is slow
   // Adding a check for saleData before trying to access its properties.
   if (!saleData) {
     // Or return a specific message indicating saleData is not available yet
-    return <div className="p-4">Invoice data is not available.</div>;
+    return <div className="p-4 dark:text-gray-300">Invoice data is not available.</div>;
   }
 
   console.log('Shop settings:', shopSettings);
@@ -335,12 +335,12 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
 
   return (
     <div className="print-container">
-      <div className="no-print mb-4 p-4 bg-gray-100 flex justify-between items-center">
-        <h2 className="text-xl font-bold">Invoice #{saleData.invoiceNumber}</h2>
+      <div className="no-print mb-4 p-4 bg-gray-100 dark:bg-gray-800 flex justify-between items-center">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Invoice #{saleData.invoiceNumber}</h2>
         <div className="flex space-x-2">
           <button 
             onClick={handlePrint} 
-            className="px-4 py-2 bg-blue-600 text-white rounded flex items-center"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded flex items-center transition-colors"
           >
             <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -349,7 +349,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
           </button>
           <button 
             onClick={onClose} 
-            className="px-4 py-2 bg-gray-500 text-white rounded flex items-center"
+            className="px-4 py-2 bg-gray-500 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-700 text-white rounded flex items-center transition-colors"
           >
             <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
