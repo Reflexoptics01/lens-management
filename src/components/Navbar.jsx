@@ -464,7 +464,7 @@ const Navbar = () => {
                         : 'var(--text-muted)'
                     }}
                   >
-                    <div className={`p-2 rounded-full ${
+                    <div className={`p-2 rounded-lg ${
                       location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
                         ? 'bg-gradient-to-r ' + item.color + ' text-white shadow-md' 
                         : 'group-hover:bg-gradient-to-r group-hover:' + item.color + ' group-hover:text-white'
@@ -498,7 +498,7 @@ const Navbar = () => {
               <ThemeToggle />
               <button
                 onClick={handleLogout}
-                className="flex items-center px-3 py-1 text-red-600 rounded-lg border border-red-200 transition-all duration-300 hover:scale-105 hover:shadow-md text-xs"
+                className="flex items-center justify-center p-2 text-red-600 rounded-lg border border-red-200 transition-all duration-300 hover:scale-105 hover:shadow-md"
                 style={{ 
                   backgroundColor: 'var(--bg-secondary)', 
                   borderColor: 'var(--border-primary)',
@@ -507,10 +507,9 @@ const Navbar = () => {
                 onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--bg-tertiary)'}
                 onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--bg-secondary)'}
               >
-                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
-                <span>Sign out</span>
               </button>
             </div>
           </div>
@@ -536,7 +535,7 @@ const Navbar = () => {
                 data-path={item.path}
                 className="flex flex-col items-center justify-center py-1.5 px-3 min-w-[60px] relative transition-transform duration-300 hover:scale-110"
               >
-                <div className={`p-1.5 rounded-full mb-1 ${
+                <div className={`p-1.5 rounded-lg mb-1 ${
                   location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
                     ? 'bg-gradient-to-r ' + item.color + ' shadow-md animate-pulse' 
                     : ''

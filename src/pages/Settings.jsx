@@ -51,6 +51,12 @@ const Settings = () => {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
   
+  // Modal states for backup and clear data
+  const [showBackupConfirmModal, setShowBackupConfirmModal] = useState(false);
+  const [showPasswordConfirmModal, setShowPasswordConfirmModal] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [passwordConfirmError, setPasswordConfirmError] = useState('');
+  
   // Users management
   const [users, setUsers] = useState([]);
   const [inactiveUsers, setInactiveUsers] = useState([]);
@@ -925,47 +931,8 @@ const Settings = () => {
   
   // Inside the Settings component, add a new function to delete all data
   const handleClearAllData = async () => {
-    if (!window.confirm("⚠️ WARNING: This will delete ALL customers, vendors, orders, and other data. This action cannot be undone. Are you sure?")) {
-      return;
-    }
-    
-    if (!window.confirm("⚠️ FINAL WARNING: All data will be permanently deleted. Continue?")) {
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      // Collections to delete
-      const collectionsToDelete = [
-        'customers', 
-        'orders', 
-        'purchases', 
-        'transactions', 
-        'sales', 
-        'invoices', 
-        'counters'
-      ];
-      
-      const deletePromises = [];
-      
-      for (const collectionName of collectionsToDelete) {
-        const collectionSnapshot = await getDocs(collection(db, collectionName));
-        collectionSnapshot.docs.forEach(doc => {
-          deletePromises.push(deleteDoc(doc.ref));
-        });
-      }
-      
-      // Wait for all deletes to complete
-      await Promise.all(deletePromises);
-      
-      alert("All data has been successfully deleted. The application will now refresh.");
-      window.location.reload();
-    } catch (error) {
-      console.error('Error clearing data:', error);
-      setError('Failed to clear data: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
+    // Show backup confirmation modal instead of window.confirm
+    setShowBackupConfirmModal(true);
   };
   
   // Fetch users
@@ -1229,6 +1196,283 @@ const Settings = () => {
     }
   };
   
+  // Actual function to delete all data after confirmations
+  const performDataDeletion = async () => {
+    setLoading(true);
+    setBackupError('');
+    setBackupSuccess('');
+    
+    try {
+      console.log('Starting comprehensive data deletion...');
+      
+      // Comprehensive list of collections to delete
+      const collectionsToDelete = [
+        'customers', 
+        'orders', 
+        'purchases', 
+        'transactions', 
+        'sales', 
+        'invoices', 
+        'counters',
+        'lensInventory',
+        'users',
+        'products',
+        'inventory',
+        'vendors',
+        'payments',
+        'reports',
+        'categories',
+        'brands',
+        'prescriptions',
+        'appointments'
+      ];
+      
+      const deletePromises = [];
+      let totalDeleted = 0;
+      
+      for (const collectionName of collectionsToDelete) {
+        try {
+          console.log(`Deleting collection: ${collectionName}`);
+          const collectionSnapshot = await getDocs(collection(db, collectionName));
+          
+          if (collectionSnapshot.docs.length > 0) {
+            console.log(`Found ${collectionSnapshot.docs.length} documents in ${collectionName}`);
+            
+            collectionSnapshot.docs.forEach(doc => {
+              deletePromises.push(deleteDoc(doc.ref));
+              totalDeleted++;
+            });
+          } else {
+            console.log(`Collection ${collectionName} is empty, skipping...`);
+          }
+        } catch (collectionError) {
+          console.warn(`Could not delete collection ${collectionName}:`, collectionError);
+          // Continue with other collections even if one fails
+        }
+      }
+      
+      if (deletePromises.length === 0) {
+        setBackupError("No data found to delete. Database appears to be empty.");
+        return;
+      }
+      
+      console.log(`Deleting ${totalDeleted} documents from ${collectionsToDelete.length} collections...`);
+      
+      // Wait for all deletes to complete
+      await Promise.all(deletePromises);
+      
+      console.log('All data deleted successfully');
+      
+      setBackupSuccess(`✅ All data has been successfully deleted. 
+      
+      Deleted: ${totalDeleted} documents
+      Collections cleared: ${collectionsToDelete.length}
+      
+      The application will refresh in 3 seconds...`);
+      
+      setTimeout(() => {
+        window.location.reload();
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Error clearing data:', error);
+      setBackupError(`Failed to clear all data: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Handle password confirmation
+  const handlePasswordConfirm = async () => {
+    try {
+      setPasswordConfirmError('');
+      
+      // Re-authenticate the user with the provided password
+      const user = auth.currentUser;
+      const credential = EmailAuthProvider.credential(user.email, adminPassword);
+      await reauthenticateWithCredential(user, credential);
+      
+      // Password is correct, close modal and proceed with deletion
+      setShowPasswordConfirmModal(false);
+      setAdminPassword('');
+      await performDataDeletion();
+      
+    } catch (error) {
+      console.error('Password verification failed:', error);
+      if (error.code === 'auth/wrong-password') {
+        setPasswordConfirmError('Incorrect password. Please try again.');
+      } else {
+        setPasswordConfirmError('Password verification failed. Please try again.');
+      }
+    }
+  };
+  
+  // Backup Confirmation Modal
+  const BackupConfirmModal = () => (
+    <div className="fixed inset-0 overflow-y-auto z-50">
+      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center">
+        <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+          <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        
+        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+            <div className="sm:flex sm:items-start">
+              <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 sm:mx-0 sm:h-10 sm:w-10">
+                <svg className="h-6 w-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                <h3 className="text-lg leading-6 font-medium text-gray-900">
+                  ⚠️ Create Backup Before Deletion?
+                </h3>
+                <div className="mt-2">
+                  <p className="text-sm text-gray-500 mb-4">
+                    You're about to permanently delete ALL data from your database. This action cannot be undone.
+                  </p>
+                  <p className="text-sm font-medium text-red-600 mb-4">
+                    Would you like to create a backup first? This is highly recommended.
+                  </p>
+                  <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                    <p className="text-xs text-red-700">
+                      <strong>Data to be deleted:</strong> Customers, vendors, orders, sales, purchases, 
+                      invoices, lens inventory, counters, transactions, users, and all other collections.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+            <button
+              type="button"
+              onClick={async () => {
+                setShowBackupConfirmModal(false);
+                await handleBackup();
+                // After backup, show password confirmation
+                setTimeout(() => setShowPasswordConfirmModal(true), 1000);
+              }}
+              className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm"
+            >
+              📁 Create Backup First
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowBackupConfirmModal(false);
+                setShowPasswordConfirmModal(true);
+              }}
+              className="mt-3 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:mt-0 sm:w-auto sm:text-sm"
+            >
+              🗑️ Skip Backup & Delete
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowBackupConfirmModal(false)}
+              className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Password Confirmation Modal
+  const PasswordConfirmModal = () => (
+    <div className="fixed inset-0 overflow-y-auto z-50">
+      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center">
+        <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+          <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        
+        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+            <div className="sm:flex sm:items-start">
+              <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                <h3 className="text-lg leading-6 font-medium text-gray-900">
+                  🔐 Admin Password Required
+                </h3>
+                <div className="mt-2">
+                  <p className="text-sm text-gray-500 mb-4">
+                    Please enter your admin password to confirm this destructive action.
+                  </p>
+                  
+                  {passwordConfirmError && (
+                    <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
+                      <p className="text-sm text-red-700">{passwordConfirmError}</p>
+                    </div>
+                  )}
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Admin Password
+                    </label>
+                    <input
+                      type="password"
+                      value={adminPassword}
+                      onChange={(e) => setAdminPassword(e.target.value)}
+                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                      placeholder="Enter your password"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && adminPassword) {
+                          handlePasswordConfirm();
+                        }
+                      }}
+                    />
+                  </div>
+                  
+                  <div className="mt-4 bg-red-50 border border-red-200 rounded-md p-3">
+                    <p className="text-xs text-red-700 font-medium">
+                      ⚠️ FINAL WARNING: This will permanently delete ALL your business data. 
+                      This action cannot be undone.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+            <button
+              type="button"
+              onClick={handlePasswordConfirm}
+              disabled={!adminPassword || loading}
+              className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 sm:ml-3 sm:w-auto sm:text-sm"
+            >
+              {loading ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Deleting...
+                </>
+              ) : '🗑️ Delete All Data'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowPasswordConfirmModal(false);
+                setAdminPassword('');
+                setPasswordConfirmError('');
+              }}
+              className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
       <Navbar />
@@ -1794,6 +2038,45 @@ const Settings = () => {
                       </div>
                       <p className="mt-1">Restoring will overwrite your current data. Make sure to back up your current data first.</p>
                     </div>
+                  </div>
+                </div>
+                
+                {/* Danger Zone - Clear All Data */}
+                <div className="mt-8 bg-red-50 border border-red-200 rounded-lg p-6">
+                  <h3 className="text-lg font-medium text-red-900 mb-4">🚨 Danger Zone</h3>
+                  <div className="bg-white border border-red-200 rounded-md p-4">
+                    <h4 className="text-md font-medium text-red-800 mb-2">Clear All Data</h4>
+                    <p className="text-sm text-red-700 mb-4">
+                      Permanently delete ALL data from your database. This includes customers, orders, sales, 
+                      purchases, invoices, inventory, and everything else. This action cannot be undone.
+                    </p>
+                    <p className="text-xs text-amber-700 mb-4 bg-amber-50 border border-amber-200 rounded p-2">
+                      💡 <strong>Smart Protection:</strong> This action will first ask if you want to create a backup, 
+                      then require your admin password for confirmation.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleClearAllData}
+                      disabled={loading}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+                    >
+                      {loading ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Clear All Data Permanently
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -2375,6 +2658,14 @@ const Settings = () => {
       
       {showFinancialYearEndModal && (
         <FinancialYearEndModal />
+      )}
+      
+      {showBackupConfirmModal && (
+        <BackupConfirmModal />
+      )}
+      
+      {showPasswordConfirmModal && (
+        <PasswordConfirmModal />
       )}
     </div>
   );

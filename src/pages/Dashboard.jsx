@@ -25,8 +25,14 @@ const Dashboard = () => {
   const [topPowers, setTopPowers] = useState([]);
   const [topProfitProducts, setTopProfitProducts] = useState([]);
   
+  // GST Notification states
+  const [gstNotifications, setGstNotifications] = useState([]);
+  const [backupNotifications, setBackupNotifications] = useState([]);
+  
   useEffect(() => {
     loadDashboardData();
+    checkGSTNotifications();
+    checkBackupNotifications();
   }, [selectedDate]);
 
   const loadDashboardData = async () => {
@@ -274,6 +280,152 @@ const Dashboard = () => {
     return current >= previous ? 'text-green-600' : 'text-red-600';
   };
 
+  const checkBackupNotifications = () => {
+    const today = new Date();
+    const currentDate = today.getDate();
+    const currentMonth = today.getMonth() + 1;
+    const currentYear = today.getFullYear();
+    
+    // Calculate which week of the month we're in
+    const firstDayOfMonth = new Date(currentYear, currentMonth - 1, 1);
+    const weekNumber = Math.ceil((currentDate + firstDayOfMonth.getDay()) / 7);
+    
+    const weekKey = `${currentYear}-${currentMonth.toString().padStart(2, '0')}-week${weekNumber}`;
+    
+    // Get dismissed backup notifications from localStorage
+    const dismissedBackups = JSON.parse(localStorage.getItem('dismissedBackupNotifications') || '{}');
+    
+    const notifications = [];
+    
+    // Show backup reminder on Sundays (day 0) or Mondays (day 1) of each week
+    const dayOfWeek = today.getDay();
+    
+    if ((dayOfWeek === 0 || dayOfWeek === 1) && !dismissedBackups[weekKey]) {
+      notifications.push({
+        id: weekKey,
+        type: 'BACKUP',
+        title: 'Weekly Backup Reminder',
+        message: 'Time to create a backup of your business data, sales records, and important files.',
+        dueDate: 'This week',
+        priority: 'medium',
+        color: 'purple',
+        weekNumber: weekNumber
+      });
+    }
+    
+    setBackupNotifications(notifications);
+  };
+
+  const dismissBackupNotification = (notificationId) => {
+    // Get current dismissed backup notifications
+    const dismissedBackups = JSON.parse(localStorage.getItem('dismissedBackupNotifications') || '{}');
+    
+    // Add this notification to dismissed list
+    dismissedBackups[notificationId] = {
+      dismissedAt: new Date().toISOString(),
+      dismissed: true
+    };
+    
+    // Save back to localStorage
+    localStorage.setItem('dismissedBackupNotifications', JSON.stringify(dismissedBackups));
+    
+    // Remove from current notifications
+    setBackupNotifications(prev => prev.filter(notification => notification.id !== notificationId));
+  };
+
+  // Test function for backup notifications
+  const testBackupNotification = () => {
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear();
+    const weekKey = `${currentYear}-${currentMonth.toString().padStart(2, '0')}-week-test`;
+    
+    const testNotification = {
+      id: weekKey,
+      type: 'BACKUP',
+      title: 'Weekly Backup Reminder (TEST)',
+      message: 'This is a test notification for weekly backup reminder.',
+      dueDate: 'This week',
+      priority: 'medium',
+      color: 'purple',
+      weekNumber: 1
+    };
+    
+    setBackupNotifications([testNotification]);
+  };
+
+  const checkGSTNotifications = () => {
+    const today = new Date();
+    const currentDate = today.getDate();
+    const currentMonth = today.getMonth() + 1; // 1-12
+    const currentYear = today.getFullYear();
+    
+    const monthKey = `${currentYear}-${currentMonth.toString().padStart(2, '0')}`;
+    
+    // Get dismissed notifications from localStorage
+    const dismissedNotifications = JSON.parse(localStorage.getItem('dismissedGSTNotifications') || '{}');
+    
+    const notifications = [];
+    
+    // Check for 1st to 11th of month - GSTR-1 due
+    if (currentDate >= 1 && currentDate <= 11) {
+      const gstr1Key = `${monthKey}-gstr1`;
+      if (!dismissedNotifications[gstr1Key]) {
+        notifications.push({
+          id: gstr1Key,
+          type: 'GSTR-1',
+          title: 'GSTR-1 Filing Due',
+          message: 'Time to generate and file your GSTR-1 return for the previous month.',
+          dueDate: '11th of this month',
+          priority: 'high',
+          color: 'blue',
+          daysLeft: 11 - currentDate + 1
+        });
+      }
+    }
+    
+    // Check for 5th to 20th of month - GSTR-3B due  
+    if (currentDate >= 5 && currentDate <= 20) {
+      const gstr3bKey = `${monthKey}-gstr3b`;
+      if (!dismissedNotifications[gstr3bKey]) {
+        notifications.push({
+          id: gstr3bKey,
+          type: 'GSTR-3B',
+          title: 'GSTR-3B Filing Due',
+          message: 'Time to generate and file your GSTR-3B return for the previous month.',
+          dueDate: '20th of this month',
+          priority: 'high', 
+          color: 'green',
+          daysLeft: 20 - currentDate + 1
+        });
+      }
+    }
+    
+    setGstNotifications(notifications);
+  };
+
+  const dismissGSTNotification = (notificationId) => {
+    // Get current dismissed notifications
+    const dismissedNotifications = JSON.parse(localStorage.getItem('dismissedGSTNotifications') || '{}');
+    
+    // Add this notification to dismissed list
+    dismissedNotifications[notificationId] = {
+      dismissedAt: new Date().toISOString(),
+      dismissed: true
+    };
+    
+    // Save back to localStorage
+    localStorage.setItem('dismissedGSTNotifications', JSON.stringify(dismissedNotifications));
+    
+    // Remove from current notifications
+    setGstNotifications(prev => prev.filter(notification => notification.id !== notificationId));
+  };
+
+  const navigateToGSTReturns = (returnType) => {
+    // Navigate to GST Returns page with the specific tab
+    const targetTab = returnType === 'GSTR-1' ? 'gstr1' : 'gstr3b';
+    window.location.href = `#/gst-returns?tab=${targetTab}`;
+  };
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
       <Navbar />
@@ -284,6 +436,206 @@ const Dashboard = () => {
           <p className="mt-2" style={{ color: 'var(--text-muted)' }}>Business overview and key metrics</p>
         </div>
         
+        {/* All Notifications Section - Combined GST and Backup */}
+        {(gstNotifications.length > 0 || backupNotifications.length > 0) && (
+          <div className="mb-8 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold flex items-center" style={{ color: 'var(--text-primary)' }}>
+                <svg className="h-5 w-5 mr-2 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5-5-5h5v-5h5v5zM9 3v3H4l5 5 5-5H9V3z" />
+                </svg>
+                Reminders ({gstNotifications.length + backupNotifications.length})
+              </h2>
+              
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => {
+                    checkGSTNotifications();
+                    checkBackupNotifications();
+                  }}
+                  className="px-3 py-1 text-xs rounded-md border transition-colors"
+                  style={{ 
+                    color: 'var(--text-secondary)', 
+                    borderColor: 'var(--border-primary)',
+                    backgroundColor: 'var(--bg-tertiary)'
+                  }}
+                  title="Refresh all notifications"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            
+            {/* GST Notifications */}
+            {gstNotifications.map((notification) => (
+              <div 
+                key={notification.id}
+                className="rounded-lg shadow-lg border-l-4 p-4"
+                style={{ 
+                  backgroundColor: 'var(--bg-secondary)',
+                  borderLeftColor: notification.color === 'blue' ? '#3B82F6' : '#10B981'
+                }}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start space-x-3">
+                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                      notification.color === 'blue' ? 'bg-blue-100' : 'bg-green-100'
+                    }`}>
+                      <svg 
+                        className={`h-5 w-5 ${notification.color === 'blue' ? 'text-blue-600' : 'text-green-600'}`} 
+                        fill="none" 
+                        viewBox="0 0 24 24" 
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                    
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                          {notification.title}
+                        </h3>
+                        {notification.daysLeft > 0 && (
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            notification.daysLeft <= 2 
+                              ? 'bg-red-100 text-red-800' 
+                              : notification.daysLeft <= 5 
+                              ? 'bg-yellow-100 text-yellow-800' 
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {notification.daysLeft} days left
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+                        {notification.message}
+                      </p>
+                      <p className="text-xs mt-2 font-medium" style={{ color: 'var(--text-secondary)' }}>
+                        📅 Due by: {notification.dueDate}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={() => dismissGSTNotification(notification.id)}
+                    className="ml-4 p-1 rounded-full hover:bg-gray-200 transition-colors"
+                    title="Dismiss notification"
+                  >
+                    <svg className="h-5 w-5 text-gray-400 hover:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                
+                <div className="mt-4 flex space-x-3">
+                  <button
+                    onClick={() => navigateToGSTReturns(notification.type)}
+                    className={`px-4 py-2 rounded-md text-sm font-medium text-white transition-colors ${
+                      notification.color === 'blue' 
+                        ? 'bg-blue-600 hover:bg-blue-700' 
+                        : 'bg-green-600 hover:bg-green-700'
+                    }`}
+                  >
+                    Generate {notification.type}
+                  </button>
+                  
+                  <button
+                    onClick={() => dismissGSTNotification(notification.id)}
+                    className="px-4 py-2 rounded-md text-sm font-medium border transition-colors"
+                    style={{ 
+                      color: 'var(--text-secondary)', 
+                      borderColor: 'var(--border-primary)',
+                      backgroundColor: 'var(--bg-tertiary)'
+                    }}
+                  >
+                    Mark as Done
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {/* Backup Notifications */}
+            {backupNotifications.map((notification) => (
+              <div 
+                key={notification.id}
+                className="rounded-lg shadow-lg border-l-4 p-4"
+                style={{ 
+                  backgroundColor: 'var(--bg-secondary)',
+                  borderLeftColor: '#8B5CF6'
+                }}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                      <svg 
+                        className="h-5 w-5 text-purple-600" 
+                        fill="none" 
+                        viewBox="0 0 24 24" 
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                      </svg>
+                    </div>
+                    
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                          {notification.title}
+                        </h3>
+                        {notification.weekNumber && (
+                          <span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-800">
+                            Week {notification.weekNumber}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+                        {notification.message}
+                      </p>
+                      <p className="text-xs mt-2 font-medium" style={{ color: 'var(--text-secondary)' }}>
+                        📅 Due by: {notification.dueDate}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={() => dismissBackupNotification(notification.id)}
+                    className="ml-4 p-1 rounded-full hover:bg-gray-200 transition-colors"
+                    title="Dismiss notification"
+                  >
+                    <svg className="h-5 w-5 text-gray-400 hover:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                
+                <div className="mt-4 flex space-x-3">
+                  <button
+                    onClick={() => dismissBackupNotification(notification.id)}
+                    className="px-4 py-2 rounded-md text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 transition-colors"
+                  >
+                    Create Backup
+                  </button>
+                  
+                  <button
+                    onClick={() => dismissBackupNotification(notification.id)}
+                    className="px-4 py-2 rounded-md text-sm font-medium border transition-colors"
+                    style={{ 
+                      color: 'var(--text-secondary)', 
+                      borderColor: 'var(--border-primary)',
+                      backgroundColor: 'var(--bg-tertiary)'
+                    }}
+                  >
+                    Mark as Done
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Date Selector */}
         <div className="mb-6 rounded-lg shadow p-4" style={{ backgroundColor: 'var(--bg-secondary)' }}>
           <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
