@@ -9,6 +9,7 @@ import ItemSuggestions from '../components/ItemSuggestions';
 import PrintInvoiceModal from '../components/PrintInvoiceModal';
 import BottomActionBar from '../components/BottomActionBar';
 import { Timestamp } from 'firebase/firestore';
+import { calculateCustomerBalance, formatCurrency as formatCurrencyUtil, getBalanceColorClass, getBalanceStatusText, calculateVendorBalance } from '../utils/ledgerUtils';
 
 const TAX_OPTIONS = [
   { id: 'TAX_FREE', label: 'Tax Free', rate: 0 },
@@ -25,6 +26,7 @@ const CreateSale = () => {
   const [customers, setCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerBalance, setCustomerBalance] = useState(0);
+  const [loadingBalance, setLoadingBalance] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -52,7 +54,7 @@ const CreateSale = () => {
     add: '',
     qty: 1,
     unit: 'Pairs', // Default unit
-    price: 0,
+    price: '', // Changed from 0 to empty string
     total: 0
   })));
 
@@ -72,7 +74,7 @@ const CreateSale = () => {
       add: '',
       qty: 1,
       unit: 'Pairs', // Default unit
-      price: 0,
+      price: '', // Changed from 0 to empty string
       total: 0
     }));
     
@@ -177,17 +179,69 @@ const CreateSale = () => {
   const fetchCustomers = async () => {
     try {
       setLoading(true);
+      
+      // Fetch customers
       const customersRef = collection(db, 'customers');
-      const q = query(customersRef, orderBy('opticalName'));
-      const snapshot = await getDocs(q);
-      const customersList = snapshot.docs.map(doc => ({
+      const customersQuery = query(customersRef, orderBy('opticalName'));
+      const customersSnapshot = await getDocs(customersQuery);
+      const customersList = customersSnapshot.docs.map(doc => ({
         id: doc.id,
+        type: 'customer',
         ...doc.data()
       }));
-      setCustomers(customersList);
+      
+      // Fetch vendors (if vendors collection exists)
+      let vendorsList = [];
+      try {
+        const vendorsRef = collection(db, 'vendors');
+        const vendorsQuery = query(vendorsRef, orderBy('name'));
+        const vendorsSnapshot = await getDocs(vendorsQuery);
+        vendorsList = vendorsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          opticalName: doc.data().name || doc.data().vendorName || doc.data().opticalName,
+          type: 'vendor',
+          isVendor: true,
+          ...doc.data()
+        }));
+      } catch (vendorError) {
+        console.log('No vendors collection found or error fetching vendors:', vendorError);
+      }
+      
+      // Also include customers marked as vendors
+      const customersAsVendors = customersList.filter(customer => 
+        customer.isVendor || customer.type === 'vendor'
+      ).map(customer => ({
+        ...customer,
+        type: 'vendor',
+        isVendor: true
+      }));
+      
+      // Merge all entities and remove duplicates by ID
+      const allEntities = [...customersList, ...vendorsList, ...customersAsVendors];
+      const uniqueEntities = allEntities.reduce((acc, entity) => {
+        const existingIndex = acc.findIndex(e => e.id === entity.id);
+        if (existingIndex >= 0) {
+          // If entity exists, prefer vendor type if either is marked as vendor
+          if (entity.isVendor || entity.type === 'vendor') {
+            acc[existingIndex] = { ...acc[existingIndex], ...entity, type: 'vendor', isVendor: true };
+          }
+        } else {
+          acc.push(entity);
+        }
+        return acc;
+      }, []);
+      
+      // Sort by name
+      uniqueEntities.sort((a, b) => {
+        const nameA = a.opticalName || a.name || '';
+        const nameB = b.opticalName || b.name || '';
+        return nameA.toLowerCase().localeCompare(nameB.toLowerCase());
+      });
+      
+      setCustomers(uniqueEntities);
     } catch (error) {
-      console.error('Error fetching customers:', error);
-      setError('Failed to fetch customers');
+      console.error('Error fetching customers and vendors:', error);
+      setError('Failed to fetch customers and vendors');
     } finally {
       setLoading(false);
     }
@@ -341,12 +395,34 @@ const CreateSale = () => {
     }
   };
 
-  const handleCustomerSelect = (customer) => {
-    // Selected customer from search suggestions
+  const handleCustomerSelect = async (customer) => {
+    // Selected customer/vendor from search suggestions
     setSelectedCustomer(customer);
     if (customer) {
-      const balance = customer.openingBalance || 0;
-      setCustomerBalance(balance);
+      setLoadingBalance(true);
+      try {
+        // Detect if this is a vendor and use appropriate balance calculation
+        const entityIsVendor = customer.isVendor || customer.type === 'vendor';
+        
+        let currentBalance;
+        if (entityIsVendor) {
+          // Use vendor balance calculation
+          currentBalance = await calculateVendorBalance(customer.id, customer.openingBalance || 0);
+        } else {
+          // Use customer balance calculation
+          currentBalance = await calculateCustomerBalance(customer.id, customer.openingBalance || 0);
+        }
+        
+        setCustomerBalance(currentBalance);
+      } catch (error) {
+        console.error('Error calculating balance:', error);
+        // Fallback to opening balance
+        setCustomerBalance(customer.openingBalance || 0);
+      } finally {
+        setLoadingBalance(false);
+      }
+    } else {
+      setCustomerBalance(0);
     }
   };
 
@@ -579,6 +655,42 @@ const CreateSale = () => {
     setTableRows(updatedRows);
   };
 
+  // Function to register payment transaction in ledger
+  const registerPaymentTransaction = async (customer, amountPaid, invoiceNumber, saleId) => {
+    try {
+      console.log(`Registering payment transaction: ₹${amountPaid} for invoice ${invoiceNumber}`);
+      
+      // Determine transaction type based on customer/vendor
+      const isVendorEntity = customer.isVendor || customer.type === 'vendor';
+      const transactionType = isVendorEntity ? 'paid' : 'received';
+      
+      const transactionData = {
+        entityId: customer.id,
+        entityName: customer.opticalName,
+        entityType: isVendorEntity ? 'vendor' : 'customer',
+        type: transactionType,
+        amount: amountPaid,
+        date: new Date(invoiceDate),
+        description: `Payment ${transactionType === 'received' ? 'received from' : 'made to'} ${customer.opticalName} for Invoice ${invoiceNumber}`,
+        invoiceId: saleId,
+        invoiceNumber: invoiceNumber,
+        paymentMethod: 'cash', // Default to cash, could be made configurable
+        createdAt: serverTimestamp(),
+        createdBy: 'system', // Could be replaced with actual user info
+        source: 'sale_creation'
+      };
+      
+      await addDoc(collection(db, 'transactions'), transactionData);
+      console.log(`✅ Payment transaction registered: ${transactionType} ₹${amountPaid} for ${customer.opticalName}`);
+      
+    } catch (error) {
+      console.error('Error registering payment transaction:', error);
+      // Don't throw error to prevent sale creation from failing
+      // but log the issue for debugging
+      console.warn('Sale was created successfully, but payment transaction registration failed');
+    }
+  };
+
   const handleSaveSale = async () => {
     if (!selectedCustomer || !selectedCustomer.id) {
       setError('Please select a customer');
@@ -652,6 +764,11 @@ const CreateSale = () => {
       
       // Update the invoice number state for UI display (this is the actual saved number)
       setInvoiceNumber(finalInvoiceNumber);
+      
+      // Register payment in ledger if amountPaid > 0
+      if (parseFloat(amountPaid || 0) > 0) {
+        await registerPaymentTransaction(selectedCustomer, parseFloat(amountPaid), finalInvoiceNumber, docRef.id);
+      }
       
       // Process all order IDs to mark lenses as sold in inventory
       await processOrderIdsForInventory(filledRows);
@@ -1000,13 +1117,9 @@ const CreateSale = () => {
     window.open(whatsappUrl, '_blank');
   };
 
-  // Format currency for display
+  // Format currency for display - use the utility function
   const formatCurrency = (amount) => {
-    if (amount === undefined || amount === null) return '-';
-    return `₹${parseFloat(amount).toLocaleString('en-IN', { 
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2 
-    })}`;
+    return formatCurrencyUtil(amount);
   };
 
   // Get visible rows based on current state
@@ -1369,8 +1482,37 @@ const CreateSale = () => {
     }
   };
 
+  // Function to handle ledger button click
+  const handleViewLedger = async (customer) => {
+    // Navigate to Ledger page with customer data
+    navigate('/ledger', { 
+      state: { 
+        selectedCustomer: {
+          id: customer.id,
+          opticalName: customer.opticalName
+        },
+        viewMode: 'invoiceOnly'
+      } 
+    });
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-gray-900">
+      <style>
+        {`
+          /* Hide webkit number input spinners */
+          input[type="number"]::-webkit-outer-spin-button,
+          input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+          }
+          
+          /* Hide Firefox number input spinners */
+          input[type="number"] {
+            -moz-appearance: textfield;
+          }
+        `}
+      </style>
       <Navbar />
       
       <main className="flex-grow p-4 max-w-7xl mx-auto w-full">
@@ -1396,21 +1538,29 @@ const CreateSale = () => {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Customer Information</h2>
+              <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Customer/Vendor Information</h2>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Customer</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Customer/Vendor</label>
                 <CustomerSearch 
                   customers={customers}
                   value={selectedCustomer?.opticalName || ''}
                   onChange={(e) => setSearchCustomer(e.target.value)}
                   onSelect={handleCustomerSelect}
                   onAddNew={handleAddNewCustomer}
+                  onViewLedger={handleViewLedger}
                 />
               </div>
 
               {selectedCustomer && (
                 <div className="border border-gray-200 dark:border-gray-700 rounded-md p-4 bg-gray-50 dark:bg-gray-700">
-                  <h3 className="font-medium text-gray-900 dark:text-white">{selectedCustomer.opticalName}</h3>
+                  <div className="flex items-center">
+                    <h3 className="font-medium text-gray-900 dark:text-white">{selectedCustomer.opticalName}</h3>
+                    {(selectedCustomer.isVendor || selectedCustomer.type === 'vendor') && (
+                      <span className="ml-2 px-2 py-0.5 text-xs bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 rounded-full">
+                        Vendor
+                      </span>
+                    )}
+                  </div>
                   {selectedCustomer.address && (
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{selectedCustomer.address}</p>
                   )}
@@ -1425,15 +1575,44 @@ const CreateSale = () => {
                     </p>
                   )}
                   <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
-                    <p className="text-sm">
-                      <span className="font-medium">Previous Balance:</span> 
-                      <span className={`ml-2 ${customerBalance < 0 ? 'text-red-600 dark:text-red-400' : customerBalance > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
-                        {formatCurrency(customerBalance)}
-                      </span>
-                    </p>
+                    {loadingBalance ? (
+                      <div className="flex items-center">
+                        <svg className="animate-spin h-4 w-4 text-blue-500 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">Calculating balance...</span>
+                      </div>
+                    ) : (
+                      <div 
+                        onClick={() => handleViewLedger(selectedCustomer)}
+                        className="flex justify-between items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 p-2 rounded-md transition-colors"
+                        title="Click to view complete ledger"
+                      >
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {(selectedCustomer.isVendor || selectedCustomer.type === 'vendor') ? 'Amount Payable:' : 'Current Balance:'}
+                        </span>
+                        <div className="text-right">
+                          <span className={`text-sm font-semibold ${getBalanceColorClass(customerBalance)}`}>
+                            {formatCurrency(Math.abs(customerBalance))}
+                          </span>
+                          <span className={`text-xs ml-1 px-2 py-0.5 rounded-full ${customerBalance > 0 ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' : customerBalance < 0 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300'}`}>
+                            {(selectedCustomer.isVendor || selectedCustomer.type === 'vendor') 
+                              ? (customerBalance > 0 ? 'Payable' : customerBalance < 0 ? 'Credit' : 'Settled')
+                              : getBalanceStatusText(customerBalance)
+                            }
+                          </span>
+                          <svg className="w-4 h-4 inline-block ml-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                          </svg>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                  
+                  {/* View Ledger Button - COMMENTED OUT: Using clickable balance instead */}
+                  </div>
+                )}
             </div>
 
             <div>
@@ -1613,12 +1792,22 @@ const CreateSale = () => {
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     <input
-                      type="number"
+                      type="text"
                       value={row.qty}
                       onChange={(e) => handleTableRowChange(index, 'qty', e.target.value)}
+                      onFocus={(e) => {
+                        // Clear default value of 1 when focused
+                        if (e.target.value === '1') {
+                          handleTableRowChange(index, 'qty', '');
+                        }
+                      }}
                       className="block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       placeholder="QTY"
-                      min="1"
+                      style={{
+                        appearance: 'textfield',
+                        MozAppearance: 'textfield'
+                      }}
+                      onWheel={(e) => e.preventDefault()}
                     />
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
@@ -1636,13 +1825,16 @@ const CreateSale = () => {
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     <input
-                      type="number"
+                      type="text"
                       value={row.price}
                       onChange={(e) => handleTableRowChange(index, 'price', e.target.value)}
                       className="block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-right bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       placeholder="Price"
-                      min="0"
-                      step="0.01"
+                      style={{
+                        appearance: 'textfield',
+                        MozAppearance: 'textfield'
+                      }}
+                      onWheel={(e) => e.preventDefault()}
                     />
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap text-right text-gray-900 dark:text-white">
@@ -1855,7 +2047,7 @@ const CreateSale = () => {
                     <span className="flex items-center justify-center">
                       <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                       Saving...
                     </span>
@@ -1881,7 +2073,7 @@ const CreateSale = () => {
                 <span className="flex items-center justify-center">
                   <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                   Saving...
                 </span>
@@ -2046,7 +2238,7 @@ const CreateSale = () => {
                           <div className="flex justify-center py-8">
                             <svg className="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
                           </div>
                         ) : searchResults.length > 0 ? (

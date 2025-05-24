@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { calculateCustomerBalance, calculateVendorBalance, isVendor, formatCurrency, getBalanceColorClass } from '../utils/ledgerUtils';
 
-const CustomerSearch = ({ customers, value, onChange, onSelect, onAddNew, isOrderFlow = false, className = '' }) => {
+const CustomerSearch = ({ customers, value, onChange, onSelect, onAddNew, onViewLedger, isOrderFlow = false, className = '' }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filteredCustomers, setFilteredCustomers] = useState([]);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [customerBalances, setCustomerBalances] = useState({});
+  const [loadingBalances, setLoadingBalances] = useState(false);
   const wrapperRef = useRef(null);
   const suggestionsRef = useRef(null);
   const inputRef = useRef(null);
@@ -71,6 +74,55 @@ const CustomerSearch = ({ customers, value, onChange, onSelect, onAddNew, isOrde
       setShowSuggestions(false);
     }
   }, [searchTerm, customers]);
+
+  // Load customer balances when filtered customers change
+  useEffect(() => {
+    const loadBalances = async () => {
+      if (filteredCustomers.length === 0) return;
+      
+      setLoadingBalances(true);
+      const balances = {};
+      
+      try {
+        // Load balances for filtered customers (limit to prevent too many API calls)
+        const customersToLoad = filteredCustomers.slice(0, 10); // Only load for first 10 results
+        
+        await Promise.all(
+          customersToLoad.map(async (customer) => {
+            try {
+              // Detect if this is a vendor
+              const entityIsVendor = customer.isVendor || customer.type === 'vendor';
+              
+              let balance;
+              if (entityIsVendor) {
+                // Use vendor balance calculation
+                balance = await calculateVendorBalance(customer.id, customer.openingBalance || 0);
+              } else {
+                // Use customer balance calculation
+                balance = await calculateCustomerBalance(customer.id, customer.openingBalance || 0);
+              }
+              
+              balances[customer.id] = balance;
+            } catch (error) {
+              console.error(`Error loading balance for ${entityIsVendor ? 'vendor' : 'customer'} ${customer.id}:`, error);
+              balances[customer.id] = customer.openingBalance || 0;
+            }
+          })
+        );
+        
+        setCustomerBalances(prev => ({ ...prev, ...balances }));
+      } catch (error) {
+        console.error('Error loading balances:', error);
+      } finally {
+        setLoadingBalances(false);
+      }
+    };
+
+    // Only load balances if we have filtered customers and suggestions are showing
+    if (showSuggestions && filteredCustomers.length > 0) {
+      loadBalances();
+    }
+  }, [filteredCustomers, showSuggestions]);
 
   // Scroll selected item into view
   useEffect(() => {
@@ -215,20 +267,82 @@ const CustomerSearch = ({ customers, value, onChange, onSelect, onAddNew, isOrde
                 ref={suggestionsRef}
                 className="py-1"
               >
-                {filteredCustomers.map((customer, idx) => (
-                  <div
-                    key={customer.id}
-                    className={`px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-600 last:border-b-0 ${selectedIndex === idx ? 'bg-sky-50 dark:bg-sky-900/50' : ''}`}
-                    onClick={(e) => handleCustomerClick(e, customer)}
-                    onMouseEnter={() => setSelectedIndex(idx)}
-                    tabIndex="0"
-                  >
-                    <div className="font-medium text-sm text-gray-900 dark:text-gray-100">{customer.opticalName}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {customer.phone} • {customer.city || 'No city'}
+                {filteredCustomers.map((customer, idx) => {
+                  const balance = customerBalances[customer.id];
+                  const hasBalance = balance !== undefined;
+                  
+                  return (
+                    <div
+                      key={customer.id}
+                      className={`px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-600 last:border-b-0 ${selectedIndex === idx ? 'bg-sky-50 dark:bg-sky-900/50' : ''}`}
+                      onClick={(e) => handleCustomerClick(e, customer)}
+                      onMouseEnter={() => setSelectedIndex(idx)}
+                      tabIndex="0"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center">
+                            <div className="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">
+                              {customer.opticalName}
+                            </div>
+                            {(customer.isVendor || customer.type === 'vendor') && (
+                              <span className="ml-2 px-2 py-0.5 text-xs bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 rounded-full">
+                                Vendor
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            {customer.phone} • {customer.city || 'No city'}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          {onViewLedger && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onViewLedger(customer);
+                              }}
+                              className="p-1 text-blue-500 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded"
+                              title="View Ledger"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                              </svg>
+                            </button>
+                          )}
+                          <div className="text-right">
+                            {loadingBalances && !hasBalance ? (
+                              <div className="text-xs text-gray-400">
+                                <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                              </div>
+                            ) : hasBalance ? (
+                              <div className="text-right">
+                                <div className={`text-xs font-medium ${getBalanceColorClass(balance)}`}>
+                                  {formatCurrency(Math.abs(balance))}
+                                </div>
+                                <div className="text-xs text-gray-400">
+                                  {(customer.isVendor || customer.type === 'vendor') 
+                                    ? (balance > 0 ? 'Payable' : balance < 0 ? 'Credit' : 'Settled')
+                                    : (balance > 0 ? 'Outstanding' : balance < 0 ? 'Credit' : 'Settled')
+                                  }
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-xs text-gray-400">
+                                {formatCurrency(customer.openingBalance || 0)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

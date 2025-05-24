@@ -3,6 +3,7 @@ import { db } from '../firebaseConfig';
 import { collection, getDocs, addDoc, serverTimestamp, query, where, orderBy, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import { calculateCustomerBalance, formatCurrency, getBalanceColorClass, getBalanceStatusText } from '../utils/ledgerUtils';
 
 const Transactions = () => {
   const navigate = useNavigate();
@@ -37,6 +38,10 @@ const Transactions = () => {
   // For editing transactions
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
+  
+  // New states for balance calculation
+  const [entityBalances, setEntityBalances] = useState({});
+  const [loadingBalances, setLoadingBalances] = useState(false);
   
   useEffect(() => {
     fetchEntities();
@@ -189,7 +194,7 @@ const Transactions = () => {
     }
   };
   
-  const handleEntitySelect = (entity, rowIndex) => {
+  const handleEntitySelect = async (entity, rowIndex) => {
     const updatedTransactions = [...batchTransactions];
     updatedTransactions[rowIndex] = {
       ...updatedTransactions[rowIndex],
@@ -199,6 +204,14 @@ const Transactions = () => {
     setBatchTransactions(updatedTransactions);
     setShowEntityList(false);
     setActiveRowIndex(null);
+    
+    // Calculate and show current balance for selected entity
+    try {
+      const balance = await calculateCustomerBalance(entity.id, entity.openingBalance || 0);
+      setEntityBalances(prev => ({ ...prev, [entity.id]: balance }));
+    } catch (error) {
+      console.error('Error calculating entity balance:', error);
+    }
   };
   
   const handleInputChange = (rowIndex, field, value) => {
@@ -268,6 +281,8 @@ const Transactions = () => {
       setTimeout(async () => {
         console.log('Refreshing transactions...');
         await fetchTransactions();
+        // Update balances for the entities that had transactions
+        await updateEntityBalances(transactionsToSave);
       }, 1000);
       
     } catch (error) {
@@ -287,12 +302,8 @@ const Transactions = () => {
     }
   };
   
-  const formatCurrency = (amount) => {
-    if (amount === undefined || amount === null) return '-';
-    return `₹${parseFloat(amount).toLocaleString('en-IN', { 
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2 
-    })}`;
+  const formatCurrencyLocal = (amount) => {
+    return formatCurrency(amount);
   };
   
   const getPaymentMethodLabel = (method) => {
@@ -412,6 +423,36 @@ const Transactions = () => {
     }
   };
   
+  // New function to calculate and update entity balances
+  const updateEntityBalances = async (transactionsToUpdate) => {
+    setLoadingBalances(true);
+    const balances = {};
+    
+    try {
+      const uniqueEntityIds = [...new Set(transactionsToUpdate.map(t => t.entityId).filter(Boolean))];
+      
+      await Promise.all(
+        uniqueEntityIds.map(async (entityId) => {
+          try {
+            const entity = entities.find(e => e.id === entityId);
+            const balance = await calculateCustomerBalance(entityId, entity?.openingBalance || 0);
+            balances[entityId] = balance;
+          } catch (error) {
+            console.error(`Error calculating balance for entity ${entityId}:`, error);
+            const entity = entities.find(e => e.id === entityId);
+            balances[entityId] = entity?.openingBalance || 0;
+          }
+        })
+      );
+      
+      setEntityBalances(prev => ({ ...prev, ...balances }));
+    } catch (error) {
+      console.error('Error updating entity balances:', error);
+    } finally {
+      setLoadingBalances(false);
+    }
+  };
+  
   return (
     <div className="mobile-page">
       <Navbar />
@@ -458,6 +499,16 @@ const Transactions = () => {
           </button>
         </div>
         
+        {/* Transaction Type Description */}
+        <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <p className="text-sm text-blue-800 dark:text-blue-200">
+            {transactionType === 'received' 
+              ? '💰 Record payments received from customers. This will reduce their outstanding balance.'
+              : '💸 Record payments made to customers/vendors. This will increase their balance (refunds/advances) or reduce what you owe them.'
+            }
+          </p>
+        </div>
+        
         {viewMode === 'form' ? (
           /* Transaction Form with Table */
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 mb-6">
@@ -484,6 +535,9 @@ const Transactions = () => {
                     <tr>
                       <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Party Name
+                      </th>
+                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Current Balance
                       </th>
                       <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Amount
@@ -535,6 +589,30 @@ const Transactions = () => {
                                   )}
                                 </div>
                               ))}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {transaction.entityId && entityBalances[transaction.entityId] !== undefined ? (
+                            <div className="text-sm">
+                              <div className={`font-medium ${getBalanceColorClass(entityBalances[transaction.entityId])}`}>
+                                {formatCurrencyLocal(Math.abs(entityBalances[transaction.entityId]))}
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {getBalanceStatusText(entityBalances[transaction.entityId])}
+                              </div>
+                            </div>
+                          ) : transaction.entityId && loadingBalances ? (
+                            <div className="flex items-center text-xs text-gray-400">
+                              <svg className="animate-spin h-3 w-3 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Loading...
+                            </div>
+                          ) : (
+                            <div className="text-xs text-gray-400">
+                              Select party first
                             </div>
                           )}
                         </td>
@@ -714,7 +792,7 @@ const Transactions = () => {
                               </div>
                             </div>
                             <div className={`font-semibold ${transaction.type === 'received' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                              {transaction.type === 'received' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                              {transaction.type === 'received' ? '+' : '-'}{formatCurrencyLocal(transaction.amount)}
                             </div>
                           </div>
                           

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import AccountStatementView from '../components/AccountStatementView';
 import InvoiceLedgerView from '../components/InvoiceLedgerView';
@@ -10,6 +10,7 @@ import LedgerFilters from '../components/LedgerFilters';
 
 const Ledger = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [viewMode, setViewMode] = useState('accountStatement'); // 'accountStatement', 'invoiceOnly', 'balanceView'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -83,31 +84,77 @@ const Ledger = () => {
       endDateObj.setHours(23, 59, 59, 999); // End of day
       
       console.log('Filtering ledger data between:', startDateObj, 'and', endDateObj);
+      console.log('Selected entity:', selectedEntity);
       
-      // Fetch invoices from the sales collection
-      const salesRef = collection(db, 'sales');
-      const salesQuery = query(
-        salesRef,
-        where('customerId', '==', selectedEntity.id),
-        where('invoiceDate', '>=', startDateObj),
-        where('invoiceDate', '<=', endDateObj),
-        orderBy('invoiceDate', 'asc')
-      );
+      let invoices = [];
+      let purchases = [];
       
-      const invoicesSnapshot = await getDocs(salesQuery);
-      const invoices = invoicesSnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          type: 'invoice',
-          ...data,
-          // Use proper field names from sales collection
-          invoiceNumber: data.invoiceNumber,
-          totalAmount: data.totalAmount,
-          items: data.items || [],
-          date: data.invoiceDate ? data.invoiceDate.toDate() : null
-        };
+      // Determine if this is a customer or vendor entity
+      const isVendor = selectedEntity.type === 'vendor' || selectedEntity.isVendor;
+      
+      console.log('[Ledger] Entity detection:', {
+        selectedEntity,
+        isVendor,
+        entityType: selectedEntity.type,
+        entityIsVendor: selectedEntity.isVendor
       });
+      
+      if (!isVendor) {
+        // For customers: Fetch invoices from the sales collection
+        const salesRef = collection(db, 'sales');
+        const salesQuery = query(
+          salesRef,
+          where('customerId', '==', selectedEntity.id),
+          where('invoiceDate', '>=', startDateObj),
+          where('invoiceDate', '<=', endDateObj),
+          orderBy('invoiceDate', 'asc')
+        );
+        
+        const invoicesSnapshot = await getDocs(salesQuery);
+        invoices = invoicesSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            type: 'invoice',
+            ...data,
+            // Use proper field names from sales collection
+            invoiceNumber: data.invoiceNumber,
+            totalAmount: data.totalAmount,
+            items: data.items || [],
+            date: data.invoiceDate ? data.invoiceDate.toDate() : null
+          };
+        });
+      } else {
+        // For vendors: Fetch purchases from the purchases collection
+        const purchasesRef = collection(db, 'purchases');
+        const purchasesQuery = query(
+          purchasesRef,
+          where('vendorId', '==', selectedEntity.id)
+        );
+        
+        const purchasesSnapshot = await getDocs(purchasesQuery);
+        
+        // Filter purchases by date range and process them
+        purchases = purchasesSnapshot.docs
+          .map(doc => {
+            const data = doc.data();
+            const purchaseDate = parseDate(data.purchaseDate || data.date || data.createdAt);
+            
+            return {
+              id: doc.id,
+              type: 'purchase',
+              ...data,
+              date: purchaseDate,
+              purchaseNumber: data.purchaseNumber || data.invoiceNumber,
+              totalAmount: data.totalAmount || data.total,
+              items: data.items || []
+            };
+          })
+          .filter(purchase => {
+            if (!purchase.date) return false;
+            return purchase.date >= startDateObj && purchase.date <= endDateObj;
+          });
+      }
       
       // Fetch transactions for the selected entity 
       const transactionsRef = collection(db, 'transactions');
@@ -140,8 +187,8 @@ const Ledger = () => {
         return transaction.date >= startDateObj && transaction.date <= endDateObj;
       });
       
-      // Combine and sort both by date
-      const combinedData = [...invoices, ...transactions].sort((a, b) => {
+      // Combine invoices/purchases and transactions, then sort by date
+      const combinedData = [...invoices, ...purchases, ...transactions].sort((a, b) => {
         if (!a.date) return -1;
         if (!b.date) return 1;
         return a.date - b.date;
@@ -151,13 +198,36 @@ const Ledger = () => {
       let balance = 0;
       const dataWithBalance = combinedData.map(item => {
         if (item.type === 'invoice') {
-          // For invoices, add to the balance (customer owes money)
+          // For customer invoices, add to the balance (customer owes us money)
           const amount = parseFloat(item.totalAmount || item.total || item.amount || 0);
           balance += amount;
-        } else if (item.type === 'transaction' || item.type === 'received' || item.type === 'paid') {
-          // For payments received, subtract from balance
+        } else if (item.type === 'purchase') {
+          // For vendor purchases, add to the balance (we owe vendor money)
+          const amount = parseFloat(item.totalAmount || item.total || item.amount || 0);
+          balance += amount;
+        } else if (item.type === 'transaction') {
+          // Handle transactions based on entity type and transaction type
           const amount = parseFloat(item.amount || 0);
-          balance -= amount;
+          
+          if (!isVendor) {
+            // For customers:
+            if (item.transactionType === 'received' || item.type === 'received') {
+              // Payment received from customer reduces their balance
+              balance -= amount;
+            } else if (item.transactionType === 'paid' || item.type === 'paid') {
+              // Payment made to customer (refund) increases their balance
+              balance += amount;
+            }
+          } else {
+            // For vendors:
+            if (item.transactionType === 'paid' || item.type === 'paid') {
+              // Payment made to vendor reduces what we owe them
+              balance -= amount;
+            } else if (item.transactionType === 'received' || item.type === 'received') {
+              // Payment received from vendor (rare, but could be refund) increases what we owe
+              balance += amount;
+            }
+          }
         }
         
         return {
@@ -193,10 +263,12 @@ const Ledger = () => {
   const navigateToInvoiceLedger = (entity) => {
     console.log('Navigating to invoice ledger for entity:', entity);
     
-    // Set selected entity 
+    // Set selected entity with proper type information
     const entityData = {
       id: entity.id,
-      opticalName: entity.name
+      opticalName: entity.name,
+      type: entity.type, // This will be 'customer' or 'vendor'
+      isVendor: entity.type === 'vendor'
     };
     
     setSelectedEntity(entityData);
@@ -221,6 +293,12 @@ const Ledger = () => {
     // Save current filter state to sessionStorage
     saveFilterState();
     navigate(`/sales/${invoiceId}`);
+  };
+  
+  const navigateToPurchaseDetail = (purchaseId) => {
+    // Save current filter state to sessionStorage
+    saveFilterState();
+    navigate(`/purchases/${purchaseId}`);
   };
   
   const navigateToTransactionDetail = (transactionId) => {
@@ -265,12 +343,47 @@ const Ledger = () => {
     restoreFilterState();
   }, []);
   
-  // Effect to fetch ledger data when filter state is restored
+  // Handle navigation state from other pages (like CreateSale.jsx)
+  useEffect(() => {
+    if (location.state) {
+      const { selectedCustomer, viewMode: stateViewMode } = location.state;
+      
+      if (selectedCustomer) {
+        setSelectedEntity(selectedCustomer);
+      }
+      
+      if (stateViewMode) {
+        setViewMode(stateViewMode);
+      }
+      
+      // Set date range to current month when coming from external navigation
+      if (selectedCustomer) {
+        const now = new Date();
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        setFromDate(firstDay.toISOString().split('T')[0]);
+        setToDate(now.toISOString().split('T')[0]);
+      }
+      
+      // Save the new filter state and clear navigation state
+      setTimeout(() => {
+        saveFilterState();
+        // Clear the navigation state to prevent reprocessing
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }, 200);
+    }
+  }, [location.state]);
+  
+  // Effect to fetch ledger data when filter state is restored or navigation state is processed
   useEffect(() => {
     if (selectedEntity && viewMode !== 'balanceView') {
-      fetchLedgerData();
+      // Add a small delay to ensure state is fully set
+      const timeoutId = setTimeout(() => {
+        fetchLedgerData();
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
     }
-  }, [selectedEntity, viewMode]); // Only trigger fetch when these keys change
+  }, [selectedEntity, viewMode, fromDate, toDate]); // Add date dependencies to refetch when dates change
   
   const formatDate = (date) => {
     if (!date) return '-';
@@ -578,6 +691,7 @@ const Ledger = () => {
               formatCurrency={formatCurrency}
               getPaymentMethodLabel={getPaymentMethodLabel}
               onInvoiceClick={navigateToInvoiceDetail}
+              onPurchaseClick={navigateToPurchaseDetail}
               onTransactionClick={navigateToTransactionDetail}
             />
           </div>
@@ -597,6 +711,7 @@ const Ledger = () => {
               formatDate={formatDate}
               formatCurrency={formatCurrency}
               onInvoiceClick={navigateToInvoiceDetail}
+              onPurchaseClick={navigateToPurchaseDetail}
               onTransactionClick={navigateToTransactionDetail}
             />
           </div>

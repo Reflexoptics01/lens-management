@@ -544,10 +544,6 @@ const Dashboard = () => {
       <Navbar />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>Dashboard</h1>
-          <p className="mt-2" style={{ color: 'var(--text-muted)' }}>Business overview and key metrics</p>
-        </div>
         
         {/* All Notifications Section - Combined GST and Backup */}
         {(gstNotifications.length > 0 || backupNotifications.length > 0) && (
@@ -752,41 +748,36 @@ const Dashboard = () => {
         {/* Date Selector */}
         <div className="mb-6 rounded-lg shadow p-4" style={{ backgroundColor: 'var(--bg-secondary)' }}>
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-                  Select Date for Analysis
-                </label>
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="form-input"
-                />
-              </div>
-              
-              <div className="flex items-end">
-                <button
-                  onClick={loadDashboardData}
-                  disabled={loading}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg flex items-center space-x-2 transition-colors"
-                  title="Refresh dashboard data"
-                >
-                  <svg 
-                    className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} 
-                    fill="none" 
-                    stroke="currentColor" 
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  <span>{loading ? 'Refreshing...' : 'Refresh Data'}</span>
-                </button>
-              </div>
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+                Select Date for Analysis
+              </label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="form-input"
+              />
             </div>
             
+            <button
+              onClick={loadDashboardData}
+              disabled={loading}
+              className="p-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition-colors"
+              title="Refresh dashboard data"
+            >
+              <svg 
+                className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            
             {loading && (
-              <div className="flex items-center text-sm" style={{ color: 'var(--text-muted)' }}>
+              <div className="flex items-center text-sm ml-3" style={{ color: 'var(--text-muted)' }}>
                 <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
