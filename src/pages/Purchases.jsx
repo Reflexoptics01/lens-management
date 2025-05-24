@@ -232,9 +232,9 @@ const Purchases = () => {
             {/* Returns Button */}
             <button
               onClick={() => navigate('/purchase-returns')}
-              className="btn-secondary inline-flex items-center space-x-2 bg-amber-600 hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-600 text-white rounded-lg shadow-sm"
+              className="btn-secondary inline-flex items-center space-x-1.5 bg-amber-600 hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-600 text-white rounded-lg shadow-sm px-3 py-1.5 text-sm"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" />
               </svg>
               <span className="desktop-only">View Returns</span>

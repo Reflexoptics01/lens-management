@@ -351,8 +351,8 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
 
   // Invoice selector component
   const InvoiceSelector = () => (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">Select Invoice to Return</h2>
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-4">
+      <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Select Invoice to Return</h2>
       
       <div className="mb-4">
         <input
@@ -360,37 +360,37 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
           placeholder="Search by invoice number or vendor..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-500 dark:focus:border-indigo-500"
         />
       </div>
       
-      <div className="overflow-y-auto max-h-96 border border-gray-200 rounded-md">
+      <div className="overflow-y-auto max-h-96 border border-gray-200 dark:border-gray-700 rounded-md">
         {filteredPurchases.length === 0 ? (
-          <div className="p-4 text-gray-500 text-center">No invoices found</div>
+          <div className="p-4 text-gray-500 dark:text-gray-400 text-center">No invoices found</div>
         ) : (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice #</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vendor</th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Invoice #</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Vendor</th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
+                <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Action</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {filteredPurchases.map(purchase => {
                 const { date } = formatDate(purchase.createdAt);
                 return (
-                  <tr key={purchase.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-sky-600">{purchase.displayId || purchase.purchaseNumber}</td>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{date}</td>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{getVendorName(purchase.vendorId)}</td>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900 text-right">{formatCurrency(purchase.totalAmount)}</td>
+                  <tr key={purchase.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-sky-600 dark:text-sky-400">{purchase.displayId || purchase.purchaseNumber}</td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white">{date}</td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white">{getVendorName(purchase.vendorId)}</td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right">{formatCurrency(purchase.totalAmount)}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-center">
                       <button
                         onClick={() => handlePurchaseSelection(purchase)}
-                        className="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded-md text-sm"
+                        className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-800 px-3 py-1 rounded-md text-sm"
                       >
                         Select
                       </button>
@@ -407,20 +407,20 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
   
   // Return form component
   const ReturnForm = () => (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
-      <div className="border-b border-gray-200 pb-4 mb-4">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-4">
+      <div className="border-b border-gray-200 dark:border-gray-700 pb-4 mb-4">
         <div className="flex flex-wrap items-center justify-between mb-2">
-          <h2 className="text-lg font-semibold text-gray-900">Return Details</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Return Details</h2>
           {selectedPurchase && (
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-500">Original Invoice:</span>
-              <span className="text-sm font-medium text-sky-600">{selectedPurchase.displayId || selectedPurchase.purchaseNumber}</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">Original Invoice:</span>
+              <span className="text-sm font-medium text-sky-600 dark:text-sky-400">{selectedPurchase.displayId || selectedPurchase.purchaseNumber}</span>
               <button 
                 onClick={() => {
                   setSelectedPurchase(null);
                   setShowInvoiceSelector(true);
                 }}
-                className="text-xs text-indigo-600 hover:text-indigo-800 underline"
+                className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 underline"
               >
                 Change
               </button>
@@ -430,55 +430,55 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Vendor</label>
-            <div className="mt-1 text-sm text-gray-900">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Vendor</label>
+            <div className="mt-1 text-sm text-gray-900 dark:text-white">
               {selectedPurchase ? getVendorName(selectedPurchase.vendorId) : 'N/A'}
             </div>
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700">Original Amount</label>
-            <div className="mt-1 text-sm text-gray-900">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Original Amount</label>
+            <div className="mt-1 text-sm text-gray-900 dark:text-white">
               {selectedPurchase ? formatCurrency(selectedPurchase.totalAmount) : 'N/A'}
             </div>
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700">Return Date</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Return Date</label>
             <input
               type="date"
               value={returnDate}
               onChange={(e) => setReturnDate(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             />
           </div>
         </div>
       </div>
       
       <div className="mb-4">
-        <h3 className="text-base font-medium text-gray-900 mb-2">Items to Return</h3>
+        <h3 className="text-base font-medium text-gray-900 dark:text-white mb-2">Items to Return</h3>
         
         {returnItems.length === 0 ? (
-          <div className="text-center p-4 bg-gray-50 rounded-md text-gray-500">
+          <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-md text-gray-500 dark:text-gray-400">
             No items available to return
           </div>
         ) : (
-          <div className="overflow-x-auto border border-gray-200 rounded-md">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+          <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-md">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
-                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Original Qty</th>
-                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Return Qty</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Return Amount</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Item</th>
+                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Original Qty</th>
+                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Return Qty</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Price</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Return Amount</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {returnItems.map((item, index) => (
-                  <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-4 py-2 text-sm text-gray-900">{item.itemName}</td>
-                    <td className="px-4 py-2 text-center text-sm text-gray-500">{item.qty}</td>
+                  <tr key={index} className={index % 2 === 0 ? 'bg-gray-50 dark:bg-gray-700' : 'bg-gray-100 dark:bg-gray-800'}>
+                    <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{item.itemName}</td>
+                    <td className="px-4 py-2 text-center text-sm text-gray-500 dark:text-gray-400">{item.qty}</td>
                     <td className="px-4 py-2 text-center">
                       <input
                         type="number"
@@ -486,18 +486,18 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
                         max={item.maxQty}
                         value={item.qtyToReturn}
                         onChange={(e) => handleReturnItemChange(index, 'qtyToReturn', e.target.value)}
-                        className="block w-20 mx-auto rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        className="block w-20 mx-auto rounded-md border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                       />
                     </td>
-                    <td className="px-4 py-2 text-right text-sm text-gray-900">{formatCurrency(item.price)}</td>
-                    <td className="px-4 py-2 text-right text-sm font-medium text-gray-900">{formatCurrency(item.returnAmount)}</td>
+                    <td className="px-4 py-2 text-right text-sm text-gray-900 dark:text-white">{formatCurrency(item.price)}</td>
+                    <td className="px-4 py-2 text-right text-sm font-medium text-gray-900 dark:text-white">{formatCurrency(item.returnAmount)}</td>
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="bg-gray-50">
+              <tfoot className="bg-gray-50 dark:bg-gray-700">
                 <tr>
-                  <td colSpan="4" className="px-4 py-2 text-right text-sm font-medium text-gray-900">Total Return Amount:</td>
-                  <td className="px-4 py-2 text-right text-sm font-medium text-indigo-600">{formatCurrency(returnAmount)}</td>
+                  <td colSpan="4" className="px-4 py-2 text-right text-sm font-medium text-gray-900 dark:text-white">Total Return Amount:</td>
+                  <td className="px-4 py-2 text-right text-sm font-medium text-indigo-600 dark:text-indigo-400">{formatCurrency(returnAmount)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -506,21 +506,21 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
       </div>
       
       <div className="mb-4">
-        <label htmlFor="returnNote" className="block text-sm font-medium text-gray-700">Return Note</label>
+        <label htmlFor="returnNote" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Return Note</label>
         <textarea
           id="returnNote"
           rows="3"
           value={returnNote}
           onChange={(e) => setReturnNote(e.target.value)}
           placeholder="Reason for return or additional notes"
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
         ></textarea>
       </div>
       
-      <div className="flex justify-end space-x-3 pt-3 border-t border-gray-200">
+      <div className="flex justify-end space-x-3 pt-3 border-t border-gray-200 dark:border-gray-700">
         <button
           onClick={() => navigate('/purchase-returns')}
-          className="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          className="py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
         >
           Cancel
         </button>
@@ -529,8 +529,8 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
           disabled={loading || returnItems.length === 0 || returnAmount <= 0}
           className={`py-2 px-4 rounded-md shadow-sm text-sm font-medium text-white 
             ${loading || returnItems.length === 0 || returnAmount <= 0 
-              ? 'bg-indigo-300 cursor-not-allowed' 
-              : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'}`}
+              ? 'bg-indigo-300 cursor-not-allowed dark:bg-indigo-700 dark:cursor-not-allowed' 
+              : 'bg-indigo-600 dark:bg-indigo-800 hover:bg-indigo-700 dark:hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800'}`}
         >
           {loading ? 'Processing...' : 'Create Return'}
         </button>
@@ -593,20 +593,20 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
   // Return details view component
   const ReturnDetailsView = () => (
     <div className="mb-6">
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-4">
+      <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-4">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 mb-2">
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
               Purchase Return Details
             </h1>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               View details for this purchase return
             </p>
           </div>
           <div className="flex space-x-2">
             <button
               onClick={() => navigate('/purchase-returns')}
-              className="btn-secondary inline-flex items-center space-x-2 whitespace-nowrap px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg shadow-sm"
+              className="btn-secondary inline-flex items-center space-x-2 whitespace-nowrap px-4 py-2 bg-sky-600 dark:bg-sky-700 hover:bg-sky-700 dark:hover:bg-sky-800 text-white rounded-lg shadow-sm"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -615,7 +615,7 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
             </button>
             <button
               onClick={handlePrintReturn}
-              className="btn-secondary inline-flex items-center space-x-2 whitespace-nowrap px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm"
+              className="btn-secondary inline-flex items-center space-x-2 whitespace-nowrap px-4 py-2 bg-indigo-600 dark:bg-indigo-700 hover:bg-indigo-700 dark:hover:bg-indigo-800 text-white rounded-lg shadow-sm"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -628,82 +628,82 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
       
       {loading ? (
         <div className="flex items-center justify-center py-8">
-          <div className="animate-spin w-8 h-8 border-4 border-sky-600 border-t-transparent rounded-full"></div>
+          <div className="animate-spin w-8 h-8 border-4 border-sky-600 dark:border-sky-400 border-t-transparent rounded-full"></div>
         </div>
       ) : error ? (
-        <div className="p-4 text-center text-red-500 bg-red-50 rounded-lg border border-red-200">
+        <div className="p-4 text-center text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
           {error}
         </div>
       ) : returnData ? (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex flex-col md:flex-row justify-between mb-6 pb-6 border-b border-gray-200">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex flex-col md:flex-row justify-between mb-6 pb-6 border-b border-gray-200 dark:border-gray-700">
             <div className="mb-4 md:mb-0">
-              <p className="text-sm text-gray-500 mb-1">Return #</p>
-              <p className="text-lg font-semibold text-indigo-600">{returnData.displayId || 'PR-001'}</p>
-              <p className="text-sm text-gray-500 mt-3 mb-1">Return Date</p>
-              <p className="font-medium">{formatDate(returnData.returnDate || returnData.createdAt).date}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Return #</p>
+              <p className="text-lg font-semibold text-indigo-600 dark:text-sky-400">{returnData.displayId || 'PR-001'}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-3 mb-1">Return Date</p>
+              <p className="font-medium text-gray-900 dark:text-white">{formatDate(returnData.returnDate || returnData.createdAt).date}</p>
             </div>
             
             <div className="mb-4 md:mb-0">
-              <p className="text-sm text-gray-500 mb-1">Vendor</p>
-              <p className="font-semibold">{returnData.vendor?.opticalName || 'Unknown Vendor'}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Vendor</p>
+              <p className="font-semibold text-gray-900 dark:text-white">{returnData.vendor?.opticalName || 'Unknown Vendor'}</p>
               {returnData.vendor?.city && (
-                <p className="text-sm text-gray-600">{returnData.vendor.city}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{returnData.vendor.city}</p>
               )}
               {returnData.vendor?.phone && (
-                <p className="text-sm text-gray-600">{returnData.vendor.phone}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{returnData.vendor.phone}</p>
               )}
             </div>
             
             <div>
-              <p className="text-sm text-gray-500 mb-1">Original Invoice</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Original Invoice</p>
               {returnData.originalInvoiceId ? (
                 <p 
-                  className="font-semibold text-sky-600 cursor-pointer" 
+                  className="font-semibold text-sky-600 dark:text-sky-400 cursor-pointer" 
                   onClick={() => navigate(`/purchases/${returnData.originalInvoiceId}`)}
                 >
                   {returnData.originalInvoiceNumber || '#'}
                 </p>
               ) : (
-                <p className="font-medium">N/A</p>
+                <p className="font-medium text-gray-500 dark:text-gray-400">N/A</p>
               )}
-              <p className="text-sm text-gray-500 mt-3 mb-1">Return Total</p>
-              <p className="text-lg font-bold text-indigo-600">{formatCurrency(returnData.totalAmount)}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-3 mb-1">Return Total</p>
+              <p className="text-lg font-bold text-indigo-600 dark:text-sky-400">{formatCurrency(returnData.totalAmount)}</p>
             </div>
           </div>
           
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-3">Returned Items</h3>
-            <div className="overflow-x-auto border border-gray-200 rounded-lg">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+            <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Item</th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Qty</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Price</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {returnData.items && returnData.items.length > 0 ? (
                     returnData.items.map((item, index) => (
-                      <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{item.itemName}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">{item.qtyToReturn}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{formatCurrency(item.price)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">{formatCurrency(item.returnAmount)}</td>
+                      <tr key={index} className={index % 2 === 0 ? 'bg-gray-50 dark:bg-gray-700' : 'bg-gray-100 dark:bg-gray-800'}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white font-medium">{item.itemName}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-center">{item.qtyToReturn}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right">{formatCurrency(item.price)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white text-right">{formatCurrency(item.returnAmount)}</td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">No items in this return</td>
+                      <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">No items in this return</td>
                     </tr>
                   )}
                 </tbody>
-                <tfoot className="bg-gray-50">
+                <tfoot className="bg-gray-50 dark:bg-gray-700">
                   <tr>
-                    <td colSpan="3" className="px-6 py-3 text-right text-sm font-medium text-gray-900">Total:</td>
-                    <td className="px-6 py-3 text-right text-sm font-bold text-indigo-600">{formatCurrency(returnData.totalAmount)}</td>
+                    <td colSpan="3" className="px-6 py-3 text-right text-sm font-medium text-gray-900 dark:text-white">Total:</td>
+                    <td className="px-6 py-3 text-right text-sm font-bold text-indigo-600 dark:text-sky-400">{formatCurrency(returnData.totalAmount)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -713,15 +713,15 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
           {returnData.notes && (
             <div className="mb-6">
               <h3 className="text-lg font-semibold mb-3">Notes</h3>
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <p className="text-gray-700">{returnData.notes}</p>
+              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                <p className="text-gray-700 dark:text-white">{returnData.notes}</p>
               </div>
             </div>
           )}
         </div>
       ) : (
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 text-center">
-          <p className="text-gray-500">No return data found</p>
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 text-center">
+          <p className="text-gray-500 dark:text-gray-400">No return data found</p>
         </div>
       )}
       
@@ -805,19 +805,19 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
         ) : isCreate ? (
           // Show return creation form when isCreate is true
           <div>
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-4">
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-4">
               <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div>
-                  <h1 className="text-xl font-semibold text-gray-900 mb-2">
+                  <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
                     {newReturn ? 'Create New Purchase Return' : 'Return Items from Purchase'}
                   </h1>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
                     {newReturn ? 'Create a return referencing an existing purchase' : 'Select items to return from this purchase'}
                   </p>
                 </div>
                 <button
                   onClick={() => navigate('/purchase-returns')}
-                  className="btn-secondary inline-flex items-center space-x-2 whitespace-nowrap px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg shadow-sm"
+                  className="btn-secondary inline-flex items-center space-x-2 whitespace-nowrap px-4 py-2 bg-sky-600 dark:bg-sky-700 hover:bg-sky-700 dark:hover:bg-sky-800 text-white rounded-lg shadow-sm"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -829,10 +829,10 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
             
             {loading && !showInvoiceSelector && !selectedPurchase ? (
               <div className="flex items-center justify-center py-8">
-                <div className="animate-spin w-8 h-8 border-4 border-sky-600 border-t-transparent rounded-full"></div>
+                <div className="animate-spin w-8 h-8 border-4 border-sky-600 dark:border-sky-400 border-t-transparent rounded-full"></div>
               </div>
             ) : error ? (
-              <div className="p-4 text-center text-red-500 bg-red-50 rounded-lg border border-red-200">
+              <div className="p-4 text-center text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
                 {error}
               </div>
             ) : (
@@ -842,11 +842,11 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
                 ) : selectedPurchase ? (
                   <ReturnForm />
                 ) : (
-                  <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-4 text-center">
-                    <p className="text-gray-500 mb-4">No invoice selected. Please select an invoice to process the return.</p>
+                  <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-4 text-center">
+                    <p className="text-gray-500 dark:text-gray-400 mb-4">No invoice selected. Please select an invoice to process the return.</p>
                     <button
                       onClick={() => setShowInvoiceSelector(true)}
-                      className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
                     >
                       Select Invoice
                     </button>
@@ -859,12 +859,12 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
           // Show returns list when isCreate is false (default view)
           <>
             {/* Replace header with filter bar */}
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-4">
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-3 flex-grow">
-                  <div className="flex items-center border border-gray-300 rounded-md overflow-hidden bg-white shadow-sm">
-                    <div className="px-3 py-2 bg-gray-50 border-r border-gray-300">
-                      <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 shadow-sm">
+                    <div className="px-3 py-2 bg-gray-50 dark:bg-gray-600 border-r border-gray-300 dark:border-gray-600">
+                      <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
                     </div>
@@ -872,23 +872,23 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
                       type="date"
                       value={dateFrom}
                       onChange={(e) => setDateFrom(e.target.value)}
-                      className="border-none focus:ring-0 text-sm w-32"
+                      className="border-none focus:ring-0 text-sm w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       placeholder="From"
                     />
-                    <span className="mx-1 text-gray-400">to</span>
+                    <span className="mx-1 text-gray-400 dark:text-gray-500">to</span>
                     <input
                       type="date"
                       value={dateTo}
                       onChange={(e) => setDateTo(e.target.value)}
-                      className="border-none focus:ring-0 text-sm w-32"
+                      className="border-none focus:ring-0 text-sm w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       placeholder="To"
                     />
                   </div>
                   
                   <div className="relative flex-grow max-w-xs">
-                    <div className="flex items-center border border-gray-300 rounded-md overflow-hidden bg-white shadow-sm">
-                      <div className="px-3 py-2 bg-gray-50 border-r border-gray-300">
-                        <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 shadow-sm">
+                      <div className="px-3 py-2 bg-gray-50 dark:bg-gray-600 border-r border-gray-300 dark:border-gray-600">
+                        <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
                       </div>
@@ -896,7 +896,7 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
                         type="text"
                         value={vendorSearchTerm}
                         onChange={(e) => setVendorSearchTerm(e.target.value)}
-                        className="border-none focus:ring-0 text-sm w-full"
+                        className="border-none focus:ring-0 text-sm w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                         placeholder="Search Vendor Name"
                         onFocus={() => vendorSearchTerm.trim() && setShowVendorSearch(true)}
                       />
@@ -906,7 +906,7 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
                             setVendorSearchTerm('');
                             setSelectedVendorId('');
                           }}
-                          className="px-2 text-gray-400 hover:text-gray-600"
+                          className="px-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -917,15 +917,15 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
                     
                     {/* Vendor search suggestions */}
                     {showVendorSearch && filteredVendors.length > 0 && (
-                      <div className="absolute mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg z-10 max-h-60 overflow-auto">
+                      <div className="absolute mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg z-10 max-h-60 overflow-auto">
                         {filteredVendors.map(vendor => (
                           <div
                             key={vendor.id}
-                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                            className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
                             onClick={() => handleVendorSelect(vendor)}
                           >
-                            <div className="font-medium">{vendor.opticalName}</div>
-                            {vendor.city && <div className="text-xs text-gray-500">{vendor.city}</div>}
+                            <div className="font-medium text-gray-900 dark:text-white">{vendor.opticalName}</div>
+                            {vendor.city && <div className="text-xs text-gray-500 dark:text-gray-400">{vendor.city}</div>}
                           </div>
                         ))}
                       </div>
@@ -935,7 +935,7 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
                   {(dateFrom || dateTo || selectedVendorId) && (
                     <button 
                       onClick={resetFilters}
-                      className="px-3 py-2 text-sm text-indigo-600 hover:text-indigo-800 flex items-center hover:bg-indigo-50 rounded-md transition-colors"
+                      className="px-3 py-2 text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 flex items-center hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-md transition-colors"
                     >
                       <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -948,7 +948,7 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
                 <div className="flex space-x-2">
                   <button
                     onClick={() => navigate('/purchases')}
-                    className="btn-secondary inline-flex items-center space-x-2 whitespace-nowrap px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg shadow-sm"
+                    className="btn-secondary inline-flex items-center space-x-2 whitespace-nowrap px-4 py-2 bg-sky-600 dark:bg-sky-700 hover:bg-sky-700 dark:hover:bg-sky-800 text-white rounded-lg shadow-sm"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -959,15 +959,15 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
               </div>
             </div>
 
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-4">
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h1 className="text-xl font-semibold text-gray-900 mb-2">Purchase Returns</h1>
-                  <p className="text-sm text-gray-500">Manage purchase returns and vendor credits</p>
+                  <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Purchase Returns</h1>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Manage purchase returns and vendor credits</p>
                 </div>
                 <button
                   onClick={() => navigate('/purchases/return/new')}
-                  className="btn-primary inline-flex items-center space-x-2 whitespace-nowrap px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm"
+                  className="btn-primary inline-flex items-center space-x-2 whitespace-nowrap px-4 py-2 bg-indigo-600 dark:bg-indigo-700 hover:bg-indigo-700 dark:hover:bg-indigo-800 text-white rounded-lg shadow-sm"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
@@ -980,44 +980,44 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
             {/* Returns List */}
             {loading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="animate-spin w-8 h-8 border-4 border-sky-600 border-t-transparent rounded-full"></div>
+                <div className="animate-spin w-8 h-8 border-4 border-sky-600 dark:border-sky-400 border-t-transparent rounded-full"></div>
               </div>
             ) : error ? (
-              <div className="p-4 text-center text-red-500">{error}</div>
+              <div className="p-4 text-center text-red-500 dark:text-red-400">{error}</div>
             ) : filteredReturns.length === 0 ? (
               <div className="text-center py-8">
-                <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-16 h-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <h3 className="text-lg font-medium text-gray-900 mb-1">No Returns Found</h3>
-                <p className="text-gray-500">There are no purchase returns matching your filters.</p>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">No Returns Found</h3>
+                <p className="text-gray-500 dark:text-gray-400">There are no purchase returns matching your filters.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto bg-white rounded-lg shadow-sm border border-gray-200">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+              <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
-                      <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px]">
+                      <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[100px]">
                         Return #
                       </th>
-                      <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-[140px]">
+                      <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[140px]">
                         Date
                       </th>
-                      <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider pl-6">
+                      <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider pl-6">
                         Vendor
                       </th>
-                      <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider text-right">
+                      <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider text-right">
                         Amount
                       </th>
-                      <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider text-center">
+                      <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider text-center">
                         Original Invoice
                       </th>
-                      <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px] text-center">
+                      <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[100px] text-center">
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {filteredReturns.map((returnItem) => {
                       const { date, time } = formatDate(returnItem.createdAt);
                       const vendorDetails = getVendorDetails(returnItem.vendorId);
@@ -1025,35 +1025,35 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
                         <tr 
                           key={returnItem.id} 
                           onClick={() => navigate(`/purchase-returns/${returnItem.id}`)}
-                          className="hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+                          className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors duration-150"
                         >
                           <td className="px-6 py-4">
-                            <span className="text-sm font-medium text-sky-600">{returnItem.displayId}</span>
+                            <span className="text-sm font-medium text-sky-600 dark:text-sky-400">{returnItem.displayId}</span>
                           </td>
                           <td className="px-6 py-4">
-                            <div className="text-sm text-gray-900">{date}</div>
-                            <div className="text-sm text-gray-500">{time}</div>
+                            <div className="text-sm text-gray-900 dark:text-white">{date}</div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">{time}</div>
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex flex-col">
-                              <span className="text-sm font-medium text-gray-900">
+                              <span className="text-sm font-medium text-gray-900 dark:text-white">
                                 {vendorDetails?.opticalName || 'Unknown Vendor'}
                               </span>
                               {vendorDetails?.city && (
-                                <span className="text-xs text-gray-500">
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
                                   {vendorDetails.city}
                                 </span>
                               )}
                             </div>
                           </td>
                           <td className="px-6 py-4 text-right">
-                            <span className="text-sm font-medium text-gray-900">
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">
                               {formatCurrency(returnItem.totalAmount)}
                             </span>
                           </td>
                           <td className="px-6 py-4 text-center">
                             {returnItem.originalInvoiceId ? (
-                              <span className="text-sm text-sky-600 hover:text-sky-800 cursor-pointer"
+                              <span className="text-sm text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 cursor-pointer"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   navigate(`/purchases/${returnItem.originalInvoiceId}`);
@@ -1062,14 +1062,14 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
                                 {returnItem.originalInvoiceNumber || 'View'}
                               </span>
                             ) : (
-                              <span className="text-sm text-gray-400">N/A</span>
+                              <span className="text-sm text-gray-400 dark:text-gray-500">N/A</span>
                             )}
                           </td>
                           <td className="px-6 py-4 text-center">
                             <div className="flex items-center justify-center space-x-2">
                               <button
                                 onClick={(e) => handleDeleteReturn(e, returnItem.id)}
-                                className="text-red-600 hover:text-red-900"
+                                className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
                                 title="Delete Return"
                               >
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
