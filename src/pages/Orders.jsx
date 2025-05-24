@@ -14,19 +14,75 @@ const isISODateString = (value) => {
 };
 
 const convertToDate = (value) => {
-  if (!value) return null;
+  if (!value) {
+    console.debug('convertToDate: null/undefined value');
+    return null;
+  }
   
   try {
+    console.debug('convertToDate: Processing value:', typeof value, value);
+    
+    // Handle Firestore Timestamp objects
     if (isFirestoreTimestamp(value)) {
+      console.debug('convertToDate: Firestore timestamp detected');
       return value.toDate();
-    } else if (isISODateString(value)) {
+    } 
+    
+    // Handle ISO date strings (from backup/restore)
+    if (isISODateString(value)) {
+      console.debug('convertToDate: ISO string detected');
       return new Date(value);
-    } else if (value instanceof Date) {
+    } 
+    
+    // Handle Date objects
+    if (value instanceof Date) {
+      console.debug('convertToDate: Date object detected');
       return value;
     }
+    
+    // Handle timestamp objects with seconds/nanoseconds (backup/restore format)
+    if (typeof value === 'object' && value.seconds) {
+      console.debug('convertToDate: Object with seconds detected');
+      return new Date(value.seconds * 1000 + (value.nanoseconds || 0) / 1000000);
+    }
+    
+    // Handle timestamp objects with _seconds/_nanoseconds (backup/restore format)
+    if (typeof value === 'object' && value._seconds) {
+      console.debug('convertToDate: Object with _seconds detected');
+      return new Date(value._seconds * 1000 + (value._nanoseconds || 0) / 1000000);
+    }
+    
+    // Handle numeric timestamps (milliseconds)
+    if (typeof value === 'number') {
+      console.debug('convertToDate: Number detected');
+      return new Date(value);
+    }
+    
+    // Handle string timestamps that might be numbers
+    if (typeof value === 'string' && !isNaN(parseInt(value))) {
+      console.debug('convertToDate: Numeric string detected');
+      const num = parseInt(value);
+      // Check if it's seconds (less than year 2100) or milliseconds
+      if (num < 4102444800) { // Year 2100 in seconds
+        return new Date(num * 1000);
+      } else {
+        return new Date(num);
+      }
+    }
+    
+    // Handle regular date strings
+    if (typeof value === 'string') {
+      console.debug('convertToDate: Regular string detected, trying Date parse');
+      const parsed = new Date(value);
+      if (!isNaN(parsed.getTime())) {
+        return parsed;
+      }
+    }
+    
+    console.warn('convertToDate: Unhandled timestamp format:', typeof value, value);
     return null;
   } catch (error) {
-    console.error('Error converting timestamp:', error, value);
+    console.error('convertToDate: Error converting timestamp:', error, value);
     return null;
   }
 };
@@ -69,6 +125,12 @@ const Orders = () => {
   useEffect(() => {
     fetchOrders();
     fetchCustomers();
+  }, []);
+  
+  // Force data reload on component mount (helps after backup restoration)
+  useEffect(() => {
+    console.log('Orders component mounted, ensuring fresh data...');
+    fetchOrders();
   }, []);
   
   // Apply filters whenever orders or filter values change
@@ -119,12 +181,14 @@ const Orders = () => {
     try {
       setLoading(true);
       setError('');
+      console.log('Fetching orders from database...');
       
       const ordersRef = collection(db, 'orders');
       let ordersList = [];
       
       try {
         // Try the standard query first
+        console.log('Attempting orderBy query...');
         const q = query(ordersRef, orderBy('createdAt', 'desc'));
         const snapshot = await getDocs(q);
         
@@ -134,10 +198,11 @@ const Orders = () => {
             id: doc.id,
             displayId: data.displayId,
             ...data,
-            // Convert timestamps to proper format
+            // Keep original createdAt for processing
             createdAt: data.createdAt 
           };
         });
+        console.log('orderBy query successful, got', ordersList.length, 'orders');
       } catch (error) {
         console.error('Error with standard query, trying fallback:', error);
         
@@ -149,23 +214,104 @@ const Orders = () => {
           return {
             id: doc.id,
             displayId: data.displayId,
-            ...data
+            ...data,
+            createdAt: data.createdAt
           };
         });
         
-        // Sort manually by createdAt if possible
+        console.log('Fallback query successful, got', ordersList.length, 'orders');
+        
+        // Sort manually by createdAt (newest first)
         ordersList.sort((a, b) => {
           const dateA = convertToDate(a.createdAt);
           const dateB = convertToDate(b.createdAt);
           
           if (dateA && dateB) {
-            return dateB - dateA; // Descending order
+            return dateB - dateA; // Descending order (newest first)
           }
+          // If one date is invalid, put the valid one first
+          if (dateA && !dateB) return -1;
+          if (!dateA && dateB) return 1;
+          // If both dates are invalid, maintain original order
           return 0;
         });
+        console.log('Manual sorting completed');
       }
       
-      setOrders(ordersList);
+      // Process and validate data
+      let processedCount = 0;
+      let invalidCount = 0;
+      
+      console.log('Raw ordersList sample (first 3):', ordersList.slice(0, 3).map(o => ({
+        id: o.displayId,
+        createdAt: o.createdAt,
+        createdAtType: typeof o.createdAt,
+        createdAtKeys: typeof o.createdAt === 'object' ? Object.keys(o.createdAt || {}) : 'N/A'
+      })));
+      
+      const processedOrders = ordersList.map((order, index) => {
+        try {
+          // Validate createdAt timestamp
+          const date = convertToDate(order.createdAt);
+          if (!date) {
+            console.warn(`Order ${order.displayId || order.id} has invalid createdAt:`, order.createdAt);
+            invalidCount++;
+          } else {
+            processedCount++;
+          }
+          
+          // Ensure displayId exists
+          if (!order.displayId) {
+            console.warn(`Order ${order.id} missing displayId, assigning temporary one`);
+            order.displayId = `ORD-${index + 1}`;
+          }
+          
+          return order;
+        } catch (error) {
+          console.error('Error processing order:', order.id, error);
+          invalidCount++;
+          return order;
+        }
+      });
+      
+      // Sort processed orders by converted date (newest first)
+      processedOrders.sort((a, b) => {
+        const dateA = convertToDate(a.createdAt);
+        const dateB = convertToDate(b.createdAt);
+        
+        // Both dates valid - sort by date (newest first)
+        if (dateA && dateB && !isNaN(dateA.getTime()) && !isNaN(dateB.getTime())) {
+          return dateB - dateA;
+        }
+        
+        // If one date is invalid, put the valid one first
+        if (dateA && !isNaN(dateA.getTime()) && (!dateB || isNaN(dateB.getTime()))) {
+          return -1;
+        }
+        if ((!dateA || isNaN(dateA.getTime())) && dateB && !isNaN(dateB.getTime())) {
+          return 1;
+        }
+        
+        // Both dates invalid - try to sort by displayId (newer display IDs typically have higher numbers)
+        if (a.displayId && b.displayId) {
+          const numA = parseInt(a.displayId.replace(/\D/g, '')) || 0;
+          const numB = parseInt(b.displayId.replace(/\D/g, '')) || 0;
+          return numB - numA; // Higher numbers first
+        }
+        
+        // Fallback to original order
+        return 0;
+      });
+      
+      console.log(`Orders processed: ${processedCount} valid dates, ${invalidCount} invalid dates`);
+      console.log('First 3 processed orders (should be newest):', processedOrders.slice(0, 3).map(o => ({
+        id: o.displayId,
+        createdAt: o.createdAt,
+        convertedDate: convertToDate(o.createdAt),
+        formattedDate: convertToDate(o.createdAt) ? convertToDate(o.createdAt).toLocaleDateString() : 'Invalid'
+      })));
+      
+      setOrders(processedOrders);
     } catch (error) {
       console.error('Error fetching orders:', error);
       setError('Failed to fetch orders. Please try reloading the page.');
@@ -442,38 +588,47 @@ const Orders = () => {
   };
 
   const formatDate = (timestamp) => {
-    if (!timestamp) return { date: '', time: '' };
+    if (!timestamp) {
+      console.debug('formatDate: No timestamp provided');
+      return { date: 'No Date', time: '' };
+    }
     
     try {
-      // Check if timestamp is a valid Firestore timestamp object
-      if (timestamp && typeof timestamp.toDate === 'function') {
-        const date = timestamp.toDate();
-        return {
-          date: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-          time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-        };
-      } 
-      // Handle string ISO dates from backup/restore
-      else if (typeof timestamp === 'string' && timestamp.match(/^\d{4}-\d{2}-\d{2}T/)) {
-        const date = new Date(timestamp);
-        return {
-          date: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-          time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-        };
-      }
-      // Handle date objects directly
-      else if (timestamp instanceof Date) {
-        return {
-          date: timestamp.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-          time: timestamp.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-        };
+      console.debug('formatDate: Processing timestamp:', typeof timestamp, timestamp);
+      
+      // Use the convertToDate helper function for robust timestamp conversion
+      const date = convertToDate(timestamp);
+      
+      if (!date) {
+        console.warn('formatDate: convertToDate returned null for:', timestamp);
+        return { date: 'Invalid Date', time: '' };
       }
       
-      // Return empty strings if format can't be determined
-      return { date: '', time: '' };
+      if (isNaN(date.getTime())) {
+        console.warn('formatDate: Date object is invalid (NaN) for:', timestamp);
+        return { date: 'Invalid Date', time: '' };
+      }
+      
+      const formattedDate = date.toLocaleDateString('en-GB', { 
+        day: '2-digit', 
+        month: 'short', 
+        year: 'numeric' 
+      });
+      
+      const formattedTime = date.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+      
+      console.debug('formatDate: Successfully formatted:', { formattedDate, formattedTime });
+      
+      return {
+        date: formattedDate,
+        time: formattedTime
+      };
     } catch (error) {
-      console.error('Error formatting date:', error, timestamp);
-      return { date: '', time: '' };
+      console.error('formatDate: Error formatting date:', error, timestamp);
+      return { date: 'Date Error', time: '' };
     }
   };
 

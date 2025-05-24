@@ -6,7 +6,7 @@ import Navbar from '../components/Navbar';
 import CustomerSearch from '../components/CustomerSearch';
 import CustomerForm from '../components/CustomerForm';
 import ItemSuggestions from '../components/ItemSuggestions';
-import FallbackInvoicePrint from '../components/FallbackInvoicePrint';
+import PrintInvoiceModal from '../components/PrintInvoiceModal';
 import BottomActionBar from '../components/BottomActionBar';
 
 const TAX_OPTIONS = [
@@ -81,11 +81,8 @@ const EditSale = () => {
   // Add state for item suggestions (only keep what's needed)
   const [itemSuggestions, setItemSuggestions] = useState([]);
 
-  // Change the PDF modal state
+  // Add PrintInvoiceModal state
   const [showPrintModal, setShowPrintModal] = useState(false);
-
-  // Add FallbackInvoicePrint state
-  const [showFallbackPrint, setShowFallbackPrint] = useState(false);
 
   // Fetch sale data and customers when component mounts
   useEffect(() => {
@@ -423,7 +420,7 @@ const EditSale = () => {
 
   const handlePrintBill = () => {
     if (saleId) {
-      setShowFallbackPrint(true);
+      setShowPrintModal(true);
     } else {
       setError('Sale ID not found');
     }
@@ -1123,12 +1120,13 @@ const EditSale = () => {
         </div>
       )}
 
-      {/* Fallback Print Component */}
-      {showFallbackPrint && (
-        <FallbackInvoicePrint 
+      {/* Print Invoice Modal */}
+      {showPrintModal && (
+        <PrintInvoiceModal 
+          isOpen={showPrintModal}
           saleId={saleId} 
-          onClose={() => setShowFallbackPrint(false)}
-          autoPrint={false}
+          onClose={() => setShowPrintModal(false)}
+          title={`Invoice #${invoiceNumber}`}
         />
       )}
     </div>

@@ -3,6 +3,33 @@ import { db } from '../firebaseConfig';
 import { collection, getDocs, query, orderBy, where, Timestamp } from 'firebase/firestore';
 import Navbar from '../components/Navbar';
 
+// Helper functions to handle different timestamp formats after restore
+const isFirestoreTimestamp = (value) => {
+  return value && typeof value === 'object' && typeof value.toDate === 'function';
+};
+
+const isISODateString = (value) => {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value);
+};
+
+const convertToDate = (value) => {
+  if (!value) return null;
+  
+  try {
+    if (isFirestoreTimestamp(value)) {
+      return value.toDate();
+    } else if (isISODateString(value)) {
+      return new Date(value);
+    } else if (value instanceof Date) {
+      return value;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error converting timestamp:', error, value);
+    return null;
+  }
+};
+
 const Dashboard = () => {
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
@@ -35,6 +62,12 @@ const Dashboard = () => {
     checkBackupNotifications();
   }, [selectedDate]);
 
+  // Force data reload on component mount (helps after backup restoration)
+  useEffect(() => {
+    console.log('Dashboard component mounted, forcing data reload...');
+    loadDashboardData();
+  }, []);
+
   const loadDashboardData = async () => {
     setLoading(true);
     try {
@@ -53,11 +86,20 @@ const Dashboard = () => {
   
   const fetchSalesData = async () => {
     try {
+      console.log('Fetching sales data for dashboard...');
       const salesRef = collection(db, 'sales');
-      const salesSnapshot = await getDocs(query(salesRef, orderBy('invoiceDate', 'desc')));
+      
+      let salesSnapshot;
+      try {
+        // Try with orderBy first
+        salesSnapshot = await getDocs(query(salesRef, orderBy('invoiceDate', 'desc')));
+      } catch (error) {
+        console.log('orderBy failed, trying without ordering:', error);
+        // Fallback: get all sales without ordering
+        salesSnapshot = await getDocs(salesRef);
+      }
       
       const selectedDateObj = new Date(selectedDate);
-      const today = new Date();
       
       // Date ranges
       const startOfToday = new Date(selectedDateObj);
@@ -88,12 +130,28 @@ const Dashboard = () => {
       let lastYearSameMonthSales = 0;
       let lastYearTotalSales = 0;
       
+      let processedCount = 0;
+      let skippedCount = 0;
+      
       salesSnapshot.docs.forEach(doc => {
         const sale = doc.data();
-        if (!sale.invoiceDate || !sale.totalAmount) return;
         
-        const saleDate = sale.invoiceDate.toDate();
+        // Skip if no invoiceDate or totalAmount
+        if (!sale.invoiceDate || !sale.totalAmount) {
+          skippedCount++;
+          return;
+        }
+        
+        // Convert timestamp safely
+        const saleDate = convertToDate(sale.invoiceDate);
+        if (!saleDate) {
+          console.warn('Could not convert sale date:', sale.invoiceDate);
+          skippedCount++;
+          return;
+        }
+        
         const amount = parseFloat(sale.totalAmount) || 0;
+        processedCount++;
         
         // Today's sales
         if (saleDate >= startOfToday && saleDate <= endOfToday) {
@@ -131,6 +189,8 @@ const Dashboard = () => {
         }
       });
       
+      console.log(`Dashboard: Processed ${processedCount} sales, skipped ${skippedCount}`);
+      
       // Calculate projections
       const daysInMonth = new Date(selectedDateObj.getFullYear(), selectedDateObj.getMonth() + 1, 0).getDate();
       const daysPassed = selectedDateObj.getDate();
@@ -140,7 +200,7 @@ const Dashboard = () => {
       const dayOfYear = Math.floor((selectedDateObj - startOfYear) / (24 * 60 * 60 * 1000)) + 1;
       const yearlyProjection = dayOfYear > 0 ? (yearSales / dayOfYear) * daysInYear : 0;
       
-      setSalesData({
+      const newSalesData = {
         today: todaySales,
         thisMonth: monthSales,
         thisYear: yearSales,
@@ -149,31 +209,55 @@ const Dashboard = () => {
         lastYear: lastYearTotalSales,
         monthlyProjection,
         yearlyProjection
-      });
+      };
+      
+      console.log('Dashboard sales data:', newSalesData);
+      setSalesData(newSalesData);
       
     } catch (error) {
       console.error('Error fetching sales data:', error);
+      // Set default values if there's an error
+      setSalesData({
+        today: 0,
+        thisMonth: 0,
+        thisYear: 0,
+        lastYearSameDay: 0,
+        lastYearSameMonth: 0,
+        lastYear: 0,
+        monthlyProjection: 0,
+        yearlyProjection: 0
+      });
     }
   };
 
   const fetchTopProducts = async () => {
     try {
+      console.log('Fetching top products for dashboard...');
       const salesRef = collection(db, 'sales');
       const salesSnapshot = await getDocs(salesRef);
       
       const productCounts = {};
+      let processedSales = 0;
+      let processedItems = 0;
       
       salesSnapshot.docs.forEach(doc => {
         const sale = doc.data();
+        processedSales++;
+        
         if (sale.items && Array.isArray(sale.items)) {
           sale.items.forEach(item => {
-            const productName = item.itemName || item.productName || 'Unknown Product';
-            const qty = parseInt(item.qty) || 1;
-            
-            if (!productCounts[productName]) {
-              productCounts[productName] = 0;
+            try {
+              const productName = item.itemName || item.productName || 'Unknown Product';
+              const qty = parseInt(item.qty) || 1;
+              processedItems++;
+              
+              if (!productCounts[productName]) {
+                productCounts[productName] = 0;
+              }
+              productCounts[productName] += qty;
+            } catch (error) {
+              console.warn('Error processing item:', item, error);
             }
-            productCounts[productName] += qty;
           });
         }
       });
@@ -183,31 +267,44 @@ const Dashboard = () => {
         .sort((a, b) => b.count - a.count)
         .slice(0, 20);
       
+      console.log(`Dashboard: Processed ${processedSales} sales with ${processedItems} items for top products`);
+      console.log('Top products:', sortedProducts.slice(0, 5));
       setTopProducts(sortedProducts);
     } catch (error) {
       console.error('Error fetching top products:', error);
+      setTopProducts([]);
     }
   };
 
   const fetchTopPowers = async () => {
     try {
+      console.log('Fetching top powers for dashboard...');
       const salesRef = collection(db, 'sales');
       const salesSnapshot = await getDocs(salesRef);
       
       const powerCounts = {};
+      let processedSales = 0;
+      let processedItems = 0;
       
       salesSnapshot.docs.forEach(doc => {
         const sale = doc.data();
+        processedSales++;
+        
         if (sale.items && Array.isArray(sale.items)) {
           sale.items.forEach(item => {
-            if (item.sph) {
-              const power = item.sph.toString();
-              const qty = parseInt(item.qty) || 1;
-              
-              if (!powerCounts[power]) {
-                powerCounts[power] = 0;
+            try {
+              if (item.sph) {
+                const power = item.sph.toString();
+                const qty = parseInt(item.qty) || 1;
+                processedItems++;
+                
+                if (!powerCounts[power]) {
+                  powerCounts[power] = 0;
+                }
+                powerCounts[power] += qty;
               }
-              powerCounts[power] += qty;
+            } catch (error) {
+              console.warn('Error processing power item:', item, error);
             }
           });
         }
@@ -218,34 +315,47 @@ const Dashboard = () => {
         .sort((a, b) => b.count - a.count)
         .slice(0, 20);
       
+      console.log(`Dashboard: Processed ${processedSales} sales with ${processedItems} power items`);
+      console.log('Top powers:', sortedPowers.slice(0, 5));
       setTopPowers(sortedPowers);
     } catch (error) {
       console.error('Error fetching top powers:', error);
+      setTopPowers([]);
     }
   };
 
   const fetchTopProfitProducts = async () => {
     try {
+      console.log('Fetching top profit products for dashboard...');
       const salesRef = collection(db, 'sales');
       const salesSnapshot = await getDocs(salesRef);
       
       const productProfits = {};
+      let processedSales = 0;
+      let processedItems = 0;
       
       salesSnapshot.docs.forEach(doc => {
         const sale = doc.data();
+        processedSales++;
+        
         if (sale.items && Array.isArray(sale.items)) {
           sale.items.forEach(item => {
-            const productName = item.itemName || item.productName || 'Unknown Product';
-            const qty = parseInt(item.qty) || 1;
-            const price = parseFloat(item.price) || 0;
-            const cost = parseFloat(item.cost) || parseFloat(item.costPrice) || 0;
-            const profit = (price - cost) * qty;
-            
-            if (!productProfits[productName]) {
-              productProfits[productName] = { profit: 0, revenue: 0 };
+            try {
+              const productName = item.itemName || item.productName || 'Unknown Product';
+              const qty = parseInt(item.qty) || 1;
+              const price = parseFloat(item.price) || 0;
+              const cost = parseFloat(item.cost) || parseFloat(item.costPrice) || 0;
+              const profit = (price - cost) * qty;
+              processedItems++;
+              
+              if (!productProfits[productName]) {
+                productProfits[productName] = { profit: 0, revenue: 0 };
+              }
+              productProfits[productName].profit += profit;
+              productProfits[productName].revenue += price * qty;
+            } catch (error) {
+              console.warn('Error processing profit item:', item, error);
             }
-            productProfits[productName].profit += profit;
-            productProfits[productName].revenue += price * qty;
           });
         }
       });
@@ -260,9 +370,12 @@ const Dashboard = () => {
         .sort((a, b) => b.profit - a.profit)
         .slice(0, 20);
       
+      console.log(`Dashboard: Processed ${processedSales} sales with ${processedItems} profit items`);
+      console.log('Top profit products:', sortedProfitProducts.slice(0, 5));
       setTopProfitProducts(sortedProfitProducts);
     } catch (error) {
       console.error('Error fetching top profit products:', error);
+      setTopProfitProducts([]);
     }
   };
 
@@ -638,19 +751,51 @@ const Dashboard = () => {
 
         {/* Date Selector */}
         <div className="mb-6 rounded-lg shadow p-4" style={{ backgroundColor: 'var(--bg-secondary)' }}>
-          <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-            Select Date for Analysis
-          </label>
-              <input
-                type="date"
-                value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="form-input"
-              />
-          {loading && (
-            <span className="ml-4 text-sm" style={{ color: 'var(--text-muted)' }}>Loading data...</span>
-          )}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+                  Select Date for Analysis
+                </label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+              
+              <div className="flex items-end">
+                <button
+                  onClick={loadDashboardData}
+                  disabled={loading}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg flex items-center space-x-2 transition-colors"
+                  title="Refresh dashboard data"
+                >
+                  <svg 
+                    className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>{loading ? 'Refreshing...' : 'Refresh Data'}</span>
+                </button>
+              </div>
             </div>
+            
+            {loading && (
+              <div className="flex items-center text-sm" style={{ color: 'var(--text-muted)' }}>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Loading data...
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Sales Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

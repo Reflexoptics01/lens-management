@@ -73,18 +73,92 @@ const Sales = () => {
   const fetchSales = async () => {
     try {
       setLoading(true);
+      setError(''); // Clear any previous errors
+      
       const salesRef = collection(db, 'sales');
-      const q = query(salesRef, orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      const salesList = snapshot.docs.map((doc, index) => ({
-        id: doc.id,
-        displayId: `S-${(snapshot.docs.length - index).toString().padStart(3, '0')}`,
-        ...doc.data()
-      }));
+      // Remove orderBy from query since we'll sort after fetching
+      const snapshot = await getDocs(salesRef);
+      
+      const salesList = snapshot.docs.map((doc, index) => {
+        try {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            // displayId will be assigned after sorting
+            ...data
+          };
+        } catch (docError) {
+          console.error('Error processing sale document:', doc.id, docError);
+          // Return a basic sale object with the document ID to prevent crashes
+          return {
+            id: doc.id,
+            invoiceNumber: 'ERROR',
+            customerName: 'Error loading customer',
+            totalAmount: 0,
+            paymentStatus: 'UNKNOWN',
+            createdAt: new Date(), // Fallback date
+            error: true
+          };
+        }
+      });
+      
+      // Sort by invoice number value (highest first)
+      salesList.sort((a, b) => {
+        const parseInvoiceNumber = (invoiceNumber) => {
+          if (!invoiceNumber) return { year: 0, number: 0 };
+          
+          // Handle different invoice formats:
+          // "2024-25/01" -> year: 2024, number: 1
+          // "2023-24/15" -> year: 2023, number: 15  
+          // "INV-0001" -> year: 0, number: 1
+          // "123" -> year: 0, number: 123
+          
+          let year = 0;
+          let number = 0;
+          
+          // Try to extract year from financial year format (2024-25, 2023-24, etc.)
+          const yearMatch = invoiceNumber.match(/(\d{4})-\d{2}/);
+          if (yearMatch) {
+            year = parseInt(yearMatch[1]);
+          }
+          
+          // Extract the final numeric part
+          const numberMatch = invoiceNumber.match(/(\d+)$/);
+          if (numberMatch) {
+            number = parseInt(numberMatch[1]);
+          }
+          
+          return { year, number };
+        };
+        
+        const aParsed = parseInvoiceNumber(a.invoiceNumber);
+        const bParsed = parseInvoiceNumber(b.invoiceNumber);
+        
+        // Sort by year first (newest year first)
+        if (bParsed.year !== aParsed.year) {
+          return bParsed.year - aParsed.year;
+        }
+        
+        // Then sort by number (highest number first)
+        if (bParsed.number !== aParsed.number) {
+          return bParsed.number - aParsed.number;
+        }
+        
+        // If invoice numbers are identical, fall back to creation date (newest first)
+        const aDate = a.createdAt && typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+        const bDate = b.createdAt && typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+        return bDate - aDate;
+      });
+      
+      // Assign displayId based on sorted order (highest invoice number = S-001)
+      salesList.forEach((sale, index) => {
+        sale.displayId = `S-${(index + 1).toString().padStart(3, '0')}`;
+      });
+      
       setSales(salesList);
     } catch (error) {
       console.error('Error fetching sales:', error);
-      setError('Failed to fetch sales');
+      setError(`Failed to fetch sales: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -119,11 +193,46 @@ const Sales = () => {
 
   const formatDate = (timestamp) => {
     if (!timestamp) return { date: '-', time: '-' };
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return {
-      date: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-      time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-    };
+    
+    let date;
+    try {
+      // Handle Firestore Timestamp
+      if (timestamp && typeof timestamp.toDate === 'function') {
+        date = timestamp.toDate();
+      }
+      // Handle Date object
+      else if (timestamp instanceof Date) {
+        date = timestamp;
+      }
+      // Handle string dates
+      else if (typeof timestamp === 'string') {
+        date = new Date(timestamp);
+      }
+      // Handle timestamp numbers
+      else if (typeof timestamp === 'number') {
+        date = new Date(timestamp);
+      }
+      // Handle objects with seconds (Firestore timestamp-like objects)
+      else if (timestamp && typeof timestamp === 'object' && timestamp.seconds) {
+        date = new Date(timestamp.seconds * 1000);
+      }
+      else {
+        date = new Date(timestamp);
+      }
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return { date: 'Invalid Date', time: '-' };
+      }
+      
+      return {
+        date: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+      };
+    } catch (error) {
+      console.error('Error formatting date:', error, timestamp);
+      return { date: 'Invalid Date', time: '-' };
+    }
   };
 
   // Format currency for display
@@ -154,8 +263,30 @@ const Sales = () => {
       const fromDate = new Date(dateFrom);
       fromDate.setHours(0, 0, 0, 0);
       filtered = filtered.filter(sale => {
-        const saleDate = sale.createdAt?.toDate ? sale.createdAt.toDate() : new Date(sale.createdAt);
-        return saleDate >= fromDate;
+        try {
+          let saleDate;
+          const timestamp = sale.createdAt;
+          
+          // Handle different timestamp formats
+          if (timestamp && typeof timestamp.toDate === 'function') {
+            saleDate = timestamp.toDate();
+          } else if (timestamp instanceof Date) {
+            saleDate = timestamp;
+          } else if (typeof timestamp === 'string') {
+            saleDate = new Date(timestamp);
+          } else if (typeof timestamp === 'number') {
+            saleDate = new Date(timestamp);
+          } else if (timestamp && typeof timestamp === 'object' && timestamp.seconds) {
+            saleDate = new Date(timestamp.seconds * 1000);
+          } else {
+            saleDate = new Date(timestamp);
+          }
+          
+          return !isNaN(saleDate.getTime()) && saleDate >= fromDate;
+        } catch (error) {
+          console.error('Error parsing sale date for filtering:', error);
+          return false;
+        }
       });
     }
     
@@ -164,8 +295,30 @@ const Sales = () => {
       const toDate = new Date(dateTo);
       toDate.setHours(23, 59, 59, 999);
       filtered = filtered.filter(sale => {
-        const saleDate = sale.createdAt?.toDate ? sale.createdAt.toDate() : new Date(sale.createdAt);
-        return saleDate <= toDate;
+        try {
+          let saleDate;
+          const timestamp = sale.createdAt;
+          
+          // Handle different timestamp formats
+          if (timestamp && typeof timestamp.toDate === 'function') {
+            saleDate = timestamp.toDate();
+          } else if (timestamp instanceof Date) {
+            saleDate = timestamp;
+          } else if (typeof timestamp === 'string') {
+            saleDate = new Date(timestamp);
+          } else if (typeof timestamp === 'number') {
+            saleDate = new Date(timestamp);
+          } else if (timestamp && typeof timestamp === 'object' && timestamp.seconds) {
+            saleDate = new Date(timestamp.seconds * 1000);
+          } else {
+            saleDate = new Date(timestamp);
+          }
+          
+          return !isNaN(saleDate.getTime()) && saleDate <= toDate;
+        } catch (error) {
+          console.error('Error parsing sale date for filtering:', error);
+          return false;
+        }
       });
     }
     
@@ -379,7 +532,7 @@ const Sales = () => {
                             className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors duration-150"
                           >
                             <td className="px-6 py-4">
-                              <span className="text-sm font-medium text-sky-600 dark:text-sky-400">{sale.displayId}</span>
+                              <span className="text-sm font-medium text-sky-600 dark:text-sky-400">{sale.invoiceNumber || sale.displayId}</span>
                             </td>
                             <td className="px-6 py-4">
                               <div className="text-sm text-gray-900 dark:text-white">{date}</div>
@@ -473,7 +626,7 @@ const Sales = () => {
                     className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 cursor-pointer"
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <span className="text-sm font-medium text-sky-600 dark:text-sky-400">{sale.displayId}</span>
+                      <span className="text-sm font-medium text-sky-600 dark:text-sky-400">{sale.invoiceNumber || sale.displayId}</span>
                       <span className={`px-2 py-1 text-xs font-semibold rounded-full 
                         ${sale.paymentStatus === 'PAID' 
                           ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200' 

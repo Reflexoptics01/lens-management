@@ -6,7 +6,7 @@ import Navbar from '../components/Navbar';
 import CustomerSearch from '../components/CustomerSearch';
 import CustomerForm from '../components/CustomerForm';
 import ItemSuggestions from '../components/ItemSuggestions';
-import FallbackInvoicePrint from '../components/FallbackInvoicePrint';
+import PrintInvoiceModal from '../components/PrintInvoiceModal';
 import BottomActionBar from '../components/BottomActionBar';
 import { Timestamp } from 'firebase/firestore';
 
@@ -96,7 +96,7 @@ const CreateSale = () => {
   const itemSuggestionsRef = useRef(null);
 
   // New state for fallback print
-  const [showFallbackPrint, setShowFallbackPrint] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
   // Add state for dispatch logs
   const [dispatchLogs, setDispatchLogs] = useState([]);
@@ -163,7 +163,7 @@ const CreateSale = () => {
 
   useEffect(() => {
     fetchCustomers();
-    generateInvoiceNumber();
+    previewNextInvoiceNumber();
     fetchItems();
   }, []);
 
@@ -193,7 +193,74 @@ const CreateSale = () => {
     }
   };
 
-  const generateInvoiceNumber = async () => {
+  // Preview the next invoice number without incrementing the counter
+  const previewNextInvoiceNumber = async () => {
+    try {
+      // Get the current financial year from settings
+      const settingsDoc = await getDoc(doc(db, 'settings', 'shopSettings'));
+      if (!settingsDoc.exists()) {
+        // Fallback to old method for preview
+        const salesRef = collection(db, 'sales');
+        const snapshot = await getDocs(salesRef);
+        const previewNumber = `INV-${(snapshot.docs.length + 1).toString().padStart(4, '0')}`;
+        setInvoiceNumber(previewNumber);
+        return;
+      }
+      
+      const settings = settingsDoc.data();
+      const financialYear = settings.financialYear;
+      
+      if (!financialYear) {
+        // Fallback to old method for preview
+        const salesRef = collection(db, 'sales');
+        const snapshot = await getDocs(salesRef);
+        const previewNumber = `INV-${(snapshot.docs.length + 1).toString().padStart(4, '0')}`;
+        setInvoiceNumber(previewNumber);
+        return;
+      }
+      
+      // Get the counter document for this financial year (without incrementing)
+      const counterRef = doc(db, 'counters', `invoices_${financialYear}`);
+      const counterDoc = await getDoc(counterRef);
+      
+      let counter;
+      if (!counterDoc.exists()) {
+        // If counter doesn't exist, preview would be 01
+        counter = {
+          count: 0,
+          prefix: financialYear,
+          separator: '/',
+          format: '${prefix}${separator}${number}'
+        };
+      } else {
+        counter = counterDoc.data();
+      }
+      
+      // Preview the next number (current count + 1) without saving
+      const nextCount = (counter.count || 0) + 1;
+      const paddedNumber = nextCount.toString().padStart(2, '0');
+      
+      // Use the format specified in the counter or fall back to default
+      let previewInvoiceNumber;
+      if (counter.format) {
+        previewInvoiceNumber = counter.format
+          .replace('${prefix}', counter.prefix || '')
+          .replace('${separator}', counter.separator || '')
+          .replace('${number}', paddedNumber);
+      } else {
+        previewInvoiceNumber = `${counter.prefix || financialYear}${counter.separator || '/'}${paddedNumber}`;
+      }
+      
+      setInvoiceNumber(previewInvoiceNumber);
+    } catch (error) {
+      console.error('Error previewing invoice number:', error);
+      // Fallback preview
+      setInvoiceNumber('PREVIEW-ERROR');
+    }
+  };
+
+  // Generate actual invoice number and increment counter (only used when saving)
+  const generateInvoiceNumberForSave = async () => {
     try {
       // Get the current financial year from settings
       const settingsDoc = await getDoc(doc(db, 'settings', 'shopSettings'));
@@ -209,8 +276,7 @@ const CreateSale = () => {
         const salesRef = collection(db, 'sales');
         const snapshot = await getDocs(salesRef);
         const newInvoiceNumber = `INV-${(snapshot.docs.length + 1).toString().padStart(4, '0')}`;
-        setInvoiceNumber(newInvoiceNumber);
-        return;
+        return newInvoiceNumber;
       }
       
       // Get or create the counter document for this financial year
@@ -259,7 +325,7 @@ const CreateSale = () => {
         invoiceNumber = `${counter.prefix || financialYear}${counter.separator || '/'}${paddedNumber}`;
       }
       
-      setInvoiceNumber(invoiceNumber);
+      return invoiceNumber;
     } catch (error) {
       console.error('Error generating invoice number:', error);
       // Fall back to the old method if there's an error
@@ -267,10 +333,10 @@ const CreateSale = () => {
         const salesRef = collection(db, 'sales');
         const snapshot = await getDocs(salesRef);
         const newInvoiceNumber = `INV-${(snapshot.docs.length + 1).toString().padStart(4, '0')}`;
-        setInvoiceNumber(newInvoiceNumber);
+        return newInvoiceNumber;
       } catch (fallbackError) {
         console.error('Error in fallback invoice numbering:', fallbackError);
-        setInvoiceNumber('ERROR-GENERATING-NUMBER');
+        return 'ERROR-GENERATING-NUMBER';
       }
     }
   };
@@ -529,9 +595,12 @@ const CreateSale = () => {
       setLoading(true);
       setError('');
 
+      // Generate the actual invoice number only when saving
+      const finalInvoiceNumber = await generateInvoiceNumberForSave();
+
       // Create sale document
       const saleData = {
-        invoiceNumber,
+        invoiceNumber: finalInvoiceNumber,
         invoiceDate: new Date(invoiceDate),
         dueDate: dueDate ? new Date(dueDate) : null,
         customerId: selectedCustomer.id,
@@ -581,6 +650,9 @@ const CreateSale = () => {
 
       const docRef = await addDoc(collection(db, 'sales'), saleData);
       
+      // Update the invoice number state for UI display (this is the actual saved number)
+      setInvoiceNumber(finalInvoiceNumber);
+      
       // Process all order IDs to mark lenses as sold in inventory
       await processOrderIdsForInventory(filledRows);
       
@@ -588,8 +660,11 @@ const CreateSale = () => {
       await deductInventoryItems(filledRows);
       
       setSavedSaleId(docRef.id);
+      console.log('Sale saved successfully with ID:', docRef.id);
       setShowSuccessModal(true);
       setSuccess(true);
+      
+      console.log(`✅ Sale saved successfully with invoice number: ${finalInvoiceNumber}`);
     } catch (error) {
       console.error('Error saving sale:', error);
       setError('Failed to save sale. Please try again.');
@@ -871,11 +946,37 @@ const CreateSale = () => {
 
   const handlePrintBill = () => {
     if (savedSaleId) {
-      // Use the FallbackInvoicePrint component for printing
-      setShowFallbackPrint(true);
-      // Don't trigger automatic printing - let user click the Print Now button
+      console.log('Opening print modal for sale ID:', savedSaleId);
+      // Use the PrintInvoiceModal component for printing
+      setShowPrintModal(true);
+      // Clear any previous errors when opening print
+      setError('');
     } else {
+      console.error('No sale ID found for printing');
       setError('No sale ID found. Please save the invoice first.');
+      alert('Error: Cannot print - No sale ID found. Please save the invoice first.');
+    }
+  };
+
+  // Alternative print method - opens sale detail in new window
+  const handlePrintBillAlternative = () => {
+    if (savedSaleId) {
+      console.log('Opening sale detail page for printing, sale ID:', savedSaleId);
+      // Open the sale detail page in a new window for printing
+      const printUrl = `/sales/${savedSaleId}`;
+      const printWindow = window.open(printUrl, '_blank');
+      
+      // Auto-trigger print dialog after page loads
+      if (printWindow) {
+        printWindow.onload = () => {
+          setTimeout(() => {
+            printWindow.print();
+          }, 1000);
+        };
+      }
+    } else {
+      console.error('No sale ID found for printing');
+      alert('Error: Cannot print - No sale ID found. Please save the invoice first.');
     }
   };
 
@@ -1343,9 +1444,9 @@ const CreateSale = () => {
                   <input
                     type="text"
                     value={invoiceNumber}
-                    onChange={(e) => setInvoiceNumber(e.target.value)}
-                    className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white"
                     readOnly
+                    placeholder="Will be generated when saving"
                   />
                 </div>
                 <div className="mb-4">
@@ -1835,6 +1936,17 @@ const CreateSale = () => {
                   </button>
                   <button
                     type="button"
+                    onClick={handlePrintBillAlternative}
+                    className="w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-gray-100 dark:bg-gray-600 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:w-auto sm:text-sm"
+                    disabled={loading}
+                  >
+                    <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    Print (New Window)
+                  </button>
+                  <button
+                    type="button"
                     onClick={handleSendWhatsApp}
                     className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-teal-600 text-base font-medium text-white hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 sm:mt-0 sm:w-auto sm:text-sm"
                     disabled={loading}
@@ -2042,12 +2154,16 @@ const CreateSale = () => {
         />
       )}
 
-      {/* Fallback Print Component */}
-      {showFallbackPrint && savedSaleId && (
-        <FallbackInvoicePrint 
+      {/* Print Invoice Modal */}
+      {showPrintModal && savedSaleId && (
+        <PrintInvoiceModal 
+          isOpen={showPrintModal}
           saleId={savedSaleId} 
-          onClose={() => setShowFallbackPrint(false)}
-          autoPrint={false}
+          onClose={() => {
+            setShowPrintModal(false);
+            console.log('Print modal closed');
+          }}
+          title={`Invoice #${invoiceNumber}`}
         />
       )}
     </div>
