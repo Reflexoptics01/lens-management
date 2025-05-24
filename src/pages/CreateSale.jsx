@@ -106,6 +106,7 @@ const CreateSale = () => {
   const [searchLogQuery, setSearchLogQuery] = useState('');
   const [isSearchingLogs, setIsSearchingLogs] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
+  const [selectedLogDate, setSelectedLogDate] = useState(new Date().toISOString().split('T')[0]); // Add state for selected log date
 
   // Format optical values (SPH, CYL, ADD) to "0.00" format with signs
   const formatOpticalValue = (value) => {
@@ -171,10 +172,10 @@ const CreateSale = () => {
 
   // Add useEffect to fetch dispatch logs when invoice date changes
   useEffect(() => {
-    if (invoiceDate) {
-      fetchDispatchLogs(invoiceDate);
+    if (selectedLogDate) {
+      fetchDispatchLogs(selectedLogDate);
     }
-  }, [invoiceDate]);
+  }, [selectedLogDate]);
 
   const fetchCustomers = async () => {
     try {
@@ -2217,18 +2218,19 @@ const CreateSale = () => {
                           
                           <div className="md:w-48">
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                              Today's Logs
+                              Select Date
                             </label>
-                            <button
-                              type="button"
-                              onClick={() => {
+                            <input
+                              type="date"
+                              value={selectedLogDate}
+                              onChange={(e) => {
+                                setSelectedLogDate(e.target.value);
                                 setSearchLogQuery('');
                                 setSearchResults([]);
+                                fetchDispatchLogs(e.target.value);
                               }}
-                              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600"
-                            >
-                              Show Today's Logs
-                            </button>
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            />
                           </div>
                         </div>
                       </div>
@@ -2280,10 +2282,10 @@ const CreateSale = () => {
                             </ul>
                           </div>
                         ) : dispatchLogs.length === 0 ? (
-                          <p className="text-gray-500 dark:text-gray-400 text-center py-4">No dispatch logs found for {new Date(invoiceDate).toLocaleDateString()}</p>
+                          <p className="text-gray-500 dark:text-gray-400 text-center py-4">No dispatch logs found for {new Date(selectedLogDate).toLocaleDateString()}</p>
                         ) : (
                           <div>
-                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Today's Logs ({new Date(invoiceDate).toLocaleDateString()}):</h4>
+                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Logs for {new Date(selectedLogDate).toLocaleDateString()}:</h4>
                             <ul className="space-y-3">
                               {dispatchLogs.map(log => (
                                 <li key={log.logId} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700">

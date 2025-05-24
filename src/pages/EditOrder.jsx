@@ -2,12 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { db } from '../firebaseConfig';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import Navbar from '../components/Navbar';
 import OrderForm from '../components/OrderForm';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import CustomerForm from '../components/CustomerForm';
 import { DocumentPlusIcon } from '@heroicons/react/24/outline';
+
+// Define section colors for the OrderForm
+const SECTION_COLORS = {
+  customer: 'from-blue-500 to-indigo-500',
+  lens: 'from-green-500 to-emerald-500', 
+  prescription: 'from-purple-500 to-violet-500',
+  delivery: 'from-orange-500 to-red-500'
+};
 
 const EditOrder = () => {
   const { orderId } = useParams();
@@ -48,18 +56,51 @@ const EditOrder = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   useEffect(() => {
-    fetchOrderDetails();
-    fetchCustomers();
+    if (orderId) {
+      fetchOrderDetails();
+      fetchCustomers();
+    } else {
+      setError('Order ID not provided');
+      setLoading(false);
+    }
   }, [orderId]);
 
   const fetchOrderDetails = async () => {
     try {
       setLoading(true);
+      setError('');
       const orderRef = doc(db, 'orders', orderId);
       const orderDoc = await getDoc(orderRef);
       
       if (orderDoc.exists()) {
-        setFormData(orderDoc.data());
+        const orderData = orderDoc.data();
+        setFormData({
+          customerName: orderData.customerName || '',
+          consumerName: orderData.consumerName || '',
+          brandName: orderData.brandName || '',
+          material: orderData.material || '',
+          index: orderData.index || '',
+          lensType: orderData.lensType || '',
+          baseTint: orderData.baseTint || '',
+          coatingType: orderData.coatingType || '',
+          coatingColour: orderData.coatingColour || '',
+          diameter: orderData.diameter || '',
+          fogMark: orderData.fogMark || false,
+          rightSph: orderData.rightSph || '',
+          rightCyl: orderData.rightCyl || '',
+          rightAxis: orderData.rightAxis || '',
+          rightAdd: orderData.rightAdd || '',
+          rightQty: orderData.rightQty || '1',
+          leftSph: orderData.leftSph || '',
+          leftCyl: orderData.leftCyl || '',
+          leftAxis: orderData.leftAxis || '',
+          leftAdd: orderData.leftAdd || '',
+          leftQty: orderData.leftQty || '1',
+          expectedDeliveryDate: orderData.expectedDeliveryDate || '',
+          price: orderData.price || '',
+          specialNotes: orderData.specialNotes || '',
+          displayId: orderData.displayId || ''
+        });
       } else {
         setError('Order not found');
       }
@@ -74,7 +115,8 @@ const EditOrder = () => {
   const fetchCustomers = async () => {
     try {
       const customersRef = collection(db, 'customers');
-      const snapshot = await getDocs(customersRef);
+      const q = query(customersRef, where('type', '!=', 'vendor'));
+      const snapshot = await getDocs(q);
       const customersList = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -82,7 +124,7 @@ const EditOrder = () => {
       setCustomers(customersList);
     } catch (error) {
       console.error('Error fetching customers:', error);
-      setError('Failed to fetch customers');
+      // Don't set error here as it's not critical for editing
     }
   };
 
@@ -102,17 +144,17 @@ const EditOrder = () => {
 
     try {
       const orderRef = doc(db, 'orders', orderId);
-      await updateDoc(orderRef, formData);
-      setSuccessMessage('Order updated successfully');
+      await updateDoc(orderRef, {
+        ...formData,
+        updatedAt: new Date()
+      });
       
-      // Show success for 1.5 seconds before redirecting
-      setTimeout(() => {
-        navigate(`/orders/${orderId}`);
-      }, 1500);
+      setSuccessMessage('Order updated successfully');
+      setShowSuccessModal(true);
       
     } catch (error) {
       console.error('Error updating order:', error);
-      setError('Failed to update order');
+      setError('Failed to update order. Please try again.');
     } finally {
       setUpdating(false);
     }
@@ -125,16 +167,43 @@ const EditOrder = () => {
     }
   };
 
+  // Show error state if there's an error and not loading
+  if (error && !loading) {
+    return (
+      <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-gray-900">
+        <Navbar />
+        <div className="flex-grow flex items-center justify-center">
+          <div className="text-center">
+            <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 rounded-md text-red-700 dark:text-red-200 shadow-sm">
+              <div className="flex items-center">
+                <svg className="w-5 h-5 mr-2 text-red-500 dark:text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                {error}
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/orders')}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Back to Orders
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
-      <div className="flex flex-col min-h-screen bg-slate-50">
+      <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-gray-900">
         <Navbar />
         <div className="flex-grow flex items-center justify-center">
           <div className="animate-pulse flex space-x-2 items-center">
-            <div className="h-3 w-3 bg-sky-600 rounded-full"></div>
-            <div className="h-3 w-3 bg-sky-600 rounded-full"></div>
-            <div className="h-3 w-3 bg-sky-600 rounded-full"></div>
-            <span className="text-gray-600 ml-2">Loading order details...</span>
+            <div className="h-3 w-3 bg-sky-600 dark:bg-sky-400 rounded-full animate-bounce"></div>
+            <div className="h-3 w-3 bg-sky-600 dark:bg-sky-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+            <div className="h-3 w-3 bg-sky-600 dark:bg-sky-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+            <span className="text-gray-600 dark:text-gray-400 ml-2">Loading order details...</span>
           </div>
         </div>
       </div>
@@ -174,6 +243,18 @@ const EditOrder = () => {
             </div>
           </div>
 
+          {/* Success Message */}
+          {successMessage && (
+            <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/50 border-l-4 border-green-500 rounded-md text-green-700 dark:text-green-200 shadow-sm">
+              <div className="flex items-center">
+                <svg className="w-5 h-5 mr-2 text-green-500 dark:text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                {successMessage}
+              </div>
+            </div>
+          )}
+
           {/* Main Content Area for OrderForm */}
           <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 sm:p-8 border-t-4 border-blue-500">
             {/* Error message display - stays above form */}
@@ -188,85 +269,47 @@ const EditOrder = () => {
               </div>
             )}
             
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="relative inline-flex">
-                  <div className="w-8 h-8 bg-blue-600 rounded-full opacity-60 animate-ping"></div>
-                  <div className="w-8 h-8 bg-blue-600 rounded-full absolute top-0 left-0"></div>
-                </div>
-                <span className="ml-3 text-gray-600 dark:text-gray-400">Loading order...</span>
-              </div>
-            ) : (
-              <OrderForm
-                formData={formData}
-                onChange={handleInputChange}
-                onSubmit={handleSubmit}
-                customers={customers}
-                onAddNewCustomer={() => setShowCustomerForm(true)}
-                loading={updating}
-                error={error}
-                isEditing={true}
-                sectionColors={SECTION_COLORS}
-              />
-            )}
-            
-            {/* Submit button for desktop view */}
-            {!loading && (
-              <div className="mt-10 hidden sm:flex sm:justify-end">
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={updating}
-                  className="relative px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-all transform hover:scale-[1.02] duration-300 flex items-center justify-center font-medium overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="absolute inset-0 w-full h-full bg-gradient-to-br from-blue-600 to-indigo-600"></span>
-                  <span className="absolute bottom-0 right-0 block w-64 h-64 mb-32 mr-4 transition-all duration-500 origin-bottom-left transform rotate-45 translate-x-24 bg-pink-500 opacity-30 group-hover:rotate-90 ease rounded-full"></span>
-                  <span className="relative flex items-center">
-                    {updating ? (
-                      <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                    ) : (
-                      <DocumentPlusIcon className="w-5 h-5 mr-2" />
-                    )}
-                    {updating ? 'Updating Order...' : 'Update Order'}
-                  </span>
-                </button>
-              </div>
-            )}
+            <OrderForm
+              formData={formData}
+              onChange={handleInputChange}
+              onSubmit={handleSubmit}
+              customers={customers}
+              onAddNewCustomer={() => setShowCustomerForm(true)}
+              loading={updating}
+              error={error}
+              isEditing={true}
+              sectionColors={SECTION_COLORS}
+            />
           </div>
         </div>
       </main>
 
-      {/* Floating Submit Button - Mobile Only */}
-      {!loading && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-br from-blue-600 to-indigo-600 border-t border-blue-700 shadow-xl z-30 mb-[65px] sm:hidden">
-          <div className="relative max-w-5xl mx-auto">
-            {/* Animated background element */}
-            <div className="absolute inset-0 overflow-hidden rounded-lg">
-              <div className="absolute top-[-50%] left-[-50%] w-[200%] h-[200%] animate-pulse-slow bg-gradient-to-br from-blue-500/30 to-indigo-500/30 rounded-full"></div>
-            </div>
-            
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={updating}
-              className="relative w-full px-4 py-3.5 bg-white text-blue-700 rounded-lg shadow-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all transform hover:scale-[1.02] duration-300 flex items-center justify-center font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {updating ? (
-                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-blue-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              ) : (
-                <DocumentPlusIcon className="w-5 h-5 mr-2" />
-              )}
-              {updating ? 'Updating Order...' : 'Update Order'}
-            </button>
+      {/* Floating Submit Button - Mobile Only (smaller size) */}
+      <div className="fixed bottom-0 left-0 right-0 p-3 bg-gradient-to-br from-blue-600 to-indigo-600 border-t border-blue-700 shadow-xl z-30 mb-[65px] sm:hidden">
+        <div className="relative max-w-5xl mx-auto">
+          {/* Animated background element */}
+          <div className="absolute inset-0 overflow-hidden rounded-lg">
+            <div className="absolute top-[-50%] left-[-50%] w-[200%] h-[200%] animate-pulse-slow bg-gradient-to-br from-blue-500/30 to-indigo-500/30 rounded-full"></div>
           </div>
+          
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={updating}
+            className="relative w-full px-3 py-2 bg-white text-blue-700 rounded-lg shadow-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all transform hover:scale-[1.02] duration-300 flex items-center justify-center font-medium disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          >
+            {updating ? (
+              <svg className="animate-spin -ml-1 mr-1.5 h-4 w-4 text-blue-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
+              <DocumentPlusIcon className="w-4 h-4 mr-1.5" />
+            )}
+            {updating ? 'Updating...' : 'Update Order'}
+          </button>
         </div>
-      )}
+      </div>
 
       {/* Customer Form Modal */}
       {showCustomerForm && (
@@ -311,7 +354,7 @@ const EditOrder = () => {
                   type="button"
                   onClick={() => {
                     setShowSuccessModal(false);
-                    navigate('/orders');
+                    navigate(`/orders/${orderId}`);
                   }}
                   className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
                 >

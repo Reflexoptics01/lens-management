@@ -208,20 +208,20 @@ const Purchases = () => {
   };
 
   return (
-    <div className="mobile-page">
+    <div className="mobile-page bg-gray-50 dark:bg-gray-900 min-h-screen">
       <Navbar />
       
       <div className="mobile-content">
         {/* Header */}
         <div className="flex justify-between items-center mb-4">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Purchases</h1>
-            <p className="mt-1 text-sm text-gray-500">Manage your purchases and invoices</p>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Purchases</h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage your purchases and invoices</p>
           </div>
           <div className="flex space-x-2">
             <button
               onClick={() => navigate('/purchases/new')}
-              className="btn-primary inline-flex items-center space-x-2"
+              className="btn-primary inline-flex items-center space-x-2 bg-sky-600 hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600 text-white"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
@@ -232,7 +232,7 @@ const Purchases = () => {
             {/* Returns Button */}
             <button
               onClick={() => navigate('/purchase-returns')}
-              className="btn-secondary inline-flex items-center space-x-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg shadow-sm"
+              className="btn-secondary inline-flex items-center space-x-2 bg-amber-600 hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-600 text-white rounded-lg shadow-sm"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" />
@@ -247,26 +247,26 @@ const Purchases = () => {
           <input
             type="text"
             placeholder="Search purchases..."
-            className="mobile-search"
+            className="mobile-search bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-sky-500 focus:border-sky-500"
           />
         </div>
 
         {/* Purchases List */}
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <div className="animate-spin w-8 h-8 border-4 border-sky-600 border-t-transparent rounded-full"></div>
+            <div className="animate-spin w-8 h-8 border-4 border-sky-600 dark:border-sky-400 border-t-transparent rounded-full"></div>
           </div>
         ) : error ? (
-          <div className="p-4 text-center text-red-500">{error}</div>
+          <div className="p-4 text-center text-red-500 dark:text-red-400">{error}</div>
         ) : purchases.length === 0 ? (
           <div className="text-center py-8">
-            <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-16 h-16 text-gray-400 dark:text-gray-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
-            <p className="text-gray-500">No purchase records found</p>
+            <p className="text-gray-500 dark:text-gray-400">No purchase records found</p>
             <button
               onClick={() => navigate('/purchases/new')}
-              className="mt-4 inline-flex items-center px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700"
+              className="mt-4 inline-flex items-center px-4 py-2 bg-sky-600 dark:bg-sky-500 text-white rounded-lg hover:bg-sky-700 dark:hover:bg-sky-600"
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
@@ -278,32 +278,32 @@ const Purchases = () => {
           <>
             {/* Desktop Table View */}
             <div className="desktop-only">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-900">
                       <tr>
-                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px]">
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[100px]">
                           Purchase #
                         </th>
-                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-[140px]">
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[140px]">
                           Date
                         </th>
-                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider pl-6">
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider pl-6">
                           Vendor
                         </th>
-                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider text-right">
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-right">
                           Amount
                         </th>
-                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider text-center">
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider text-center">
                           Payment Status
                         </th>
-                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px] text-center">
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[100px] text-center">
                           Actions
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                       {purchases.map((purchase) => {
                         const { date, time } = formatDate(purchase.createdAt);
                         const vendorDetails = getVendorDetails(purchase.vendorId);
@@ -311,39 +311,39 @@ const Purchases = () => {
                           <tr 
                             key={purchase.id} 
                             onClick={() => navigate(`/purchases/${purchase.id}`)}
-                            className="hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+                            className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors duration-150"
                           >
                             <td className="px-6 py-4">
-                              <span className="text-sm font-medium text-sky-600">{purchase.displayId}</span>
+                              <span className="text-sm font-medium text-sky-600 dark:text-sky-400">{purchase.displayId}</span>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="text-sm text-gray-900">{date}</div>
-                              <div className="text-sm text-gray-500">{time}</div>
+                              <div className="text-sm text-gray-900 dark:text-white">{date}</div>
+                              <div className="text-sm text-gray-500 dark:text-gray-400">{time}</div>
                             </td>
                             <td className="px-6 py-4">
                               <div className="flex flex-col">
-                                <span className="text-sm font-medium text-gray-900">
+                                <span className="text-sm font-medium text-gray-900 dark:text-white">
                                   {vendorDetails?.opticalName || 'Unknown Vendor'}
                                 </span>
                                 {vendorDetails?.city && (
-                                  <span className="text-xs text-gray-500">
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
                                     {vendorDetails.city}
                                   </span>
                                 )}
                               </div>
                             </td>
                             <td className="px-6 py-4 text-right">
-                              <span className="text-sm font-medium text-gray-900">
+                              <span className="text-sm font-medium text-gray-900 dark:text-white">
                                 {formatCurrency(purchase.totalAmount)}
                               </span>
                             </td>
                             <td className="px-6 py-4 text-center">
                               <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
                                 ${purchase.paymentStatus === 'PAID' 
-                                  ? 'bg-green-100 text-green-800' 
+                                  ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' 
                                   : purchase.paymentStatus === 'PARTIAL' 
-                                    ? 'bg-yellow-100 text-yellow-800'
-                                    : 'bg-red-100 text-red-800'}`}
+                                    ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
+                                    : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'}`}
                               >
                                 {purchase.paymentStatus || 'UNPAID'}
                               </span>
@@ -355,7 +355,7 @@ const Purchases = () => {
                                     e.stopPropagation();
                                     navigate(`/purchases/edit/${purchase.id}`);
                                   }}
-                                  className="text-sky-600 hover:text-sky-900"
+                                  className="text-sky-600 dark:text-sky-400 hover:text-sky-900 dark:hover:text-sky-300"
                                   title="Edit Purchase"
                                 >
                                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -364,16 +364,16 @@ const Purchases = () => {
                                 </button>
                                 <button
                                   onClick={(e) => handlePrintPurchase(e, purchase.id)}
-                                  className="text-indigo-600 hover:text-indigo-900"
+                                  className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300"
                                   title="Print Purchase"
                                 >
                                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2 2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                   </svg>
                                 </button>
                                 <button
                                   onClick={(e) => handleDeletePurchase(e, purchase.id)}
-                                  className="text-red-600 hover:text-red-900"
+                                  className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
                                 >
                                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -398,55 +398,55 @@ const Purchases = () => {
                 return (
                   <div 
                     key={purchase.id}
-                    className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden"
+                    className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden"
                     onClick={() => navigate(`/purchases/${purchase.id}`)}
                   >
                     <div className="p-4">
                       <div className="flex justify-between items-start mb-2">
-                        <span className="text-sm font-medium text-sky-600">{purchase.displayId}</span>
+                        <span className="text-sm font-medium text-sky-600 dark:text-sky-400">{purchase.displayId}</span>
                         <span className={`px-2 py-1 text-xs leading-none rounded-full 
                           ${purchase.paymentStatus === 'PAID' 
-                            ? 'bg-green-100 text-green-800' 
+                            ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' 
                             : purchase.paymentStatus === 'PARTIAL' 
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-red-100 text-red-800'}`}
+                              ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
+                              : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'}`}
                         >
                           {purchase.paymentStatus || 'UNPAID'}
                         </span>
                       </div>
                       <div className="mb-2">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">
                           {vendorDetails?.opticalName || 'Unknown Vendor'}
                         </div>
                         {vendorDetails?.city && (
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
                             {vendorDetails.city}
                           </div>
                         )}
                       </div>
                       <div className="flex justify-between items-center text-sm">
-                        <div className="text-gray-500">{date}</div>
-                        <div className="font-medium text-gray-900">{formatCurrency(purchase.totalAmount)}</div>
+                        <div className="text-gray-500 dark:text-gray-400">{date}</div>
+                        <div className="font-medium text-gray-900 dark:text-white">{formatCurrency(purchase.totalAmount)}</div>
                       </div>
-                      <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between">
+                      <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 flex justify-between">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             navigate(`/purchases/edit/${purchase.id}`);
                           }}
-                          className="text-sky-600 text-sm"
+                          className="text-sky-600 dark:text-sky-400 text-sm hover:text-sky-700 dark:hover:text-sky-300"
                         >
                           Edit
                         </button>
                         <button
                           onClick={(e) => handlePrintPurchase(e, purchase.id)}
-                          className="text-indigo-600 text-sm"
+                          className="text-indigo-600 dark:text-indigo-400 text-sm hover:text-indigo-700 dark:hover:text-indigo-300"
                         >
                           Print
                         </button>
                         <button
                           onClick={(e) => handleDeletePurchase(e, purchase.id)}
-                          className="text-red-600 text-sm"
+                          className="text-red-600 dark:text-red-400 text-sm hover:text-red-700 dark:hover:text-red-300"
                         >
                           Delete
                         </button>
