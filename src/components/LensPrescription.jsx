@@ -95,6 +95,45 @@ const LensPrescription = ({ formData, onChange, matchingLenses = [] }) => {
     return rawValue;
   };
 
+  // Lens transposition function
+  const transposeLens = (eye) => {
+    // Get the current values
+    const prefix = eye === 'right' ? 'right' : 'left';
+    const sphValue = parseFloat(formData[`${prefix}Sph`] || '0.00');
+    const cylValue = parseFloat(formData[`${prefix}Cyl`] || '0.00');
+    const axisValue = parseInt(formData[`${prefix}Axis`] || '0');
+
+    if (isNaN(sphValue) || isNaN(cylValue) || isNaN(axisValue)) {
+      return; // Don't transpose if values are not valid numbers
+    }
+
+    // Calculate new transposed values
+    // 1. Add CYL to SPH
+    const newSph = (sphValue + cylValue).toFixed(2);
+    
+    // 2. Flip the sign of CYL
+    const newCyl = (-cylValue).toFixed(2);
+    
+    // 3. Add 90 to AXIS (or subtract 90 if it would exceed 180)
+    let newAxis = axisValue + 90;
+    if (newAxis > 180) {
+      newAxis = newAxis - 180;
+    }
+
+    // Update the form values
+    onChange({ target: { name: `${prefix}Sph`, value: newSph } });
+    onChange({ target: { name: `${prefix}Cyl`, value: newCyl } });
+    onChange({ target: { name: `${prefix}Axis`, value: newAxis.toString() } });
+
+    // Update raw inputs for display
+    setRawInputs(prev => ({
+      ...prev,
+      [`${prefix}Sph`]: newSph,
+      [`${prefix}Cyl`]: newCyl,
+      [`${prefix}Axis`]: newAxis.toString()
+    }));
+  };
+
   const navigateToLensDetail = (lensId) => {
     navigate(`/lens-inventory/${lensId}`);
   };
@@ -163,7 +202,34 @@ const LensPrescription = ({ formData, onChange, matchingLenses = [] }) => {
       {(selectedEye === 'RE' || selectedEye === 'BE') && (
         <div className="space-y-2">
           {selectedEye === 'BE' && (
-            <h4 className="text-sm font-semibold text-sky-800 dark:text-sky-200">Right Eye</h4>
+            <div className="flex justify-between items-center">
+              <h4 className="text-sm font-semibold text-sky-800 dark:text-sky-200">Right Eye</h4>
+              <button
+                type="button"
+                onClick={() => transposeLens('right')}
+                className="px-3 py-1 text-xs font-medium bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-md border border-purple-300 dark:border-purple-700 hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors flex items-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                </svg>
+                Transpose
+              </button>
+            </div>
+          )}
+          {selectedEye === 'RE' && (
+            <div className="flex justify-between items-center">
+              <div className="flex-1"></div>
+              <button
+                type="button"
+                onClick={() => transposeLens('right')}
+                className="px-3 py-1 text-xs font-medium bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-md border border-purple-300 dark:border-purple-700 hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors flex items-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                </svg>
+                Transpose
+              </button>
+            </div>
           )}
           <div className="grid grid-cols-5 gap-2">
             <div>
@@ -238,7 +304,34 @@ const LensPrescription = ({ formData, onChange, matchingLenses = [] }) => {
       {(selectedEye === 'LE' || selectedEye === 'BE') && (
         <div className="space-y-2">
           {selectedEye === 'BE' && (
-            <h4 className="text-sm font-semibold text-sky-800 dark:text-sky-200">Left Eye</h4>
+            <div className="flex justify-between items-center">
+              <h4 className="text-sm font-semibold text-sky-800 dark:text-sky-200">Left Eye</h4>
+              <button
+                type="button"
+                onClick={() => transposeLens('left')}
+                className="px-3 py-1 text-xs font-medium bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-md border border-purple-300 dark:border-purple-700 hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors flex items-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                </svg>
+                Transpose
+              </button>
+            </div>
+          )}
+          {selectedEye === 'LE' && (
+            <div className="flex justify-between items-center">
+              <div className="flex-1"></div>
+              <button
+                type="button"
+                onClick={() => transposeLens('left')}
+                className="px-3 py-1 text-xs font-medium bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-md border border-purple-300 dark:border-purple-700 hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors flex items-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                </svg>
+                Transpose
+              </button>
+            </div>
           )}
           <div className="grid grid-cols-5 gap-2">
             <div>
