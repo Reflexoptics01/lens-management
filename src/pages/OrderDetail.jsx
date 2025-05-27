@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import StickerPrintPage from '../components/StickerPrintPage';
 
 // Helper functions to handle different timestamp formats after restore
 const isFirestoreTimestamp = (value) => {
@@ -16,13 +17,55 @@ const convertToDate = (value) => {
   if (!value) return null;
   
   try {
+    // Handle Firestore Timestamp objects
     if (isFirestoreTimestamp(value)) {
       return value.toDate();
-    } else if (isISODateString(value)) {
+    } 
+    
+    // Handle ISO date strings (from backup/restore)
+    if (isISODateString(value)) {
       return new Date(value);
-    } else if (value instanceof Date) {
+    } 
+    
+    // Handle Date objects
+    if (value instanceof Date) {
       return value;
     }
+    
+    // Handle timestamp objects with seconds/nanoseconds (backup/restore format)
+    if (typeof value === 'object' && value.seconds) {
+      return new Date(value.seconds * 1000 + (value.nanoseconds || 0) / 1000000);
+    }
+    
+    // Handle timestamp objects with _seconds/_nanoseconds (backup/restore format)
+    if (typeof value === 'object' && value._seconds) {
+      return new Date(value._seconds * 1000 + (value._nanoseconds || 0) / 1000000);
+    }
+    
+    // Handle numeric timestamps (milliseconds)
+    if (typeof value === 'number') {
+      return new Date(value);
+    }
+    
+    // Handle string timestamps that might be numbers
+    if (typeof value === 'string' && !isNaN(parseInt(value))) {
+      const num = parseInt(value);
+      // Check if it's seconds (less than year 2100) or milliseconds
+      if (num < 4102444800) { // Year 2100 in seconds
+        return new Date(num * 1000);
+      } else {
+        return new Date(num);
+      }
+    }
+    
+    // Handle regular date strings
+    if (typeof value === 'string') {
+      const parsed = new Date(value);
+      if (!isNaN(parsed.getTime())) {
+        return parsed;
+      }
+    }
+    
     return null;
   } catch (error) {
     console.error('Error converting timestamp:', error, value);
@@ -91,6 +134,12 @@ const OrderDetail = () => {
       
       const rawOrderData = orderDoc.data();
       console.log('Raw order data:', rawOrderData);
+      console.log('Raw createdAt:', rawOrderData.createdAt);
+      console.log('createdAt type:', rawOrderData.createdAt ? typeof rawOrderData.createdAt : 'undefined');
+      
+      // Process the createdAt timestamp using the convertToDate helper
+      const processedCreatedAt = convertToDate(rawOrderData.createdAt) || new Date();
+      console.log('Processed createdAt:', processedCreatedAt);
       
       // Safely process the order data with fallbacks
       const processedOrderData = {
@@ -103,7 +152,7 @@ const OrderDetail = () => {
         status: rawOrderData.status || 'PENDING',
         
         // Handle timestamps safely
-        createdAt: convertToDate(rawOrderData.createdAt) || new Date(),
+        createdAt: processedCreatedAt,
         
         // Prescription data with fallbacks
         rightSph: rawOrderData.rightSph || '0.00',
@@ -619,6 +668,8 @@ const OrderDetail = () => {
                           </span>
                           Send WhatsApp Message
                         </button>
+                        
+                        <StickerPrintPage order={order} />
                         
                         <button
                           onClick={() => navigate(`/orders/edit/${order?.id}`)}
