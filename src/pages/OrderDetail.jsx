@@ -192,15 +192,16 @@ const OrderDetail = () => {
     }
   };
 
-  const sendVendorWhatsAppMessage = () => {
+  // Modify the WhatsApp message function to use the official API
+  const sendWhatsAppMessage = () => {
     if (!order) return;
     
     // Always use the displayId
     const displayOrderId = order.displayId;
     
-    const message = `🔔 *New Order #${displayOrderId}*\n\n` +
-      `👤 *Consumer Details:*\n` +
-      `Name: ${order.consumerName || 'N/A'}\n\n` +
+    const message = `🔔 *Order #${displayOrderId}*\n\n` +
+      `👤 *Customer:* ${order.customerName || 'N/A'}\n` +
+      `👤 *Consumer:* ${order.consumerName || 'N/A'}\n\n` +
       `🕶 *Order Details:*\n` +
       `Brand: ${order.brandName}\n` +
       `Expected Delivery: ${order.expectedDeliveryDate}\n\n` +
@@ -228,49 +229,8 @@ const OrderDetail = () => {
       (order.specialNotes ? `\n📝 *Special Notes:*\n${order.specialNotes}` : '');
     
     const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://web.whatsapp.com/send?text=${encodedMessage}`;
-    window.open(whatsappUrl, '_blank');
-  };
-
-  const sendCustomerWhatsAppMessage = () => {
-    if (!order) return;
-    
-    // Always use the displayId
-    const displayOrderId = order.displayId;
-    
-    const message = `🎉 *Order Confirmation*\n\n` +
-      `Dear ${order.customerName || 'Customer'},\n\n` +
-      `Your order has been successfully placed!\n\n` +
-      `*Order Details:*\n` +
-      `Order Reference: #${displayOrderId}\n` +
-      `Brand: ${order.brandName}\n` +
-      `Expected Delivery: ${order.expectedDeliveryDate}\n\n` +
-      `*Lens Details:*\n` +
-      `${order.material ? `📍 Material: ${order.material}\n` : ''}` +
-      `${order.index ? `📍 Index: ${order.index}\n` : ''}` +
-      `${order.lensType ? `📍 Type: ${order.lensType}\n` : ''}` +
-      `${order.baseTint ? `📍 Base Tint: ${order.baseTint}\n` : ''}` +
-      `${order.coatingType ? `📍 Coating: ${order.coatingType}${order.coatingColour ? ` - ${order.coatingColour}` : ''}\n` : ''}` +
-      `${order.diameter ? `📍 Diameter: ${order.diameter}\n` : ''}` +
-      `\n*Prescription Details:*\n` +
-      `Right Eye:\n` +
-      `• SPH: ${order.rightSph || '0.00'}\n` +
-      `• CYL: ${order.rightCyl || '0.00'}\n` +
-      `• AXIS: ${order.rightAxis || '0'}\n` +
-      `• ADD: ${order.rightAdd || '0.00'}\n` +
-      `• Qty: ${order.rightQty || '1'} pieces\n\n` +
-      `Left Eye:\n` +
-      `• SPH: ${order.leftSph || '0.00'}\n` +
-      `• CYL: ${order.leftCyl || '0.00'}\n` +
-      `• AXIS: ${order.leftAxis || '0'}\n` +
-      `• ADD: ${order.leftAdd || '0.00'}\n` +
-      `• Qty: ${order.leftQty || '1'} pieces\n\n` +
-      `💰 Amount: ₹${order.price}\n` +
-      (order.specialNotes ? `\n📝 *Special Notes:*\n${order.specialNotes}\n\n` : '\n\n') +
-      `Thank you for choosing our services! We'll keep you updated on your order status.`;
-    
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://web.whatsapp.com/send?text=${encodedMessage}`;
+    // Use the official WhatsApp API endpoint
+    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodedMessage}`;
     window.open(whatsappUrl, '_blank');
   };
 
@@ -648,31 +608,17 @@ const OrderDetail = () => {
                     </div>
                     <div className="p-6 bg-gradient-to-br from-white via-white to-blue-50 dark:from-gray-800 dark:via-gray-800 dark:to-blue-900/20">
                       <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-3">
-                          <button
-                            onClick={sendCustomerWhatsAppMessage} 
-                            className="flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-blue-500 transition-all transform hover:scale-[1.02] duration-300"
-                          >
-                            <span className="mr-2">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
-                                <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592z"/>
-                              </svg>
-                            </span>
-                            Customer Message
-                          </button>
-                          
-                          <button
-                            onClick={sendVendorWhatsAppMessage} 
-                            className="flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-green-500 transition-all transform hover:scale-[1.02] duration-300"
-                          >
-                            <span className="mr-2">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
-                                <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592z"/>
-                              </svg>
-                            </span>
-                            Vendor Message
-                          </button>
-                        </div>
+                        <button
+                          onClick={sendWhatsAppMessage} 
+                          className="w-full flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-green-500 transition-all transform hover:scale-[1.02] duration-300"
+                        >
+                          <span className="mr-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                              <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592z"/>
+                            </svg>
+                          </span>
+                          Send WhatsApp Message
+                        </button>
                         
                         <button
                           onClick={() => navigate(`/orders/edit/${order?.id}`)}
