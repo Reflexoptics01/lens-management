@@ -56,12 +56,9 @@ const OrderDetail = () => {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
-  const [vendorPhone, setVendorPhone] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
   const [statusUpdateMessage, setStatusUpdateMessage] = useState('');
   const [progressStep, setProgressStep] = useState(0);
 
@@ -195,75 +192,85 @@ const OrderDetail = () => {
     }
   };
 
-  const sendWhatsAppMessage = (type, phone) => {
-    if (!order || !phone) return;
-    const cleanPhone = phone.replace(/[^0-9+]/g, '');
+  const sendVendorWhatsAppMessage = () => {
+    if (!order) return;
     
     // Always use the displayId
     const displayOrderId = order.displayId;
     
-    const message = type === 'vendor' 
-      ? `🔔 *New Order #${displayOrderId}*\n\n` +
-        `👤 *Consumer Details:*\n` +
-        `Name: ${order.consumerName || 'N/A'}\n\n` +
-        `🕶 *Order Details:*\n` +
-        `Brand: ${order.brandName}\n` +
-        `Expected Delivery: ${order.expectedDeliveryDate}\n\n` +
-        `*Lens Details:*\n` +
-        `📍 Material: ${order.material}\n` +
-        `📍 Index: ${order.index}\n` +
-        `📍 Type: ${order.lensType}\n` +
-        `📍 Base Tint: ${order.baseTint}\n` +
-        `📍 Coating: ${order.coatingType}${order.coatingColour ? ` - ${order.coatingColour}` : ''}\n` +
-        `📍 Diameter: ${order.diameter}\n\n` +
-        `*Prescription Details:*\n` +
-        `Right Eye:\n` +
-        `• SPH: ${order.rightSph || '0.00'}\n` +
-        `• CYL: ${order.rightCyl || '0.00'}\n` +
-        `• AXIS: ${order.rightAxis || '0'}\n` +
-        `• ADD: ${order.rightAdd || '0.00'}\n` +
-        `• Qty: ${order.rightQty || '1'} pieces\n\n` +
-        `Left Eye:\n` +
-        `• SPH: ${order.leftSph || '0.00'}\n` +
-        `• CYL: ${order.leftCyl || '0.00'}\n` +
-        `• AXIS: ${order.leftAxis || '0'}\n` +
-        `• ADD: ${order.leftAdd || '0.00'}\n` +
-        `• Qty: ${order.leftQty || '1'} pieces\n\n` +
-        `💰 Price: ₹${order.price}\n` +
-        (order.specialNotes ? `\n📝 *Special Notes:*\n${order.specialNotes}` : '')
-      : `🎉 *Order Confirmation*\n\n` +
-        `Dear ${order.customerName || 'Customer'},\n\n` +
-        `Your order has been successfully placed!\n\n` +
-        `*Order Details:*\n` +
-        `Order Reference: #${displayOrderId}\n` +
-        `Brand: ${order.brandName}\n` +
-        `Expected Delivery: ${order.expectedDeliveryDate}\n\n` +
-        `*Lens Details:*\n` +
-        `${order.material ? `📍 Material: ${order.material}\n` : ''}` +
-        `${order.index ? `📍 Index: ${order.index}\n` : ''}` +
-        `${order.lensType ? `📍 Type: ${order.lensType}\n` : ''}` +
-        `${order.baseTint ? `📍 Base Tint: ${order.baseTint}\n` : ''}` +
-        `${order.coatingType ? `📍 Coating: ${order.coatingType}${order.coatingColour ? ` - ${order.coatingColour}` : ''}\n` : ''}` +
-        `${order.diameter ? `📍 Diameter: ${order.diameter}\n` : ''}` +
-        `\n*Prescription Details:*\n` +
-        `Right Eye:\n` +
-        `• SPH: ${order.rightSph || '0.00'}\n` +
-        `• CYL: ${order.rightCyl || '0.00'}\n` +
-        `• AXIS: ${order.rightAxis || '0'}\n` +
-        `• ADD: ${order.rightAdd || '0.00'}\n` +
-        `• Qty: ${order.rightQty || '1'} pieces\n\n` +
-        `Left Eye:\n` +
-        `• SPH: ${order.leftSph || '0.00'}\n` +
-        `• CYL: ${order.leftCyl || '0.00'}\n` +
-        `• AXIS: ${order.leftAxis || '0'}\n` +
-        `• ADD: ${order.leftAdd || '0.00'}\n` +
-        `• Qty: ${order.leftQty || '1'} pieces\n\n` +
-        `💰 Amount: ₹${order.price}\n` +
-        (order.specialNotes ? `\n📝 *Special Notes:*\n${order.specialNotes}\n\n` : '\n\n') +
-        `Thank you for choosing our services! We'll keep you updated on your order status.`;
+    const message = `🔔 *New Order #${displayOrderId}*\n\n` +
+      `👤 *Consumer Details:*\n` +
+      `Name: ${order.consumerName || 'N/A'}\n\n` +
+      `🕶 *Order Details:*\n` +
+      `Brand: ${order.brandName}\n` +
+      `Expected Delivery: ${order.expectedDeliveryDate}\n\n` +
+      `*Lens Details:*\n` +
+      `📍 Material: ${order.material}\n` +
+      `📍 Index: ${order.index}\n` +
+      `📍 Type: ${order.lensType}\n` +
+      `📍 Base Tint: ${order.baseTint}\n` +
+      `📍 Coating: ${order.coatingType}${order.coatingColour ? ` - ${order.coatingColour}` : ''}\n` +
+      `📍 Diameter: ${order.diameter}\n\n` +
+      `*Prescription Details:*\n` +
+      `Right Eye:\n` +
+      `• SPH: ${order.rightSph || '0.00'}\n` +
+      `• CYL: ${order.rightCyl || '0.00'}\n` +
+      `• AXIS: ${order.rightAxis || '0'}\n` +
+      `• ADD: ${order.rightAdd || '0.00'}\n` +
+      `• Qty: ${order.rightQty || '1'} pieces\n\n` +
+      `Left Eye:\n` +
+      `• SPH: ${order.leftSph || '0.00'}\n` +
+      `• CYL: ${order.leftCyl || '0.00'}\n` +
+      `• AXIS: ${order.leftAxis || '0'}\n` +
+      `• ADD: ${order.leftAdd || '0.00'}\n` +
+      `• Qty: ${order.leftQty || '1'} pieces\n\n` +
+      `💰 Price: ₹${order.price}\n` +
+      (order.specialNotes ? `\n📝 *Special Notes:*\n${order.specialNotes}` : '');
     
     const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
+    const whatsappUrl = `https://web.whatsapp.com/send?text=${encodedMessage}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
+  const sendCustomerWhatsAppMessage = () => {
+    if (!order) return;
+    
+    // Always use the displayId
+    const displayOrderId = order.displayId;
+    
+    const message = `🎉 *Order Confirmation*\n\n` +
+      `Dear ${order.customerName || 'Customer'},\n\n` +
+      `Your order has been successfully placed!\n\n` +
+      `*Order Details:*\n` +
+      `Order Reference: #${displayOrderId}\n` +
+      `Brand: ${order.brandName}\n` +
+      `Expected Delivery: ${order.expectedDeliveryDate}\n\n` +
+      `*Lens Details:*\n` +
+      `${order.material ? `📍 Material: ${order.material}\n` : ''}` +
+      `${order.index ? `📍 Index: ${order.index}\n` : ''}` +
+      `${order.lensType ? `📍 Type: ${order.lensType}\n` : ''}` +
+      `${order.baseTint ? `📍 Base Tint: ${order.baseTint}\n` : ''}` +
+      `${order.coatingType ? `📍 Coating: ${order.coatingType}${order.coatingColour ? ` - ${order.coatingColour}` : ''}\n` : ''}` +
+      `${order.diameter ? `📍 Diameter: ${order.diameter}\n` : ''}` +
+      `\n*Prescription Details:*\n` +
+      `Right Eye:\n` +
+      `• SPH: ${order.rightSph || '0.00'}\n` +
+      `• CYL: ${order.rightCyl || '0.00'}\n` +
+      `• AXIS: ${order.rightAxis || '0'}\n` +
+      `• ADD: ${order.rightAdd || '0.00'}\n` +
+      `• Qty: ${order.rightQty || '1'} pieces\n\n` +
+      `Left Eye:\n` +
+      `• SPH: ${order.leftSph || '0.00'}\n` +
+      `• CYL: ${order.leftCyl || '0.00'}\n` +
+      `• AXIS: ${order.leftAxis || '0'}\n` +
+      `• ADD: ${order.leftAdd || '0.00'}\n` +
+      `• Qty: ${order.leftQty || '1'} pieces\n\n` +
+      `💰 Amount: ₹${order.price}\n` +
+      (order.specialNotes ? `\n📝 *Special Notes:*\n${order.specialNotes}\n\n` : '\n\n') +
+      `Thank you for choosing our services! We'll keep you updated on your order status.`;
+    
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://web.whatsapp.com/send?text=${encodedMessage}`;
     window.open(whatsappUrl, '_blank');
   };
 
@@ -641,17 +648,31 @@ const OrderDetail = () => {
                     </div>
                     <div className="p-6 bg-gradient-to-br from-white via-white to-blue-50 dark:from-gray-800 dark:via-gray-800 dark:to-blue-900/20">
                       <div className="space-y-4">
-                        <button
-                          onClick={() => setShowWhatsAppModal(true)} 
-                          className="w-full flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-green-500 transition-all transform hover:scale-[1.02] duration-300"
-                        >
-                          <span className="mr-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
-                              <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592z"/>
-                            </svg>
-                          </span>
-                          Send WhatsApp Messages
-                        </button>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            onClick={sendCustomerWhatsAppMessage} 
+                            className="flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-blue-500 transition-all transform hover:scale-[1.02] duration-300"
+                          >
+                            <span className="mr-2">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592z"/>
+                              </svg>
+                            </span>
+                            Customer Message
+                          </button>
+                          
+                          <button
+                            onClick={sendVendorWhatsAppMessage} 
+                            className="flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-green-500 transition-all transform hover:scale-[1.02] duration-300"
+                          >
+                            <span className="mr-2">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592z"/>
+                              </svg>
+                            </span>
+                            Vendor Message
+                          </button>
+                        </div>
                         
                         <button
                           onClick={() => navigate(`/orders/edit/${order?.id}`)}
@@ -685,113 +706,6 @@ const OrderDetail = () => {
             </div>
           </main>
 
-          {/* WhatsApp Modal */}
-          {showWhatsAppModal && (
-            <div className="fixed inset-0 bg-gray-800 dark:bg-gray-900 bg-opacity-75 dark:bg-opacity-85 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity duration-300 ease-in-out opacity-100">
-              <div className="bg-gradient-to-br from-white to-green-50 dark:from-gray-800 dark:to-green-900/30 rounded-xl shadow-xl w-full max-w-md transform transition-all duration-300 ease-in-out scale-100 p-6 border-t-4 border-green-500">
-                <div className="flex justify-between items-center mb-5">
-                  <div className="flex items-center">
-                    <div className="bg-gradient-to-r from-green-500 to-green-600 p-2 rounded-lg mr-3 shadow-sm">
-                      <svg className="w-5 h-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592z"/>
-                      </svg>
-                    </div>
-                    <h3 className="text-lg font-bold bg-gradient-to-r from-green-700 to-teal-700 dark:from-green-300 dark:to-teal-300 bg-clip-text text-transparent">Send Order Details</h3>
-                  </div>
-                  <button onClick={() => { setShowWhatsAppModal(false); setVendorPhone(''); }} className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                  </button>
-                </div>
-                
-                <div className="space-y-5">
-                  {/* Customer Phone Input */}
-                  <div className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow-sm border border-green-100 dark:border-green-800">
-                    <label htmlFor="customerPhone" className="block text-sm font-medium text-green-700 dark:text-green-300 mb-2 flex items-center">
-                      <svg className="w-4 h-4 mr-1 text-green-600 dark:text-green-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                      Customer's Phone Number
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <span className="text-gray-500 dark:text-gray-400 sm:text-sm">+</span>
-                      </div>
-                      <input
-                        id="customerPhone"
-                        type="tel"
-                        value={customerPhone}
-                        onChange={(e) => setCustomerPhone(e.target.value)}
-                        placeholder="Country code and number (e.g., 911234567890)"
-                        className="w-full rounded-lg border-green-200 dark:border-green-600 bg-white dark:bg-gray-600 text-gray-900 dark:text-white pl-7 px-3 py-2.5 shadow-sm focus:border-green-500 dark:focus:border-green-400 focus:ring-1 focus:ring-green-500 dark:focus:ring-green-400 text-sm"
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Vendor Phone Input */}
-                  <div className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow-sm border border-green-100 dark:border-green-800">
-                    <label htmlFor="vendorPhone" className="block text-sm font-medium text-green-700 dark:text-green-300 mb-2 flex items-center">
-                      <svg className="w-4 h-4 mr-1 text-green-600 dark:text-green-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                      </svg>
-                      Vendor's Phone Number
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <span className="text-gray-500 dark:text-gray-400 sm:text-sm">+</span>
-                      </div>
-                      <input
-                        id="vendorPhone"
-                        type="tel"
-                        value={vendorPhone}
-                        onChange={(e) => setVendorPhone(e.target.value)}
-                        placeholder="Country code and number (e.g., 911234567890)"
-                        className="w-full rounded-lg border-green-200 dark:border-green-600 bg-white dark:bg-gray-600 text-gray-900 dark:text-white pl-7 px-3 py-2.5 shadow-sm focus:border-green-500 dark:focus:border-green-400 focus:ring-1 focus:ring-green-500 dark:focus:ring-green-400 text-sm"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 flex flex-col sm:flex-row sm:justify-end sm:space-x-3 space-y-3 sm:space-y-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowWhatsAppModal(false);
-                      setVendorPhone('');
-                      setCustomerPhone('');
-                    }}
-                    className="w-full sm:w-auto px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-gray-400 shadow-sm transition-all"
-                  >
-                    Cancel
-                  </button>
-                  {customerPhone && (
-                    <button
-                      type="button"
-                      onClick={() => sendWhatsAppMessage('customer', customerPhone)}
-                      className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-blue-500 transition-all transform hover:scale-[1.02] duration-300"
-                    >
-                      <svg className="w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                      </svg>
-                      Send to Customer
-                    </button>
-                  )}
-                  {vendorPhone && (
-                    <button
-                      type="button"
-                      onClick={() => sendWhatsAppMessage('vendor', vendorPhone)}
-                      className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-green-500 transition-all transform hover:scale-[1.02] duration-300"
-                    >
-                      <svg className="w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                      </svg>
-                      Send to Vendor
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Status Update Modal */}
           {showStatusModal && (
             <div className="fixed inset-0 bg-gray-800 dark:bg-gray-900 bg-opacity-75 dark:bg-opacity-85 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity duration-300 ease-in-out opacity-100">
@@ -814,7 +728,7 @@ const OrderDetail = () => {
                   <div className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow-sm border border-indigo-100 dark:border-indigo-800">
                     <label htmlFor="status" className="block text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-2 flex items-center">
                       <svg className="w-4 h-4 mr-1 text-indigo-600 dark:text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                       Order Status
                     </label>
