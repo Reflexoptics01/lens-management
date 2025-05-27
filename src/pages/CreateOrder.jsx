@@ -737,7 +737,7 @@ const CreateOrder = () => {
       </main>
 
       {/* Floating Submit Button - Mobile Only */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-br from-blue-600 to-indigo-600 border-t border-blue-700 shadow-xl z-30 mb-[65px] sm:hidden">
+      <div className="fixed bottom-0 left-0 right-0 p-3 bg-gradient-to-br from-blue-600 to-indigo-600 border-t border-blue-700 shadow-xl z-30 mb-[65px] sm:hidden">
         <div className="relative max-w-5xl mx-auto">
           {/* Animated background element */}
           <div className="absolute inset-0 overflow-hidden rounded-lg">
@@ -748,15 +748,15 @@ const CreateOrder = () => {
             type="button"
             onClick={handleSubmit}
             disabled={loading}
-            className="relative w-full px-4 py-3.5 bg-white text-blue-700 rounded-lg shadow-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all transform hover:scale-[1.02] duration-300 flex items-center justify-center font-medium"
+            className="relative w-full px-4 py-2 bg-white text-blue-700 rounded-lg shadow-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all transform hover:scale-[1.02] duration-300 flex items-center justify-center font-medium"
           >
             {loading ? (
-              <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-blue-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             ) : (
-              <DocumentPlusIcon className="w-5 h-5 mr-2" />
+              <DocumentPlusIcon className="w-4 h-4 mr-2" />
             )}
             {loading ? 'Creating Order...' : 'Submit Order'}
           </button>
