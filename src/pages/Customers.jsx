@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { db, auth } from '../firebaseConfig';
-import { collection, deleteDoc, doc, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, deleteDoc, doc, onSnapshot, query, where, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
+import { getUserCollection, getUserDoc, getUserSettings } from '../utils/multiTenancy';
 import Navbar from '../components/Navbar';
 import CustomerForm from '../components/CustomerForm';
 import CustomerCard from '../components/CustomerCard';
@@ -25,6 +26,11 @@ const Customers = () => {
   const [isAddingVendor, setIsAddingVendor] = useState(false);
   const [componentError, setComponentError] = useState(null); // For overall component errors
   const navigate = useNavigate();
+
+  // States for address modal
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [shopInfo, setShopInfo] = useState(null);
 
   // Global error handler to prevent white screen
   useEffect(() => {
@@ -70,18 +76,20 @@ const Customers = () => {
 
         console.log("Setting up listeners for customers and vendors");
         // Set up real-time listener for customers collection
-        const customersRef = collection(db, 'customers');
+        const customersRef = getUserCollection('customers');
         const customersQuery = query(customersRef, where('type', '!=', 'vendor'));
         
         unsubscribeCustomers = onSnapshot(customersQuery, (snapshot) => {
           console.log(`Received ${snapshot.docs.length} customer(s) from Firestore`);
-          const customersList = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              ...data
-            };
-          });
+          const customersList = snapshot.docs
+            .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+            .map(doc => {
+              const data = doc.data();
+              return {
+                id: doc.id,
+                ...data
+              };
+            });
           setCustomers(customersList);
           setError('');
           setLoading(false);
@@ -96,17 +104,22 @@ const Customers = () => {
         
         unsubscribeVendors = onSnapshot(vendorsQuery, (snapshot) => {
           console.log(`Received ${snapshot.docs.length} vendor(s) from Firestore`);
-          const vendorsList = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              ...data
-            };
-          });
+          const vendorsList = snapshot.docs
+            .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+            .map(doc => {
+              const data = doc.data();
+              return {
+                id: doc.id,
+                ...data
+              };
+            });
           setVendors(vendorsList);
         }, (err) => {
           console.error('Error fetching vendors:', err);
         });
+
+        // Fetch shop information for address printing
+        fetchShopInfo();
 
       } catch (error) {
         console.error('Error initializing contacts:', error);
@@ -124,6 +137,44 @@ const Customers = () => {
     };
   }, [navigate]);
 
+  // Fetch shop information for address modal
+  const fetchShopInfo = async () => {
+    try {
+      console.log('Fetching shop info...');
+      const shopSettingsDoc = await getDoc(getUserSettings());
+      if (shopSettingsDoc.exists()) {
+        const shopData = shopSettingsDoc.data();
+        console.log('Shop info fetched successfully:', shopData);
+        setShopInfo(shopData);
+      } else {
+        console.warn('Shop settings document does not exist');
+        setShopInfo({}); // Set empty object to prevent infinite loading
+      }
+    } catch (error) {
+      console.error('Error fetching shop info:', error);
+      setShopInfo({}); // Set empty object to prevent infinite loading
+    }
+  };
+
+  // Handle printing address
+  const handlePrintAddress = (customer) => {
+    console.log('Print address clicked for customer:', customer);
+    
+    if (!customer) {
+      console.error('No customer provided for address printing');
+      return;
+    }
+    
+    setSelectedCustomer(customer);
+    setShowAddressModal(true);
+    
+    // Ensure shop info is fetched if not available
+    if (!shopInfo) {
+      console.log('Shop information not available, fetching...');
+      fetchShopInfo();
+    }
+  };
+
   const handleDelete = async (itemId) => {
     const itemType = activeTab === 'customers' ? 'customer' : 'vendor';
     
@@ -132,7 +183,7 @@ const Customers = () => {
     }
 
     try {
-      await deleteDoc(doc(db, 'customers', itemId));
+      await deleteDoc(getUserDoc('customers', itemId));
       console.log(`${itemType} deleted successfully`);
       // No need to update state as the onSnapshot listener will handle it
     } catch (error) {
@@ -247,6 +298,197 @@ const Customers = () => {
     searchTerm: searchTerm || 'none',
     filteredItemsCount: filteredItems.length
   });
+
+  // Function to print the address content
+  const printAddressContent = () => {
+    const content = document.getElementById('address-content');
+    if (!content) {
+      console.error('Address content element not found');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      console.error('Failed to open print window');
+      return;
+    }
+
+    const htmlContent = `
+      <html>
+        <head>
+          <title>Print Address</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 0;
+              padding: 20px;
+            }
+            .address-wrapper {
+              display: flex;
+              flex-direction: column;
+              gap: 30px;
+              max-width: 400px;
+              margin: 0 auto;
+            }
+            .address-block {
+              border: 1px solid #000;
+              padding: 15px;
+              margin-bottom: 20px;
+            }
+            .address-label {
+              font-weight: bold;
+              font-size: 14px;
+              margin-bottom: 5px;
+              text-transform: uppercase;
+            }
+            .address-text {
+              font-size: 16px;
+              line-height: 1.4;
+            }
+            h2 {
+              margin-top: 0;
+              margin-bottom: 10px;
+              font-size: 18px;
+              text-align: center;
+            }
+            .divider {
+              border-bottom: 1px dashed #000;
+              margin: 15px 0;
+            }
+            @media print {
+              body {
+                padding: 0;
+              }
+              .no-print {
+                display: none;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          ${content.innerHTML}
+          <div class="no-print" style="margin-top: 20px; text-align: center;">
+            <button onclick="window.print();" style="padding: 10px 20px; background: #4a90e2; color: white; border: none; border-radius: 4px; cursor: pointer;">
+              Print
+            </button>
+            <button onclick="window.close();" style="padding: 10px 20px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">
+              Close
+            </button>
+          </div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    
+    // Auto-print after a delay to ensure content is loaded
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+    }, 500);
+  };
+
+  // Address Modal Component
+  const AddressModal = () => {
+    if (!selectedCustomer) {
+      console.error('No selected customer for address modal');
+      return null;
+    }
+    
+    // If shop info is not available, show a loading state or fetch it
+    if (!shopInfo) {
+      console.log('Shop info not available, fetching...');
+      fetchShopInfo();
+      return (
+        <div className="fixed inset-0 overflow-y-auto z-50">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="text-center">
+                  <p>Loading shop information...</p>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={() => setShowAddressModal(false)}
+                  className="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:w-auto sm:text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="fixed inset-0 overflow-y-auto z-50">
+        <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+          <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+          </div>
+
+          <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+          <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div id="address-content" className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+              <div className="address-wrapper">
+                <div className="address-block">
+                  <h2>FROM</h2>
+                  <div className="divider"></div>
+                  <div className="address-label">Sender:</div>
+                  <div className="address-text">
+                    <strong>{shopInfo.shopName || 'Your Shop Name'}</strong><br />
+                    {shopInfo.address || ''}<br />
+                    {shopInfo.city && shopInfo.state ? `${shopInfo.city}, ${shopInfo.state}` : shopInfo.city || shopInfo.state || ''} 
+                    {shopInfo.pincode ? ` - ${shopInfo.pincode}` : ''}<br />
+                    {shopInfo.phone && `Phone: ${shopInfo.phone}`}<br />
+                    {shopInfo.email && `Email: ${shopInfo.email}`}<br />
+                    {shopInfo.gstNumber && `GSTIN: ${shopInfo.gstNumber}`}
+                  </div>
+                </div>
+
+                <div className="address-block">
+                  <h2>TO</h2>
+                  <div className="divider"></div>
+                  <div className="address-label">Recipient:</div>
+                  <div className="address-text">
+                    <strong>{selectedCustomer.opticalName || selectedCustomer.name || 'Customer Name'}</strong><br />
+                    {selectedCustomer.address || ''}<br />
+                    {selectedCustomer.city && selectedCustomer.state ? `${selectedCustomer.city}, ${selectedCustomer.state}` : selectedCustomer.city || selectedCustomer.state || ''}<br />
+                    {selectedCustomer.phone && `Phone: ${selectedCustomer.phone}`}<br />
+                    {selectedCustomer.gstNumber && `GSTIN: ${selectedCustomer.gstNumber}`}<br />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              <button
+                type="button"
+                onClick={printAddressContent}
+                className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
+              >
+                Print
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAddressModal(false)}
+                className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -543,6 +785,12 @@ const Customers = () => {
                               Edit
                             </button>
                             <button
+                              onClick={() => handlePrintAddress(item)}
+                              className="text-purple-600 hover:text-purple-900 mr-4"
+                            >
+                              Print Address
+                            </button>
+                            <button
                               onClick={() => handleDelete(item.id)}
                               className="text-red-600 hover:text-red-900"
                             >
@@ -565,6 +813,7 @@ const Customers = () => {
                   customer={item}
                   onEdit={() => handleEdit(item)}
                   onDelete={() => handleDelete(item.id)}
+                  onPrintAddress={() => handlePrintAddress(item)}
                   formatCurrency={formatCurrency}
                   isVendor={activeTab === 'vendors'}
                 />
@@ -581,6 +830,11 @@ const Customers = () => {
           customer={editingCustomer} 
           isVendor={isAddingVendor} 
         />
+      )}
+
+      {/* Address Modal */}
+      {showAddressModal && (
+        <AddressModal />
       )}
     </div>
   );

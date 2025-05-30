@@ -12,7 +12,7 @@ import {
   UserIcon
 } from '@heroicons/react/24/outline';
 
-const CustomerCard = ({ customer, onEdit, onDelete, formatCurrency, isVendor = false }) => {
+const CustomerCard = ({ customer, onEdit, onDelete, formatCurrency, isVendor = false, onPrintAddress }) => {
   const {
     opticalName,
     contactPerson,
@@ -57,6 +57,18 @@ const CustomerCard = ({ customer, onEdit, onDelete, formatCurrency, isVendor = f
               aria-label={`Edit ${isVendor ? 'vendor' : 'customer'}`}
             >
               <PencilIcon className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => {
+                console.log('CustomerCard print address clicked for:', customer);
+                onPrintAddress && onPrintAddress(customer);
+              }}
+              className="p-2 text-gray-400 hover:text-purple-600 dark:text-gray-500 dark:hover:text-purple-400 rounded-full hover:bg-purple-50 dark:hover:bg-purple-900/50 transition-colors"
+              aria-label="Print address"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
             </button>
             <button
               onClick={() => onDelete()}
