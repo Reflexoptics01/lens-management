@@ -35,22 +35,27 @@ const Register = () => {
     password: '',
     confirmPassword: '',
     
-    // Company details
-    companyName: '',
+    // Shop/Company details (mandatory)
+    shopName: '',
     address: '',
-    contactNumber: '',
+    city: '',
     state: '',
-    stateCode: '',
-    gstin: '',
+    pincode: '',
+    contactNumber: '',
+    shopEmail: '', // Shop email (can be same as account email)
+    
+    // Business details (optional)
+    gstNumber: '',
     panNumber: '',
     
     // Bank details (optional)
     bankName: '',
-    bankBranch: '',
-    bankAccountNumber: '',
+    accountNumber: '',
     ifscCode: '',
+    accountHolderName: '',
+    upiId: '',
     
-    // Additional details
+    // Additional settings
     financialYear: '2024-2025',
     dateFormat: 'DD/MM/YYYY',
     timeFormat: '12-hour',
@@ -156,21 +161,22 @@ const Register = () => {
       }
     } else if (stepNumber === 2) {
       // Validate company details
-      if (!formData.companyName) newErrors.companyName = 'Company name is required';
+      if (!formData.shopName) newErrors.shopName = 'Shop/Company name is required';
       if (!formData.address) newErrors.address = 'Address is required';
+      if (!formData.city) newErrors.city = 'City is required';
+      if (!formData.state) newErrors.state = 'State is required';
+      if (!formData.pincode) newErrors.pincode = 'Pincode is required';
+      else if (!/^[0-9]{6}$/.test(formData.pincode)) {
+        newErrors.pincode = 'Pincode must be 6 digits';
+      }
       if (!formData.contactNumber) newErrors.contactNumber = 'Contact number is required';
       else if (!/^[+]?[\d\s\-\(\)]{10,}$/.test(formData.contactNumber)) {
         newErrors.contactNumber = 'Invalid contact number format';
       }
-      if (!formData.state) newErrors.state = 'State is required';
-      if (!formData.stateCode) newErrors.stateCode = 'State code is required';
-      else if (!/^[0-9]{2}$/.test(formData.stateCode)) {
-        newErrors.stateCode = 'State code must be 2 digits';
-      }
       
       // GSTIN validation (optional but if provided, must be valid)
-      if (formData.gstin && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(formData.gstin)) {
-        newErrors.gstin = 'Invalid GSTIN format (e.g., 22AAAAA0000A1Z5)';
+      if (formData.gstNumber && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(formData.gstNumber)) {
+        newErrors.gstNumber = 'Invalid GSTIN format (e.g., 22AAAAA0000A1Z5)';
       }
       
       // PAN validation (optional but if provided, must be valid)
@@ -193,7 +199,7 @@ const Register = () => {
     let processedValue = value;
     
     // Auto-format certain fields
-    if (name === 'gstin') {
+    if (name === 'gstNumber') {
       processedValue = value.toUpperCase();
     } else if (name === 'panNumber') {
       processedValue = value.toUpperCase();
@@ -201,9 +207,11 @@ const Register = () => {
       processedValue = value.toUpperCase();
     } else if (name === 'email') {
       processedValue = value.toLowerCase();
-    } else if (name === 'stateCode') {
+    } else if (name === 'shopEmail') {
+      processedValue = value.toLowerCase();
+    } else if (name === 'pincode') {
       // Only allow numbers
-      processedValue = value.replace(/\D/g, '').slice(0, 2);
+      processedValue = value.replace(/\D/g, '').slice(0, 6);
     }
     
     setFormData(prev => ({
@@ -352,17 +360,20 @@ const Register = () => {
         uid: user.uid,
         email: formData.email,
         companyDetails: {
-          companyName: formData.companyName,
+          companyName: formData.shopName,
           address: formData.address,
-          contactNumber: formData.contactNumber,
+          city: formData.city,
           state: formData.state,
-          stateCode: formData.stateCode,
-          gstin: formData.gstin || '',
+          pincode: formData.pincode,
+          contactNumber: formData.contactNumber,
+          shopEmail: formData.shopEmail || '',
+          gstNumber: formData.gstNumber || '',
           panNumber: formData.panNumber || '',
           bankName: formData.bankName || '',
-          bankBranch: formData.bankBranch || '',
-          bankAccountNumber: formData.bankAccountNumber || '',
+          accountNumber: formData.accountNumber || '',
           ifscCode: formData.ifscCode || '',
+          accountHolderName: formData.accountHolderName || '',
+          upiId: formData.upiId || '',
         },
         settings: {
           financialYear: formData.financialYear,
@@ -578,8 +589,8 @@ const Register = () => {
                   </label>
                   <input
                     type="text"
-                    name="companyName"
-                    value={formData.companyName}
+                    name="shopName"
+                    value={formData.shopName}
                     onChange={handleInputChange}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -588,11 +599,11 @@ const Register = () => {
                       }
                     }}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${
-                      errors.companyName ? 'border-red-500' : 'border-gray-300'
+                      errors.shopName ? 'border-red-500' : 'border-gray-300'
                     }`}
                     placeholder="Enter your optical shop name"
                   />
-                  {errors.companyName && <p className="text-red-500 text-xs mt-1">{errors.companyName}</p>}
+                  {errors.shopName && <p className="text-red-500 text-xs mt-1">{errors.shopName}</p>}
                 </div>
                 
                 <div>
@@ -616,30 +627,6 @@ const Register = () => {
                     placeholder="Phone number"
                   />
                   {errors.contactNumber && <p className="text-red-500 text-xs mt-1">{errors.contactNumber}</p>}
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    State Code <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="stateCode"
-                    value={formData.stateCode}
-                    onChange={handleInputChange}
-                    maxLength={2}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleNext();
-                      }
-                    }}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${
-                      errors.stateCode ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="State code (e.g., 29)"
-                  />
-                  {errors.stateCode && <p className="text-red-500 text-xs mt-1">{errors.stateCode}</p>}
                 </div>
               </div>
               
@@ -692,12 +679,12 @@ const Register = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    GSTIN (Optional)
+                    City <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
-                    name="gstin"
-                    value={formData.gstin}
+                    name="city"
+                    value={formData.city}
                     onChange={handleInputChange}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -706,11 +693,80 @@ const Register = () => {
                       }
                     }}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${
-                      errors.gstin ? 'border-red-500' : 'border-gray-300'
+                      errors.city ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="City name"
+                  />
+                  {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Pincode <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="pincode"
+                    value={formData.pincode}
+                    onChange={handleInputChange}
+                    maxLength={6}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleNext();
+                      }
+                    }}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${
+                      errors.pincode ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="6-digit pincode"
+                  />
+                  {errors.pincode && <p className="text-red-500 text-xs mt-1">{errors.pincode}</p>}
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Shop Email (Optional)
+                </label>
+                <input
+                  type="email"
+                  name="shopEmail"
+                  value={formData.shopEmail}
+                  onChange={handleInputChange}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleNext();
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  placeholder="Shop email (can be different from login email)"
+                />
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    GSTIN (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    name="gstNumber"
+                    value={formData.gstNumber}
+                    onChange={handleInputChange}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleNext();
+                      }
+                    }}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${
+                      errors.gstNumber ? 'border-red-500' : 'border-gray-300'
                     }`}
                     placeholder="15 character GSTIN"
                   />
-                  {errors.gstin && <p className="text-red-500 text-xs mt-1">{errors.gstin}</p>}
+                  {errors.gstNumber && <p className="text-red-500 text-xs mt-1">{errors.gstNumber}</p>}
                 </div>
                 
                 <div>
@@ -761,23 +817,11 @@ const Register = () => {
                   </div>
                   
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1">Branch</label>
-                    <input
-                      type="text"
-                      name="bankBranch"
-                      value={formData.bankBranch}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                      placeholder="Branch name"
-                    />
-                  </div>
-                  
-                  <div>
                     <label className="block text-xs text-gray-600 mb-1">Account Number</label>
                     <input
                       type="text"
-                      name="bankAccountNumber"
-                      value={formData.bankAccountNumber}
+                      name="accountNumber"
+                      value={formData.accountNumber}
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                       placeholder="Account number"
@@ -796,6 +840,30 @@ const Register = () => {
                     />
                     {errors.ifscCode && <p className="text-red-500 text-xs mt-1">{errors.ifscCode}</p>}
                   </div>
+                  
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Account Holder Name</label>
+                    <input
+                      type="text"
+                      name="accountHolderName"
+                      value={formData.accountHolderName}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      placeholder="Account holder name"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">UPI ID (Optional)</label>
+                  <input
+                    type="text"
+                    name="upiId"
+                    value={formData.upiId}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    placeholder="user@paytm"
+                  />
                 </div>
               </div>
               

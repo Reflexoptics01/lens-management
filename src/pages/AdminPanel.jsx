@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebaseConfig';
-import { collection, query, where, getDocs, doc, updateDoc, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, addDoc, deleteDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged, deleteUser } from 'firebase/auth';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
@@ -97,12 +97,19 @@ const AdminPanel = () => {
       
       // Add users from users collection that aren't in registrations
       approvedUsersData.forEach(approvedUser => {
+        // Skip the main admin user - don't show them in the user list
+        if (approvedUser.email === 'reflexopticsolutions@gmail.com') {
+          console.log('Skipping main admin user from user list');
+          return;
+        }
+        
         const existsInRegistrations = allUsersData.find(regUser => regUser.uid === approvedUser.uid);
         if (!existsInRegistrations) {
-          console.log('Found legacy user not in registrations:', approvedUser.email);
+          console.log('Found user not in registrations (treating as regular user):', approvedUser.email);
           combinedUsers.push({
             ...approvedUser,
-            companyDetails: { companyName: 'Legacy User' }, // Fallback for old users
+            // Don't override company details - use existing data or set to unknown
+            companyDetails: approvedUser.companyDetails || { companyName: 'Unknown Company' },
             status: 'approved'
           });
         }
@@ -166,10 +173,46 @@ const AdminPanel = () => {
         });
 
         // Create company settings for the user
-        await addDoc(collection(db, `users/${registration.uid}/settings`), {
-          ...registration.companyDetails,
-          ...registration.settings,
-          createdAt: serverTimestamp()
+        await setDoc(doc(db, `users/${registration.uid}/settings/shopSettings`), {
+          // Shop information from registration
+          shopName: registration.companyDetails?.companyName || '',
+          address: registration.companyDetails?.address || '',
+          city: registration.companyDetails?.city || '',
+          state: registration.companyDetails?.state || '',
+          pincode: registration.companyDetails?.pincode || '',
+          phone: registration.companyDetails?.contactNumber || '',
+          email: registration.companyDetails?.shopEmail || registration.email,
+          gstNumber: registration.companyDetails?.gstNumber || '',
+          
+          // Bank details from registration
+          bankName: registration.companyDetails?.bankName || '',
+          accountNumber: registration.companyDetails?.accountNumber || '',
+          ifscCode: registration.companyDetails?.ifscCode || '',
+          accountHolderName: registration.companyDetails?.accountHolderName || '',
+          upiId: registration.companyDetails?.upiId || '',
+          
+          // Settings from registration
+          financialYear: registration.settings?.financialYear || '2024-2025',
+          dateFormat: registration.settings?.dateFormat || 'DD/MM/YYYY',
+          timeFormat: registration.settings?.timeFormat || '12-hour',
+          currency: registration.settings?.currency || 'INR',
+          decimalPlaces: registration.settings?.decimalPlaces || 2,
+          quantityDecimalPlaces: registration.settings?.quantityDecimalPlaces || 0,
+          rateDecimalPlaces: registration.settings?.rateDecimalPlaces || 2,
+          roundOffTotal: registration.settings?.roundOffTotal || true,
+          showPreviousBalance: registration.settings?.showPreviousBalance || true,
+          enableOrderTracking: registration.settings?.enableOrderTracking || false,
+          enableCreditLimit: registration.settings?.enableCreditLimit || false,
+          enableGST: registration.settings?.enableGST || true,
+          enableMultipleBranches: registration.settings?.enableMultipleBranches || false,
+          
+          // Logo and QR code placeholders
+          logoDataURL: '',
+          qrCodeDataURL: '',
+          
+          // Metadata
+          createdAt: serverTimestamp(),
+          importedFromRegistration: true
         });
 
         // Initialize empty collections for the user
