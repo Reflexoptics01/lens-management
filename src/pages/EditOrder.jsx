@@ -8,6 +8,7 @@ import OrderForm from '../components/OrderForm';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import CustomerForm from '../components/CustomerForm';
 import { DocumentPlusIcon } from '@heroicons/react/24/outline';
+import { getUserCollection } from '../utils/multiTenancy';
 
 // Define section colors for the OrderForm
 const SECTION_COLORS = {
@@ -114,7 +115,7 @@ const EditOrder = () => {
 
   const fetchCustomers = async () => {
     try {
-      const customersRef = collection(db, 'customers');
+      const customersRef = getUserCollection('customers');
       const q = query(customersRef, where('type', '!=', 'vendor'));
       const snapshot = await getDocs(q);
       const customersList = snapshot.docs.map(doc => ({

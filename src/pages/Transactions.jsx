@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, getDocs, addDoc, serverTimestamp, query, where, orderBy, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { calculateCustomerBalance, formatCurrency, getBalanceColorClass, getBalanceStatusText } from '../utils/ledgerUtils';
+import { formatDate, formatDateTime } from '../utils/dateUtils';
 
 const Transactions = () => {
   const navigate = useNavigate();
@@ -77,14 +79,16 @@ const Transactions = () => {
       
       // For 'received', fetch customers
       // For 'paid', fetch vendors (we'll use customers for now, could be separated later)
-      const entitiesRef = collection(db, 'customers');
+      const entitiesRef = getUserCollection('customers');
       const q = query(entitiesRef, orderBy('opticalName'));
       const snapshot = await getDocs(q);
       
-      const entitiesList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const entitiesList = snapshot.docs
+        .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
       
       setEntities(entitiesList);
     } catch (error) {
@@ -102,7 +106,7 @@ const Transactions = () => {
       
       console.log('Fetching transactions for type:', transactionType);
       
-      const transactionsRef = collection(db, 'transactions');
+      const transactionsRef = getUserCollection('transactions');
       
       // Build query with type filter
       const q = query(
@@ -114,13 +118,15 @@ const Transactions = () => {
       console.log('Filtered transactions:', snapshot.docs.length);
       
       // Get transactions from snapshot data
-      let transactionsList = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data
-        };
-      });
+      let transactionsList = snapshot.docs
+        .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+        .map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data
+          };
+        });
       
       // Filter by date range
       if (fromDate || toDate) {
@@ -286,7 +292,7 @@ const Transactions = () => {
         };
         
         console.log('Saving transaction data:', transactionData);
-        const docRef = await addDoc(collection(db, 'transactions'), transactionData);
+        const docRef = await addDoc(getUserCollection('transactions'), transactionData);
         console.log('Transaction saved with ID:', docRef.id);
       }
       
@@ -312,15 +318,6 @@ const Transactions = () => {
       setError('Failed to save transactions');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const formatDate = (dateString) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-    } catch (error) {
-      return dateString;
     }
   };
   
@@ -357,7 +354,7 @@ const Transactions = () => {
       setLoading(true);
       setError('');
       
-      const transactionRef = doc(db, 'transactions', editingTransaction.id);
+      const transactionRef = getUserDoc('transactions', editingTransaction.id);
       
       const updateData = {
         entityName: editingTransaction.entityName,
@@ -390,7 +387,7 @@ const Transactions = () => {
       setError('');
       
       // Delete from Firestore
-      await deleteDoc(doc(db, 'transactions', transactionId));
+      await deleteDoc(getUserDoc('transactions', transactionId));
       
       // Hide confirmation dialog
       setShowDeleteConfirm(null);
@@ -417,7 +414,7 @@ const Transactions = () => {
   const fetchTransactionToEdit = async (transactionId) => {
     try {
       setLoading(true);
-      const transactionDoc = await getDoc(doc(db, 'transactions', transactionId));
+      const transactionDoc = await getDoc(getUserDoc('transactions', transactionId));
       
       if (transactionDoc.exists()) {
         const data = transactionDoc.data();

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebaseConfig';
-import { collection, addDoc, doc, updateDoc, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 
 // Constants from OrderForm.jsx
 const MATERIALS = ['CR', 'POLY', 'GLASS', 'POLARISED', 'TRIVEX', 'MR8'];
@@ -240,7 +241,7 @@ const AddLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCancel }
           console.log("Adding lens:", lensData); // Debug log
           
           // Add document to Firestore
-          const docRef = await addDoc(collection(db, 'lens_inventory'), lensData);
+          const docRef = await addDoc(getUserCollection('lensInventory'), lensData);
           addedLenses.push({ id: docRef.id, ...lensData });
         }
         

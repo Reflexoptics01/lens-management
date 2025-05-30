@@ -1,34 +1,10 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, getDocs, query, orderBy, where, Timestamp } from 'firebase/firestore';
+import { getUserCollection } from '../utils/multiTenancy';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-
-// Helper functions to handle different timestamp formats after restore
-const isFirestoreTimestamp = (value) => {
-  return value && typeof value === 'object' && typeof value.toDate === 'function';
-};
-
-const isISODateString = (value) => {
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value);
-};
-
-const convertToDate = (value) => {
-  if (!value) return null;
-  
-  try {
-    if (isFirestoreTimestamp(value)) {
-      return value.toDate();
-    } else if (isISODateString(value)) {
-      return new Date(value);
-    } else if (value instanceof Date) {
-      return value;
-    }
-    return null;
-  } catch (error) {
-    console.error('Error converting timestamp:', error, value);
-    return null;
-  }
-};
+import { safelyParseDate, formatDate, formatDateTime } from '../utils/dateUtils';
 
 const Dashboard = () => {
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -87,7 +63,11 @@ const Dashboard = () => {
   const fetchSalesData = async () => {
     try {
       console.log('Fetching sales data for dashboard...');
-      const salesRef = collection(db, 'sales');
+      console.log('Current userUid from localStorage:', localStorage.getItem('userUid'));
+      console.log('Current user role from localStorage:', localStorage.getItem('userRole'));
+      
+      const salesRef = getUserCollection('sales');
+      console.log('Sales collection path will be:', `users/${localStorage.getItem('userUid')}/sales`);
       
       let salesSnapshot;
       try {
@@ -98,6 +78,8 @@ const Dashboard = () => {
         // Fallback: get all sales without ordering
         salesSnapshot = await getDocs(salesRef);
       }
+      
+      console.log('Found', salesSnapshot.docs.length, 'sales documents for this user');
       
       const selectedDateObj = new Date(selectedDate);
       
@@ -143,7 +125,7 @@ const Dashboard = () => {
         }
         
         // Convert timestamp safely
-        const saleDate = convertToDate(sale.invoiceDate);
+        const saleDate = safelyParseDate(sale.invoiceDate);
         if (!saleDate) {
           console.warn('Could not convert sale date:', sale.invoiceDate);
           skippedCount++;
@@ -233,7 +215,7 @@ const Dashboard = () => {
   const fetchTopProducts = async () => {
     try {
       console.log('Fetching top products for dashboard...');
-      const salesRef = collection(db, 'sales');
+      const salesRef = getUserCollection('sales');
       const salesSnapshot = await getDocs(salesRef);
       
       const productCounts = {};
@@ -279,7 +261,7 @@ const Dashboard = () => {
   const fetchTopPowers = async () => {
     try {
       console.log('Fetching top powers for dashboard...');
-      const salesRef = collection(db, 'sales');
+      const salesRef = getUserCollection('sales');
       const salesSnapshot = await getDocs(salesRef);
       
       const powerCounts = {};
@@ -327,7 +309,7 @@ const Dashboard = () => {
   const fetchTopProfitProducts = async () => {
     try {
       console.log('Fetching top profit products for dashboard...');
-      const salesRef = collection(db, 'sales');
+      const salesRef = getUserCollection('sales');
       const salesSnapshot = await getDocs(salesRef);
       
       const productProfits = {};

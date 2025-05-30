@@ -3,89 +3,8 @@ import { db } from '../firebaseConfig';
 import { collection, getDocs, query, orderBy, updateDoc, doc, deleteDoc, writeBatch, where, serverTimestamp, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-
-// Helper functions to handle different timestamp formats after restore
-const isFirestoreTimestamp = (value) => {
-  return value && typeof value === 'object' && typeof value.toDate === 'function';
-};
-
-const isISODateString = (value) => {
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value);
-};
-
-const convertToDate = (value) => {
-  if (!value) {
-    console.debug('convertToDate: null/undefined value');
-    return null;
-  }
-  
-  try {
-    console.debug('convertToDate: Processing value:', typeof value, value);
-    
-    // Handle Firestore Timestamp objects
-    if (isFirestoreTimestamp(value)) {
-      console.debug('convertToDate: Firestore timestamp detected');
-      return value.toDate();
-    } 
-    
-    // Handle ISO date strings (from backup/restore)
-    if (isISODateString(value)) {
-      console.debug('convertToDate: ISO string detected');
-      return new Date(value);
-    } 
-    
-    // Handle Date objects
-    if (value instanceof Date) {
-      console.debug('convertToDate: Date object detected');
-      return value;
-    }
-    
-    // Handle timestamp objects with seconds/nanoseconds (backup/restore format)
-    if (typeof value === 'object' && value.seconds) {
-      console.debug('convertToDate: Object with seconds detected');
-      return new Date(value.seconds * 1000 + (value.nanoseconds || 0) / 1000000);
-    }
-    
-    // Handle timestamp objects with _seconds/_nanoseconds (backup/restore format)
-    if (typeof value === 'object' && value._seconds) {
-      console.debug('convertToDate: Object with _seconds detected');
-      return new Date(value._seconds * 1000 + (value._nanoseconds || 0) / 1000000);
-    }
-    
-    // Handle numeric timestamps (milliseconds)
-    if (typeof value === 'number') {
-      console.debug('convertToDate: Number detected');
-      return new Date(value);
-    }
-    
-    // Handle string timestamps that might be numbers
-    if (typeof value === 'string' && !isNaN(parseInt(value))) {
-      console.debug('convertToDate: Numeric string detected');
-      const num = parseInt(value);
-      // Check if it's seconds (less than year 2100) or milliseconds
-      if (num < 4102444800) { // Year 2100 in seconds
-        return new Date(num * 1000);
-      } else {
-        return new Date(num);
-      }
-    }
-    
-    // Handle regular date strings
-    if (typeof value === 'string') {
-      console.debug('convertToDate: Regular string detected, trying Date parse');
-      const parsed = new Date(value);
-      if (!isNaN(parsed.getTime())) {
-        return parsed;
-      }
-    }
-    
-    console.warn('convertToDate: Unhandled timestamp format:', typeof value, value);
-    return null;
-  } catch (error) {
-    console.error('convertToDate: Error converting timestamp:', error, value);
-    return null;
-  }
-};
+import { safelyParseDate, formatDate, formatDateTime } from '../utils/dateUtils';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 
 const ORDER_STATUSES = [
   'PENDING',
@@ -151,7 +70,7 @@ const Orders = () => {
       toDateObj.setHours(23, 59, 59, 999);
       
       result = result.filter(order => {
-        const orderDate = convertToDate(order.createdAt);
+        const orderDate = safelyParseDate(order.createdAt);
         return orderDate && orderDate >= fromDateObj && orderDate <= toDateObj;
       });
     }
@@ -181,9 +100,22 @@ const Orders = () => {
     try {
       setLoading(true);
       setError('');
+      
+      // Add debugging for user authentication
+      const userUid = localStorage.getItem('userUid');
+      console.log('fetchOrders: Current user UID:', userUid);
+      
+      if (!userUid) {
+        console.error('fetchOrders: No user UID found in localStorage');
+        setError('User not authenticated');
+        return;
+      }
+      
       console.log('Fetching orders from database...');
       
-      const ordersRef = collection(db, 'orders');
+      const ordersRef = getUserCollection('orders');
+      console.log('fetchOrders: Got orders collection reference');
+      
       let ordersList = [];
       
       try {
@@ -192,16 +124,24 @@ const Orders = () => {
         const q = query(ordersRef, orderBy('createdAt', 'desc'));
         const snapshot = await getDocs(q);
         
-        ordersList = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            displayId: data.displayId,
-            ...data,
-            // Keep original createdAt for processing
-            createdAt: data.createdAt 
-          };
-        });
+        console.log('fetchOrders: Query executed, got', snapshot.docs.length, 'documents');
+        
+        if (snapshot.docs.length > 0) {
+          console.log('fetchOrders: First document data sample:', snapshot.docs[0].data());
+        }
+        
+        ordersList = snapshot.docs
+          .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+          .map((doc) => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              displayId: data.displayId,
+              ...data,
+              // Keep original createdAt for processing
+              createdAt: data.createdAt 
+            };
+          });
         console.log('orderBy query successful, got', ordersList.length, 'orders');
       } catch (error) {
         console.error('Error with standard query, trying fallback:', error);
@@ -209,22 +149,26 @@ const Orders = () => {
         // Fallback: Get all orders without sorting
         const snapshot = await getDocs(ordersRef);
         
-        ordersList = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            displayId: data.displayId,
-            ...data,
-            createdAt: data.createdAt
-          };
-        });
+        console.log('fetchOrders: Fallback query executed, got', snapshot.docs.length, 'documents');
+        
+        ordersList = snapshot.docs
+          .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+          .map((doc) => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              displayId: data.displayId,
+              ...data,
+              createdAt: data.createdAt
+            };
+          });
         
         console.log('Fallback query successful, got', ordersList.length, 'orders');
         
         // Sort manually by createdAt (newest first)
         ordersList.sort((a, b) => {
-          const dateA = convertToDate(a.createdAt);
-          const dateB = convertToDate(b.createdAt);
+          const dateA = safelyParseDate(a.createdAt);
+          const dateB = safelyParseDate(b.createdAt);
           
           if (dateA && dateB) {
             return dateB - dateA; // Descending order (newest first)
@@ -236,6 +180,14 @@ const Orders = () => {
           return 0;
         });
         console.log('Manual sorting completed');
+      }
+      
+      // Log final results
+      console.log('fetchOrders: Final ordersList length:', ordersList.length);
+      console.log('fetchOrders: Current user path should be: users/' + userUid + '/orders');
+      
+      if (ordersList.length > 0) {
+        console.log('fetchOrders: Sample order data:', ordersList[0]);
       }
       
       // Process and validate data
@@ -252,7 +204,7 @@ const Orders = () => {
       const processedOrders = ordersList.map((order, index) => {
         try {
           // Validate createdAt timestamp
-          const date = convertToDate(order.createdAt);
+          const date = safelyParseDate(order.createdAt);
           if (!date) {
             console.warn(`Order ${order.displayId || order.id} has invalid createdAt:`, order.createdAt);
             invalidCount++;
@@ -276,8 +228,8 @@ const Orders = () => {
       
       // Sort processed orders by converted date (newest first)
       processedOrders.sort((a, b) => {
-        const dateA = convertToDate(a.createdAt);
-        const dateB = convertToDate(b.createdAt);
+        const dateA = safelyParseDate(a.createdAt);
+        const dateB = safelyParseDate(b.createdAt);
         
         // Both dates valid - sort by date (newest first)
         if (dateA && dateB && !isNaN(dateA.getTime()) && !isNaN(dateB.getTime())) {
@@ -307,8 +259,8 @@ const Orders = () => {
       console.log('First 3 processed orders (should be newest):', processedOrders.slice(0, 3).map(o => ({
         id: o.displayId,
         createdAt: o.createdAt,
-        convertedDate: convertToDate(o.createdAt),
-        formattedDate: convertToDate(o.createdAt) ? convertToDate(o.createdAt).toLocaleDateString() : 'Invalid'
+        convertedDate: safelyParseDate(o.createdAt),
+        formattedDate: safelyParseDate(o.createdAt) ? safelyParseDate(o.createdAt).toLocaleDateString() : 'Invalid'
       })));
       
       setOrders(processedOrders);
@@ -322,12 +274,14 @@ const Orders = () => {
 
   const fetchCustomers = async () => {
     try {
-      const customersRef = collection(db, 'customers');
+      const customersRef = getUserCollection('customers');
       const snapshot = await getDocs(customersRef);
-      const customersList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const customersList = snapshot.docs
+        .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
       setCustomers(customersList);
     } catch (error) {
       console.error('Error fetching customers:', error);
@@ -381,7 +335,7 @@ const Orders = () => {
       const isNowInvalid = invalidStatuses.includes(newStatus);
       
       // Find existing lenses in inventory
-      const lensRef = collection(db, 'lens_inventory');
+      const lensRef = getUserCollection('lensInventory');
       const q = query(lensRef, where('orderId', '==', orderData.id));
       const snapshot = await getDocs(q);
       
@@ -392,7 +346,7 @@ const Orders = () => {
           const batch = writeBatch(db);
           
           snapshot.docs.forEach(lensDoc => {
-            const lensRef = doc(db, 'lens_inventory', lensDoc.id);
+            const lensRef = getUserDoc('lensInventory', lensDoc.id);
             batch.delete(lensRef);
           });
           
@@ -411,7 +365,7 @@ const Orders = () => {
           
           const batch = writeBatch(db);
           snapshot.docs.forEach(lensDoc => {
-            const lensRef = doc(db, 'lens_inventory', lensDoc.id);
+            const lensRef = getUserDoc('lensInventory', lensDoc.id);
             batch.update(lensRef, { 
               status: newStatus,
               updatedAt: serverTimestamp()
@@ -431,7 +385,7 @@ const Orders = () => {
         const batch = writeBatch(db);
         
         snapshot.docs.forEach(lensDoc => {
-          const lensRef = doc(db, 'lens_inventory', lensDoc.id);
+          const lensRef = getUserDoc('lensInventory', lensDoc.id);
           batch.update(lensRef, { 
             status: newStatus,
             updatedAt: serverTimestamp()
@@ -468,7 +422,7 @@ const Orders = () => {
       
       // Create lens inventory items
       if (hasRightEye) {
-        const rightLensRef = doc(collection(db, 'lens_inventory'));
+        const rightLensRef = getUserDoc('lensInventory', `${orderData.id}_right`);
         const rightLensData = {
           orderId: orderData.id,
           orderDisplayId: orderData.displayId,
@@ -499,7 +453,7 @@ const Orders = () => {
       }
       
       if (hasLeftEye) {
-        const leftLensRef = doc(collection(db, 'lens_inventory'));
+        const leftLensRef = getUserDoc('lensInventory', `${orderData.id}_left`);
         const leftLensData = {
           orderId: orderData.id,
           orderDisplayId: orderData.displayId,
@@ -521,7 +475,7 @@ const Orders = () => {
           type: 'prescription',
           status: status,
           location: 'Main Cabinet',
-          notes: `Added from Order #${orderData.displayId}`,
+          notes: `Added from Order #${orderData.id}`,
           createdAt: serverTimestamp()
         };
         
@@ -544,7 +498,7 @@ const Orders = () => {
     if (window.confirm('Are you sure you want to delete this order?')) {
       try {
         // Delete the order
-        await deleteDoc(doc(db, 'orders', orderId));
+        await deleteDoc(getUserDoc('orders', orderId));
         
         // Also delete any associated lenses in inventory
         await deleteLensesForOrder(orderId);
@@ -562,7 +516,7 @@ const Orders = () => {
   const deleteLensesForOrder = async (orderId) => {
     try {
       // Find lenses associated with this order
-      const lensRef = collection(db, 'lens_inventory');
+      const lensRef = getUserCollection('lensInventory');
       const q = query(lensRef, where('orderId', '==', orderId));
       const snapshot = await getDocs(q);
       
@@ -575,8 +529,8 @@ const Orders = () => {
       const batch = writeBatch(db);
       
       snapshot.docs.forEach(lensDoc => {
-        const lensRef = doc(db, 'lens_inventory', lensDoc.id);
-        batch.delete(lensRef);
+        const lensDocRef = getUserDoc('lensInventory', lensDoc.id);
+        batch.delete(lensDocRef);
       });
       
       // Commit the batch
@@ -587,47 +541,44 @@ const Orders = () => {
     }
   };
 
-  const formatDate = (timestamp) => {
+  const formatDisplayDate = (timestamp) => {
     if (!timestamp) {
-      console.debug('formatDate: No timestamp provided');
+      console.debug('formatDisplayDate: No timestamp provided');
       return { date: 'No Date', time: '' };
     }
     
     try {
-      console.debug('formatDate: Processing timestamp:', typeof timestamp, timestamp);
+      console.debug('formatDisplayDate: Processing timestamp:', typeof timestamp, timestamp);
       
-      // Use the convertToDate helper function for robust timestamp conversion
-      const date = convertToDate(timestamp);
+      // Use the safelyParseDate helper function for robust timestamp conversion
+      const date = safelyParseDate(timestamp);
       
       if (!date) {
-        console.warn('formatDate: convertToDate returned null for:', timestamp);
+        console.warn('formatDisplayDate: safelyParseDate returned null for:', timestamp);
         return { date: 'Invalid Date', time: '' };
       }
       
       if (isNaN(date.getTime())) {
-        console.warn('formatDate: Date object is invalid (NaN) for:', timestamp);
+        console.warn('formatDisplayDate: Date object is invalid (NaN) for:', timestamp);
         return { date: 'Invalid Date', time: '' };
       }
       
-      const formattedDate = date.toLocaleDateString('en-GB', { 
-        day: '2-digit', 
-        month: 'short', 
-        year: 'numeric' 
-      });
+      // Use formatDate from dateUtils for consistency
+      const formattedDate = formatDate(date);
       
       const formattedTime = date.toLocaleTimeString('en-US', { 
         hour: '2-digit', 
         minute: '2-digit' 
       });
       
-      console.debug('formatDate: Successfully formatted:', { formattedDate, formattedTime });
+      console.debug('formatDisplayDate: Successfully formatted:', { formattedDate, formattedTime });
       
       return {
         date: formattedDate,
         time: formattedTime
       };
     } catch (error) {
-      console.error('formatDate: Error formatting date:', error, timestamp);
+      console.error('formatDisplayDate: Error formatting date:', error, timestamp);
       return { date: 'Date Error', time: '' };
     }
   };
@@ -789,7 +740,7 @@ const Orders = () => {
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                       {filteredOrders.map((order) => {
-                        const { date, time } = formatDate(order.createdAt);
+                        const { date, time } = formatDisplayDate(order.createdAt);
                         const customerDetails = getCustomerDetails(order.customerName);
                         return (
                           <tr 
@@ -882,7 +833,7 @@ const Orders = () => {
             {/* Mobile Card View */}
             <div className="mobile-only space-y-3">
               {filteredOrders.map((order) => {
-                const { date, time } = formatDate(order.createdAt);
+                const { date, time } = formatDisplayDate(order.createdAt);
                 const customerDetails = getCustomerDetails(order.customerName);
                 return (
                   <div

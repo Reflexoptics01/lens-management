@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, getDocs, query, orderBy, doc, getDoc, deleteDoc, where, Timestamp, addDoc } from 'firebase/firestore';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 
@@ -58,7 +59,7 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
   const fetchPurchases = async () => {
     try {
       setLoading(true);
-      const purchasesRef = collection(db, 'purchases');
+      const purchasesRef = getUserCollection('purchases');
       const q = query(purchasesRef, orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
       const purchasesList = snapshot.docs.map((doc, index) => ({
@@ -104,7 +105,7 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
   const fetchPurchase = async (purchaseId) => {
     try {
       setLoading(true);
-      const purchaseDoc = await getDoc(doc(db, 'purchases', purchaseId));
+      const purchaseDoc = await getDoc(getUserDoc('purchases', purchaseId));
       if (purchaseDoc.exists()) {
         const purchaseData = { id: purchaseId, ...purchaseDoc.data() };
         setSelectedPurchase(purchaseData);
@@ -197,7 +198,7 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
       };
       
       // Add the return document to Firestore
-      await addDoc(collection(db, 'purchase_returns'), returnData);
+      await addDoc(getUserCollection('purchaseReturns'), returnData);
       
       // Navigate back to the returns list
       navigate('/purchase-returns');
@@ -236,7 +237,7 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
   const fetchReturns = async () => {
     try {
       setLoading(true);
-      const returnsRef = collection(db, 'purchase_returns');
+      const returnsRef = getUserCollection('purchaseReturns');
       const q = query(returnsRef, orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
       const returnsList = snapshot.docs.map((doc, index) => ({
@@ -255,9 +256,8 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
 
   const fetchVendors = async () => {
     try {
-      const vendorsRef = collection(db, 'customers');
-      const q = query(vendorsRef, where('type', '==', 'vendor'));
-      const snapshot = await getDocs(q);
+      const vendorsRef = getUserCollection('customers');
+      const snapshot = await getDocs(vendorsRef);
       const vendorsList = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -273,7 +273,7 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
     if (!window.confirm('Are you sure you want to delete this return?')) return;
     
     try {
-      await deleteDoc(doc(db, 'purchase_returns', returnId));
+      await deleteDoc(getUserDoc('purchaseReturns', returnId));
       setReturns(prevReturns => prevReturns.filter(returnItem => returnItem.id !== returnId));
     } catch (error) {
       console.error('Error deleting return:', error);
@@ -541,7 +541,7 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
   const fetchReturnDetails = async (returnId) => {
     try {
       setLoading(true);
-      const returnDoc = await getDoc(doc(db, 'purchase_returns', returnId));
+      const returnDoc = await getDoc(getUserDoc('purchaseReturns', returnId));
       
       if (returnDoc.exists()) {
         const returnData = {
@@ -551,7 +551,7 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
         
         // Get vendor details
         if (returnData.vendorId) {
-          const vendorDoc = await getDoc(doc(db, 'customers', returnData.vendorId));
+          const vendorDoc = await getDoc(getUserDoc('customers', returnData.vendorId));
           if (vendorDoc.exists()) {
             returnData.vendor = vendorDoc.data();
           }
@@ -559,7 +559,7 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
         
         // Get original purchase details if available
         if (returnData.originalInvoiceId) {
-          const purchaseDoc = await getDoc(doc(db, 'purchases', returnData.originalInvoiceId));
+          const purchaseDoc = await getDoc(getUserDoc('purchases', returnData.originalInvoiceId));
           if (purchaseDoc.exists()) {
             returnData.originalPurchase = purchaseDoc.data();
           }

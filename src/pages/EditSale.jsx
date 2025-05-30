@@ -8,6 +8,7 @@ import CustomerForm from '../components/CustomerForm';
 import ItemSuggestions from '../components/ItemSuggestions';
 import PrintInvoiceModal from '../components/PrintInvoiceModal';
 import BottomActionBar from '../components/BottomActionBar';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 
 const TAX_OPTIONS = [
   { id: 'TAX_FREE', label: 'Tax Free', rate: 0 },
@@ -152,7 +153,7 @@ const EditSale = () => {
       setPaymentStatus(saleData.paymentStatus || 'UNPAID');
       setAmountPaid(saleData.amountPaid || 0);
       
-      // Set customer
+      // Set customer - include phone number from sale data or fetch from customer record
       if (saleData.customerId) {
         const customer = { 
           id: saleData.customerId,
@@ -160,8 +161,24 @@ const EditSale = () => {
           city: saleData.customerCity,
           address: saleData.customerAddress,
           state: saleData.customerState,
-          gstNumber: saleData.customerGst
+          gstNumber: saleData.customerGst,
+          phone: saleData.customerPhone // Include phone from sale data
         };
+        
+        // If phone is not in sale data, try to fetch it from customer record
+        if (!customer.phone) {
+          try {
+            const customerDoc = await getDoc(doc(db, 'customers', saleData.customerId));
+            if (customerDoc.exists()) {
+              const customerData = customerDoc.data();
+              customer.phone = customerData.phone;
+              customer.openingBalance = customerData.openingBalance;
+            }
+          } catch (error) {
+            console.log('Could not fetch customer details:', error);
+          }
+        }
+        
         setSelectedCustomer(customer);
       }
       
@@ -205,7 +222,7 @@ const EditSale = () => {
 
   const fetchCustomers = async () => {
     try {
-      const customersRef = collection(db, 'customers');
+      const customersRef = getUserCollection('customers');
       const q = query(customersRef, orderBy('opticalName'));
       const snapshot = await getDocs(q);
       const customersList = snapshot.docs.map(doc => ({
@@ -274,7 +291,7 @@ const EditSale = () => {
         const paddedDisplayId = orderId.trim().padStart(3, '0');
         
         // Search by displayId
-        const ordersRef = collection(db, 'orders');
+        const ordersRef = getUserCollection('orders');
         const q = query(ordersRef, where('displayId', '==', paddedDisplayId));
         const snapshot = await getDocs(q);
         
@@ -286,7 +303,7 @@ const EditSale = () => {
       // If not found by displayId, try direct ID lookup
       if (!orderDoc) {
         try {
-          orderDoc = await getDoc(doc(db, 'orders', orderId));
+          orderDoc = await getDoc(getUserDoc('orders', orderId));
         } catch (e) {
           // If direct ID fails, no order was found
           console.log('Order not found by ID:', e);
@@ -368,16 +385,16 @@ const EditSale = () => {
       setError('');
 
       // Create updated sale document
-      const saleData = {
-        invoiceNumber,
+      const updatedSaleData = {
+        customerId: selectedCustomer.id,
+        customerName: selectedCustomer.opticalName || selectedCustomer.name || '',
+        customerAddress: selectedCustomer.address || '',
+        customerCity: selectedCustomer.city || '',
+        customerState: selectedCustomer.state || '',
+        phone: selectedCustomer.phone || '', // Add phone number from customer
+        gstNumber: selectedCustomer.gstNumber || '',
         invoiceDate: new Date(invoiceDate),
         dueDate: dueDate ? new Date(dueDate) : null,
-        customerId: selectedCustomer.id,
-        customerName: selectedCustomer.opticalName,
-        customerAddress: selectedCustomer.address,
-        customerCity: selectedCustomer.city,
-        customerState: selectedCustomer.state,
-        customerGst: selectedCustomer.gstNumber,
         items: filledRows.map(row => ({
           orderId: row.orderId,
           itemName: row.itemName,
@@ -405,7 +422,7 @@ const EditSale = () => {
         updatedAt: serverTimestamp()
       };
 
-      await updateDoc(doc(db, 'sales', saleId), saleData);
+      await updateDoc(doc(db, 'sales', saleId), updatedSaleData);
       
       setSavedSaleId(saleId);
       setShowSuccessModal(true);
@@ -427,9 +444,23 @@ const EditSale = () => {
   };
 
   const handleSendWhatsApp = () => {
-    if (!selectedCustomer || !selectedCustomer.phone) return;
+    if (!selectedCustomer) {
+      alert('Please select a customer first.');
+      return;
+    }
+    
+    if (!selectedCustomer.phone) {
+      alert(`No phone number found for ${selectedCustomer.opticalName}. Please add a phone number to the customer record.`);
+      return;
+    }
     
     const phone = selectedCustomer.phone.replace(/[^0-9+]/g, '');
+    
+    if (phone.length < 10) {
+      alert('Invalid phone number format. Please check the customer\'s phone number.');
+      return;
+    }
+    
     const total = calculateTotal().toLocaleString('en-IN', {
       style: 'currency',
       currency: 'INR'
@@ -443,7 +474,13 @@ const EditSale = () => {
       `For any questions, please contact us.`;
     
     const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
+    
+    try {
+      window.open(whatsappUrl, '_blank');
+    } catch (error) {
+      console.error('Error opening WhatsApp:', error);
+      alert('Could not open WhatsApp. Please check if your browser allows popups.');
+    }
   };
 
   // Format currency for display
@@ -466,7 +503,7 @@ const EditSale = () => {
   // Add function to fetch saved items
   const fetchItems = async () => {
     try {
-      const itemsRef = collection(db, 'items');
+      const itemsRef = getUserCollection('items');
       const snapshot = await getDocs(itemsRef);
       
       // Create a map to deduplicate items by name
@@ -502,7 +539,7 @@ const EditSale = () => {
     
     try {
       const normalizedName = itemName.trim();
-      const itemsRef = collection(db, 'items');
+      const itemsRef = getUserCollection('items');
       
       // First check if item with this name already exists
       const q = query(itemsRef, where('name', '==', normalizedName));
@@ -519,7 +556,7 @@ const EditSale = () => {
       } else {
         // Update existing item
         const existingItem = snapshot.docs[0];
-        await updateDoc(doc(db, 'items', existingItem.id), {
+        await updateDoc(getUserDoc('items', existingItem.id), {
           price: parseFloat(price) || 0,
           updatedAt: serverTimestamp()
         });

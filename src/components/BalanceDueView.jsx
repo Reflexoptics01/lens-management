@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, getDocs, query, where } from 'firebase/firestore';
+import { getUserCollection } from '../utils/multiTenancy';
 
 const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
   const [loading, setLoading] = useState(false);
@@ -64,70 +65,74 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
 
   const calculateCustomerBalances = async (cutoffDate) => {
     try {
-      // Fetch all customers
-      const customersSnapshot = await getDocs(collection(db, 'customers'));
-      const customersList = customersSnapshot.docs.map(doc => ({
+      const customersSnapshot = await getDocs(getUserCollection('customers'));
+      let allCustomers = customersSnapshot.docs.map(doc => ({
         id: doc.id,
-        name: doc.data().opticalName,
-        type: 'customer',
         ...doc.data()
       }));
       
-      // For each customer, calculate their balance
-      const summaryPromises = customersList.map(async (customer) => {
-        // Fetch all sales (invoices) for this customer
-        const salesQuery = query(collection(db, 'sales'), where('customerId', '==', customer.id));
-        const salesSnapshot = await getDocs(salesQuery);
-        
-        const totalInvoiced = salesSnapshot.docs.reduce((sum, doc) => {
-          const data = doc.data();
-          const invoiceDate = parseDate(data.invoiceDate);
-          
-          if (invoiceDate && invoiceDate < cutoffDate) {
-            return sum + parseFloat(data.totalAmount || 0);
-          }
-          return sum;
-        }, 0);
-        
-        // Fetch all transactions for this customer
-        const transactionsQuery = query(collection(db, 'transactions'), where('entityId', '==', customer.id));
-        const transactionsSnapshot = await getDocs(transactionsQuery);
-        
-        const totalPaid = transactionsSnapshot.docs.reduce((sum, doc) => {
-          const data = doc.data();
-          const transactionDate = parseDate(data.date) || parseDate(data.createdAt);
-          
-          if (transactionDate && transactionDate < cutoffDate) {
-            // For customers: 'received' reduces balance, 'paid' increases balance (refund)
-            if (data.type === 'received') {
-              return sum + parseFloat(data.amount || 0);
-            } else if (data.type === 'paid') {
-              return sum - parseFloat(data.amount || 0);
-            }
-          }
-          return sum;
-        }, 0);
-        
-        const balance = totalInvoiced - totalPaid;
-        
-        if (balance === 0 && totalInvoiced === 0 && totalPaid === 0) {
-          return null; 
-        }
-        
-        return { 
-          id: customer.id, 
-          name: customer.name, 
-          address: customer.address || customer.customerAddress || '',
-          city: customer.city || customer.customerCity || '',
-          phone: customer.phoneNumber || customer.phone || customer.contactNumber || '',
-          balance, 
-          type: 'customer' 
-        };
-      });
+      // Filter out vendors to get only customers
+      const customers = allCustomers.filter(customer => customer.type !== 'vendor');
       
-      let customerBalances = await Promise.all(summaryPromises);
-      customerBalances = customerBalances.filter(summary => summary !== null);
-      customerBalances.sort((a, b) => b.balance - a.balance);
+      // Calculate balance for each customer
+      const customerBalances = await Promise.all(
+        customers.map(async (customer) => {
+          try {
+            // Fetch sales for this customer
+            const salesQuery = query(getUserCollection('sales'), where('customerId', '==', customer.id));
+            const salesSnapshot = await getDocs(salesQuery);
+            
+            let totalSales = 0;
+            salesSnapshot.docs.forEach(saleDoc => {
+              const saleData = saleDoc.data();
+              totalSales += parseFloat(saleData.totalAmount || 0);
+            });
+            
+            // Fetch transactions for this customer
+            const transactionsQuery = query(getUserCollection('transactions'), where('entityId', '==', customer.id));
+            const transactionsSnapshot = await getDocs(transactionsQuery);
+            
+            let totalPayments = 0;
+            transactionsSnapshot.docs.forEach(transactionDoc => {
+              const transactionData = transactionDoc.data();
+              const amount = parseFloat(transactionData.amount || 0);
+              
+              // For customers: 'received' payments reduce balance, 'paid' increases balance
+              if (transactionData.type === 'received') {
+                totalPayments += amount;
+              } else if (transactionData.type === 'paid') {
+                totalPayments -= amount; // Negative because it's money paid TO customer (refund)
+              }
+            });
+            
+            const openingBalance = parseFloat(customer.openingBalance || 0);
+            const currentBalance = openingBalance + totalSales - totalPayments;
+            
+            return {
+              id: customer.id,
+              name: customer.opticalName,
+              type: 'customer',
+              openingBalance,
+              totalSales,
+              totalPayments,
+              currentBalance
+            };
+          } catch (error) {
+            console.error(`Error calculating balance for customer ${customer.id}:`, error);
+            return {
+              id: customer.id,
+              name: customer.opticalName,
+              type: 'customer',
+              openingBalance: parseFloat(customer.openingBalance || 0),
+              totalSales: 0,
+              totalPayments: 0,
+              currentBalance: parseFloat(customer.openingBalance || 0)
+            };
+          }
+        })
+      );
+      
+      customerBalances.sort((a, b) => b.currentBalance - a.currentBalance);
       
       return customerBalances;
     } catch (error) {
@@ -138,139 +143,76 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
 
   const calculateVendorBalances = async (cutoffDate) => {
     try {
-      // Fetch all vendors (assuming they might be in 'vendors' collection or 'customers' with a type field)
-      // Let's first try 'vendors' collection, then fall back to customers with vendor type
-      let vendorsList = [];
+      // Also get vendor balances
+      const vendorsSnapshot = await getDocs(getUserCollection('customers'));
+      const allEntities = vendorsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
       
-      try {
-        const vendorsSnapshot = await getDocs(collection(db, 'vendors'));
-        vendorsList = vendorsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          name: doc.data().name || doc.data().vendorName || doc.data().opticalName,
-          type: 'vendor',
-          ...doc.data()
-        }));
-      } catch (vendorError) {
-        console.log('[BalanceDueView] No vendors collection found, checking customers with vendor type');
-        
-        // Fallback: look for customers marked as vendors
-        const customersSnapshot = await getDocs(collection(db, 'customers'));
-        vendorsList = customersSnapshot.docs
-          .map(doc => ({
-            id: doc.id,
-            name: doc.data().opticalName,
-            type: 'vendor',
-            ...doc.data()
-          }))
-          .filter(customer => customer.isVendor || customer.type === 'vendor');
-      }
+      // Filter to get only vendors
+      const vendors = allEntities.filter(entity => entity.type === 'vendor');
       
-      // If still no vendors found, let's try to get unique vendors from purchases
-      if (vendorsList.length === 0) {
-        const purchasesSnapshot = await getDocs(collection(db, 'purchases'));
-        const vendorIds = new Set();
-        const vendorData = new Map();
-        
-        purchasesSnapshot.docs.forEach(doc => {
-          const purchase = doc.data();
-          if (purchase.vendorId && purchase.vendorName) {
-            vendorIds.add(purchase.vendorId);
-            vendorData.set(purchase.vendorId, {
-              name: purchase.vendorName,
-              address: purchase.vendorAddress || '',
-              city: purchase.vendorCity || '',
-              phone: purchase.vendorPhone || purchase.vendorContactNumber || ''
+      // Calculate balance for each vendor
+      const vendorBalances = await Promise.all(
+        vendors.map(async (vendor) => {
+          try {
+            // Fetch purchases for this vendor
+            const purchasesSnapshot = await getDocs(getUserCollection('purchases'));
+            
+            let totalPurchases = 0;
+            purchasesSnapshot.docs.forEach(purchaseDoc => {
+              const purchaseData = purchaseDoc.data();
+              if (purchaseData.vendorId === vendor.id) {
+                totalPurchases += parseFloat(purchaseData.totalAmount || 0);
+              }
             });
-          }
-        });
-        
-        // Try to fetch complete vendor details from customers collection
-        const customersSnapshot = await getDocs(collection(db, 'customers'));
-        const customerVendors = new Map();
-        
-        customersSnapshot.docs.forEach(doc => {
-          const customer = doc.data();
-          if (vendorIds.has(doc.id)) {
-            customerVendors.set(doc.id, {
-              name: customer.opticalName || customer.name,
-              address: customer.address || customer.customerAddress || '',
-              city: customer.city || customer.customerCity || '',
-              phone: customer.phoneNumber || customer.phone || customer.contactNumber || ''
+            
+            // Fetch transactions for this vendor
+            const transactionsQuery = query(getUserCollection('transactions'), where('entityId', '==', vendor.id));
+            const transactionsSnapshot = await getDocs(transactionsQuery);
+            
+            let totalPayments = 0;
+            transactionsSnapshot.docs.forEach(transactionDoc => {
+              const transactionData = transactionDoc.data();
+              const amount = parseFloat(transactionData.amount || 0);
+              
+              // For vendors: 'paid' payments reduce balance, 'received' increases balance
+              if (transactionData.type === 'paid') {
+                totalPayments += amount;
+              } else if (transactionData.type === 'received') {
+                totalPayments -= amount; // Negative because it's money received FROM vendor (rare)
+              }
             });
+            
+            const openingBalance = parseFloat(vendor.openingBalance || 0);
+            const currentBalance = openingBalance + totalPurchases - totalPayments;
+            
+            return {
+              id: vendor.id,
+              name: vendor.opticalName,
+              type: 'vendor',
+              openingBalance,
+              totalPurchases,
+              totalPayments,
+              currentBalance
+            };
+          } catch (error) {
+            console.error(`Error calculating balance for vendor ${vendor.id}:`, error);
+            return {
+              id: vendor.id,
+              name: vendor.opticalName,
+              type: 'vendor',
+              openingBalance: parseFloat(vendor.openingBalance || 0),
+              totalPurchases: 0,
+              totalPayments: 0,
+              currentBalance: parseFloat(vendor.openingBalance || 0)
+            };
           }
-        });
-        
-        vendorsList = Array.from(vendorIds).map(vendorId => {
-          // Prefer customer data if available, otherwise use purchase data
-          const vendorInfo = customerVendors.get(vendorId) || vendorData.get(vendorId);
-          return {
-            id: vendorId,
-            name: vendorInfo.name,
-            address: vendorInfo.address,
-            city: vendorInfo.city,
-            phone: vendorInfo.phone,
-            type: 'vendor'
-          };
-        });
-      }
+        })
+      );
       
-      console.log('[BalanceDueView] Found vendors:', vendorsList);
-      
-      // For each vendor, calculate their balance
-      const summaryPromises = vendorsList.map(async (vendor) => {
-        // Fetch all purchases from this vendor
-        const purchasesQuery = query(collection(db, 'purchases'), where('vendorId', '==', vendor.id));
-        const purchasesSnapshot = await getDocs(purchasesQuery);
-        
-        const totalPurchased = purchasesSnapshot.docs.reduce((sum, doc) => {
-          const data = doc.data();
-          const purchaseDate = parseDate(data.purchaseDate || data.date || data.createdAt);
-          
-          if (purchaseDate && purchaseDate < cutoffDate) {
-            return sum + parseFloat(data.totalAmount || data.total || 0);
-          }
-          return sum;
-        }, 0);
-        
-        // Fetch all transactions for this vendor
-        const transactionsQuery = query(collection(db, 'transactions'), where('entityId', '==', vendor.id));
-        const transactionsSnapshot = await getDocs(transactionsQuery);
-        
-        const totalPaid = transactionsSnapshot.docs.reduce((sum, doc) => {
-          const data = doc.data();
-          const transactionDate = parseDate(data.date) || parseDate(data.createdAt);
-          
-          if (transactionDate && transactionDate < cutoffDate) {
-            // For vendors: 'paid' reduces balance (we paid them), 'received' increases balance (they paid us back)
-            if (data.type === 'paid') {
-              return sum + parseFloat(data.amount || 0);
-            } else if (data.type === 'received') {
-              return sum - parseFloat(data.amount || 0);
-            }
-          }
-          return sum;
-        }, 0);
-        
-        const balance = totalPurchased - totalPaid;
-        
-        if (balance === 0 && totalPurchased === 0 && totalPaid === 0) {
-          return null; 
-        }
-        
-        return { 
-          id: vendor.id, 
-          name: vendor.name, 
-          address: vendor.address || vendor.vendorAddress || '',
-          city: vendor.city || vendor.vendorCity || '',
-          phone: vendor.phone || '',
-          balance, 
-          type: 'vendor' 
-        };
-      });
-      
-      let vendorBalances = await Promise.all(summaryPromises);
-      vendorBalances = vendorBalances.filter(summary => summary !== null);
-      vendorBalances.sort((a, b) => b.balance - a.balance);
+      vendorBalances.sort((a, b) => b.currentBalance - a.currentBalance);
       
       return vendorBalances;
     } catch (error) {
@@ -385,16 +327,16 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
     if (!currentBalances.length) return;
     
     // Create CSV content
-    let csvContent = "Party Type,Party Name,Address,City,Phone,Balance Due\n";
+    let csvContent = "Party Type,Party Name,Opening Balance,Total Sales,Total Payments,Current Balance\n";
     
     // Add data rows for current view
     currentBalances.forEach(summary => {
       const partyType = viewMode === 'customers' ? 'Customer' : 'Vendor';
-      csvContent += `"${partyType}","${summary.name}","${summary.address || ''}","${summary.city || ''}","${summary.phone || ''}",${summary.balance}\n`;
+      csvContent += `"${partyType}","${summary.name}","${summary.openingBalance}","${summary.totalSales}","${summary.totalPayments}","${summary.currentBalance}"\n`;
     });
     
     // Add total
-    const total = currentBalances.reduce((sum, item) => sum + item.balance, 0);
+    const total = currentBalances.reduce((sum, item) => sum + item.currentBalance, 0);
     csvContent += `"","Total ${viewMode === 'customers' ? 'Customer' : 'Vendor'} Balance","","","",${total}\n`;
     
     // Create a hidden download link
@@ -495,10 +437,10 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
                   <tr className="border-b border-gray-300 dark:border-gray-600">
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600 w-[60px]">S.No</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">Customer Name</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">Address</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">City</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">Phone</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px]">Balance Due</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px]">Opening Balance</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px]">Total Sales</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px]">Total Payments</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px]">Current Balance</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
@@ -514,19 +456,25 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
                       <td className="px-4 py-3 text-sm text-left text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600">
                         {summary.name}
                       </td>
-                      <td className="px-4 py-3 text-sm text-left text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600">
-                        {summary.address}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-left text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600">
-                        {summary.city}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-left text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600">
-                        {summary.phone}
+                      <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-medium ${
+                        summary.openingBalance > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                      }`}>
+                        {formatCurrency(summary.openingBalance)}
                       </td>
                       <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-medium ${
-                        summary.balance > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                        summary.totalSales > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
                       }`}>
-                        {formatCurrency(summary.balance)}
+                        {formatCurrency(summary.totalSales)}
+                      </td>
+                      <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-medium ${
+                        summary.totalPayments > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                      }`}>
+                        {formatCurrency(summary.totalPayments)}
+                      </td>
+                      <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-medium ${
+                        summary.currentBalance > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                      }`}>
+                        {formatCurrency(summary.currentBalance)}
                       </td>
                     </tr>
                   ))}
@@ -537,7 +485,7 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
                       Total Customer Balance
                     </td>
                     <td className="px-4 py-3 text-right font-bold text-blue-900 dark:text-blue-100">
-                      {formatCurrency(customerBalances.reduce((sum, item) => sum + item.balance, 0))}
+                      {formatCurrency(customerBalances.reduce((sum, item) => sum + item.currentBalance, 0))}
                     </td>
                   </tr>
                 </tbody>
@@ -553,10 +501,10 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
                   <tr className="border-b border-gray-300 dark:border-gray-600">
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600 w-[60px]">S.No</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">Vendor Name</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">Address</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">City</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">Phone</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px]">Balance Payable</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px]">Opening Balance</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px]">Total Purchases</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px]">Total Payments</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px]">Current Balance</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
@@ -572,19 +520,25 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
                       <td className="px-4 py-3 text-sm text-left text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600">
                         {summary.name}
                       </td>
-                      <td className="px-4 py-3 text-sm text-left text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600">
-                        {summary.address}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-left text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600">
-                        {summary.city}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-left text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600">
-                        {summary.phone}
+                      <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-medium ${
+                        summary.openingBalance > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                      }`}>
+                        {formatCurrency(summary.openingBalance)}
                       </td>
                       <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-medium ${
-                        summary.balance > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                        summary.totalPurchases > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
                       }`}>
-                        {formatCurrency(summary.balance)}
+                        {formatCurrency(summary.totalPurchases)}
+                      </td>
+                      <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-medium ${
+                        summary.totalPayments > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                      }`}>
+                        {formatCurrency(summary.totalPayments)}
+                      </td>
+                      <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-medium ${
+                        summary.currentBalance > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                      }`}>
+                        {formatCurrency(summary.currentBalance)}
                       </td>
                     </tr>
                   ))}
@@ -595,7 +549,7 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
                       Total Vendor Balance
                     </td>
                     <td className="px-4 py-3 text-right font-bold text-orange-900 dark:text-orange-100">
-                      {formatCurrency(vendorBalances.reduce((sum, item) => sum + item.balance, 0))}
+                      {formatCurrency(vendorBalances.reduce((sum, item) => sum + item.currentBalance, 0))}
                     </td>
                   </tr>
                 </tbody>

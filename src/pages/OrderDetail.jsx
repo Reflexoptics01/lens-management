@@ -3,75 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import StickerPrintPage from '../components/StickerPrintPage';
-
-// Helper functions to handle different timestamp formats after restore
-const isFirestoreTimestamp = (value) => {
-  return value && typeof value === 'object' && typeof value.toDate === 'function';
-};
-
-const isISODateString = (value) => {
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value);
-};
-
-const convertToDate = (value) => {
-  if (!value) return null;
-  
-  try {
-    // Handle Firestore Timestamp objects
-    if (isFirestoreTimestamp(value)) {
-      return value.toDate();
-    } 
-    
-    // Handle ISO date strings (from backup/restore)
-    if (isISODateString(value)) {
-      return new Date(value);
-    } 
-    
-    // Handle Date objects
-    if (value instanceof Date) {
-      return value;
-    }
-    
-    // Handle timestamp objects with seconds/nanoseconds (backup/restore format)
-    if (typeof value === 'object' && value.seconds) {
-      return new Date(value.seconds * 1000 + (value.nanoseconds || 0) / 1000000);
-    }
-    
-    // Handle timestamp objects with _seconds/_nanoseconds (backup/restore format)
-    if (typeof value === 'object' && value._seconds) {
-      return new Date(value._seconds * 1000 + (value._nanoseconds || 0) / 1000000);
-    }
-    
-    // Handle numeric timestamps (milliseconds)
-    if (typeof value === 'number') {
-      return new Date(value);
-    }
-    
-    // Handle string timestamps that might be numbers
-    if (typeof value === 'string' && !isNaN(parseInt(value))) {
-      const num = parseInt(value);
-      // Check if it's seconds (less than year 2100) or milliseconds
-      if (num < 4102444800) { // Year 2100 in seconds
-        return new Date(num * 1000);
-      } else {
-        return new Date(num);
-      }
-    }
-    
-    // Handle regular date strings
-    if (typeof value === 'string') {
-      const parsed = new Date(value);
-      if (!isNaN(parsed.getTime())) {
-        return parsed;
-      }
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('Error converting timestamp:', error, value);
-    return null;
-  }
-};
+import { safelyParseDate, formatDate, formatDateTime, processRestoredData } from '../utils/dateUtils';
 
 const ORDER_STATUSES = [
   'PENDING',
@@ -138,7 +70,7 @@ const OrderDetail = () => {
       console.log('createdAt type:', rawOrderData.createdAt ? typeof rawOrderData.createdAt : 'undefined');
       
       // Process the createdAt timestamp using the convertToDate helper
-      const processedCreatedAt = convertToDate(rawOrderData.createdAt) || new Date();
+      const processedCreatedAt = safelyParseDate(rawOrderData.createdAt) || new Date();
       console.log('Processed createdAt:', processedCreatedAt);
       
       // Safely process the order data with fallbacks
@@ -534,7 +466,7 @@ const OrderDetail = () => {
                             <DataItem label="Created" 
                               value={order.createdAt ? (() => {
                                 try {
-                                  const date = convertToDate(order.createdAt);
+                                  const date = safelyParseDate(order.createdAt);
                                   return date ? date.toLocaleString('en-IN', {
                                     day: '2-digit',
                                     month: 'short', 

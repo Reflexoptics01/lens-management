@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
 import { collection, getDocs } from 'firebase/firestore';
+import { getUserCollection } from '../utils/multiTenancy';
 import Navbar from '../components/Navbar';
 import { BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useTheme } from '../contexts/ThemeContext';
@@ -29,7 +30,7 @@ const LensInventoryReport = () => {
       setLoading(true);
       setError('');
       
-      const lensRef = collection(db, 'lens_inventory');
+      const lensRef = getUserCollection('lensInventory');
       const snapshot = await getDocs(lensRef);
       
       const lensesList = snapshot.docs.map(doc => ({

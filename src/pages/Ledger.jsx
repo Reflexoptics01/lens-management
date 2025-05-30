@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { getUserCollection } from '../utils/multiTenancy';
+import { formatDate, formatDateTime, safelyParseDate } from '../utils/dateUtils';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import AccountStatementView from '../components/AccountStatementView';
@@ -31,40 +33,6 @@ const Ledger = () => {
   
   // Ledger data
   const [ledgerData, setLedgerData] = useState([]);
-  
-  // Helper function to parse dates consistently
-  const parseDate = (dateInput) => {
-    if (!dateInput) return null;
-    
-    let date;
-    
-    // If it's a Firestore timestamp
-    if (typeof dateInput.toDate === 'function') {
-      date = dateInput.toDate();
-    } 
-    // If it's a string (like '2023-05-17')
-    else if (typeof dateInput === 'string') {
-      date = new Date(dateInput);
-    } 
-    // If it's already a Date object
-    else if (dateInput instanceof Date) {
-      date = dateInput;
-    } 
-    // Fallback
-    else {
-      try {
-        date = new Date(dateInput);
-      } catch (error) {
-        console.error('Failed to parse date:', dateInput);
-        return null;
-      }
-    }
-    
-    // Set to noon to avoid timezone issues
-    date.setHours(12, 0, 0, 0);
-    
-    return date;
-  };
   
   const fetchLedgerData = async () => {
     if (!selectedEntity) {
@@ -101,7 +69,7 @@ const Ledger = () => {
       
       if (!isVendor) {
         // For customers: Fetch invoices from the sales collection
-        const salesRef = collection(db, 'sales');
+        const salesRef = getUserCollection('sales');
         const salesQuery = query(
           salesRef,
           where('customerId', '==', selectedEntity.id),
@@ -111,22 +79,24 @@ const Ledger = () => {
         );
         
         const invoicesSnapshot = await getDocs(salesQuery);
-        invoices = invoicesSnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            type: 'invoice',
-            ...data,
-            // Use proper field names from sales collection
-            invoiceNumber: data.invoiceNumber,
-            totalAmount: data.totalAmount,
-            items: data.items || [],
-            date: data.invoiceDate ? data.invoiceDate.toDate() : null
-          };
-        });
+        invoices = invoicesSnapshot.docs
+          .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+          .map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              type: 'invoice',
+              ...data,
+              // Use proper field names from sales collection
+              invoiceNumber: data.invoiceNumber,
+              totalAmount: data.totalAmount,
+              items: data.items || [],
+              date: data.invoiceDate ? data.invoiceDate.toDate() : null
+            };
+          });
       } else {
         // For vendors: Fetch purchases from the purchases collection
-        const purchasesRef = collection(db, 'purchases');
+        const purchasesRef = getUserCollection('purchases');
         const purchasesQuery = query(
           purchasesRef,
           where('vendorId', '==', selectedEntity.id)
@@ -138,7 +108,7 @@ const Ledger = () => {
         purchases = purchasesSnapshot.docs
           .map(doc => {
             const data = doc.data();
-            const purchaseDate = parseDate(data.purchaseDate || data.date || data.createdAt);
+            const purchaseDate = safelyParseDate(data.purchaseDate || data.date || data.createdAt);
             
             return {
               id: doc.id,
@@ -157,7 +127,7 @@ const Ledger = () => {
       }
       
       // Fetch transactions for the selected entity 
-      const transactionsRef = collection(db, 'transactions');
+      const transactionsRef = getUserCollection('transactions');
       const transactionsQuery = query(
         transactionsRef,
         where('entityId', '==', selectedEntity.id)
@@ -166,19 +136,21 @@ const Ledger = () => {
       const transactionsSnapshot = await getDocs(transactionsQuery);
       
       // Process all transactions and filter by date range
-      let allTransactions = transactionsSnapshot.docs.map(doc => {
-        const data = doc.data();
-        
-        // Parse date consistently
-        const transactionDate = parseDate(data.date) || parseDate(data.createdAt);
-        
-        return {
-          id: doc.id,
-          type: 'transaction',
-          ...data,
-          date: transactionDate
-        };
-      });
+      let allTransactions = transactionsSnapshot.docs
+        .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+        .map(doc => {
+          const data = doc.data();
+          
+          // Parse date consistently
+          const transactionDate = safelyParseDate(data.date) || safelyParseDate(data.createdAt);
+          
+          return {
+            id: doc.id,
+            type: 'transaction',
+            ...data,
+            date: transactionDate
+          };
+        });
       
       // Filter by date range
       const transactions = allTransactions.filter(transaction => {
@@ -385,17 +357,18 @@ const Ledger = () => {
     }
   }, [selectedEntity, viewMode, fromDate, toDate]); // Add date dependencies to refetch when dates change
   
-  const formatDate = (date) => {
+  const formatDateDisplay = (date) => {
     if (!date) return '-';
     
-    // Check if date is a Firebase timestamp or a Date object
-    const dateObj = typeof date.toDate === 'function' ? date.toDate() : date;
+    // Use safelyParseDate from dateUtils for consistent parsing
+    const dateObj = safelyParseDate(date);
     
-    return dateObj.toLocaleDateString('en-GB', { 
-      day: '2-digit', 
-      month: 'short', 
-      year: 'numeric' 
-    });
+    if (!dateObj || isNaN(dateObj.getTime())) {
+      return 'Invalid Date';
+    }
+    
+    // Use formatDate from dateUtils for consistent formatting
+    return formatDate(dateObj);
   };
   
   const formatCurrency = (amount) => {
@@ -461,7 +434,7 @@ const Ledger = () => {
         </head>
         <body>
           <h2>${title}</h2>
-          <p class="subtitle">${formatDate(new Date(fromDate))} to ${formatDate(new Date(toDate))}</p>
+          <p class="subtitle">${formatDateDisplay(fromDate)} to ${formatDateDisplay(toDate)}</p>
           ${printContents}
         </body>
       </html>
@@ -490,7 +463,7 @@ const Ledger = () => {
       
       // Add data rows
       ledgerData.forEach(item => {
-        const date = formatDate(item.date);
+        const date = formatDateDisplay(item.date);
         let particulars = '';
         
         if (item.type === 'invoice') {
@@ -514,7 +487,7 @@ const Ledger = () => {
       
       // Add data rows
       ledgerData.forEach(item => {
-        const date = formatDate(item.date);
+        const date = formatDateDisplay(item.date);
         const type = item.type === 'invoice' ? 'Invoice' : 'Payment';
         const reference = item.type === 'invoice' ? item.invoiceNumber : (item.notes || item.paymentMethod || '-');
         const amount = item.type === 'invoice' 
@@ -559,7 +532,7 @@ const Ledger = () => {
       
       message = `*Account Statement*\n\n` +
                 `*Party:* ${selectedEntity.opticalName}\n` +
-                `*Period:* ${formatDate(new Date(fromDate))} to ${formatDate(new Date(toDate))}\n` +
+                `*Period:* ${formatDateDisplay(fromDate)} to ${formatDateDisplay(toDate)}\n` +
                 `*Closing Balance:* ${formatCurrency(balance)}\n\n` +
                 `To view the complete statement, please contact us.`;
     } else if (viewMode === 'invoiceOnly') {
@@ -576,7 +549,7 @@ const Ledger = () => {
       
       message = `*Invoice Ledger*\n\n` +
                 `*Party:* ${selectedEntity.opticalName}\n` +
-                `*Period:* ${formatDate(new Date(fromDate))} to ${formatDate(new Date(toDate))}\n` +
+                `*Period:* ${formatDateDisplay(fromDate)} to ${formatDateDisplay(toDate)}\n` +
                 `*Net Amount:* ${formatCurrency(netAmount)}\n\n` +
                 `To view the complete ledger, please contact us.`;
     }
@@ -681,13 +654,13 @@ const Ledger = () => {
           <div>
             <div className="p-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-t-lg shadow-md">
               <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-                {selectedEntity?.opticalName} • {formatDate(new Date(fromDate))} to {formatDate(new Date(toDate))}
+                {selectedEntity?.opticalName} • {formatDateDisplay(fromDate)} to {formatDateDisplay(toDate)}
               </h3>
             </div>
             
             <AccountStatementView 
               ledgerData={ledgerData}
-              formatDate={formatDate}
+              formatDate={formatDateDisplay}
               formatCurrency={formatCurrency}
               getPaymentMethodLabel={getPaymentMethodLabel}
               onInvoiceClick={navigateToInvoiceDetail}
@@ -702,13 +675,13 @@ const Ledger = () => {
           <div>
             <div className="p-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-t-lg shadow-md">
               <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-                {selectedEntity?.opticalName} • {formatDate(new Date(fromDate))} to {formatDate(new Date(toDate))}
+                {selectedEntity?.opticalName} • {formatDateDisplay(fromDate)} to {formatDateDisplay(toDate)}
               </h3>
             </div>
             
             <InvoiceLedgerView 
               ledgerData={ledgerData} 
-              formatDate={formatDate}
+              formatDate={formatDateDisplay}
               formatCurrency={formatCurrency}
               onInvoiceClick={navigateToInvoiceDetail}
               onPurchaseClick={navigateToPurchaseDetail}

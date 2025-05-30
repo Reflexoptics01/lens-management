@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { getUserCollection } from '../utils/multiTenancy';
 
 const LedgerFilters = ({ fromDate, setFromDate, toDate, setToDate, selectedEntity, setSelectedEntity, handleSearch, loading }) => {
   const [entities, setEntities] = useState([]);
@@ -25,7 +26,7 @@ const LedgerFilters = ({ fromDate, setFromDate, toDate, setToDate, selectedEntit
   
   const fetchEntities = async () => {
     try {
-      const entitiesRef = collection(db, 'customers');
+      const entitiesRef = getUserCollection('customers');
       const q = query(entitiesRef, orderBy('opticalName'));
       const snapshot = await getDocs(q);
       

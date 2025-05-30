@@ -1,5 +1,6 @@
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
+import { getUserCollection } from './multiTenancy';
 
 /**
  * Calculate the current balance for a customer/vendor
@@ -9,10 +10,12 @@ import { db } from '../firebaseConfig';
  */
 export const calculateCustomerBalance = async (customerId, openingBalance = 0) => {
   try {
+    console.log('calculateCustomerBalance: Starting calculation for customer:', customerId);
+    
     let currentBalance = parseFloat(openingBalance) || 0;
     
-    // Get all sales (invoices) for this customer
-    const salesRef = collection(db, 'sales');
+    // Get all sales for this customer using multi-tenant collection
+    const salesRef = getUserCollection('sales');
     const salesQuery = query(salesRef, where('customerId', '==', customerId));
     const salesSnapshot = await getDocs(salesQuery);
     
@@ -25,8 +28,8 @@ export const calculateCustomerBalance = async (customerId, openingBalance = 0) =
       currentBalance += balanceDue;
     });
     
-    // Get all transactions for this customer
-    const transactionsRef = collection(db, 'transactions');
+    // Get all transactions for this customer using multi-tenant collection
+    const transactionsRef = getUserCollection('transactions');
     const transactionsQuery = query(transactionsRef, where('entityId', '==', customerId));
     const transactionsSnapshot = await getDocs(transactionsQuery);
     
@@ -61,8 +64,8 @@ export const calculateVendorBalance = async (vendorId, openingBalance = 0) => {
   try {
     let currentBalance = parseFloat(openingBalance) || 0;
     
-    // Get all purchases from this vendor
-    const purchasesRef = collection(db, 'purchases');
+    // Get all purchases from this vendor using multi-tenant collection
+    const purchasesRef = getUserCollection('purchases');
     const purchasesQuery = query(purchasesRef, where('vendorId', '==', vendorId));
     const purchasesSnapshot = await getDocs(purchasesQuery);
     
@@ -75,8 +78,8 @@ export const calculateVendorBalance = async (vendorId, openingBalance = 0) => {
       currentBalance += balanceDue;
     });
     
-    // Get all transactions for this vendor
-    const transactionsRef = collection(db, 'transactions');
+    // Get all transactions for this vendor using multi-tenant collection
+    const transactionsRef = getUserCollection('transactions');
     const transactionsQuery = query(transactionsRef, where('entityId', '==', vendorId));
     const transactionsSnapshot = await getDocs(transactionsQuery);
     
@@ -151,20 +154,8 @@ export const getBalanceStatusText = (balance) => {
  */
 export const isVendor = async (entityId) => {
   try {
-    // Check if it exists in vendors collection
-    try {
-      const vendorsRef = collection(db, 'vendors');
-      const vendorQuery = query(vendorsRef, where('__name__', '==', entityId));
-      const vendorSnapshot = await getDocs(vendorQuery);
-      if (!vendorSnapshot.empty) {
-        return true;
-      }
-    } catch (vendorError) {
-      // Vendors collection might not exist
-    }
-    
-    // Check if customer is marked as vendor
-    const customersRef = collection(db, 'customers');
+    // Check if customer is marked as vendor using multi-tenant collection
+    const customersRef = getUserCollection('customers');
     const customerQuery = query(customersRef, where('__name__', '==', entityId));
     const customerSnapshot = await getDocs(customerQuery);
     
@@ -175,8 +166,8 @@ export const isVendor = async (entityId) => {
       }
     }
     
-    // Check if entity has any purchases (indicating it's a vendor)
-    const purchasesRef = collection(db, 'purchases');
+    // Check if entity has any purchases (indicating it's a vendor) using multi-tenant collection
+    const purchasesRef = getUserCollection('purchases');
     const purchaseQuery = query(purchasesRef, where('vendorId', '==', entityId));
     const purchaseSnapshot = await getDocs(purchaseQuery);
     

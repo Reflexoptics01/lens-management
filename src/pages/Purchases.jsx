@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, getDocs, query, orderBy, doc, getDoc, deleteDoc, updateDoc, where } from 'firebase/firestore';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
+import { formatDate, formatDateTime, safelyParseDate } from '../utils/dateUtils';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import PrintInvoiceModal from '../components/PrintInvoiceModal';
@@ -70,14 +72,37 @@ const Purchases = () => {
   const fetchPurchases = async () => {
     try {
       setLoading(true);
-      const purchasesRef = collection(db, 'purchases');
+      
+      // Add debugging for user authentication
+      const userUid = localStorage.getItem('userUid');
+      console.log('fetchPurchases: Current user UID:', userUid);
+      
+      if (!userUid) {
+        console.error('fetchPurchases: No user UID found in localStorage');
+        setError('User not authenticated');
+        return;
+      }
+      
+      const purchasesRef = getUserCollection('purchases');
+      console.log('fetchPurchases: Got purchases collection reference');
+      
       const q = query(purchasesRef, orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
-      const purchasesList = snapshot.docs.map((doc, index) => ({
-        id: doc.id,
-        displayId: `P-${(snapshot.docs.length - index).toString().padStart(3, '0')}`,
-        ...doc.data()
-      }));
+      
+      console.log('fetchPurchases: Query executed, got', snapshot.docs.length, 'documents');
+      console.log('fetchPurchases: Current user path should be: users/' + userUid + '/purchases');
+      
+      if (snapshot.docs.length > 0) {
+        console.log('fetchPurchases: First document data sample:', snapshot.docs[0].data());
+      }
+      
+      const purchasesList = snapshot.docs
+        .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+        .map((doc, index) => ({
+          id: doc.id,
+          displayId: `P-${(snapshot.docs.length - index).toString().padStart(3, '0')}`,
+          ...doc.data()
+        }));
       setPurchases(purchasesList);
     } catch (error) {
       console.error('Error fetching purchases:', error);
@@ -89,13 +114,15 @@ const Purchases = () => {
 
   const fetchVendors = async () => {
     try {
-      const customersRef = collection(db, 'customers');
+      const customersRef = getUserCollection('customers');
       const q = query(customersRef, where('type', '==', 'vendor'));
       const snapshot = await getDocs(q);
-      const vendorsList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const vendorsList = snapshot.docs
+        .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
       setVendors(vendorsList);
     } catch (error) {
       console.error('Error fetching vendors:', error);
@@ -107,7 +134,7 @@ const Purchases = () => {
     if (!window.confirm('Are you sure you want to delete this purchase?')) return;
     
     try {
-      await deleteDoc(doc(db, 'purchases', purchaseId));
+      await deleteDoc(getUserDoc('purchases', purchaseId));
       setPurchases(prevPurchases => prevPurchases.filter(purchase => purchase.id !== purchaseId));
     } catch (error) {
       console.error('Error deleting purchase:', error);
@@ -115,11 +142,18 @@ const Purchases = () => {
     }
   };
 
-  const formatDate = (timestamp) => {
+  const formatDisplayDate = (timestamp) => {
     if (!timestamp) return { date: '-', time: '-' };
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    
+    // Use safelyParseDate from dateUtils for consistent parsing
+    const date = safelyParseDate(timestamp);
+    
+    if (!date || isNaN(date.getTime())) {
+      return { date: 'Invalid Date', time: '-' };
+    }
+    
     return {
-      date: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      date: formatDate(date), // Use formatDate from dateUtils  
       time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
     };
   };
@@ -141,7 +175,7 @@ const Purchases = () => {
     e.stopPropagation();
     try {
       // Fetch the full purchase data
-      const purchaseDoc = await getDoc(doc(db, 'purchases', purchaseId));
+      const purchaseDoc = await getDoc(getUserDoc('purchases', purchaseId));
       if (!purchaseDoc.exists()) {
         console.error('Purchase not found');
         return;
@@ -152,7 +186,7 @@ const Purchases = () => {
       // Get vendor details
       let vendorData = null;
       if (purchaseData.vendorId) {
-        const vendorDoc = await getDoc(doc(db, 'customers', purchaseData.vendorId));
+        const vendorDoc = await getDoc(getUserDoc('customers', purchaseData.vendorId));
         if (vendorDoc.exists()) {
           vendorData = vendorDoc.data();
         }
@@ -305,7 +339,7 @@ const Purchases = () => {
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                       {purchases.map((purchase) => {
-                        const { date, time } = formatDate(purchase.createdAt);
+                        const { date: purchaseDate, time: purchaseTime } = formatDisplayDate(purchase.createdAt);
                         const vendorDetails = getVendorDetails(purchase.vendorId);
                         return (
                           <tr 
@@ -317,8 +351,8 @@ const Purchases = () => {
                               <span className="text-sm font-medium text-sky-600 dark:text-sky-400">{purchase.displayId}</span>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="text-sm text-gray-900 dark:text-white">{date}</div>
-                              <div className="text-sm text-gray-500 dark:text-gray-400">{time}</div>
+                              <div className="text-sm text-gray-900 dark:text-white">{purchaseDate}</div>
+                              <div className="text-sm text-gray-500 dark:text-gray-400">{purchaseTime}</div>
                             </td>
                             <td className="px-6 py-4">
                               <div className="flex flex-col">
@@ -393,7 +427,7 @@ const Purchases = () => {
             {/* Mobile List View */}
             <div className="mobile-only space-y-4">
               {purchases.map((purchase) => {
-                const { date } = formatDate(purchase.createdAt);
+                const { date: mobileDate } = formatDisplayDate(purchase.createdAt);
                 const vendorDetails = getVendorDetails(purchase.vendorId);
                 return (
                   <div 
@@ -425,7 +459,7 @@ const Purchases = () => {
                         )}
                       </div>
                       <div className="flex justify-between items-center text-sm">
-                        <div className="text-gray-500 dark:text-gray-400">{date}</div>
+                        <div className="text-gray-500 dark:text-gray-400">{mobileDate}</div>
                         <div className="font-medium text-gray-900 dark:text-white">{formatCurrency(purchase.totalAmount)}</div>
                       </div>
                       <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 flex justify-between">
@@ -487,7 +521,7 @@ const Purchases = () => {
               {printData.vendor?.phone && <p>Phone: {printData.vendor.phone}</p>}
             </div>
             <div className="text-right">
-              <p><span className="font-bold">Date: </span>{formatDate(printData.purchaseDate).date}</p>
+              <p><span className="font-bold">Date: </span>{formatDisplayDate(printData.purchaseDate).date}</p>
               <p><span className="font-bold">Invoice #: </span>{printData.vendorInvoiceNumber || 'N/A'}</p>
               <p><span className="font-bold">Payment Status: </span>{getPaymentStatusText(printData.paymentStatus)}</p>
             </div>

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, getDocs, query, orderBy, doc, getDoc, deleteDoc, where, Timestamp, addDoc } from 'firebase/firestore';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 
 const SalesReturn = ({ isCreate = false, newReturn = false, isView = false }) => {
   const [returns, setReturns] = useState([]);
@@ -58,7 +59,7 @@ const SalesReturn = ({ isCreate = false, newReturn = false, isView = false }) =>
   const fetchSales = async () => {
     try {
       setLoading(true);
-      const salesRef = collection(db, 'sales');
+      const salesRef = getUserCollection('sales');
       const q = query(salesRef, orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
       const salesList = snapshot.docs.map((doc, index) => ({
@@ -104,7 +105,7 @@ const SalesReturn = ({ isCreate = false, newReturn = false, isView = false }) =>
   const fetchSale = async (saleId) => {
     try {
       setLoading(true);
-      const saleDoc = await getDoc(doc(db, 'sales', saleId));
+      const saleDoc = await getDoc(getUserDoc('sales', saleId));
       if (saleDoc.exists()) {
         const saleData = { id: saleId, ...saleDoc.data() };
         setSelectedSale(saleData);
@@ -197,7 +198,7 @@ const SalesReturn = ({ isCreate = false, newReturn = false, isView = false }) =>
       };
       
       // Add the return document to Firestore
-      await addDoc(collection(db, 'sales_returns'), returnData);
+      await addDoc(getUserCollection('salesReturns'), returnData);
       
       // Navigate back to the returns list
       navigate('/sales-returns');
@@ -236,7 +237,7 @@ const SalesReturn = ({ isCreate = false, newReturn = false, isView = false }) =>
   const fetchReturns = async () => {
     try {
       setLoading(true);
-      const returnsRef = collection(db, 'sales_returns');
+      const returnsRef = getUserCollection('salesReturns');
       const q = query(returnsRef, orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
       const returnsList = snapshot.docs.map((doc, index) => ({
@@ -255,7 +256,7 @@ const SalesReturn = ({ isCreate = false, newReturn = false, isView = false }) =>
 
   const fetchCustomers = async () => {
     try {
-      const customersRef = collection(db, 'customers');
+      const customersRef = getUserCollection('customers');
       const snapshot = await getDocs(customersRef);
       const customersList = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -272,7 +273,7 @@ const SalesReturn = ({ isCreate = false, newReturn = false, isView = false }) =>
     if (!window.confirm('Are you sure you want to delete this return?')) return;
     
     try {
-      await deleteDoc(doc(db, 'sales_returns', returnId));
+      await deleteDoc(getUserDoc('salesReturns', returnId));
       setReturns(prevReturns => prevReturns.filter(returnItem => returnItem.id !== returnId));
     } catch (error) {
       console.error('Error deleting return:', error);
@@ -540,7 +541,7 @@ const SalesReturn = ({ isCreate = false, newReturn = false, isView = false }) =>
   const fetchReturnDetails = async (returnId) => {
     try {
       setLoading(true);
-      const returnDoc = await getDoc(doc(db, 'sales_returns', returnId));
+      const returnDoc = await getDoc(getUserDoc('salesReturns', returnId));
       
       if (returnDoc.exists()) {
         const returnData = {
@@ -550,7 +551,7 @@ const SalesReturn = ({ isCreate = false, newReturn = false, isView = false }) =>
         
         // Get customer details
         if (returnData.customerId) {
-          const customerDoc = await getDoc(doc(db, 'customers', returnData.customerId));
+          const customerDoc = await getDoc(getUserDoc('customers', returnData.customerId));
           if (customerDoc.exists()) {
             returnData.customer = customerDoc.data();
           }
@@ -558,7 +559,7 @@ const SalesReturn = ({ isCreate = false, newReturn = false, isView = false }) =>
         
         // Get original sale details if available
         if (returnData.originalInvoiceId) {
-          const saleDoc = await getDoc(doc(db, 'sales', returnData.originalInvoiceId));
+          const saleDoc = await getDoc(getUserDoc('sales', returnData.originalInvoiceId));
           if (saleDoc.exists()) {
             returnData.originalSale = saleDoc.data();
           }

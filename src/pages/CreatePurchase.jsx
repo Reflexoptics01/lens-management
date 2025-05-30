@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import CustomerForm from '../components/CustomerForm';
 import ItemSuggestions from '../components/ItemSuggestions';
+import { getUserCollection } from '../utils/multiTenancy';
 
 const TAX_OPTIONS = [
   { id: 'TAX_FREE', label: 'Tax Free', rate: 0 },
@@ -104,7 +105,7 @@ const CreatePurchase = () => {
   const fetchVendors = async () => {
     try {
       setLoading(true);
-      const customersRef = collection(db, 'customers');
+      const customersRef = getUserCollection('customers');
       const q = query(customersRef, where('type', '==', 'vendor'));
       const snapshot = await getDocs(q);
       const vendorsList = snapshot.docs.map(doc => ({
@@ -125,7 +126,7 @@ const CreatePurchase = () => {
   const generatePurchaseNumber = async () => {
     try {
       // Get the current number of purchases
-      const purchasesRef = collection(db, 'purchases');
+      const purchasesRef = getUserCollection('purchases');
       const snapshot = await getDocs(purchasesRef);
       const newPurchaseNumber = `P-${(snapshot.docs.length + 1).toString().padStart(4, '0')}`;
       setPurchaseNumber(newPurchaseNumber);
@@ -139,7 +140,7 @@ const CreatePurchase = () => {
   const fetchItems = async () => {
     try {
       // Only fetch items from 'lens_inventory' collection to restrict suggestions
-      const lensRef = collection(db, 'lens_inventory');
+      const lensRef = getUserCollection('lensInventory');
       const lensSnapshot = await getDocs(lensRef);
       
       // Create a map to deduplicate items by name
@@ -362,13 +363,13 @@ const CreatePurchase = () => {
       
       // Add stock lenses to inventory
       for (const lens of stockLenses) {
-        await addDoc(collection(db, 'lens_inventory'), lens);
+        await addDoc(getUserCollection('lensInventory'), lens);
         console.log('Added stock lens to inventory:', lens.brandName);
       }
       
       // Add contact lenses to inventory
       for (const lens of contactLenses) {
-        await addDoc(collection(db, 'lens_inventory'), lens);
+        await addDoc(getUserCollection('lensInventory'), lens);
         console.log('Added contact lens to inventory:', lens.brandName);
       }
       
@@ -424,7 +425,7 @@ const CreatePurchase = () => {
         createdAt: serverTimestamp()
       };
 
-      const docRef = await addDoc(collection(db, 'purchases'), purchaseData);
+      const docRef = await addDoc(getUserCollection('purchases'), purchaseData);
       
       // Add lenses to inventory if any
       const lensItems = filteredRows.filter(row => 

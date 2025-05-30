@@ -40,28 +40,67 @@ const Login = () => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // Check if user exists and get permissions
+        console.log('=== LOGIN DEBUG START ===');
+        console.log('Login: User authenticated:', user.email);
+        console.log('Login: User UID:', user.uid);
+        
+        // Check if user is main admin first
+        if (user.email === 'reflexopticsolutions@gmail.com') {
+          console.log('Login: Super admin detected');
+          localStorage.setItem('userRole', 'superadmin');
+          localStorage.setItem('userPermissions', JSON.stringify({}));
+          localStorage.setItem('userUid', user.uid);
+          navigate('/admin');
+          return;
+        }
+        
         try {
+          console.log('Login: Checking if user exists in approved users collection...');
+          // First check if user exists in the approved users collection
+          // IMPORTANT: Check by UID, not email, to ensure exact user match
           const usersRef = collection(db, 'users');
-          const userQuery = query(usersRef, where('email', '==', user.email));
+          const userQuery = query(usersRef, where('uid', '==', user.uid));
           const userSnapshot = await getDocs(userQuery);
           
+          console.log('Login: Users collection query result:', userSnapshot.size, 'documents found');
+          
           if (!userSnapshot.empty) {
+            console.log('Login: Found approved user in users collection');
             // Store user role and permissions in localStorage for app-wide access
             const userData = userSnapshot.docs[0].data();
+            console.log('Login: User data from users collection:', userData);
+            
+            // Double-check that email matches too (additional security)
+            if (userData.email !== user.email) {
+              console.error('Login: UID found but email mismatch - security issue');
+              await auth.signOut();
+              setError('Account verification failed. Please contact an administrator.');
+              setInitializing(false);
+              return;
+            }
             
             // Check if user is inactive
             if (userData.isActive === false) {
               console.error('User account is inactive');
-              // Sign out the user
               await auth.signOut();
               setError('Your account has been deactivated. Please contact an administrator.');
               setInitializing(false);
               return;
             }
             
+            // Check if user is approved (for new registrations)
+            if (userData.status === 'pending') {
+              console.error('User account is pending approval');
+              await auth.signOut();
+              setError('Your account is pending approval. Please wait for admin verification.');
+              setInitializing(false);
+              return;
+            }
+            
+            console.log('Login: User is approved, setting up session...');
             localStorage.setItem('userRole', userData.role || 'user');
             localStorage.setItem('userPermissions', JSON.stringify(userData.permissions || {}));
+            localStorage.setItem('userUid', user.uid);
             
             // Navigate based on role or permissions
             if (userData.role === 'admin') {
@@ -76,29 +115,81 @@ const Login = () => {
               if (availablePaths.length > 0) {
                 navigate(availablePaths[0]);
               } else {
-                navigate('/orders'); // Default page if no specific permissions
+                navigate('/dashboard'); // Default page if no specific permissions
               }
             }
+            console.log('=== LOGIN DEBUG: APPROVED USER LOGIN SUCCESS ===');
           } else {
-            // Create new user document if it doesn't exist (for first login)
-            await addDoc(collection(db, 'users'), {
-              uid: user.uid,
-              email: user.email,
-              role: 'admin', // First user is admin by default
-              permissions: {}, // Admin has all permissions by default
-              createdAt: new Date(),
-              isActive: true // Mark as active by default
-            });
-            localStorage.setItem('userRole', 'admin');
-            localStorage.setItem('userPermissions', JSON.stringify({}));
-            navigate('/dashboard');
+            console.log('Login: User NOT found in approved users collection');
+            console.log('Login: Checking userRegistrations collection...');
+            
+            // User not in approved users collection, check if they're in pending registrations
+            // Check by UID for exact match
+            const registrationsRef = collection(db, 'userRegistrations');
+            const registrationQuery = query(registrationsRef, where('uid', '==', user.uid));
+            const registrationSnapshot = await getDocs(registrationQuery);
+            
+            console.log('Login: UserRegistrations collection query result:', registrationSnapshot.size, 'documents found');
+            
+            if (!registrationSnapshot.empty) {
+              const registrationData = registrationSnapshot.docs[0].data();
+              console.log('Login: Found user registration with status:', registrationData.status);
+              console.log('Login: Full registration data:', registrationData);
+              
+              // Double-check that email matches too (additional security)
+              if (registrationData.email !== user.email) {
+                console.error('Login: UID found in registrations but email mismatch - security issue');
+                await auth.signOut();
+                setError('Account verification failed. Please contact an administrator.');
+                setInitializing(false);
+                return;
+              }
+              
+              if (registrationData.status === 'pending') {
+                console.log('Login: User registration is PENDING - BLOCKING LOGIN');
+                await auth.signOut();
+                setError('Your account is pending approval. Please wait for admin verification.');
+                setInitializing(false);
+                console.log('=== LOGIN DEBUG: PENDING USER BLOCKED ===');
+                return;
+              } else if (registrationData.status === 'rejected') {
+                console.log('Login: User registration was REJECTED - BLOCKING LOGIN');
+                await auth.signOut();
+                setError('Your account registration was rejected. Please contact an administrator.');
+                setInitializing(false);
+                console.log('=== LOGIN DEBUG: REJECTED USER BLOCKED ===');
+                return;
+              } else {
+                // Registration exists but status is not pending or rejected
+                // This should not happen - sign out for security
+                console.log('Login: User registration has UNEXPECTED status:', registrationData.status, '- BLOCKING LOGIN');
+                await auth.signOut();
+                setError('Your account is not properly configured. Please contact an administrator.');
+                setInitializing(false);
+                console.log('=== LOGIN DEBUG: UNEXPECTED STATUS BLOCKED ===');
+                return;
+              }
+            } else {
+              // User doesn't exist in either collection - unauthorized
+              console.log('Login: User NOT found in userRegistrations collection either');
+              console.log('Login: UNAUTHORIZED ACCESS - BLOCKING LOGIN');
+              await auth.signOut();
+              setError('Unauthorized access. Please register for an account or contact an administrator.');
+              setInitializing(false);
+              console.log('=== LOGIN DEBUG: UNAUTHORIZED USER BLOCKED ===');
+              return;
+            }
           }
         } catch (error) {
-          console.error('Error checking user:', error);
-          // Still navigate to default page on error
-          navigate('/orders');
+          console.error('Login: Error during authentication check:', error);
+          await auth.signOut();
+          setError('An error occurred during login. Please try again.');
+          setInitializing(false);
+          console.log('=== LOGIN DEBUG: ERROR OCCURRED ===');
+          return;
         }
       }
+      console.log('Login: No authenticated user or authentication check complete');
       setInitializing(false);
     });
 
@@ -247,6 +338,18 @@ const Login = () => {
                 </span>
                 <span className="absolute bottom-0 left-0 w-full h-full transform translate-y-full bg-gradient-to-r from-indigo-600 to-blue-700 transition-transform duration-300 ease-in-out group-hover:translate-y-0"></span>
               </button>
+            </div>
+            
+            <div className="text-center mt-4">
+              <span className="text-sm text-gray-600">
+                No account?{' '}
+                <Link 
+                  to="/register" 
+                  className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
+                >
+                  Create one now
+                </Link>
+              </span>
             </div>
           </form>
         </div>

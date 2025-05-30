@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 import { XMarkIcon } from '@heroicons/react/24/outline';
+import { toast } from 'react-hot-toast';
 
 const CustomerForm = ({ onClose, customer, isVendor = false }) => {
   const modalRef = useRef(null);
@@ -88,57 +90,48 @@ const CustomerForm = ({ onClose, customer, isVendor = false }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
-
-    setLoading(true);
-    setError('');
-
+    
+    if (!validateForm()) {
+      return;
+    }
+    
     try {
-      // Create data without server timestamps to prevent serialization issues
-      const customerData = {
-        ...formData,
-        creditLimit: formData.creditLimit ? parseFloat(formData.creditLimit) : 0,
-        openingBalance: formData.openingBalance ? parseFloat(formData.openingBalance) : 0,
-        creditPeriod: formData.creditPeriod ? parseInt(formData.creditPeriod, 10) : 0,
-        updatedAt: new Date().toISOString(), // Use ISO string instead of serverTimestamp
-        type: isVendor ? 'vendor' : 'customer' 
-      };
-
-      console.log("Saving customer data:", customerData);
-
+      setLoading(true);
+      
+      // Log form data for debugging
+      console.log('Submitting customer form with data:', formData);
+      console.log('Phone field value:', formData.phone);
+      
+      // Check if it's an edit or create
       if (customer) {
-        await updateDoc(doc(db, 'customers', customer.id), customerData);
-        console.log("Customer updated successfully");
-        // Remove server timestamp from local state to avoid serialization issues
-        const savedData = { 
-          id: customer.id, 
-          ...customerData,
-          updatedAt: new Date().toISOString() 
-        };
-        setSavedCustomer(savedData);
+        // Update existing customer
+        await updateDoc(getUserDoc('customers', customer.id), {
+          ...formData,
+          updatedAt: serverTimestamp()
+        });
+        
+        console.log(`Updated ${entityName}:`, customer.id);
+        console.log('Updated data includes phone:', formData.phone);
+        
+        toast.success(`${entityName} updated successfully!`);
       } else {
-        customerData.createdAt = new Date().toISOString(); // Use ISO string
-        const docRef = await addDoc(collection(db, 'customers'), customerData);
-        console.log("New customer added successfully with ID:", docRef.id);
-        const savedData = { 
-          id: docRef.id, 
-          ...customerData 
-        };
-        setSavedCustomer(savedData);
+        // Create new customer
+        const docRef = await addDoc(getUserCollection('customers'), {
+          ...formData,
+          createdAt: serverTimestamp()
+        });
+        
+        console.log(`Created new ${entityName}:`, docRef.id);
+        console.log('New customer data includes phone:', formData.phone);
+        
+        toast.success(`${entityName} created successfully!`);
       }
-
-      // Small delay to ensure Firestore has time to update
-      setTimeout(() => {
-        // Pass true to onClose to indicate a customer was added/updated
-        try {
-          onClose(true);
-        } catch (closeError) {
-          console.error("Error in onClose callback:", closeError);
-        }
-      }, 300);
+      
+      // Close the form and refresh the parent component
+      onClose(true);
     } catch (error) {
-      console.error('Error saving customer:', error);
-      setError(`Failed to save ${isVendor ? 'vendor' : 'customer'}. Please try again.`);
+      console.error(`Error saving ${entityName.toLowerCase()}:`, error);
+      toast.error(`Failed to save ${entityName.toLowerCase()}. Please try again.`);
     } finally {
       setLoading(false);
     }

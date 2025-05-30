@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, addDoc, doc, updateDoc, Timestamp } from 'firebase/firestore';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 
 const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCancel }) => {
   const [loading, setLoading] = useState(false);
@@ -125,7 +126,7 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
           };
           
           // Add document to Firestore
-          const docRef = await addDoc(collection(db, 'lens_inventory'), lensData);
+          const docRef = await addDoc(getUserCollection('lensInventory'), lensData);
           addedLenses.push({ id: docRef.id, ...lensData });
         }
         

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { db } from '../firebaseConfig';
-import { collection, getDocs, getDoc, doc, addDoc, serverTimestamp, query, where, orderBy, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, getDoc, updateDoc, setDoc, deleteDoc, serverTimestamp, query, where, orderBy, Timestamp } from 'firebase/firestore';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import CustomerSearch from '../components/CustomerSearch';
@@ -8,8 +9,7 @@ import CustomerForm from '../components/CustomerForm';
 import ItemSuggestions from '../components/ItemSuggestions';
 import PrintInvoiceModal from '../components/PrintInvoiceModal';
 import BottomActionBar from '../components/BottomActionBar';
-import { Timestamp } from 'firebase/firestore';
-import { calculateCustomerBalance, formatCurrency as formatCurrencyUtil, getBalanceColorClass, getBalanceStatusText, calculateVendorBalance } from '../utils/ledgerUtils';
+import { calculateCustomerBalance, calculateVendorBalance, formatCurrency as formatCurrencyUtil, getBalanceColorClass, getBalanceStatusText } from '../utils/ledgerUtils';
 
 const TAX_OPTIONS = [
   { id: 'TAX_FREE', label: 'Tax Free', rate: 0 },
@@ -84,6 +84,10 @@ const CreateSale = () => {
   // Success modal
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [savedSaleId, setSavedSaleId] = useState(null);
+  
+  // Add state for address modal
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [shopInfo, setShopInfo] = useState(null);
 
   const [searchCustomer, setSearchCustomer] = useState('');
 
@@ -168,6 +172,7 @@ const CreateSale = () => {
     fetchCustomers();
     previewNextInvoiceNumber();
     fetchItems();
+    fetchShopInfo();
   }, []);
 
   // Add useEffect to fetch dispatch logs when invoice date changes
@@ -176,39 +181,35 @@ const CreateSale = () => {
       fetchDispatchLogs(selectedLogDate);
     }
   }, [selectedLogDate]);
+  
+  // Fetch shop information for the address
+  const fetchShopInfo = async () => {
+    try {
+      const shopSettingsDoc = await getDoc(doc(db, 'settings', 'shopSettings'));
+      if (shopSettingsDoc.exists()) {
+        setShopInfo(shopSettingsDoc.data());
+      }
+    } catch (error) {
+      console.error('Error fetching shop info:', error);
+    }
+  };
 
   const fetchCustomers = async () => {
     try {
       setLoading(true);
       
       // Fetch customers
-      const customersRef = collection(db, 'customers');
+      const customersRef = getUserCollection('customers');
       const customersQuery = query(customersRef, orderBy('opticalName'));
       const customersSnapshot = await getDocs(customersQuery);
-      const customersList = customersSnapshot.docs.map(doc => ({
-        id: doc.id,
-        type: 'customer',
-        ...doc.data()
-      }));
-      
-      // Fetch vendors (if vendors collection exists)
-      let vendorsList = [];
-      try {
-        const vendorsRef = collection(db, 'vendors');
-        const vendorsQuery = query(vendorsRef, orderBy('name'));
-        const vendorsSnapshot = await getDocs(vendorsQuery);
-        vendorsList = vendorsSnapshot.docs.map(doc => ({
+      const customersList = customersSnapshot.docs
+        .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+        .map(doc => ({
           id: doc.id,
-          opticalName: doc.data().name || doc.data().vendorName || doc.data().opticalName,
-          type: 'vendor',
-          isVendor: true,
           ...doc.data()
         }));
-      } catch (vendorError) {
-        console.log('No vendors collection found or error fetching vendors:', vendorError);
-      }
       
-      // Also include customers marked as vendors
+      // Include customers marked as vendors (no need to fetch from global vendors collection)
       const customersAsVendors = customersList.filter(customer => 
         customer.isVendor || customer.type === 'vendor'
       ).map(customer => ({
@@ -218,7 +219,7 @@ const CreateSale = () => {
       }));
       
       // Merge all entities and remove duplicates by ID
-      const allEntities = [...customersList, ...vendorsList, ...customersAsVendors];
+      const allEntities = [...customersList, ...customersAsVendors];
       const uniqueEntities = allEntities.reduce((acc, entity) => {
         const existingIndex = acc.findIndex(e => e.id === entity.id);
         if (existingIndex >= 0) {
@@ -255,7 +256,7 @@ const CreateSale = () => {
       const settingsDoc = await getDoc(doc(db, 'settings', 'shopSettings'));
       if (!settingsDoc.exists()) {
         // Fallback to old method for preview
-        const salesRef = collection(db, 'sales');
+        const salesRef = getUserCollection('sales');
         const snapshot = await getDocs(salesRef);
         const previewNumber = `INV-${(snapshot.docs.length + 1).toString().padStart(4, '0')}`;
         setInvoiceNumber(previewNumber);
@@ -267,7 +268,7 @@ const CreateSale = () => {
       
       if (!financialYear) {
         // Fallback to old method for preview
-        const salesRef = collection(db, 'sales');
+        const salesRef = getUserCollection('sales');
         const snapshot = await getDocs(salesRef);
         const previewNumber = `INV-${(snapshot.docs.length + 1).toString().padStart(4, '0')}`;
         setInvoiceNumber(previewNumber);
@@ -328,7 +329,7 @@ const CreateSale = () => {
       
       if (!financialYear) {
         // If no financial year is set, fall back to old method
-        const salesRef = collection(db, 'sales');
+        const salesRef = getUserCollection('sales');
         const snapshot = await getDocs(salesRef);
         const newInvoiceNumber = `INV-${(snapshot.docs.length + 1).toString().padStart(4, '0')}`;
         return newInvoiceNumber;
@@ -385,7 +386,7 @@ const CreateSale = () => {
       console.error('Error generating invoice number:', error);
       // Fall back to the old method if there's an error
       try {
-        const salesRef = collection(db, 'sales');
+        const salesRef = getUserCollection('sales');
         const snapshot = await getDocs(salesRef);
         const newInvoiceNumber = `INV-${(snapshot.docs.length + 1).toString().padStart(4, '0')}`;
         return newInvoiceNumber;
@@ -450,12 +451,11 @@ const CreateSale = () => {
       let orderDoc = null;
       let snapshot = null;
       
-      // Try with the original displayId
-        const ordersRef = collection(db, 'orders');
-      let q = query(ordersRef, where('displayId', '==', orderId));
-      snapshot = await getDocs(q);
-        
-      // If no results, try with padding
+      // Search in orders collection by displayId
+      const ordersRef = getUserCollection('orders');
+      const queryByDisplayId = query(ordersRef, where('displayId', '==', orderId));
+      snapshot = await getDocs(queryByDisplayId);
+      
       if (snapshot.empty) {
         console.log(`No order found with display ID: "${orderId}", trying with padding`);
         const paddedDisplayId = orderId.toString().padStart(3, '0');
@@ -541,7 +541,7 @@ const CreateSale = () => {
       
       // First try searching by orderId
       console.log('Searching for lenses with orderId:', orderData.id);
-      const lensRef = collection(db, 'lens_inventory');
+      const lensRef = getUserCollection('lensInventory');
       let q = query(lensRef, where('orderId', '==', orderData.id));
       let snapshot = await getDocs(q);
       
@@ -583,7 +583,7 @@ const CreateSale = () => {
             action: 'update',
             data: {
               qty: lens.qty - 1,
-              updatedAt: Timestamp.now()
+              updatedAt: Timestamp.fromDate(new Date())
             }
           });
         } else {
@@ -597,7 +597,7 @@ const CreateSale = () => {
       
       // Execute all updates/deletes
       for (const operation of batch) {
-        const lensDocRef = doc(db, 'lens_inventory', operation.id);
+        const lensDocRef = getUserDoc('lensInventory', operation.id);
         
         if (operation.action === 'update') {
           await updateDoc(lensDocRef, operation.data);
@@ -681,7 +681,7 @@ const CreateSale = () => {
         source: 'sale_creation'
       };
       
-      await addDoc(collection(db, 'transactions'), transactionData);
+      await addDoc(getUserCollection('transactions'), transactionData);
       console.log(`✅ Payment transaction registered: ${transactionType} ₹${amountPaid} for ${customer.opticalName}`);
       
     } catch (error) {
@@ -708,20 +708,26 @@ const CreateSale = () => {
       setLoading(true);
       setError('');
 
+      // Debug log customer data
+      console.log('Customer data when saving sale:', selectedCustomer);
+      console.log('Phone number when saving sale:', selectedCustomer.phone);
+      console.log('Phone number type:', typeof selectedCustomer.phone);
+
       // Generate the actual invoice number only when saving
       const finalInvoiceNumber = await generateInvoiceNumberForSave();
 
       // Create sale document
       const saleData = {
+        customerId: selectedCustomer.id,
+        customerName: selectedCustomer.opticalName || selectedCustomer.name || '',
+        customerAddress: selectedCustomer.address || '',
+        customerCity: selectedCustomer.city || '',
+        customerState: selectedCustomer.state || '',
+        phone: selectedCustomer.phone || '', // Add phone number from customer
+        gstNumber: selectedCustomer.gstNumber || '',
         invoiceNumber: finalInvoiceNumber,
         invoiceDate: new Date(invoiceDate),
         dueDate: dueDate ? new Date(dueDate) : null,
-        customerId: selectedCustomer.id,
-        customerName: selectedCustomer.opticalName,
-        customerAddress: selectedCustomer.address,
-        customerCity: selectedCustomer.city,
-        customerState: selectedCustomer.state,
-        customerGst: selectedCustomer.gstNumber,
         items: filledRows.map(row => {
           // Make sure SPH, CYL, and ADD are properly formatted for each item
           const formattedRow = {
@@ -761,7 +767,7 @@ const CreateSale = () => {
         createdAt: serverTimestamp()
       };
 
-      const docRef = await addDoc(collection(db, 'sales'), saleData);
+      const docRef = await addDoc(getUserCollection('sales'), saleData);
       
       // Update the invoice number state for UI display (this is the actual saved number)
       setInvoiceNumber(finalInvoiceNumber);
@@ -806,8 +812,8 @@ const CreateSale = () => {
       // For each order ID, find the actual order document
       for (const displayId of orderIds) {
         try {
-          // Find the order by displayId
-          const ordersRef = collection(db, 'orders');
+          // Find the order by displayId using multi-tenant collection
+          const ordersRef = getUserCollection('orders');
           const q = query(ordersRef, where('displayId', '==', displayId));
           const snapshot = await getDocs(q);
           
@@ -831,8 +837,8 @@ const CreateSale = () => {
                 continue;
               }
               
-              // Mark this order as DELIVERED in the orders collection
-              await updateDoc(doc(db, 'orders', orderData.id), {
+              // Mark this order as DELIVERED in the orders collection using multi-tenant reference
+              await updateDoc(getUserDoc('orders', orderData.id), {
                 status: 'DELIVERED',
                 updatedAt: serverTimestamp()
               });
@@ -858,8 +864,8 @@ const CreateSale = () => {
             continue;
           }
           
-          // Mark this order as DELIVERED in the orders collection
-          await updateDoc(doc(db, 'orders', orderData.id), {
+          // Mark this order as DELIVERED in the orders collection using multi-tenant reference
+          await updateDoc(getUserDoc('orders', orderData.id), {
             status: 'DELIVERED',
             updatedAt: serverTimestamp()
           });
@@ -897,8 +903,8 @@ const CreateSale = () => {
             continue;
           }
           
-          // Search for matching items in lens_inventory
-          const lensRef = collection(db, 'lens_inventory');
+          // Search for matching items in lensInventory using multi-tenant collection
+          const lensRef = getUserCollection('lensInventory');
           let matchingLenses = [];
           
           // Method 1: Try to find exact matches by brand name
@@ -1022,13 +1028,13 @@ const CreateSale = () => {
             try {
               if (newQty <= 0) {
                 // Remove the lens from inventory if quantity becomes zero or negative
-                await deleteDoc(doc(db, 'lens_inventory', lens.id));
+                await deleteDoc(getUserDoc('lensInventory', lens.id));
                 console.log(`🗑️ Removed lens ${lens.id} from inventory (quantity depleted)`);
               } else {
                 // Update the quantity
-                await updateDoc(doc(db, 'lens_inventory', lens.id), {
+                await updateDoc(getUserDoc('lensInventory', lens.id), {
                   qty: newQty,
-                  updatedAt: serverTimestamp()
+                  updatedAt: Timestamp.fromDate(new Date())
                 });
                 console.log(`✅ Updated lens ${lens.id} quantity to ${newQty}`);
               }
@@ -1134,8 +1140,8 @@ const CreateSale = () => {
   // Add function to fetch saved items
   const fetchItems = async () => {
     try {
-      // Only fetch items from 'lens_inventory' collection to restrict suggestions
-      const lensRef = collection(db, 'lens_inventory');
+      // Only fetch items from 'lensInventory' collection to restrict suggestions using multi-tenant collection
+      const lensRef = getUserCollection('lensInventory');
       const allSnapshot = await getDocs(lensRef);
       
       // Create a map to deduplicate items by name
@@ -1206,7 +1212,7 @@ const CreateSale = () => {
     
     try {
       const normalizedName = itemName.trim();
-      const itemsRef = collection(db, 'items');
+      const itemsRef = getUserCollection('items');
       
       // First check if item with this name already exists
       const q = query(itemsRef, where('name', '==', normalizedName));
@@ -1290,7 +1296,7 @@ const CreateSale = () => {
     try {
       console.log(`Fetching dispatch logs for date: ${date}`);
       
-      const dispatchRef = collection(db, 'dispatch_logs');
+      const dispatchRef = getUserCollection('dispatchLogs');
       
       // Try without orderBy first to see if we get any results
       const simpleQuery = query(dispatchRef, where('date', '==', date));
@@ -1309,8 +1315,11 @@ const CreateSale = () => {
         
         // Filter manually
         const logsList = allSnapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(log => log.date === date);
+          .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+          .map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
         
         console.log(`Manually filtered logs for ${date}:`, logsList);
         setDispatchLogs(logsList);
@@ -1442,7 +1451,7 @@ const CreateSale = () => {
       const normalizedQuery = query.toLowerCase().trim();
       
       // Search in dispatch logs
-      const dispatchRef = collection(db, 'dispatch_logs');
+      const dispatchRef = getUserCollection('dispatchLogs');
       const snapshot = await getDocs(dispatchRef);
       
       const matchingLogs = [];
@@ -1495,6 +1504,254 @@ const CreateSale = () => {
         viewMode: 'invoiceOnly'
       } 
     });
+  };
+
+  // Function to handle printing the address
+  const handlePrintAddress = () => {
+    if (!selectedCustomer || !shopInfo) {
+      console.error('Customer or shop info not available');
+      return;
+    }
+    
+    // Debug logging for phone number
+    console.log('Customer data in handlePrintAddress:', selectedCustomer);
+    console.log('Phone number available:', selectedCustomer.phone);
+    console.log('Phone number type:', typeof selectedCustomer.phone);
+    
+    setShowAddressModal(true);
+  };
+
+  // Function to actually print the address content
+  const printAddressContent = () => {
+    const content = document.getElementById('address-content');
+    if (!content) return;
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Print Address</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 0;
+              padding: 20px;
+            }
+            .address-wrapper {
+              display: flex;
+              flex-direction: column;
+              gap: 30px;
+              max-width: 400px;
+              margin: 0 auto;
+            }
+            .address-block {
+              border: 1px solid #000;
+              padding: 15px;
+              margin-bottom: 20px;
+            }
+            .address-label {
+              font-weight: bold;
+              font-size: 14px;
+              margin-bottom: 5px;
+              text-transform: uppercase;
+            }
+            .address-text {
+              font-size: 16px;
+              line-height: 1.4;
+            }
+            h2 {
+              margin-top: 0;
+              margin-bottom: 10px;
+              font-size: 18px;
+              text-align: center;
+            }
+            .divider {
+              border-bottom: 1px dashed #000;
+              margin: 15px 0;
+            }
+            @media print {
+              body {
+                padding: 0;
+              }
+              .no-print {
+                display: none;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          ${content.innerHTML}
+          <div class="no-print" style="margin-top: 20px; text-align: center;">
+            <button onclick="window.print();" style="padding: 10px 20px; background: #4a90e2; color: white; border: none; border-radius: 4px; cursor: pointer;">
+              Print
+            </button>
+            <button onclick="window.close();" style="padding: 10px 20px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">
+              Close
+            </button>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    
+    // Auto-print after a delay to ensure content is loaded
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+    }, 500);
+  };
+
+  // Address Modal Component
+  const AddressModal = () => {
+    if (!selectedCustomer || !shopInfo) return null;
+    
+    // Debug logging for phone number in modal
+    console.log('AddressModal - Customer data:', selectedCustomer);
+    console.log('AddressModal - Phone number:', selectedCustomer.phone);
+    
+    return (
+      <div className="fixed inset-0 overflow-y-auto z-50">
+        <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+          <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+          </div>
+
+          <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+          <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div id="address-content" className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+              <div className="address-wrapper">
+                <div className="address-block">
+                  <h2>FROM</h2>
+                  <div className="divider"></div>
+                  <div className="address-label">Sender:</div>
+                  <div className="address-text">
+                    <strong>{shopInfo.shopName || 'Your Shop Name'}</strong><br />
+                    {shopInfo.address || ''}<br />
+                    {shopInfo.city && shopInfo.state ? `${shopInfo.city}, ${shopInfo.state}` : shopInfo.city || shopInfo.state || ''} 
+                    {shopInfo.pincode ? ` - ${shopInfo.pincode}` : ''}<br />
+                    {shopInfo.phone && `Phone: ${shopInfo.phone}`}<br />
+                    {shopInfo.email && `Email: ${shopInfo.email}`}<br />
+                    {shopInfo.gstNumber && `GSTIN: ${shopInfo.gstNumber}`}
+                  </div>
+                </div>
+
+                <div className="address-block">
+                  <h2>TO</h2>
+                  <div className="divider"></div>
+                  <div className="address-label">Recipient:</div>
+                  <div className="address-text">
+                    <strong>{selectedCustomer.opticalName || 'Customer Name'}</strong><br />
+                    {selectedCustomer.address || ''}<br />
+                    {selectedCustomer.city && selectedCustomer.state ? `${selectedCustomer.city}, ${selectedCustomer.state}` : selectedCustomer.city || selectedCustomer.state || ''}<br />
+                    {selectedCustomer.phone && `Phone: ${selectedCustomer.phone}`}<br />
+                    {selectedCustomer.gstNumber && `GSTIN: ${selectedCustomer.gstNumber}`}<br />
+                    {`Invoice: ${invoiceNumber || ''}`}<br />
+                    {`Date: ${new Date(invoiceDate).toLocaleDateString()}`}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              <button
+                type="button"
+                onClick={printAddressContent}
+                className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
+              >
+                Print
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAddressModal(false)}
+                className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Success Modal
+  const SuccessModal = () => {
+    return (
+      <div className="fixed inset-0 overflow-y-auto z-50">
+        <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+          <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+          </div>
+
+          <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+          <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+              <div className="sm:flex sm:items-start">
+                <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100 sm:mx-0 sm:h-10 sm:w-10">
+                  <svg className="h-6 w-6 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">Sale Created Successfully!</h3>
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-500">
+                      The sale has been created successfully with invoice number {invoiceNumber}.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              <button
+                type="button"
+                onClick={handlePrintBill}
+                className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Print Bill
+              </button>
+              
+              <button
+                type="button"
+                onClick={handlePrintAddress}
+                className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                Print Address
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  resetForm();
+                }}
+                className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+              >
+                New Sale
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  navigate(`/sales/${savedSaleId}`);
+                }}
+                className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+              >
+                View Details
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -2086,80 +2343,20 @@ const CreateSale = () => {
         </div>
 
         {/* Success Modal */}
-        {showSuccessModal && (
-          <div className="fixed inset-0 overflow-y-auto z-50">
-            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-              <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-                <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-              </div>
+        {showSuccessModal && <SuccessModal />}
 
-              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        {/* Address Modal */}
+        {showAddressModal && <AddressModal />}
 
-              <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <div className="sm:flex sm:items-start">
-                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/50 sm:mx-0 sm:h-10 sm:w-10">
-                      <svg className="h-6 w-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                      <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
-                        Invoice Created Successfully
-                      </h3>
-                      <div className="mt-2">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          Your invoice has been successfully created and saved.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={handlePrintBill}
-                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:w-auto sm:text-sm"
-                    disabled={loading}
-                  >
-                    <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                    </svg>
-                    Print Bill
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handlePrintBillAlternative}
-                    className="w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-gray-100 dark:bg-gray-600 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:w-auto sm:text-sm"
-                    disabled={loading}
-                  >
-                    <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                    Print (New Window)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSendWhatsApp}
-                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-teal-600 text-base font-medium text-white hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 sm:mt-0 sm:w-auto sm:text-sm"
-                    disabled={loading}
-                  >
-                    <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                    Send via WhatsApp
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => navigate('/sales')}
-                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 sm:mt-0 sm:w-auto sm:text-sm"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+        {/* Customer Form Modal */}
+        {showCustomerForm && (
+          <CustomerForm
+            onClose={handleCustomerFormClose}
+            customer={null}
+            initialData={{
+              name: searchCustomer
+            }}
+          />
         )}
 
         {/* Add Dispatch Logs Modal */}
@@ -2340,14 +2537,6 @@ const CreateSale = () => {
         )}
       </main>
       
-      {/* Customer Form Modal */}
-      {showCustomerForm && (
-        <CustomerForm 
-          onClose={handleCustomerFormClose}
-          customer={null}
-        />
-      )}
-
       {/* Print Invoice Modal */}
       {showPrintModal && savedSaleId && (
         <PrintInvoiceModal 

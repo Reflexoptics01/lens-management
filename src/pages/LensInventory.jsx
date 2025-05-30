@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, getDocs, addDoc, doc, deleteDoc, Timestamp, query, orderBy, updateDoc } from 'firebase/firestore';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import AddLensForm from '../components/AddLensForm';
@@ -240,7 +241,7 @@ const LensInventory = () => {
           updatedAt: Timestamp.now()
         };
         
-        await updateDoc(doc(db, 'lens_inventory', lensToEdit.id), lensData);
+        await updateDoc(getUserDoc('lensInventory', lensToEdit.id), lensData);
         console.log("Updated stock lens:", lensData);
         
         // Reset edit mode
@@ -259,7 +260,7 @@ const LensInventory = () => {
             createdAt: Timestamp.now()
           };
           
-          await addDoc(collection(db, 'lens_inventory'), lensData);
+          await addDoc(getUserCollection('lensInventory'), lensData);
         }
         
         // Reset form
@@ -292,13 +293,15 @@ const LensInventory = () => {
       setLoading(true);
       setError('');
       
-      const lensRef = collection(db, 'lens_inventory');
+      const lensRef = getUserCollection('lensInventory');
       const snapshot = await getDocs(lensRef);
       
-      const lensesList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const lensesList = snapshot.docs
+        .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
       
       console.log("Fetched lenses:", lensesList); // Debug log
       setLenses(lensesList);
@@ -380,7 +383,7 @@ const LensInventory = () => {
     if (window.confirm('Are you sure you want to remove this lens from inventory?')) {
       try {
         setLoading(true);
-        await deleteDoc(doc(db, 'lens_inventory', id));
+        await deleteDoc(getUserDoc('lensInventory', id));
         fetchLensInventory();
       } catch (error) {
         console.error('Error removing lens:', error);
@@ -461,7 +464,7 @@ const LensInventory = () => {
           updatedAt: Timestamp.now()
         };
         
-        await updateDoc(doc(db, 'lens_inventory', lensToEdit.id), lensData);
+        await updateDoc(getUserDoc('lensInventory', lensToEdit.id), lensData);
       } else if (lensToEdit.type === 'service') {
         // Update service
         const lensData = {
@@ -470,7 +473,7 @@ const LensInventory = () => {
           updatedAt: Timestamp.now()
         };
         
-        await updateDoc(doc(db, 'lens_inventory', lensToEdit.id), lensData);
+        await updateDoc(getUserDoc('lensInventory', lensToEdit.id), lensData);
       } else {
         // Update prescription lens
         const validRows = prescriptionRows.filter(row => row.sph && row.sph.trim() !== '');
@@ -496,7 +499,7 @@ const LensInventory = () => {
           updatedAt: Timestamp.now()
         };
         
-        await updateDoc(doc(db, 'lens_inventory', lensToEdit.id), lensData);
+        await updateDoc(getUserDoc('lensInventory', lensToEdit.id), lensData);
       }
       
       // Reset form and states

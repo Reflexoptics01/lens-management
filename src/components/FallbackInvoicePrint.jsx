@@ -293,18 +293,18 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
   };
 
   if (loading) {
-    return <div className="p-4 dark:text-gray-300">Loading invoice data...</div>;
+    return <div className="p-4" style={{ color: '#374151' }}>Loading invoice data...</div>;
   }
 
   if (error) {
-    return <div className="p-4 text-red-500 dark:text-red-400">Error: {error}</div>;
+    return <div className="p-4" style={{ color: '#dc2626' }}>Error: {error}</div>;
   }
 
   // saleData might be null here if there was an error before this point or if loading is slow
   // Adding a check for saleData before trying to access its properties.
   if (!saleData) {
     // Or return a specific message indicating saleData is not available yet
-    return <div className="p-4 dark:text-gray-300">Invoice data is not available.</div>;
+    return <div className="p-4" style={{ color: '#374151' }}>Invoice data is not available.</div>;
   }
 
   console.log('Shop settings:', shopSettings);
@@ -335,32 +335,28 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
 
   return (
     <div className="print-container">
-      <div className="no-print mb-4 p-4 bg-gray-100 dark:bg-gray-800 flex justify-between items-center">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Invoice #{saleData.invoiceNumber}</h2>
-        <div className="flex space-x-2">
-          <button 
-            onClick={handlePrint} 
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded flex items-center transition-colors"
-          >
-            <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-            </svg>
-            Print Invoice
-          </button>
-          <button 
-            onClick={onClose} 
-            className="px-4 py-2 bg-gray-500 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-700 text-white rounded flex items-center transition-colors"
-          >
-            <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            Close
-          </button>
-        </div>
-      </div>
-      
       <style>
         {`
+          /* Force light theme for the entire print container */
+          .print-container {
+            background-color: white !important;
+            color: #374151 !important;
+          }
+          
+          /* Override any dark mode styles in the no-print header */
+          .print-container .no-print {
+            background-color: #f3f4f6 !important;
+            color: #374151 !important;
+          }
+          
+          .print-container .no-print h2 {
+            color: #111827 !important;
+          }
+          
+          .print-container .no-print button {
+            transition: all 0.2s ease;
+          }
+          
           @media print {
             body * {
               visibility: hidden;
@@ -384,12 +380,53 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
               size: auto;
               margin: 10mm;
             }
+            /* Ensure print uses white background and black text */
+            * {
+              background-color: white !important;
+              color: black !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
           }
           .print-only {
             display: block;
+            background-color: white !important;
+            color: black !important;
           }
         `}
       </style>
+      
+      <div className="no-print mb-4 p-4" style={{ backgroundColor: '#f3f4f6', color: '#374151' }}>
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-bold" style={{ color: '#111827' }}>Invoice #{saleData.invoiceNumber}</h2>
+          <div className="flex space-x-2">
+            <button 
+              onClick={handlePrint} 
+              className="px-4 py-2 text-white rounded flex items-center transition-colors"
+              style={{ backgroundColor: '#2563eb' }}
+              onMouseOver={(e) => e.target.style.backgroundColor = '#1d4ed8'}
+              onMouseOut={(e) => e.target.style.backgroundColor = '#2563eb'}
+            >
+              <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              Print Invoice
+            </button>
+            <button 
+              onClick={onClose} 
+              className="px-4 py-2 text-white rounded flex items-center transition-colors"
+              style={{ backgroundColor: '#6b7280' }}
+              onMouseOver={(e) => e.target.style.backgroundColor = '#4b5563'}
+              onMouseOut={(e) => e.target.style.backgroundColor = '#6b7280'}
+            >
+              <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
       
       <div className="print-only">
         <div style={{ maxWidth: '800px', margin: '0 auto', fontSize: '12px' }}>

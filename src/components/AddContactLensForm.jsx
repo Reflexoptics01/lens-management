@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, addDoc, doc, updateDoc, Timestamp } from 'firebase/firestore';
+import { getUserCollection } from '../utils/multiTenancy';
 
 const CONTACT_CATEGORIES = ['Toric', 'Non-Toric'];
 const CONTACT_TYPES = ['Clear', 'Color'];
@@ -180,7 +181,7 @@ const AddContactLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onC
           };
           
           // Add document to Firestore
-          const docRef = await addDoc(collection(db, 'lens_inventory'), lensData);
+          const docRef = await addDoc(getUserCollection('lensInventory'), lensData);
           addedLenses.push({ id: docRef.id, ...lensData });
         }
         

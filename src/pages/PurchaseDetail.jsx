@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, getDoc, doc } from 'firebase/firestore';
 import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import { safelyParseDate, formatDate } from '../utils/dateUtils';
 
 const TAX_OPTIONS = [
   { id: 'TAX_FREE', label: 'Tax Free', rate: 0 },
@@ -64,38 +65,6 @@ const PurchaseDetail = () => {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2 
     })}`;
-  };
-
-  // Format date
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    
-    try {
-      // If it's a Firebase timestamp
-      if (dateString.toDate) {
-        const date = dateString.toDate();
-        return date.toLocaleDateString('en-IN', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric'
-        });
-      }
-      
-      // If it's a string date (YYYY-MM-DD)
-      const parts = dateString.split('-');
-      if (parts.length === 3) {
-        const date = new Date(parts[0], parts[1] - 1, parts[2]);
-        return date.toLocaleDateString('en-IN', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric'
-        });
-      }
-      
-      return dateString;
-    } catch (error) {
-      return dateString;
-    }
   };
 
   // Get tax label

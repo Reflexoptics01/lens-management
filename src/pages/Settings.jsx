@@ -3,6 +3,8 @@ import { db, auth, functions } from '../firebaseConfig';
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, addDoc, query, where } from 'firebase/firestore';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential, createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
+import { dateToISOString, processRestoredData, safelyParseDate } from '../utils/dateUtils';
 import Navbar from '../components/Navbar';
 
 const Settings = () => {
@@ -112,7 +114,8 @@ const Settings = () => {
     try {
       setLoading(true);
       
-      const settingsDoc = await getDoc(doc(db, 'settings', 'shopSettings'));
+      // Use user-specific settings document
+      const settingsDoc = await getDoc(getUserDoc('settings', 'shopSettings'));
       
       if (settingsDoc.exists()) {
         const data = settingsDoc.data();
@@ -222,18 +225,18 @@ const Settings = () => {
       
       console.log('Preparing to save settings...'); 
       
-      // Save to Firestore
+      // Save to Firestore using user-specific document
       try {
         console.log('Saving settings to Firestore...');
         try {
           // First try to update the existing document
-          await setDoc(doc(db, 'settings', 'shopSettings'), settingsData);
+          await setDoc(getUserDoc('settings', 'shopSettings'), settingsData);
           console.log('Settings saved successfully to Firestore');
         } catch (initialError) {
           console.warn('Initial save attempt failed, trying alternative approach:', initialError);
           
           // Try with merge option
-          await setDoc(doc(db, 'settings', 'shopSettings'), settingsData, { merge: true });
+          await setDoc(getUserDoc('settings', 'shopSettings'), settingsData, { merge: true });
           console.log('Settings saved successfully using merge option');
         }
         
@@ -499,8 +502,8 @@ const Settings = () => {
     try {
       setLoading(true);
       
-      // 1. Update the financial year in settings
-      const settingsRef = doc(db, 'settings', 'shopSettings');
+      // 1. Update the financial year in user-specific settings
+      const settingsRef = getUserDoc('settings', 'shopSettings');
       await setDoc(settingsRef, { 
         financialYear: newFinancialYear,
         previousFinancialYear: currentFinancialYear || '',
@@ -508,7 +511,7 @@ const Settings = () => {
       }, { merge: true });
       
       // 2. Handle invoice numbering based on user choice
-      const counterRef = doc(db, 'counters', `invoices_${newFinancialYear}`);
+      const counterRef = getUserDoc('counters', `invoices_${newFinancialYear}`);
       
       if (resetNumbering) {
         // Create a counter document for the new financial year to reset invoice numbering
@@ -531,7 +534,7 @@ const Settings = () => {
           let startCount = 0;
           
           if (currentFinancialYear) {
-            const prevCounterRef = doc(db, 'counters', `invoices_${currentFinancialYear}`);
+            const prevCounterRef = getUserDoc('counters', `invoices_${currentFinancialYear}`);
             const prevCounterDoc = await getDoc(prevCounterRef);
             
             if (prevCounterDoc.exists()) {
@@ -775,13 +778,13 @@ const Settings = () => {
       setBackupError('');
       setBackupSuccess('');
       
-      // Collections to backup
-      const collectionsToBackup = ['customers', 'orders', 'sales', 'settings', 'transactions'];
+      // Collections to backup - using user-specific collections
+      const collectionsToBackup = ['customers', 'orders', 'sales', 'purchases', 'settings', 'transactions', 'lensInventory', 'counters'];
       const backupData = {};
       
-      // Fetch data from each collection
+      // Fetch data from each user-specific collection
       for (const collectionName of collectionsToBackup) {
-        const collectionRef = collection(db, collectionName);
+        const collectionRef = getUserCollection(collectionName);
         const snapshot = await getDocs(collectionRef);
         
         backupData[collectionName] = {};
@@ -789,14 +792,11 @@ const Settings = () => {
         snapshot.docs.forEach(doc => {
           const data = doc.data();
           
-          // Convert any timestamps to ISO strings for JSON serialization
+          // Convert any timestamps to ISO strings for JSON serialization using dateUtils
           const processedData = JSON.parse(
             JSON.stringify(data, (key, value) => {
-              // Check if the value is a Firestore Timestamp
-              if (value && typeof value === 'object' && value.toDate) {
-                return value.toDate().toISOString();
-              }
-              return value;
+              // Use dateToISOString from dateUtils for consistent date handling
+              return dateToISOString(value) || value;
             })
           );
           
@@ -807,8 +807,10 @@ const Settings = () => {
       // Add metadata
       backupData.metadata = {
         createdAt: new Date().toISOString(),
-        version: '1.0',
-        collections: collectionsToBackup
+        version: '2.0', // Updated version for multi-tenant backup
+        collections: collectionsToBackup,
+        userId: auth.currentUser?.uid,
+        userEmail: auth.currentUser?.email
       };
       
       // Convert to JSON and create download link
@@ -897,8 +899,11 @@ const Settings = () => {
           for (const collectionName of collections) {
             if (backupData[collectionName]) {
               for (const [docId, docData] of Object.entries(backupData[collectionName])) {
-                // Write document to Firestore
-                await setDoc(doc(db, collectionName, docId), docData, { merge: true });
+                // Process the restored data using dateUtils for consistent date handling
+                const processedData = processRestoredData(docData);
+                
+                // Write document to user-specific Firestore collection
+                await setDoc(getUserDoc(collectionName, docId), processedData, { merge: true });
               }
             }
           }
@@ -935,17 +940,17 @@ const Settings = () => {
     setShowBackupConfirmModal(true);
   };
   
-  // Fetch users
+  // Fetch users - now using user-specific users collection
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      console.log('Fetching users from Firestore');
+      console.log('Fetching users from user-specific collection');
       
-      // Fetch all users
-      const usersCollection = collection(db, 'users');
+      // Fetch users from user-specific collection
+      const usersCollection = getUserCollection('teamMembers'); // Changed from 'users' to 'teamMembers' for clarity
       const usersSnapshot = await getDocs(usersCollection);
       
-      console.log(`Retrieved ${usersSnapshot.docs.length} user documents from Firestore`);
+      console.log(`Retrieved ${usersSnapshot.docs.length} user documents from user-specific collection`);
       
       const activeUsersList = [];
       const inactiveUsersList = [];
@@ -955,25 +960,21 @@ const Settings = () => {
         const userData = doc.data();
         console.log(`Processing user: ${userData.email}`);
         
-        // Skip the current admin user
-        if (userData.email !== auth.currentUser?.email) {
-          const userWithId = {
-            id: doc.id,
-            ...userData,
-            // Convert Firestore Timestamp to JS Date for display
-            createdAt: userData.createdAt ? userData.createdAt.toDate() : null,
-            inactiveAt: userData.inactiveAt ? userData.inactiveAt.toDate() : null
-          };
-          
-          if (userData.isActive === false) {
-            console.log(`Adding to inactive users: ${userData.email}`);
-            inactiveUsersList.push(userWithId);
-          } else {
-            console.log(`Adding to active users: ${userData.email}`);
-            activeUsersList.push(userWithId);
-          }
+        // Include all users from this tenant's team
+        const userWithId = {
+          id: doc.id,
+          ...userData,
+          // Convert Firestore Timestamp to JS Date for display using dateUtils
+          createdAt: safelyParseDate(userData.createdAt),
+          inactiveAt: safelyParseDate(userData.inactiveAt)
+        };
+        
+        if (userData.isActive === false) {
+          console.log(`Adding to inactive users: ${userData.email}`);
+          inactiveUsersList.push(userWithId);
         } else {
-          console.log(`Skipping current admin user: ${userData.email}`);
+          console.log(`Adding to active users: ${userData.email}`);
+          activeUsersList.push(userWithId);
         }
       });
       
@@ -994,8 +995,8 @@ const Settings = () => {
     try {
       setLoading(true);
       
-      // Update the user document to mark as active
-      await updateDoc(doc(db, 'users', userId), {
+      // Update the user document to mark as active in user-specific collection
+      await updateDoc(getUserDoc('teamMembers', userId), {
         isActive: true,
         inactiveAt: null,
         inactiveBy: null,
@@ -1075,8 +1076,8 @@ const Settings = () => {
       
       console.log('User created successfully with uid:', userCredential.user.uid);
       
-      // Add user to Firestore with permissions
-      await addDoc(collection(db, 'users'), {
+      // Add user to user-specific Firestore collection
+      await addDoc(getUserCollection('teamMembers'), {
         uid: userCredential.user.uid,
         email: newUserEmail,
         role: newUserRole,
@@ -1119,7 +1120,7 @@ const Settings = () => {
   const handleUpdatePermissions = async (userId, permissions) => {
     try {
       setLoading(true);
-      const userRef = doc(db, 'users', userId);
+      const userRef = getUserDoc('teamMembers', userId);
       await updateDoc(userRef, { permissions });
       await fetchUsers();
       setUserSuccess('User permissions updated successfully');
@@ -1141,11 +1142,11 @@ const Settings = () => {
       setLoading(true);
       
       // Instead of deleting from Firebase Auth (which requires admin privileges),
-      // we'll mark the user as inactive in Firestore
+      // we'll mark the user as inactive in user-specific Firestore
       console.log(`Marking user ${userEmail} as inactive`);
       
-      // Update the user document to mark as inactive
-      await updateDoc(doc(db, 'users', userId), {
+      // Update the user document to mark as inactive in user-specific collection
+      await updateDoc(getUserDoc('teamMembers', userId), {
         isActive: false,
         inactiveAt: new Date(),
         inactiveBy: auth.currentUser.uid
@@ -1205,7 +1206,7 @@ const Settings = () => {
     try {
       console.log('Starting comprehensive data deletion...');
       
-      // Comprehensive list of collections to delete
+      // Comprehensive list of user-specific collections to delete
       const collectionsToDelete = [
         'customers', 
         'orders', 
@@ -1215,7 +1216,7 @@ const Settings = () => {
         'invoices', 
         'counters',
         'lensInventory',
-        'users',
+        'teamMembers', // Changed from 'users' to 'teamMembers'
         'products',
         'inventory',
         'vendors',
@@ -1224,7 +1225,8 @@ const Settings = () => {
         'categories',
         'brands',
         'prescriptions',
-        'appointments'
+        'appointments',
+        'settings'
       ];
       
       const deletePromises = [];
@@ -1232,8 +1234,9 @@ const Settings = () => {
       
       for (const collectionName of collectionsToDelete) {
         try {
-          console.log(`Deleting collection: ${collectionName}`);
-          const collectionSnapshot = await getDocs(collection(db, collectionName));
+          console.log(`Deleting user-specific collection: ${collectionName}`);
+          const collectionRef = getUserCollection(collectionName);
+          const collectionSnapshot = await getDocs(collectionRef);
           
           if (collectionSnapshot.docs.length > 0) {
             console.log(`Found ${collectionSnapshot.docs.length} documents in ${collectionName}`);
@@ -1261,7 +1264,7 @@ const Settings = () => {
       // Wait for all deletes to complete
       await Promise.all(deletePromises);
       
-      console.log('All data deleted successfully');
+      console.log('All user-specific data deleted successfully');
       
       setBackupSuccess(`✅ All data has been successfully deleted. 
       

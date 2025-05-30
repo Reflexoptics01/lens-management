@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
 import { doc, getDoc, collection, query, where, getDocs, orderBy, updateDoc, addDoc, Timestamp } from 'firebase/firestore';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 import Navbar from '../components/Navbar';
 import { 
   LineChart, 
@@ -60,7 +61,7 @@ const LensDetail = () => {
       setError('');
       
       // Fetch the lens details
-      const lensDoc = await getDoc(doc(db, 'lens_inventory', id));
+      const lensDoc = await getDoc(getUserDoc('lensInventory', id));
       
       if (!lensDoc.exists()) {
         throw new Error('Lens not found');
@@ -86,7 +87,7 @@ const LensDetail = () => {
       // This requires sales data to be stored in a 'sales' collection
       // with each sale item having a lensId field to match with
       
-      const salesRef = collection(db, 'sales');
+      const salesRef = getUserCollection('sales');
       
       // Use lens brand name, type, and other identifiers to match sales
       // This will depend on your exact sales data structure
@@ -281,14 +282,14 @@ const LensDetail = () => {
       const finalReason = deductionData.reason === 'other' ? deductionData.customReason : deductionData.reason;
 
       // Update the lens quantity in Firestore
-      const lensRef = doc(db, 'lens_inventory', id);
+      const lensRef = getUserDoc('lensInventory', id);
       await updateDoc(lensRef, {
         qty: newQty,
         updatedAt: Timestamp.now()
       });
 
       // Log the deduction in a separate collection for audit trail
-      await addDoc(collection(db, 'inventory_deductions'), {
+      await addDoc(getUserCollection('inventoryDeductions'), {
         lensId: id,
         lensName: lens.brandName,
         lensType: lens.type,

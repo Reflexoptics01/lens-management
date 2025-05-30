@@ -11,7 +11,7 @@ import React from 'react';
  * @param {string} props.className - Additional CSS classes to apply
  * @param {string} props.bgColor - Background color class (defaults to 'bg-white')
  */
-const BottomActionBar = ({ 
+const BottomActionBar = ({
   children, 
   fixed = false, 
   className = '', 

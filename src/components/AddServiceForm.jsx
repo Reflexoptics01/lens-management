@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, addDoc, updateDoc, doc, Timestamp } from 'firebase/firestore';
+import { getUserCollection } from '../utils/multiTenancy';
 
 const SERVICE_TYPES = [
   'Eye Examination',
@@ -94,7 +95,7 @@ const AddServiceForm = ({ editMode, lensToEdit, onSubmit, onCancel }) => {
         setSuccess('Service updated successfully!');
       } else {
         // Create new service
-        await addDoc(collection(db, 'lens_inventory'), {
+        await addDoc(getUserCollection('lensInventory'), {
           ...serviceDocData,
           createdAt: Timestamp.now()
         });

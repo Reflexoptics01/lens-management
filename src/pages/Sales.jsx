@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, getDocs, query, orderBy, doc, getDoc, deleteDoc, updateDoc, where } from 'firebase/firestore';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import PrintInvoiceModal from '../components/PrintInvoiceModal';
+import { formatDate, formatDateTime, safelyParseDate } from '../utils/dateUtils';
 
 const Sales = () => {
   const [sales, setSales] = useState([]);
@@ -75,29 +77,113 @@ const Sales = () => {
       setLoading(true);
       setError(''); // Clear any previous errors
       
-      const salesRef = collection(db, 'sales');
+      // Add debugging for user authentication
+      const userUid = localStorage.getItem('userUid');
+      console.log('fetchSales: Current user UID:', userUid);
+      
+      if (!userUid) {
+        console.error('fetchSales: No user UID found in localStorage');
+        setError('User not authenticated');
+        return;
+      }
+      
+      const salesRef = getUserCollection('sales');
+      console.log('fetchSales: Got sales collection reference');
+      
       // Remove orderBy from query since we'll sort after fetching
       const snapshot = await getDocs(salesRef);
       
-      const salesList = snapshot.docs.map((doc, index) => {
+      console.log('fetchSales: Query executed, got', snapshot.docs.length, 'documents');
+      console.log('fetchSales: Current user path should be: users/' + userUid + '/sales');
+      
+      if (snapshot.docs.length > 0) {
+        console.log('fetchSales: First document data sample:', snapshot.docs[0].data());
+      }
+      
+      const salesList = snapshot.docs
+        .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+        .map((doc, index) => {
         try {
           const data = doc.data();
+          
+          // Process timestamps early to ensure they're handled correctly
+          let processedData = { ...data };
+          
+          // Handle createdAt timestamp explicitly
+          if (data.createdAt) {
+            try {
+              // If it's a Firestore timestamp with toDate method
+              if (typeof data.createdAt.toDate === 'function') {
+                processedData.createdAt = data.createdAt.toDate();
+              } else if (data.createdAt._seconds !== undefined) {
+                // Handle serverTimestamp format
+                processedData.createdAt = new Date(data.createdAt._seconds * 1000);
+              } else if (typeof data.createdAt === 'string') {
+                // Handle ISO string
+                processedData.createdAt = new Date(data.createdAt);
+              }
+            } catch (e) {
+              console.warn('Error processing createdAt timestamp', e);
+              processedData.createdAt = new Date(); // fallback
+            }
+          }
+          
+          // Handle invoiceDate timestamp explicitly
+          if (data.invoiceDate) {
+            try {
+              if (typeof data.invoiceDate.toDate === 'function') {
+                processedData.invoiceDate = data.invoiceDate.toDate();
+              } else if (data.invoiceDate._seconds !== undefined) {
+                processedData.invoiceDate = new Date(data.invoiceDate._seconds * 1000);
+              } else if (typeof data.invoiceDate === 'string') {
+                processedData.invoiceDate = new Date(data.invoiceDate);
+              }
+            } catch (e) {
+              console.warn('Error processing invoiceDate timestamp', e);
+              processedData.invoiceDate = new Date(); // fallback
+            }
+          }
+          
+          // Handle dueDate timestamp explicitly (if it exists)
+          if (data.dueDate) {
+            try {
+              if (typeof data.dueDate.toDate === 'function') {
+                processedData.dueDate = data.dueDate.toDate();
+              } else if (data.dueDate._seconds !== undefined) {
+                processedData.dueDate = new Date(data.dueDate._seconds * 1000);
+              } else if (typeof data.dueDate === 'string') {
+                processedData.dueDate = new Date(data.dueDate);
+              }
+            } catch (e) {
+              console.warn('Error processing dueDate timestamp', e);
+              processedData.dueDate = null; // fallback
+            }
+          }
+
+          // Ensure phone property exists
+          if (!processedData.phone && processedData.customerId) {
+            // We could fetch the customer data here to get the phone number,
+            // but that would be a lot of extra queries. Instead, we'll leave it empty
+            // and rely on future edits to populate it.
+            processedData.phone = '';
+          }
+          
+          // Ensure gstNumber property exists (may be stored as customerGst in older records)
+          if (!processedData.gstNumber && processedData.customerGst) {
+            processedData.gstNumber = processedData.customerGst;
+          }
+          
           return {
             id: doc.id,
-            // displayId will be assigned after sorting
-            ...data
+            ...processedData
           };
         } catch (docError) {
-          console.error('Error processing sale document:', doc.id, docError);
-          // Return a basic sale object with the document ID to prevent crashes
+          console.error(`Error processing sale document at index ${index}:`, docError);
           return {
             id: doc.id,
-            invoiceNumber: 'ERROR',
-            customerName: 'Error loading customer',
-            totalAmount: 0,
-            paymentStatus: 'UNKNOWN',
-            createdAt: new Date(), // Fallback date
-            error: true
+            error: true,
+            errorMessage: docError.message,
+            ...doc.data()
           };
         }
       });
@@ -145,8 +231,8 @@ const Sales = () => {
         }
         
         // If invoice numbers are identical, fall back to creation date (newest first)
-        const aDate = a.createdAt && typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate() : new Date(a.createdAt || 0);
-        const bDate = b.createdAt && typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+        const aDate = a.createdAt instanceof Date ? a.createdAt : new Date(0);
+        const bDate = b.createdAt instanceof Date ? b.createdAt : new Date(0);
         return bDate - aDate;
       });
       
@@ -155,6 +241,7 @@ const Sales = () => {
         sale.displayId = `S-${(index + 1).toString().padStart(3, '0')}`;
       });
       
+      console.log('Processed sales data:', salesList.slice(0, 3));
       setSales(salesList);
     } catch (error) {
       console.error('Error fetching sales:', error);
@@ -166,12 +253,14 @@ const Sales = () => {
 
   const fetchCustomers = async () => {
     try {
-      const customersRef = collection(db, 'customers');
+      const customersRef = getUserCollection('customers');
       const snapshot = await getDocs(customersRef);
-      const customersList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const customersList = snapshot.docs
+        .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
       setCustomers(customersList);
     } catch (error) {
       console.error('Error fetching customers:', error);
@@ -183,7 +272,7 @@ const Sales = () => {
     if (!window.confirm('Are you sure you want to delete this sale?')) return;
     
     try {
-      await deleteDoc(doc(db, 'sales', saleId));
+      await deleteDoc(getUserDoc('sales', saleId));
       setSales(prevSales => prevSales.filter(sale => sale.id !== saleId));
     } catch (error) {
       console.error('Error deleting sale:', error);
@@ -191,46 +280,29 @@ const Sales = () => {
     }
   };
 
-  const formatDate = (timestamp) => {
+  // Replace the existing formatDisplayDate function with dateUtils version
+  const formatDisplayDate = (timestamp) => {
     if (!timestamp) return { date: '-', time: '-' };
     
-    let date;
     try {
-      // Handle Firestore Timestamp
-      if (timestamp && typeof timestamp.toDate === 'function') {
-        date = timestamp.toDate();
-      }
-      // Handle Date object
-      else if (timestamp instanceof Date) {
-        date = timestamp;
-      }
-      // Handle string dates
-      else if (typeof timestamp === 'string') {
-        date = new Date(timestamp);
-      }
-      // Handle timestamp numbers
-      else if (typeof timestamp === 'number') {
-        date = new Date(timestamp);
-      }
-      // Handle objects with seconds (Firestore timestamp-like objects)
-      else if (timestamp && typeof timestamp === 'object' && timestamp.seconds) {
-        date = new Date(timestamp.seconds * 1000);
-      }
-      else {
-        date = new Date(timestamp);
-      }
+      console.log('Formatting date, original value:', timestamp);
+      
+      // Use safelyParseDate from dateUtils for consistent parsing
+      const date = safelyParseDate(timestamp);
+      console.log('After safelyParseDate:', date);
       
       // Check if date is valid
-      if (isNaN(date.getTime())) {
+      if (!date || isNaN(date.getTime())) {
+        console.warn('Invalid date after parsing:', date, 'Original:', timestamp);
         return { date: 'Invalid Date', time: '-' };
       }
       
       return {
-        date: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        date: formatDate(date), // Use formatDate from dateUtils
         time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
       };
     } catch (error) {
-      console.error('Error formatting date:', error, timestamp);
+      console.error('Error formatting date:', error, 'Original timestamp:', timestamp);
       return { date: 'Invalid Date', time: '-' };
     }
   };
@@ -262,69 +334,75 @@ const Sales = () => {
     if (dateFrom) {
       const fromDate = new Date(dateFrom);
       fromDate.setHours(0, 0, 0, 0);
+      console.log('Filtering by from date:', fromDate);
+      
       filtered = filtered.filter(sale => {
         try {
-          let saleDate;
-          const timestamp = sale.createdAt;
+          // Use our utility function to safely parse dates
+          const saleDate = sale.createdAt instanceof Date 
+            ? sale.createdAt 
+            : safelyParseDate(sale.createdAt);
           
-          // Handle different timestamp formats
-          if (timestamp && typeof timestamp.toDate === 'function') {
-            saleDate = timestamp.toDate();
-          } else if (timestamp instanceof Date) {
-            saleDate = timestamp;
-          } else if (typeof timestamp === 'string') {
-            saleDate = new Date(timestamp);
-          } else if (typeof timestamp === 'number') {
-            saleDate = new Date(timestamp);
-          } else if (timestamp && typeof timestamp === 'object' && timestamp.seconds) {
-            saleDate = new Date(timestamp.seconds * 1000);
-          } else {
-            saleDate = new Date(timestamp);
+          // Debug info for date comparison
+          if (!saleDate || isNaN(saleDate.getTime())) {
+            console.warn('Invalid sale date during filtering:', sale.createdAt, 'for sale:', sale.id);
+            return false;
           }
           
-          return !isNaN(saleDate.getTime()) && saleDate >= fromDate;
+          // Debug date comparison
+          const result = saleDate >= fromDate;
+          if (!result) {
+            console.log('Sale date excluded by fromDate filter:', saleDate, '>=', fromDate, '=', result);
+          }
+          
+          return result;
         } catch (error) {
-          console.error('Error parsing sale date for filtering:', error);
+          console.error('Error parsing sale date for filtering:', error, sale);
           return false;
         }
       });
+      
+      console.log(`After fromDate filter: ${filtered.length} sales remaining`);
     }
     
     // Apply date to filter
     if (dateTo) {
       const toDate = new Date(dateTo);
       toDate.setHours(23, 59, 59, 999);
+      console.log('Filtering by to date:', toDate);
+      
       filtered = filtered.filter(sale => {
         try {
-          let saleDate;
-          const timestamp = sale.createdAt;
+          // Use our utility function to safely parse dates
+          const saleDate = sale.createdAt instanceof Date 
+            ? sale.createdAt 
+            : safelyParseDate(sale.createdAt);
           
-          // Handle different timestamp formats
-          if (timestamp && typeof timestamp.toDate === 'function') {
-            saleDate = timestamp.toDate();
-          } else if (timestamp instanceof Date) {
-            saleDate = timestamp;
-          } else if (typeof timestamp === 'string') {
-            saleDate = new Date(timestamp);
-          } else if (typeof timestamp === 'number') {
-            saleDate = new Date(timestamp);
-          } else if (timestamp && typeof timestamp === 'object' && timestamp.seconds) {
-            saleDate = new Date(timestamp.seconds * 1000);
-          } else {
-            saleDate = new Date(timestamp);
+          if (!saleDate || isNaN(saleDate.getTime())) {
+            console.warn('Invalid sale date during filtering:', sale.createdAt, 'for sale:', sale.id);
+            return false;
           }
           
-          return !isNaN(saleDate.getTime()) && saleDate <= toDate;
+          // Debug date comparison
+          const result = saleDate <= toDate;
+          if (!result) {
+            console.log('Sale date excluded by toDate filter:', saleDate, '<=', toDate, '=', result);
+          }
+          
+          return result;
         } catch (error) {
-          console.error('Error parsing sale date for filtering:', error);
+          console.error('Error parsing sale date for filtering:', error, sale);
           return false;
         }
       });
+      
+      console.log(`After toDate filter: ${filtered.length} sales remaining`);
     }
     
     // Apply customer filter
     if (selectedCustomerId) {
       filtered = filtered.filter(sale => sale.customerId === selectedCustomerId);
+      console.log(`After customer filter: ${filtered.length} sales remaining`);
     }
     
     setFilteredSales(filtered);
@@ -523,7 +601,7 @@ const Sales = () => {
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         {filteredSales.map((sale) => {
-                        const { date, time } = formatDate(sale.createdAt);
+                        const { date, time } = formatDisplayDate(sale.createdAt);
                         const customerDetails = getCustomerDetails(sale.customerId);
                         return (
                           <tr 
@@ -617,7 +695,7 @@ const Sales = () => {
                 </div>
               ) : (
                 filteredSales.map((sale) => {
-                const { date } = formatDate(sale.createdAt);
+                const { date } = formatDisplayDate(sale.createdAt);
                 const customerDetails = getCustomerDetails(sale.customerId);
                 return (
                   <div 

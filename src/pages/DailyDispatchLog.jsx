@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, addDoc, getDocs, query, orderBy, doc, updateDoc, deleteDoc, Timestamp, where } from 'firebase/firestore';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 import Navbar from '../components/Navbar';
 import ItemSuggestions from '../components/ItemSuggestions';
 import AutocompleteInput from '../components/AutocompleteInput';
@@ -86,57 +87,59 @@ const DailyDispatchLog = () => {
 
   const fetchLensInventory = async () => {
     try {
-      const lensRef = collection(db, 'lens_inventory');
+      const lensRef = getUserCollection('lensInventory');
       const snapshot = await getDocs(lensRef);
       
-      const lensesList = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          name: data.brandName || data.serviceName || 'Unknown Item',
-          brandName: data.brandName,
-          serviceName: data.serviceName,
-          price: data.salePrice || data.purchasePrice || data.servicePrice || 0,
-          salePrice: data.salePrice,
-          purchasePrice: data.purchasePrice,
-          servicePrice: data.servicePrice,
-          type: data.type,
-          sph: data.sph,
-          cyl: data.cyl,
-          axis: data.axis,
-          add: data.add,
-          eye: data.eye,
-          material: data.material,
-          index: data.index,
-          powerSeries: data.powerSeries,
-          category: data.category,
-          contactType: data.contactType,
-          color: data.color,
-          disposalFrequency: data.disposalFrequency,
-          serviceType: data.serviceType,
-          serviceDescription: data.serviceDescription,
-          serviceDuration: data.serviceDuration,
-          isActive: data.isActive,
-          qty: data.qty || 1,
-          isStockLens: data.type === 'stock',
-          isService: data.type === 'service',
-          stockData: data.type === 'stock' ? {
+      const lensesList = snapshot.docs
+        .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+        .map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.brandName || data.serviceName || 'Unknown Item',
+            brandName: data.brandName,
+            serviceName: data.serviceName,
+            price: data.salePrice || data.purchasePrice || data.servicePrice || 0,
+            salePrice: data.salePrice,
+            purchasePrice: data.purchasePrice,
+            servicePrice: data.servicePrice,
+            type: data.type,
+            sph: data.sph,
+            cyl: data.cyl,
+            axis: data.axis,
+            add: data.add,
+            eye: data.eye,
+            material: data.material,
+            index: data.index,
             powerSeries: data.powerSeries,
-            type: 'stock'
-          } : null,
-          serviceData: data.type === 'service' ? {
+            category: data.category,
+            contactType: data.contactType,
+            color: data.color,
+            disposalFrequency: data.disposalFrequency,
             serviceType: data.serviceType,
             serviceDescription: data.serviceDescription,
             serviceDuration: data.serviceDuration,
-            salePrice: data.salePrice,
-            servicePrice: data.servicePrice,
-            price: data.salePrice || data.servicePrice,
             isActive: data.isActive,
-            type: 'service'
-          } : null,
-          ...data
-        };
-      });
+            qty: data.qty || 1,
+            isStockLens: data.type === 'stock',
+            isService: data.type === 'service',
+            stockData: data.type === 'stock' ? {
+              powerSeries: data.powerSeries,
+              type: 'stock'
+            } : null,
+            serviceData: data.type === 'service' ? {
+              serviceType: data.serviceType,
+              serviceDescription: data.serviceDescription,
+              serviceDuration: data.serviceDuration,
+              salePrice: data.salePrice,
+              servicePrice: data.servicePrice,
+              price: data.salePrice || data.servicePrice,
+              isActive: data.isActive,
+              type: 'service'
+            } : null,
+            ...data
+          };
+        });
       
       setLensInventory(lensesList);
     } catch (error) {
@@ -146,14 +149,16 @@ const DailyDispatchLog = () => {
 
   const fetchCustomers = async () => {
     try {
-      const customersRef = collection(db, 'customers');
+      const customersRef = getUserCollection('customers');
       const customersQuery = query(customersRef, where('type', '!=', 'vendor'));
       const snapshot = await getDocs(customersQuery);
       
-      const customersList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const customersList = snapshot.docs
+        .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
       
       setCustomers(customersList);
     } catch (error) {
@@ -164,13 +169,15 @@ const DailyDispatchLog = () => {
   const fetchDispatchLogs = async () => {
     try {
       setLoading(true);
-      const logsRef = collection(db, 'dispatch_logs');
+      const logsRef = getUserCollection('dispatchLogs');
       const snapshot = await getDocs(query(logsRef, orderBy('createdAt', 'desc')));
       
-      const logsList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const logsList = snapshot.docs
+        .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
       
       setDispatchLogs(logsList);
     } catch (error) {
@@ -183,7 +190,7 @@ const DailyDispatchLog = () => {
 
   const generateLogId = async () => {
     try {
-      const logsRef = collection(db, 'dispatch_logs');
+      const logsRef = getUserCollection('dispatchLogs');
       const snapshot = await getDocs(logsRef);
       
       const existingIds = snapshot.docs.map(doc => doc.data().logId || '').filter(id => id.startsWith('L'));
@@ -360,14 +367,14 @@ const DailyDispatchLog = () => {
       if (editMode && editingDocId) {
         // Update existing log
         dispatchData.logId = editingLogId;
-        await updateDoc(doc(db, 'dispatch_logs', editingDocId), dispatchData);
+        await updateDoc(getUserDoc('dispatchLogs', editingDocId), dispatchData);
         setSuccess(`Dispatch log ${editingLogId} updated successfully!`);
       } else {
         // Create new log
         const logId = await generateLogId();
         dispatchData.logId = logId;
         dispatchData.createdAt = Timestamp.now();
-        await addDoc(collection(db, 'dispatch_logs'), dispatchData);
+        await addDoc(getUserCollection('dispatchLogs'), dispatchData);
         setSuccess(`Dispatch log ${logId} saved successfully!`);
       }
       
@@ -387,7 +394,7 @@ const DailyDispatchLog = () => {
     if (window.confirm(`Are you sure you want to delete dispatch log ${logId}?`)) {
       try {
         setLoading(true);
-        await deleteDoc(doc(db, 'dispatch_logs', docId));
+        await deleteDoc(getUserDoc('dispatchLogs', docId));
         setSuccess(`Dispatch log ${logId} deleted successfully!`);
         fetchDispatchLogs();
         setTimeout(() => setSuccess(''), 3000);

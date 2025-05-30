@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
 import { collection, addDoc, getDocs, Timestamp, query, orderBy, where } from 'firebase/firestore';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 import Navbar from '../components/Navbar';
 import OrderForm from '../components/OrderForm';
 import { ArrowLeftIcon, PlusIcon, DocumentPlusIcon } from '@heroicons/react/24/outline';
@@ -121,7 +122,7 @@ const CreateOrder = () => {
       
       console.log("Checking lens inventory for matches...");
       
-      const lensInventoryRef = collection(db, 'lens_inventory');
+      const lensInventoryRef = getUserCollection('lensInventory');
       
       // Get all RX lenses 
       const rxQuery = query(
@@ -354,7 +355,7 @@ const CreateOrder = () => {
 
   const calculateNextOrderDisplayId = async () => {
     try {
-      const ordersRef = collection(db, 'orders');
+      const ordersRef = getUserCollection('orders');
       const orderQuery = query(ordersRef, orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(orderQuery);
       
@@ -369,7 +370,7 @@ const CreateOrder = () => {
 
   const fetchCustomers = async () => {
     try {
-      const customersRef = collection(db, 'customers');
+      const customersRef = getUserCollection('customers');
       const snapshot = await getDocs(customersRef);
       const customersList = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -462,7 +463,7 @@ const CreateOrder = () => {
         createdAt: Timestamp.now()
       };
 
-      const docRef = await addDoc(collection(db, 'orders'), orderData);
+      const docRef = await addDoc(getUserCollection('orders'), orderData);
       setOrderId(docRef.id);
       
       // Add the lens to inventory
@@ -529,7 +530,7 @@ const CreateOrder = () => {
           createdAt: Timestamp.now()
         };
         
-        await addDoc(collection(db, 'lens_inventory'), rightLensData);
+        await addDoc(getUserCollection('lensInventory'), rightLensData);
         console.log('Added right eye lens to inventory');
       }
       
@@ -559,7 +560,7 @@ const CreateOrder = () => {
           createdAt: Timestamp.now()
         };
         
-        await addDoc(collection(db, 'lens_inventory'), leftLensData);
+        await addDoc(getUserCollection('lensInventory'), leftLensData);
         console.log('Added left eye lens to inventory');
       }
     } catch (error) {

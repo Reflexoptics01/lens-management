@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { getUserCollection } from '../utils/multiTenancy';
 import Navbar from '../components/Navbar';
 import * as XLSX from 'xlsx';
 
@@ -79,7 +80,7 @@ const GSTReturns = () => {
       console.log('Generating GST reports from:', startDate, 'to:', endDate);
       
       // Fetch all sales within date range
-      const salesRef = collection(db, 'sales');
+      const salesRef = getUserCollection('sales');
       const salesQuery = query(
         salesRef,
         where('invoiceDate', '>=', startDate),
@@ -95,7 +96,7 @@ const GSTReturns = () => {
       }));
 
       // Fetch all purchases within date range for ITC calculation
-      const purchasesRef = collection(db, 'purchases');
+      const purchasesRef = getUserCollection('purchases');
       const purchasesQuery = query(
         purchasesRef,
         where('purchaseDate', '>=', startDate),
@@ -111,7 +112,7 @@ const GSTReturns = () => {
       }));
       
       // Fetch transactions (receipts) within date range
-      const transactionsRef = collection(db, 'transactions');
+      const transactionsRef = getUserCollection('transactions');
       const transactionsQuery = query(
         transactionsRef,
         where('date', '>=', startDate),
