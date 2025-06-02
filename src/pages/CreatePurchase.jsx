@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
-import { collection, getDocs, addDoc, serverTimestamp, query, where, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, serverTimestamp, query, where, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import CustomerForm from '../components/CustomerForm';
 import ItemSuggestions from '../components/ItemSuggestions';
-import { getUserCollection } from '../utils/multiTenancy';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 
 const TAX_OPTIONS = [
   { id: 'TAX_FREE', label: 'Tax Free', rate: 0 },
@@ -125,14 +125,82 @@ const CreatePurchase = () => {
 
   const generatePurchaseNumber = async () => {
     try {
-      // Get the current number of purchases
-      const purchasesRef = getUserCollection('purchases');
-      const snapshot = await getDocs(purchasesRef);
-      const newPurchaseNumber = `P-${(snapshot.docs.length + 1).toString().padStart(4, '0')}`;
-      setPurchaseNumber(newPurchaseNumber);
+      // Get the current financial year from user-specific settings
+      const settingsDoc = await getDoc(getUserDoc('settings', 'shopSettings'));
+      let financialYear = null;
+      
+      if (settingsDoc.exists()) {
+        const settings = settingsDoc.data();
+        financialYear = settings.financialYear;
+      }
+      
+      if (!financialYear) {
+        // Fallback to simple counting method if no financial year is set
+        const purchasesRef = getUserCollection('purchases');
+        const snapshot = await getDocs(purchasesRef);
+        const newPurchaseNumber = `P-${(snapshot.docs.length + 1).toString().padStart(4, '0')}`;
+        setPurchaseNumber(newPurchaseNumber);
+        return;
+      }
+      
+      // Get or create the user-specific counter document for purchases in this financial year
+      const counterRef = getUserDoc('counters', `purchases_${financialYear}`);
+      const counterDoc = await getDoc(counterRef);
+      
+      let counter;
+      if (!counterDoc.exists()) {
+        // If counter doesn't exist, create it starting from 1
+        counter = {
+          count: 1,
+          prefix: 'P',
+          separator: '-',
+          format: '${prefix}${separator}${number}'
+        };
+        await setDoc(counterRef, {
+          ...counter,
+          createdAt: serverTimestamp()
+        });
+      } else {
+        counter = counterDoc.data();
+        // Increment the counter for preview
+        const newCount = (counter.count || 0) + 1;
+        
+        // Update the counter in user-specific Firestore
+        await updateDoc(counterRef, {
+          count: newCount,
+          updatedAt: serverTimestamp()
+        });
+        
+        counter.count = newCount;
+      }
+      
+      // Format the purchase number
+      const paddedNumber = counter.count.toString().padStart(4, '0');
+      
+      // Use the format specified in the counter or fall back to default
+      let purchaseNumber;
+      if (counter.format) {
+        purchaseNumber = counter.format
+          .replace('${prefix}', counter.prefix || 'P')
+          .replace('${separator}', counter.separator || '-')
+          .replace('${number}', paddedNumber);
+      } else {
+        purchaseNumber = `${counter.prefix || 'P'}${counter.separator || '-'}${paddedNumber}`;
+      }
+      
+      setPurchaseNumber(purchaseNumber);
     } catch (error) {
       console.error('Error generating purchase number:', error);
-      setPurchaseNumber('P-0001');
+      // Fallback to simple method
+      try {
+        const purchasesRef = getUserCollection('purchases');
+        const snapshot = await getDocs(purchasesRef);
+        const fallbackNumber = `P-${(snapshot.docs.length + 1).toString().padStart(4, '0')}`;
+        setPurchaseNumber(fallbackNumber);
+      } catch (fallbackError) {
+        console.error('Error in fallback purchase numbering:', fallbackError);
+        setPurchaseNumber('P-0001');
+      }
     }
   };
 

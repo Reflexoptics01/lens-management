@@ -4,6 +4,7 @@ import { db } from '../firebaseConfig';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import StickerPrintPage from '../components/StickerPrintPage';
 import { safelyParseDate, formatDate, formatDateTime, processRestoredData } from '../utils/dateUtils';
+import { getUserDoc } from '../utils/multiTenancy';
 
 const ORDER_STATUSES = [
   'PENDING',
@@ -55,7 +56,8 @@ const OrderDetail = () => {
       
       console.log('Fetching order details for ID:', orderId);
       
-      const orderRef = doc(db, 'orders', orderId);
+      // Use user-specific collection instead of global collection
+      const orderRef = getUserDoc('orders', orderId);
       const orderDoc = await getDoc(orderRef);
       
       if (!orderDoc.exists()) {
@@ -142,7 +144,8 @@ const OrderDetail = () => {
     
     setUpdatingStatus(true);
     try {
-      const orderRef = doc(db, 'orders', orderId);
+      // Use user-specific collection instead of global collection
+      const orderRef = getUserDoc('orders', orderId);
       await updateDoc(orderRef, {
         status: selectedStatus
       });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, addDoc, updateDoc, doc, Timestamp } from 'firebase/firestore';
-import { getUserCollection } from '../utils/multiTenancy';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 
 const SERVICE_TYPES = [
   'Eye Examination',
@@ -81,14 +81,14 @@ const AddServiceForm = ({ editMode, lensToEdit, onSubmit, onCancel }) => {
         isActive: serviceData.isActive,
         notes: serviceData.notes,
         type: 'service',
-        qty: 1, // Services always have quantity 1
+        qty: 1, // Services always have quantity 1 pair
         name: serviceData.serviceName, // For compatibility with suggestion systems
         price: parseFloat(serviceData.servicePrice) // For compatibility with suggestion systems
       };
 
       if (editMode && lensToEdit) {
         // Update existing service
-        await updateDoc(doc(db, 'lens_inventory', lensToEdit.id), {
+        await updateDoc(getUserDoc('lensInventory', lensToEdit.id), {
           ...serviceDocData,
           updatedAt: Timestamp.now()
         });
@@ -231,7 +231,7 @@ const AddServiceForm = ({ editMode, lensToEdit, onSubmit, onCancel }) => {
               name="servicePrice"
               value={serviceData.servicePrice}
               onChange={handleInputChange}
-              className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-sky-500 dark:focus:border-sky-400 focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 px-3 py-2"
+              className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-sky-500 dark:focus:border-sky-400 focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 px-3 py-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               placeholder="0.00"
               min="0"
               step="0.01"

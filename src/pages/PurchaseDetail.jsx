@@ -3,7 +3,8 @@ import { db } from '../firebaseConfig';
 import { collection, getDoc, doc } from 'firebase/firestore';
 import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import { safelyParseDate, formatDate } from '../utils/dateUtils';
+import { safelyParseDate, formatDate, formatDateTime } from '../utils/dateUtils';
+import { getUserDoc } from '../utils/multiTenancy';
 
 const TAX_OPTIONS = [
   { id: 'TAX_FREE', label: 'Tax Free', rate: 0 },
@@ -27,29 +28,42 @@ const PurchaseDetail = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchPurchaseData();
+    fetchPurchaseDetails();
   }, [purchaseId]);
 
-  const fetchPurchaseData = async () => {
+  const fetchPurchaseDetails = async () => {
     try {
       setLoading(true);
-      const purchaseDoc = await getDoc(doc(db, 'purchases', purchaseId));
+      setError(''); // Clear any previous errors
+      
+      console.log('Fetching purchase details for ID:', purchaseId);
+      
+      // Use user-specific collection instead of global collection
+      const purchaseDoc = await getDoc(getUserDoc('purchases', purchaseId));
       
       if (!purchaseDoc.exists()) {
+        console.error('Purchase not found:', purchaseId);
         setError('Purchase not found');
         return;
       }
       
-      const purchaseData = purchaseDoc.data();
-      setPurchase(purchaseData);
+      const purchaseData = { id: purchaseId, ...purchaseDoc.data() };
+      console.log('Purchase data fetched:', purchaseData);
       
       // Fetch vendor details if vendorId exists
       if (purchaseData.vendorId) {
-        const vendorDoc = await getDoc(doc(db, 'customers', purchaseData.vendorId));
+        console.log('Fetching vendor details for ID:', purchaseData.vendorId);
+        // Use user-specific collection for vendor details
+        const vendorDoc = await getDoc(getUserDoc('customers', purchaseData.vendorId));
         if (vendorDoc.exists()) {
-          setVendor(vendorDoc.data());
+          purchaseData.vendor = vendorDoc.data();
+          console.log('Vendor data fetched:', purchaseData.vendor);
+        } else {
+          console.warn('Vendor not found for ID:', purchaseData.vendorId);
         }
       }
+      
+      setPurchase(purchaseData);
     } catch (error) {
       console.error('Error fetching purchase data:', error);
       setError('Failed to fetch purchase data');

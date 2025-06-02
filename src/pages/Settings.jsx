@@ -3,7 +3,7 @@ import { db, auth, functions } from '../firebaseConfig';
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, addDoc, query, where } from 'firebase/firestore';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential, createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
-import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
+import { getUserCollection, getUserDoc, createSecureBackupMetadata, validateBackupOwnership } from '../utils/multiTenancy';
 import { dateToISOString, processRestoredData, safelyParseDate } from '../utils/dateUtils';
 import Navbar from '../components/Navbar';
 
@@ -778,40 +778,100 @@ const Settings = () => {
       setBackupError('');
       setBackupSuccess('');
       
+      // Get current user information for validation
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error('User not authenticated. Please login again.');
+      }
+      
       // Collections to backup - using user-specific collections
-      const collectionsToBackup = ['customers', 'orders', 'sales', 'purchases', 'settings', 'transactions', 'lensInventory', 'counters'];
+      // Enhanced list to include all ledger-related collections
+      const collectionsToBackup = [
+        'customers', 
+        'orders', 
+        'sales', 
+        'purchases', 
+        'settings', 
+        'transactions', 
+        'lensInventory', 
+        'counters',
+        'teamMembers', // User management
+        'vendors', // Vendor information
+        'products', // Product catalog
+        'inventory', // General inventory
+        'payments', // Payment records
+        'invoices', // Invoice data
+        'categories', // Product categories
+        'brands', // Brand information
+        'prescriptions', // Prescription data
+        'appointments' // Appointment data
+      ];
       const backupData = {};
+      
+      console.log('Starting backup process for collections:', collectionsToBackup);
+      console.log('Current user creating backup:', currentUser.uid, currentUser.email);
       
       // Fetch data from each user-specific collection
       for (const collectionName of collectionsToBackup) {
-        const collectionRef = getUserCollection(collectionName);
-        const snapshot = await getDocs(collectionRef);
-        
-        backupData[collectionName] = {};
-        
-        snapshot.docs.forEach(doc => {
-          const data = doc.data();
+        try {
+          console.log(`Backing up collection: ${collectionName}`);
+          const collectionRef = getUserCollection(collectionName);
+          const snapshot = await getDocs(collectionRef);
           
-          // Convert any timestamps to ISO strings for JSON serialization using dateUtils
-          const processedData = JSON.parse(
-            JSON.stringify(data, (key, value) => {
-              // Use dateToISOString from dateUtils for consistent date handling
-              return dateToISOString(value) || value;
-            })
-          );
+          backupData[collectionName] = {};
           
-          backupData[collectionName][doc.id] = processedData;
-        });
+          let docCount = 0;
+          snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            
+            // Skip placeholder documents
+            if (data._placeholder) {
+              console.log(`Skipping placeholder document in ${collectionName}: ${doc.id}`);
+              return;
+            }
+            
+            // Convert any timestamps to ISO strings for JSON serialization using dateUtils
+            const processedData = JSON.parse(
+              JSON.stringify(data, (key, value) => {
+                // Use dateToISOString from dateUtils for consistent date handling
+                return dateToISOString(value) || value;
+              })
+            );
+            
+            backupData[collectionName][doc.id] = processedData;
+            docCount++;
+          });
+          
+          console.log(`Collection ${collectionName}: backed up ${docCount} documents`);
+          
+        } catch (collectionError) {
+          console.warn(`Could not backup collection ${collectionName}:`, collectionError);
+          // Don't fail the entire backup if one collection fails
+          backupData[collectionName] = {};
+        }
       }
       
-      // Add metadata
+      // Enhanced metadata with strict user identification
       backupData.metadata = {
-        createdAt: new Date().toISOString(),
-        version: '2.0', // Updated version for multi-tenant backup
+        ...createSecureBackupMetadata(currentUser),
         collections: collectionsToBackup,
-        userId: auth.currentUser?.uid,
-        userEmail: auth.currentUser?.email
+        totalDocuments: 0, // Will be updated below
+        collectionsCount: collectionsToBackup.length
       };
+      
+      // Calculate backup statistics
+      const totalDocuments = Object.values(backupData)
+        .filter(collection => typeof collection === 'object' && collection !== null && !collection.createdAt)
+        .reduce((total, collection) => total + Object.keys(collection).length, 0);
+      
+      backupData.metadata.totalDocuments = totalDocuments;
+      
+      console.log(`Backup completed: ${totalDocuments} documents across ${collectionsToBackup.length} collections`);
+      console.log('Backup metadata:', {
+        userId: backupData.metadata.userId,
+        userEmail: backupData.metadata.userEmail,
+        version: backupData.metadata.version
+      });
       
       // Convert to JSON and create download link
       const backupJSON = JSON.stringify(backupData, null, 2);
@@ -821,11 +881,15 @@ const Settings = () => {
       // Create date string for filename
       const date = new Date();
       const dateString = date.toISOString().slice(0, 10).replace(/-/g, '');
+      const timeString = date.toTimeString().slice(0, 5).replace(/:/g, '');
+      
+      // Include user email in filename for easier identification
+      const safeEmail = currentUser.email.replace(/[^a-zA-Z0-9]/g, '_');
       
       // Create a link element and trigger download
       const a = document.createElement('a');
       a.href = url;
-      a.download = `lens-management-backup-${dateString}.json`;
+      a.download = `lens-management-${safeEmail}-${dateString}-${timeString}.json`;
       document.body.appendChild(a);
       a.click();
       
@@ -835,7 +899,17 @@ const Settings = () => {
         URL.revokeObjectURL(url);
       }, 100);
       
-      setBackupSuccess('Backup created successfully! Your file is downloading.');
+      setBackupSuccess(`✅ Your personal backup created successfully! 
+      
+      📊 Backup Summary:
+      • User: ${currentUser.email}
+      • ${totalDocuments} documents backed up
+      • ${collectionsToBackup.length} collections included
+      • File: lens-management-${safeEmail}-${dateString}-${timeString}.json
+      
+      🔒 Security: This backup can only be restored by your account (${currentUser.email}).
+      
+      Your backup file is downloading now.`);
     } catch (error) {
       console.error('Error creating backup:', error);
       setBackupError(`Failed to create backup: ${error.message}`);
@@ -872,6 +946,14 @@ const Settings = () => {
       setBackupError('');
       setBackupSuccess('');
       
+      // Get current user information for validation
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error('User not authenticated. Please login again to restore backup.');
+      }
+      
+      console.log('Current user attempting restore:', currentUser.uid, currentUser.email);
+      
       // Read the file
       const reader = new FileReader();
       
@@ -881,48 +963,152 @@ const Settings = () => {
           
           // Validate backup format
           if (!backupData.metadata || !backupData.metadata.collections) {
-            throw new Error('Invalid backup file format');
+            throw new Error('Invalid backup file format. Please ensure you are using a valid backup file.');
           }
+          
+          console.log('Restore: Backup file validation passed');
+          console.log('Backup metadata:', backupData.metadata);
+          
+          // CRITICAL: Validate backup ownership
+          const validationResult = validateBackupOwnership(backupData.metadata, currentUser);
+          
+          console.log('Backup ownership validation result:', validationResult);
+          
+          if (!validationResult.isValid) {
+            const errorMessage = `🔒 SECURITY ERROR: This backup cannot be restored by your account.
+
+${validationResult.errors.join('\n')}
+
+Backup Details:
+• Backup Owner: ${backupData.metadata.userEmail || 'Unknown'}
+• Current User: ${currentUser.email}
+
+For security reasons, you can only restore backups created by your own account.`;
+            
+            throw new Error(errorMessage);
+          }
+          
+          // Log any warnings
+          if (validationResult.warnings.length > 0) {
+            console.warn('Backup validation warnings:', validationResult.warnings);
+          }
+          
+          console.log('✅ Backup ownership validation successful');
           
           // Collections to restore
           const collections = backupData.metadata.collections;
+          const totalDocuments = backupData.metadata.totalDocuments || 'unknown';
           
-          // Confirm with the user
+          // Enhanced confirmation dialog with security information
           if (!window.confirm(
-            `This will restore data for the following collections: ${collections.join(', ')}. This operation will overwrite existing data. Are you sure you want to continue?`
+            `🔒 RESTORE CONFIRMATION FOR ${currentUser.email}
+            
+This backup was created by: ${backupData.metadata.userEmail}
+Backup created: ${new Date(backupData.metadata.createdAt).toLocaleString()}
+
+📋 Backup Details:
+• Collections: ${collections.length}
+• Total documents: ${totalDocuments}
+• Backup version: ${backupData.metadata.version || 'unknown'}
+• Security level: ${backupData.metadata.securityLevel || 'standard'}
+
+⚠️  WARNING: This will OVERWRITE your current data!
+
+Collections that will be restored:
+${collections.join(', ')}
+
+✅ Ownership verified: This backup belongs to your account.
+
+Are you sure you want to continue with the restoration?`
           )) {
             setRestoreLoading(false);
             return;
           }
           
+          console.log('User confirmed restoration');
+          setBackupSuccess('🔒 Ownership verified. Starting restoration process...');
+          
+          let restoredCount = 0;
+          let skippedCount = 0;
+          let errorCount = 0;
+          
           // Loop through each collection
           for (const collectionName of collections) {
-            if (backupData[collectionName]) {
-              for (const [docId, docData] of Object.entries(backupData[collectionName])) {
-                // Process the restored data using dateUtils for consistent date handling
-                const processedData = processRestoredData(docData);
+            try {
+              console.log(`Restoring collection: ${collectionName}`);
+              
+              if (backupData[collectionName] && typeof backupData[collectionName] === 'object') {
+                const documents = Object.entries(backupData[collectionName]);
+                console.log(`Collection ${collectionName}: ${documents.length} documents to restore`);
                 
-                // Write document to user-specific Firestore collection
-                await setDoc(getUserDoc(collectionName, docId), processedData, { merge: true });
+                for (const [docId, docData] of documents) {
+                  try {
+                    // Skip if docData is null or invalid
+                    if (!docData || typeof docData !== 'object') {
+                      console.warn(`Skipping invalid document in ${collectionName}: ${docId}`);
+                      skippedCount++;
+                      continue;
+                    }
+                    
+                    // Process the restored data using dateUtils for consistent date handling
+                    const processedData = processRestoredData(docData);
+                    
+                    // Write document to user-specific Firestore collection
+                    // This ensures data goes to the correct user's space
+                    await setDoc(getUserDoc(collectionName, docId), processedData, { merge: true });
+                    restoredCount++;
+                    
+                    // Update progress every 10 documents
+                    if (restoredCount % 10 === 0) {
+                      setBackupSuccess(`Restoring to ${currentUser.email}... ${restoredCount} documents processed`);
+                    }
+                  } catch (docError) {
+                    console.error(`Error restoring document ${docId} in ${collectionName}:`, docError);
+                    errorCount++;
+                  }
+                }
+                
+                console.log(`Collection ${collectionName}: restored ${documents.length} documents to user ${currentUser.uid}`);
+              } else {
+                console.log(`Collection ${collectionName}: no data to restore`);
               }
+            } catch (collectionError) {
+              console.error(`Error restoring collection ${collectionName}:`, collectionError);
+              errorCount++;
             }
           }
           
-          setBackupSuccess('Restore completed successfully! Refreshing page...');
+          // Final success message with statistics and user verification
+          const successMessage = `✅ Restore completed successfully for ${currentUser.email}!
+
+🔒 Security Verified: Data restored to your account only.
+
+📊 Restoration Summary:
+• User Account: ${currentUser.email}
+• ${restoredCount} documents restored
+• ${skippedCount} documents skipped
+• ${errorCount} errors encountered
+• ${collections.length} collections processed
+
+The page will refresh in 3 seconds to load your restored data...`;
           
-          // Refresh page after 2 seconds to load new data
+          setBackupSuccess(successMessage);
+          console.log('Restoration completed for user:', currentUser.uid, { restoredCount, skippedCount, errorCount });
+          
+          // Refresh page after 3 seconds to load new data
           setTimeout(() => {
             window.location.reload();
-          }, 2000);
+          }, 3000);
+          
         } catch (parseError) {
-          console.error('Error parsing backup file:', parseError);
-          setBackupError(`Failed to parse backup file: ${parseError.message}`);
+          console.error('Error parsing backup file or validation failed:', parseError);
+          setBackupError(`${parseError.message}`);
           setRestoreLoading(false);
         }
       };
       
       reader.onerror = () => {
-        setBackupError('Error reading backup file');
+        setBackupError('Error reading backup file. Please try selecting the file again.');
         setRestoreLoading(false);
       };
       
@@ -1207,26 +1393,29 @@ const Settings = () => {
       console.log('Starting comprehensive data deletion...');
       
       // Comprehensive list of user-specific collections to delete
+      // Updated to match the backup collections list
       const collectionsToDelete = [
         'customers', 
         'orders', 
-        'purchases', 
-        'transactions', 
         'sales', 
-        'invoices', 
+        'purchases', 
+        'settings', 
+        'transactions', 
+        'lensInventory', 
         'counters',
-        'lensInventory',
-        'teamMembers', // Changed from 'users' to 'teamMembers'
-        'products',
-        'inventory',
-        'vendors',
-        'payments',
-        'reports',
-        'categories',
-        'brands',
-        'prescriptions',
-        'appointments',
-        'settings'
+        'teamMembers', // User management
+        'vendors', // Vendor information
+        'products', // Product catalog
+        'inventory', // General inventory
+        'payments', // Payment records
+        'invoices', // Invoice data
+        'categories', // Product categories
+        'brands', // Brand information
+        'prescriptions', // Prescription data
+        'appointments', // Appointment data
+        // Legacy collections that might exist
+        'users', // Old user collection name
+        'reports' // Reports if any
       ];
       
       const deletePromises = [];
@@ -1937,6 +2126,13 @@ const Settings = () => {
                     Backup your data to a local file that you can use to restore your shop's data in case of data loss.
                     Regular backups are recommended to protect your business data.
                   </p>
+                  <div className="mt-3 p-3 bg-blue-100 dark:bg-blue-800/50 border border-blue-200 dark:border-blue-600 rounded-md">
+                    <p className="text-sm font-medium text-blue-800 dark:text-blue-200">🔒 Security Notice:</p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                      Backups are personal and account-specific. You can only restore backups created by your own account ({auth.currentUser?.email}). 
+                      This prevents accidental data mixing between different users.
+                    </p>
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -1980,6 +2176,14 @@ const Settings = () => {
                         <li>Orders and sales</li>
                         <li>Transactions</li>
                         <li>Shop settings</li>
+                        <li>Lens inventory</li>
+                        <li>Purchase records</li>
+                        <li>Vendor information</li>
+                        <li>Product catalog</li>
+                        <li>Invoice data</li>
+                        <li>Payment records</li>
+                        <li>User management</li>
+                        <li>All other business data</li>
                       </ul>
                     </div>
                   </div>
@@ -1990,6 +2194,13 @@ const Settings = () => {
                     <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
                       Restore your data from a previously created backup file. This will overwrite your current data.
                     </p>
+                    
+                    {/* Security Warning */}
+                    <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-md">
+                      <p className="text-xs text-amber-800 dark:text-amber-200 font-medium">
+                        🔒 Security Validation: Only backups created by your account can be restored here.
+                      </p>
+                    </div>
                     
                     <div className="mt-4">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select Backup File</label>
@@ -2006,9 +2217,14 @@ const Settings = () => {
                       />
                       
                       {backupFile && (
-                        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                          Selected file: {backupFile.name}
-                        </p>
+                        <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-md">
+                          <p className="text-sm text-green-800 dark:text-green-200 font-medium">
+                            ✅ Selected file: {backupFile.name}
+                          </p>
+                          <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                            File will be validated to ensure it belongs to your account before restoration.
+                          </p>
+                        </div>
                       )}
                     </div>
                     
@@ -2025,14 +2241,14 @@ const Settings = () => {
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
-                            Restoring...
+                            Validating & Restoring...
                           </>
                         ) : (
                           <>
                             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                             </svg>
-                            Restore Data
+                            🔒 Validate & Restore Data
                           </>
                         )}
                       </button>
@@ -2041,6 +2257,9 @@ const Settings = () => {
                     <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-md">
                       <p className="text-xs text-red-700 dark:text-red-200 font-medium">
                         ⚠️ Warning: This will permanently overwrite all your current data.
+                      </p>
+                      <p className="text-xs text-red-600 dark:text-red-300 mt-1">
+                        Only proceed if you're certain this backup contains the data you want to restore.
                       </p>
                     </div>
                   </div>

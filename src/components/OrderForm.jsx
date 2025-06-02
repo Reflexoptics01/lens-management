@@ -33,7 +33,7 @@ const COATING_COLORS = {
   'SHMC': ['GREEN', 'BLUE', 'DUAL (BLUE & GREEN)', 'MAGENTA', 'VIOLET']
 };
 
-const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, loading, error, isEditing = false, matchingLenses = [], sectionColors }) => {
+const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, loading, error, isEditing = false, matchingLenses = [], shopMatchingLenses = [], shopLoading = false, sectionColors }) => {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [otherTint, setOtherTint] = useState('');
   const [showCoatingColors, setShowCoatingColors] = useState(false);
@@ -388,7 +388,7 @@ const OrderForm = ({ formData, onChange, onSubmit, customers, onAddNewCustomer, 
         </div>
         
         <div className="bg-gradient-to-br from-white via-white to-green-50 dark:from-gray-800 dark:via-gray-800 dark:to-green-900/20 p-4 rounded-lg border border-green-100 dark:border-green-700/50 shadow-sm">
-          <LensPrescription formData={formData} onChange={onChange} matchingLenses={matchingLenses} />
+          <LensPrescription formData={formData} onChange={onChange} matchingLenses={matchingLenses} shopMatchingLenses={shopMatchingLenses} shopLoading={shopLoading} />
         </div>
       </div>
 

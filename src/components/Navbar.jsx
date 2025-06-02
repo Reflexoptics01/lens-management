@@ -1,10 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { auth, db } from '../firebaseConfig';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, getDoc, collection, query, where, getDocs, setDoc } from 'firebase/firestore';
 import React from 'react';
 import ThemeToggle from './ThemeToggle';
+import { 
+  getShopPreferences, 
+  setShopPreferences, 
+  uploadLensesToShop, 
+  removeLensesFromShop, 
+  getCurrentUserInfo,
+  searchMatchingLenses 
+} from '../utils/shopAPI';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -17,6 +26,13 @@ const Navbar = () => {
   const [logoDataURL, setLogoDataURL] = useState('');
   const [userRole, setUserRole] = useState('user');
   const [userPermissions, setUserPermissions] = useState({});
+  
+  // Shop states
+  const [showShopModal, setShowShopModal] = useState(false);
+  const [shopLoading, setShopLoading] = useState(false);
+  const [shopPreferences, setShopPreferencesState] = useState({ isSharing: false });
+  const [shopLenses, setShopLenses] = useState([]);
+  const [shopError, setShopError] = useState('');
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -30,6 +46,9 @@ const Navbar = () => {
         
         // Fetch user role and permissions
         await fetchUserPermissions(currentUser.email);
+        
+        // Load shop preferences
+        loadShopPreferences();
       }
       
       setLoading(false);
@@ -38,18 +57,24 @@ const Navbar = () => {
     return () => unsubscribe();
   }, []);
 
+  // Load shop preferences on component mount
+  useEffect(() => {
+    loadShopPreferences();
+  }, []);
+
   // Fetch shop settings to get logo and shop name
   const fetchShopSettings = async () => {
     try {
-      const settingsDoc = await getDoc(doc(db, 'settings', 'shopSettings'));
+      const settingsDoc = await getDoc(getUserDoc('settings', 'shopSettings'));
       
       if (settingsDoc.exists()) {
-        const data = settingsDoc.data();
-        setShopName(data.shopName || '');
-        setLogoDataURL(data.logoDataURL || '');
+        const settings = settingsDoc.data();
+        setShopName(settings.shopName || 'Lens Management');
+        setLogoDataURL(settings.logoDataURL || '');
       }
     } catch (error) {
       console.error('Error fetching shop settings:', error);
+      setShopName('Lens Management'); // fallback
     }
   };
 
@@ -81,6 +106,76 @@ const Navbar = () => {
       }
     } catch (error) {
       console.error('Error fetching user permissions:', error);
+    }
+  };
+
+  // Load shop preferences from localStorage
+  const loadShopPreferences = () => {
+    const prefs = getShopPreferences();
+    setShopPreferencesState(prefs);
+  };
+
+  // Handle shop permission toggle
+  const handleShopPermissionToggle = async () => {
+    setShopLoading(true);
+    setShopError('');
+    
+    try {
+      const newPrefs = { isSharing: !shopPreferences.isSharing };
+      
+      if (newPrefs.isSharing) {
+        // User wants to share - upload lenses to shop
+        const userInfo = getCurrentUserInfo();
+        const lensInventoryRef = getUserCollection('lensInventory');
+        const snapshot = await getDocs(lensInventoryRef);
+        
+        const lenses = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        await uploadLensesToShop(lenses, userInfo);
+        console.log('Successfully uploaded lenses to shop');
+      } else {
+        // User wants to stop sharing - remove lenses from shop
+        const userInfo = getCurrentUserInfo();
+        const lensInventoryRef = getUserCollection('lensInventory');
+        const snapshot = await getDocs(lensInventoryRef);
+        
+        const lenses = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        await removeLensesFromShop(lenses, userInfo);
+        console.log('Successfully removed lenses from shop');
+      }
+      
+      setShopPreferences(newPrefs);
+      setShopPreferencesState(newPrefs);
+      
+    } catch (error) {
+      console.error('Error toggling shop permission:', error);
+      setShopError(`Failed to ${shopPreferences.isSharing ? 'disable' : 'enable'} lens sharing: ${error.message}`);
+    } finally {
+      setShopLoading(false);
+    }
+  };
+
+  // Search and fetch matching lenses from the centralized shop
+  const searchShopLenses = async (prescriptionData) => {
+    setShopLoading(true);
+    setShopError('');
+    
+    try {
+      const matches = await searchMatchingLenses(prescriptionData);
+      setShopLenses(matches);
+      console.log(`Found ${matches.length} matching lenses in shop`);
+    } catch (error) {
+      console.error('Error searching shop lenses:', error);
+      setShopError(`Failed to search lenses: ${error.message}`);
+    } finally {
+      setShopLoading(false);
     }
   };
 
@@ -127,7 +222,7 @@ const Navbar = () => {
   const handleLogout = async () => {
     try {
       setIsMenuOpen(false);
-      await auth.signOut();
+      await signOut(auth);
       navigate('/login', { replace: true });
     } catch (error) {
       console.error('Error logging out:', error);
@@ -632,6 +727,165 @@ const Navbar = () => {
           }
         }
       `}</style>
+
+      {/* Floating Shop Button */}
+      <button
+        onClick={() => setShowShopModal(true)}
+        className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 w-14 h-14 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-full shadow-lg hover:shadow-xl transform hover:scale-110 transition-all duration-300 z-40 flex items-center justify-center group"
+        style={{
+          backdropFilter: 'blur(10px)',
+          border: '2px solid rgba(255, 255, 255, 0.2)'
+        }}
+      >
+        <svg className="w-7 h-7 group-hover:animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+        </svg>
+        
+        {/* Notification badge for shop status */}
+        {shopPreferences.isSharing && (
+          <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+            <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+          </div>
+        )}
+      </button>
+
+      {/* Shop Modal */}
+      {showShopModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity duration-300 ease-in-out">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden transform transition-all duration-300 ease-in-out scale-100">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-emerald-500 to-teal-600">
+              <div className="flex items-center">
+                <svg className="w-8 h-8 text-white mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                </svg>
+                <h3 className="text-xl font-semibold text-white">Lens Marketplace</h3>
+              </div>
+              <button 
+                onClick={() => setShowShopModal(false)} 
+                className="text-white hover:bg-white hover:bg-opacity-20 transition-colors p-2 rounded-md"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+            
+            {/* Modal Content */}
+            <div className="p-6 max-h-[70vh] overflow-y-auto">
+              {/* Error Display */}
+              {shopError && (
+                <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 rounded-md text-red-700 dark:text-red-200 text-sm">
+                  {shopError}
+                </div>
+              )}
+
+              {/* Permission Toggle Section */}
+              <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-lg font-medium text-gray-900 dark:text-white">Share Your Lenses</h4>
+                  <div className="flex items-center">
+                    <button
+                      onClick={handleShopPermissionToggle}
+                      disabled={shopLoading}
+                      className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors duration-200 ${
+                        shopPreferences.isSharing ? 'bg-green-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform duration-200 ${
+                          shopPreferences.isSharing ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+                
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+                  {shopPreferences.isSharing 
+                    ? 'Your RX and Contact lenses are being shared in the marketplace. Other optical shops can find and contact you for lens availability.'
+                    : 'Enable sharing to make your lens inventory visible to other optical shops. Only RX and Contact lenses will be shared.'
+                  }
+                </p>
+
+                <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
+                  <div className={`w-2 h-2 rounded-full mr-2 ${shopPreferences.isSharing ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                  Status: {shopPreferences.isSharing ? 'Sharing Active' : 'Not Sharing'}
+                </div>
+              </div>
+
+              {/* Search Section */}
+              <div className="mb-6">
+                <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-3 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  Search Available Lenses
+                </h4>
+                
+                <div className="bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-400 p-3 mb-3 text-sm text-blue-700 dark:text-blue-300">
+                  <p>💡 Go to the <strong>Create Order</strong> page and enter prescription details to automatically see matching lenses from other optical shops!</p>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setShowShopModal(false);
+                    navigate('/orders/create');
+                  }}
+                  className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 flex items-center justify-center"
+                >
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Create New Order
+                </button>
+              </div>
+
+              {/* How it Works Section */}
+              <div className="border-t pt-4 border-gray-200 dark:border-gray-600">
+                <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-3">How It Works</h4>
+                <div className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
+                  <div className="flex items-start">
+                    <span className="w-6 h-6 bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center text-xs font-bold mr-3 mt-0.5">1</span>
+                    <div>
+                      <strong>Enable Sharing:</strong> Toggle the switch to share your RX and Contact lens inventory with other shops.
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="w-6 h-6 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center text-xs font-bold mr-3 mt-0.5">2</span>
+                    <div>
+                      <strong>Smart Matching:</strong> When creating orders, the system finds matching lenses (±0.25 power, ±10° axis) from all participating shops.
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="w-6 h-6 bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400 rounded-full flex items-center justify-center text-xs font-bold mr-3 mt-0.5">3</span>
+                    <div>
+                      <strong>Connect & Purchase:</strong> Contact details are shown for available lenses, making it easy to connect with other optical shops.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Loading Overlay */}
+            {shopLoading && (
+              <div className="absolute inset-0 bg-white bg-opacity-80 dark:bg-gray-800 dark:bg-opacity-80 flex items-center justify-center">
+                <div className="flex items-center">
+                  <svg className="animate-spin h-6 w-6 text-emerald-600 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span className="text-gray-700 dark:text-gray-300">
+                    {shopPreferences.isSharing ? 'Disabling lens sharing...' : 'Enabling lens sharing...'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 };

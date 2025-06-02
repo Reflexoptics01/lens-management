@@ -98,9 +98,10 @@ const Purchases = () => {
       
       const purchasesList = snapshot.docs
         .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
-        .map((doc, index) => ({
+        .map((doc) => ({
           id: doc.id,
-          displayId: `P-${(snapshot.docs.length - index).toString().padStart(3, '0')}`,
+          // Use the actual stored purchaseNumber instead of calculating displayId
+          displayId: doc.data().purchaseNumber || `P-${doc.id.slice(-3)}`,
           ...doc.data()
         }));
       setPurchases(purchasesList);

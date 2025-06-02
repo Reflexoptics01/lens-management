@@ -66,13 +66,18 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
   const calculateCustomerBalances = async (cutoffDate) => {
     try {
       const customersSnapshot = await getDocs(getUserCollection('customers'));
-      let allCustomers = customersSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      let allCustomers = customersSnapshot.docs
+        .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        .filter(customer => customer.opticalName && customer.opticalName.trim() !== ''); // Filter out entries with missing/empty names
       
-      // Filter out vendors to get only customers
-      const customers = allCustomers.filter(customer => customer.type !== 'vendor');
+      // Filter to get only customers with explicit type 'customer' or no type (legacy customers)
+      const customers = allCustomers.filter(customer => 
+        customer.type === 'customer' || (!customer.type && !customer.isVendor)
+      );
       
       // Calculate balance for each customer
       const customerBalances = await Promise.all(
@@ -132,9 +137,14 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
         })
       );
       
-      customerBalances.sort((a, b) => b.currentBalance - a.currentBalance);
+      // Filter out entries with zero balances for cleaner view (optional)
+      const filteredCustomerBalances = customerBalances.filter(customer => 
+        Math.abs(customer.currentBalance) > 0.01 // Use small threshold to account for floating point precision
+      );
       
-      return customerBalances;
+      filteredCustomerBalances.sort((a, b) => b.currentBalance - a.currentBalance);
+      
+      return filteredCustomerBalances;
     } catch (error) {
       console.error('[BalanceDueView] Error calculating customer balances:', error);
       return [];
@@ -145,13 +155,18 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
     try {
       // Also get vendor balances
       const vendorsSnapshot = await getDocs(getUserCollection('customers'));
-      const allEntities = vendorsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const allEntities = vendorsSnapshot.docs
+        .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        .filter(entity => entity.opticalName && entity.opticalName.trim() !== ''); // Filter out entries with missing/empty names
       
-      // Filter to get only vendors
-      const vendors = allEntities.filter(entity => entity.type === 'vendor');
+      // Filter to get only vendors with explicit type 'vendor' or isVendor flag
+      const vendors = allEntities.filter(entity => 
+        entity.type === 'vendor' || entity.isVendor === true
+      );
       
       // Calculate balance for each vendor
       const vendorBalances = await Promise.all(
@@ -212,9 +227,14 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
         })
       );
       
-      vendorBalances.sort((a, b) => b.currentBalance - a.currentBalance);
+      // Filter out entries with zero balances for cleaner view (optional)
+      const filteredVendorBalances = vendorBalances.filter(vendor => 
+        Math.abs(vendor.currentBalance) > 0.01 // Use small threshold to account for floating point precision
+      );
       
-      return vendorBalances;
+      filteredVendorBalances.sort((a, b) => b.currentBalance - a.currentBalance);
+      
+      return filteredVendorBalances;
     } catch (error) {
       console.error('[BalanceDueView] Error calculating vendor balances:', error);
       return [];

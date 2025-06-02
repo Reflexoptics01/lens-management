@@ -99,7 +99,7 @@ const LensInventory = () => {
   );
   
   // Styling constants
-  const inputClassName = "block w-full rounded-md border-gray-300 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm py-1.5 px-2 text-center";
+  const inputClassName = "block w-full rounded-md border-gray-300 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm py-1.5 px-2 text-left [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
   const selectClassName = "block w-full rounded-md border-gray-300 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm py-1.5 px-2";
   const labelClassName = "block uppercase tracking-wide text-xs font-bold text-sky-700 mb-1";
   const sectionClassName = "bg-white rounded-lg shadow-md p-6 mb-6";
@@ -236,7 +236,7 @@ const LensInventory = () => {
           powerSeries: row.powerSeries,
           purchasePrice: row.purchasePrice,
           salePrice: row.salePrice,
-          qty: parseInt(row.qty) || 1,
+          qty: parseFloat(row.qty) || 1,
           type: 'stock',
           updatedAt: Timestamp.now()
         };
@@ -255,7 +255,7 @@ const LensInventory = () => {
             powerSeries: row.powerSeries,
             purchasePrice: row.purchasePrice,
             salePrice: row.salePrice,
-            qty: parseInt(row.qty) || 1,
+            qty: parseFloat(row.qty) || 1,
             type: 'stock',
             createdAt: Timestamp.now()
           };
@@ -459,7 +459,7 @@ const LensInventory = () => {
           powerSeries: row.powerSeries,
           purchasePrice: row.purchasePrice,
           salePrice: row.salePrice,
-          qty: parseInt(row.qty) || 1,
+          qty: parseFloat(row.qty) || 1,
           type: 'stock',
           updatedAt: Timestamp.now()
         };
@@ -565,14 +565,14 @@ const LensInventory = () => {
 
   const calculateInventoryMetrics = () => {
     // Calculate total inventory statistics
-    const totalQty = lenses.reduce((sum, lens) => sum + (parseInt(lens.qty) || 0), 0);
+    const totalQty = lenses.reduce((sum, lens) => sum + (parseFloat(lens.qty) || 0), 0);
     const totalValue = lenses.reduce((sum, lens) => {
-      const qty = parseInt(lens.qty) || 0;
+      const qty = parseFloat(lens.qty) || 0;
       const price = parseFloat(lens.purchasePrice) || 0;
       return sum + (qty * price);
     }, 0);
     const potentialSaleValue = lenses.reduce((sum, lens) => {
-      const qty = parseInt(lens.qty) || 0;
+      const qty = parseFloat(lens.qty) || 0;
       const price = parseFloat(lens.salePrice) || 0;
       return sum + (qty * price);
     }, 0);
@@ -584,24 +584,24 @@ const LensInventory = () => {
     const prescriptionLenses = lenses.filter(lens => lens.type === 'prescription');
     const serviceLenses = lenses.filter(lens => lens.type === 'service');
     
-    const stockQty = stockLenses.reduce((sum, lens) => sum + (parseInt(lens.qty) || 0), 0);
-    const prescriptionQty = prescriptionLenses.reduce((sum, lens) => sum + (parseInt(lens.qty) || 0), 0);
-    const serviceQty = serviceLenses.reduce((sum, lens) => sum + (parseInt(lens.qty) || 0), 0);
+    const stockQty = stockLenses.reduce((sum, lens) => sum + (parseFloat(lens.qty) || 0), 0);
+    const prescriptionQty = prescriptionLenses.reduce((sum, lens) => sum + (parseFloat(lens.qty) || 0), 0);
+    const serviceQty = serviceLenses.reduce((sum, lens) => sum + (parseFloat(lens.qty) || 0), 0);
     
     const stockValue = stockLenses.reduce((sum, lens) => {
-      const qty = parseInt(lens.qty) || 0;
+      const qty = parseFloat(lens.qty) || 0;
       const price = parseFloat(lens.purchasePrice) || 0;
       return sum + (qty * price);
     }, 0);
     
     const prescriptionValue = prescriptionLenses.reduce((sum, lens) => {
-      const qty = parseInt(lens.qty) || 0;
+      const qty = parseFloat(lens.qty) || 0;
       const price = parseFloat(lens.purchasePrice) || 0;
       return sum + (qty * price);
     }, 0);
     
     const serviceValue = serviceLenses.reduce((sum, lens) => {
-      const qty = parseInt(lens.qty) || 0;
+      const qty = parseFloat(lens.qty) || 0;
       const price = parseFloat(lens.purchasePrice) || 0;
       return sum + (qty * price);
     }, 0);
@@ -617,8 +617,8 @@ const LensInventory = () => {
         };
       }
       
-      brandGroups[brand].qty += parseInt(lens.qty) || 0;
-      brandGroups[brand].value += (parseInt(lens.qty) || 0) * (parseFloat(lens.purchasePrice) || 0);
+      brandGroups[brand].qty += parseFloat(lens.qty) || 0;
+      brandGroups[brand].value += (parseFloat(lens.qty) || 0) * (parseFloat(lens.purchasePrice) || 0);
     });
     
     // Sort brands by value
@@ -684,11 +684,11 @@ const LensInventory = () => {
         {filteredLenses.map((lens, index) => (
           <div key={lens.id} className={`p-3 rounded-lg border shadow-sm ${index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700'} border-gray-200 dark:border-gray-600`}>
             <div className="flex justify-between items-center mb-2">
-              <div className="font-medium text-sky-600">
+              <div className="font-medium text-sky-600 text-left">
                 {lens.brandName || 'N/A'}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">
-                Qty: {lens.qty || '1'}
+              <div className="text-xs text-gray-500 dark:text-gray-400 text-right">
+                Qty: {parseFloat(lens.qty) || 1} pairs
               </div>
             </div>
 
@@ -782,13 +782,13 @@ const LensInventory = () => {
               <div>
                 <div>
                   <span className="font-medium text-gray-500 dark:text-gray-400">Purchase:</span>{' '}
-                  <span className="text-gray-900 dark:text-white">
+                  <span className="text-gray-900 dark:text-white text-left">
                     {lens.purchasePrice ? `₹${parseFloat(lens.purchasePrice).toFixed(2)}` : 'N/A'}
                   </span>
                 </div>
                 <div>
                   <span className="font-medium text-gray-500 dark:text-gray-400">Sale:</span>{' '}
-                  <span className="text-gray-900 dark:text-white">
+                  <span className="text-gray-900 dark:text-white text-left">
                     {lens.salePrice ? `₹${parseFloat(lens.salePrice).toFixed(2)}` : 'N/A'}
                   </span>
                 </div>
@@ -1114,21 +1114,21 @@ const LensInventory = () => {
                               {/* Conditional rendering for RX lens columns */}
                               {activeTab === 'rx' && (
                                 <>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white font-medium">
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white font-medium text-left">
                                     {lens.eye === 'right' ? 'Right' : lens.eye === 'left' ? 'Left' : lens.eye === 'both' ? 'Both' : 'N/A'}
                                   </td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.sph || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.cyl || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.axis || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.add || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.material || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.index || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.sph || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.cyl || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.axis || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.add || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.material || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.index || 'N/A'}</td>
                                 </>
                               )}
                               
                               {/* Power Series column for stock lenses */}
                               {activeTab === 'stock' && (
-                                <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">
+                                <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">
                                   {lens.powerSeries || 'N/A'}
                                 </td>
                               )}
@@ -1136,31 +1136,33 @@ const LensInventory = () => {
                               {/* Contact lens specific columns */}
                               {activeTab === 'contact' && (
                                 <>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.powerSeries || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.category || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.contactType || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.color || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.disposalFrequency || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.powerSeries || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.category || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.contactType || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.color || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.disposalFrequency || 'N/A'}</td>
                                 </>
                               )}
                               
                               {/* Service specific columns */}
                               {activeTab === 'services' && (
                                 <>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.serviceType || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.serviceDescription || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.serviceType || 'N/A'}</td>
+                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.serviceDescription || 'N/A'}</td>
                                 </>
                               )}
                               
                               {/* Common columns for all lens types */}
-                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">
+                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">
                                 {lens.purchasePrice ? `₹${parseFloat(lens.purchasePrice).toFixed(2)}` : 'N/A'}
                               </td>
-                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">
+                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">
                                 {lens.salePrice ? `₹${parseFloat(lens.salePrice).toFixed(2)}` : 'N/A'}
                               </td>
-                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">{lens.qty || '1'}</td>
-                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm font-medium">
+                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">
+                                {parseFloat(lens.qty) || 1} pairs
+                              </td>
+                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm font-medium text-left">
                                 <div className="flex gap-1 sm:gap-2">
                                   <button
                                     onClick={() => handleEditLens(lens)}

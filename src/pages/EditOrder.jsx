@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { db } from '../firebaseConfig';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
 import Navbar from '../components/Navbar';
 import OrderForm from '../components/OrderForm';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import CustomerForm from '../components/CustomerForm';
 import { DocumentPlusIcon } from '@heroicons/react/24/outline';
-import { getUserCollection } from '../utils/multiTenancy';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
+import { formatDate } from '../utils/dateUtils';
 
 // Define section colors for the OrderForm
 const SECTION_COLORS = {
@@ -70,7 +70,7 @@ const EditOrder = () => {
     try {
       setLoading(true);
       setError('');
-      const orderRef = doc(db, 'orders', orderId);
+      const orderRef = getUserDoc('orders', orderId);
       const orderDoc = await getDoc(orderRef);
       
       if (orderDoc.exists()) {
@@ -144,10 +144,10 @@ const EditOrder = () => {
     setSuccessMessage('');
 
     try {
-      const orderRef = doc(db, 'orders', orderId);
+      const orderRef = getUserDoc('orders', orderId);
       await updateDoc(orderRef, {
         ...formData,
-        updatedAt: new Date()
+        updatedAt: serverTimestamp()
       });
       
       setSuccessMessage('Order updated successfully');

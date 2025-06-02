@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
-import { collection, addDoc, getDocs, Timestamp, query, orderBy, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, Timestamp, query, orderBy, where, doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
 import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 import Navbar from '../components/Navbar';
 import OrderForm from '../components/OrderForm';
 import { ArrowLeftIcon, PlusIcon, DocumentPlusIcon } from '@heroicons/react/24/outline';
 import CustomerForm from '../components/CustomerForm';
+import { searchMatchingLenses } from '../utils/shopAPI';
 
 // Define colors for visual organization
 const SECTION_COLORS = {
@@ -67,6 +68,10 @@ const CreateOrder = () => {
   // Add state for lens inventory matches
   const [matchingLenses, setMatchingLenses] = useState([]);
   const [showLensMatches, setShowLensMatches] = useState(false);
+  
+  // Add state for shop lens matches
+  const [shopMatchingLenses, setShopMatchingLenses] = useState([]);
+  const [shopLoading, setShopLoading] = useState(false);
 
   useEffect(() => {
     fetchCustomers();
@@ -117,11 +122,13 @@ const CreateOrder = () => {
       // Only search if we have prescription data for at least one eye
       if (!formData.rightSph && !formData.leftSph) {
         setMatchingLenses([]);
+        setShopMatchingLenses([]);
         return;
       }
       
       console.log("Checking lens inventory for matches...");
       
+      // Search local lens inventory
       const lensInventoryRef = getUserCollection('lensInventory');
       
       // Get all RX lenses 
@@ -132,239 +139,316 @@ const CreateOrder = () => {
       
       const snapshot = await getDocs(rxQuery);
       if (snapshot.empty) {
-        console.log("No RX lenses found in inventory");
+        console.log("No RX lenses found in local inventory");
         setMatchingLenses([]);
-        return;
+      } else {
+        // Get all lenses
+        const allLenses = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        console.log(`Found ${allLenses.length} RX lenses in local inventory`);
+        
+        // Apply the existing matching logic for local lenses
+        const localMatches = findLocalMatches(allLenses);
+        setMatchingLenses(localMatches);
       }
       
-      // Get all lenses
-      const allLenses = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      
-      console.log(`Found ${allLenses.length} RX lenses in inventory`);
-      
-      // Set tolerance parameters as specified
-      const SPH_TOLERANCE = 0.25;
-      const CYL_TOLERANCE = 0.25;
-      const ADD_TOLERANCE = 0.25;
-      const AXIS_TOLERANCE = 10; // 10 degrees tolerance
-      
-      // Helper function to check if prescription values match within tolerance
-      const isWithinTolerance = (val1, val2, tolerance) => {
-        if (!val1 || !val2) return false;
+      // Search centralized shop for matching lenses
+      setShopLoading(true);
+      try {
+        const prescriptionData = {
+          rightSph: formData.rightSph,
+          rightCyl: formData.rightCyl,
+          rightAxis: formData.rightAxis,
+          rightAdd: formData.rightAdd,
+          leftSph: formData.leftSph,
+          leftCyl: formData.leftCyl,
+          leftAxis: formData.leftAxis,
+          leftAdd: formData.leftAdd
+        };
         
-        try {
-          const num1 = parseFloat(val1);
-          const num2 = parseFloat(val2);
-          if (isNaN(num1) || isNaN(num2)) return false;
-          
-          return Math.abs(num1 - num2) <= tolerance;
-        } catch (e) {
-          return false;
-        }
-      };
-      
-      // Helper function to check if axis values match within tolerance
-      const isAxisWithinTolerance = (val1, val2, tolerance = AXIS_TOLERANCE) => {
-        if (!val1 || !val2) return false;
-        
-        try {
-          const num1 = parseInt(val1);
-          const num2 = parseInt(val2);
-          if (isNaN(num1) || isNaN(num2)) return false;
-          
-          // Handle wrap-around case (e.g., 5 degrees is close to 175 degrees in lens terminology)
-          const diff = Math.abs(num1 - num2);
-          return diff <= tolerance || diff >= (180 - tolerance);
-        } catch (e) {
-          return false;
-        }
-      };
-      
-      // Create separate matching arrays for right eye and left eye
-      const rightEyeMatches = [];
-      const leftEyeMatches = [];
-      
-      // If we have right eye prescription data, find matches
-      if (formData.rightSph) {
-        console.log(`Searching for right eye matches with SPH: ${formData.rightSph}`);
-        
-        // Look for right eye lenses or lenses without specified eye
-        for (const lens of allLenses) {
-          // Only consider right eye lenses or unspecified eye
-          if (lens.eye !== 'left') {
-            // Require ALL values to match when present
-            
-            // Check SPH (always required to match)
-            if (!lens.sph || !isWithinTolerance(lens.sph, formData.rightSph, SPH_TOLERANCE)) {
-              continue;
-            }
-            
-            // Check CYL
-            // If either the prescription or lens has CYL, both must have it and match
-            if ((formData.rightCyl || lens.cyl) && 
-                (!formData.rightCyl || !lens.cyl || !isWithinTolerance(lens.cyl, formData.rightCyl, CYL_TOLERANCE))) {
-              continue;
-            }
-            
-            // Check AXIS (only if CYL is present in both)
-            if (formData.rightCyl && lens.cyl) {
-              // If either has AXIS, both must have it and match
-              if ((formData.rightAxis || lens.axis) && 
-                  (!formData.rightAxis || !lens.axis || !isAxisWithinTolerance(lens.axis, formData.rightAxis))) {
-                continue;
-              }
-            }
-            
-            // Check ADD
-            // If either has ADD, both must have it and match
-            if ((formData.rightAdd || lens.add) && 
-                (!formData.rightAdd || !lens.add || !isWithinTolerance(lens.add, formData.rightAdd, ADD_TOLERANCE))) {
-              continue;
-            }
-            
-            // If we got here, all values match within tolerances
-            {
-              console.log(`Found matching lens for right eye:`, lens);
-              rightEyeMatches.push({
-                ...lens,
-                matchedEye: 'right',
-                matchQuality: calculateMatchQuality(
-                  lens, 
-                  formData.rightSph, 
-                  formData.rightCyl, 
-                  formData.rightAxis, 
-                  formData.rightAdd
-                )
-              });
-            }
-          }
-        }
+        const shopMatches = await searchMatchingLenses(prescriptionData);
+        setShopMatchingLenses(shopMatches);
+        console.log(`Found ${shopMatches.length} matching lenses in centralized shop`);
+      } catch (error) {
+        console.error('Error searching shop lenses:', error);
+        setShopMatchingLenses([]);
+      } finally {
+        setShopLoading(false);
       }
-      
-      // If we have left eye prescription data, find matches
-      if (formData.leftSph) {
-        console.log(`Searching for left eye matches with SPH: ${formData.leftSph}`);
-        
-        // Look for left eye lenses or lenses without specified eye
-        for (const lens of allLenses) {
-          // Only consider left eye lenses or unspecified eye
-          if (lens.eye !== 'right') {
-            // Require ALL values to match when present
-            
-            // Check SPH (always required to match)
-            if (!lens.sph || !isWithinTolerance(lens.sph, formData.leftSph, SPH_TOLERANCE)) {
-              continue;
-            }
-            
-            // Check CYL
-            // If either the prescription or lens has CYL, both must have it and match
-            if ((formData.leftCyl || lens.cyl) && 
-                (!formData.leftCyl || !lens.cyl || !isWithinTolerance(lens.cyl, formData.leftCyl, CYL_TOLERANCE))) {
-              continue;
-            }
-            
-            // Check AXIS (only if CYL is present in both)
-            if (formData.leftCyl && lens.cyl) {
-              // If either has AXIS, both must have it and match
-              if ((formData.leftAxis || lens.axis) && 
-                  (!formData.leftAxis || !lens.axis || !isAxisWithinTolerance(lens.axis, formData.leftAxis))) {
-                continue;
-              }
-            }
-            
-            // Check ADD
-            // If either has ADD, both must have it and match
-            if ((formData.leftAdd || lens.add) && 
-                (!formData.leftAdd || !lens.add || !isWithinTolerance(lens.add, formData.leftAdd, ADD_TOLERANCE))) {
-              continue;
-            }
-            
-            // If we got here, all values match within tolerances
-            {
-              console.log(`Found matching lens for left eye:`, lens);
-              leftEyeMatches.push({
-                ...lens,
-                matchedEye: 'left',
-                matchQuality: calculateMatchQuality(
-                  lens, 
-                  formData.leftSph, 
-                  formData.leftCyl, 
-                  formData.leftAxis, 
-                  formData.leftAdd
-                )
-              });
-            }
-          }
-        }
-      }
-      
-      // Calculate match quality score (0-100%) to sort results
-      function calculateMatchQuality(lens, sph, cyl, axis, add) {
-        let score = 0;
-        let factors = 0;
-        
-        // SPH match quality
-        if (lens.sph && sph) {
-          const sphDiff = Math.abs(parseFloat(lens.sph) - parseFloat(sph));
-          score += Math.max(0, 1 - (sphDiff / SPH_TOLERANCE));
-          factors++;
-        }
-        
-        // CYL match quality
-        if (lens.cyl && cyl) {
-          const cylDiff = Math.abs(parseFloat(lens.cyl) - parseFloat(cyl));
-          score += Math.max(0, 1 - (cylDiff / CYL_TOLERANCE));
-          factors++;
-        }
-        
-        // AXIS match quality
-        if (lens.axis && axis) {
-          const axisDiff = Math.abs(parseInt(lens.axis) - parseInt(axis));
-          const normalizedAxisDiff = Math.min(axisDiff, 180 - axisDiff);
-          score += Math.max(0, 1 - (normalizedAxisDiff / AXIS_TOLERANCE));
-          factors++;
-        }
-        
-        // ADD match quality
-        if (lens.add && add) {
-          const addDiff = Math.abs(parseFloat(lens.add) - parseFloat(add));
-          score += Math.max(0, 1 - (addDiff / ADD_TOLERANCE));
-          factors++;
-        }
-        
-        // Calculate percentage
-        return factors > 0 ? Math.round((score / factors) * 100) : 0;
-      }
-      
-      // Combine both match arrays and sort by match quality
-      const combinedMatches = [...rightEyeMatches, ...leftEyeMatches]
-        .sort((a, b) => b.matchQuality - a.matchQuality);
-      
-      console.log(`Found ${combinedMatches.length} total matching lenses`);
-      
-      setMatchingLenses(combinedMatches);
       
     } catch (error) {
       console.error('Error checking lens inventory:', error);
       setMatchingLenses([]);
+      setShopMatchingLenses([]);
     }
+  };
+
+  // Extract the existing local matching logic into a separate function
+  const findLocalMatches = (allLenses) => {
+    // Set tolerance parameters as specified
+    const SPH_TOLERANCE = 0.25;
+    const CYL_TOLERANCE = 0.25;
+    const ADD_TOLERANCE = 0.25;
+    const AXIS_TOLERANCE = 10; // 10 degrees tolerance
+    
+    // Helper function to check if prescription values match within tolerance
+    const isWithinTolerance = (val1, val2, tolerance) => {
+      if (!val1 || !val2) return false;
+      
+      try {
+        const num1 = parseFloat(val1);
+        const num2 = parseFloat(val2);
+        if (isNaN(num1) || isNaN(num2)) return false;
+        
+        return Math.abs(num1 - num2) <= tolerance;
+      } catch (e) {
+        return false;
+      }
+    };
+    
+    // Helper function to check if axis values match within tolerance
+    const isAxisWithinTolerance = (val1, val2, tolerance = AXIS_TOLERANCE) => {
+      if (!val1 || !val2) return false;
+      
+      try {
+        const num1 = parseInt(val1);
+        const num2 = parseInt(val2);
+        if (isNaN(num1) || isNaN(num2)) return false;
+        
+        // Handle wrap-around case (e.g., 5 degrees is close to 175 degrees in lens terminology)
+        const diff = Math.abs(num1 - num2);
+        return diff <= tolerance || diff >= (180 - tolerance);
+      } catch (e) {
+        return false;
+      }
+    };
+    
+    // Create separate matching arrays for right eye and left eye
+    const rightEyeMatches = [];
+    const leftEyeMatches = [];
+    
+    // If we have right eye prescription data, find matches
+    if (formData.rightSph) {
+      console.log(`Searching for right eye matches with SPH: ${formData.rightSph}`);
+      
+      // Look for right eye lenses or lenses without specified eye
+      for (const lens of allLenses) {
+        // Only consider right eye lenses or unspecified eye
+        if (lens.eye !== 'left') {
+          // Require ALL values to match when present
+          
+          // Check SPH (always required to match)
+          if (!lens.sph || !isWithinTolerance(lens.sph, formData.rightSph, SPH_TOLERANCE)) {
+            continue;
+          }
+          
+          // Check CYL
+          // If either the prescription or lens has CYL, both must have it and match
+          if ((formData.rightCyl || lens.cyl) && 
+              (!formData.rightCyl || !lens.cyl || !isWithinTolerance(lens.cyl, formData.rightCyl, CYL_TOLERANCE))) {
+            continue;
+          }
+          
+          // Check AXIS (only if CYL is present in both)
+          if (formData.rightCyl && lens.cyl) {
+            // If either has AXIS, both must have it and match
+            if ((formData.rightAxis || lens.axis) && 
+                (!formData.rightAxis || !lens.axis || !isAxisWithinTolerance(lens.axis, formData.rightAxis))) {
+              continue;
+            }
+          }
+          
+          // Check ADD
+          // If either has ADD, both must have it and match
+          if ((formData.rightAdd || lens.add) && 
+              (!formData.rightAdd || !lens.add || !isWithinTolerance(lens.add, formData.rightAdd, ADD_TOLERANCE))) {
+            continue;
+          }
+          
+          // If we got here, all values match within tolerances
+          {
+            console.log(`Found matching lens for right eye:`, lens);
+            rightEyeMatches.push({
+              ...lens,
+              matchedEye: 'right',
+              isLocal: true,
+              matchQuality: calculateMatchQuality(
+                lens, 
+                formData.rightSph, 
+                formData.rightCyl, 
+                formData.rightAxis, 
+                formData.rightAdd
+              )
+            });
+          }
+        }
+      }
+    }
+    
+    // If we have left eye prescription data, find matches
+    if (formData.leftSph) {
+      console.log(`Searching for left eye matches with SPH: ${formData.leftSph}`);
+      
+      // Look for left eye lenses or lenses without specified eye
+      for (const lens of allLenses) {
+        // Only consider left eye lenses or unspecified eye
+        if (lens.eye !== 'right') {
+          // Require ALL values to match when present
+          
+          // Check SPH (always required to match)
+          if (!lens.sph || !isWithinTolerance(lens.sph, formData.leftSph, SPH_TOLERANCE)) {
+            continue;
+          }
+          
+          // Check CYL
+          // If either the prescription or lens has CYL, both must have it and match
+          if ((formData.leftCyl || lens.cyl) && 
+              (!formData.leftCyl || !lens.cyl || !isWithinTolerance(lens.cyl, formData.leftCyl, CYL_TOLERANCE))) {
+            continue;
+          }
+          
+          // Check AXIS (only if CYL is present in both)
+          if (formData.leftCyl && lens.cyl) {
+            // If either has AXIS, both must have it and match
+            if ((formData.leftAxis || lens.axis) && 
+                (!formData.leftAxis || !lens.axis || !isAxisWithinTolerance(lens.axis, formData.leftAxis))) {
+              continue;
+            }
+          }
+          
+          // Check ADD
+          // If either has ADD, both must have it and match
+          if ((formData.leftAdd || lens.add) && 
+              (!formData.leftAdd || !lens.add || !isWithinTolerance(lens.add, formData.leftAdd, ADD_TOLERANCE))) {
+            continue;
+          }
+          
+          // If we got here, all values match within tolerances
+          {
+            console.log(`Found matching lens for left eye:`, lens);
+            leftEyeMatches.push({
+              ...lens,
+              matchedEye: 'left',
+              isLocal: true,
+              matchQuality: calculateMatchQuality(
+                lens, 
+                formData.leftSph, 
+                formData.leftCyl, 
+                formData.leftAxis, 
+                formData.leftAdd
+              )
+            });
+          }
+        }
+      }
+    }
+    
+    // Calculate match quality score (0-100%) to sort results
+    function calculateMatchQuality(lens, sph, cyl, axis, add) {
+      let score = 0;
+      let factors = 0;
+      
+      // SPH match quality
+      if (lens.sph && sph) {
+        const sphDiff = Math.abs(parseFloat(lens.sph) - parseFloat(sph));
+        score += Math.max(0, 1 - (sphDiff / SPH_TOLERANCE));
+        factors++;
+      }
+      
+      // CYL match quality
+      if (lens.cyl && cyl) {
+        const cylDiff = Math.abs(parseFloat(lens.cyl) - parseFloat(cyl));
+        score += Math.max(0, 1 - (cylDiff / CYL_TOLERANCE));
+        factors++;
+      }
+      
+      // AXIS match quality
+      if (lens.axis && axis) {
+        const axisDiff = Math.abs(parseInt(lens.axis) - parseInt(axis));
+        const normalizedAxisDiff = Math.min(axisDiff, 180 - axisDiff);
+        score += Math.max(0, 1 - (normalizedAxisDiff / AXIS_TOLERANCE));
+        factors++;
+      }
+      
+      // ADD match quality
+      if (lens.add && add) {
+        const addDiff = Math.abs(parseFloat(lens.add) - parseFloat(add));
+        score += Math.max(0, 1 - (addDiff / ADD_TOLERANCE));
+        factors++;
+      }
+      
+      // Calculate percentage
+      return factors > 0 ? Math.round((score / factors) * 100) : 0;
+    }
+    
+    // Combine both match arrays and sort by match quality
+    const combinedMatches = [...rightEyeMatches, ...leftEyeMatches]
+      .sort((a, b) => b.matchQuality - a.matchQuality);
+    
+    return combinedMatches;
   };
 
   const calculateNextOrderDisplayId = async () => {
     try {
+      // Get the current financial year from user-specific settings
+      const settingsDoc = await getDoc(getUserDoc('settings', 'shopSettings'));
+      let financialYear = null;
+      
+      if (settingsDoc.exists()) {
+        const settings = settingsDoc.data();
+        financialYear = settings.financialYear;
+      }
+      
+      if (!financialYear) {
+        console.log('No financial year set, using simple counter');
+        // Fallback to simple counter without financial year
+        const counterDoc = await getDoc(getUserDoc('counters', 'orderCounter'));
+        
+        if (!counterDoc.exists()) {
+          // Create initial counter
+          await setDoc(getUserDoc('counters', 'orderCounter'), { 
+            count: 1,
+            createdAt: Timestamp.now()
+          });
+          setNextOrderDisplayId('001');
+        } else {
+          const currentCount = counterDoc.data().count || 0;
+          const nextCount = currentCount + 1;
+          setNextOrderDisplayId(nextCount.toString().padStart(3, '0'));
+        }
+        return;
+      }
+      
+      // Use financial year-based counter
+      const counterId = `orderCounter_${financialYear}`;
+      const counterDoc = await getDoc(getUserDoc('counters', counterId));
+      
+      if (!counterDoc.exists()) {
+        // Create initial counter for this financial year
+        await setDoc(getUserDoc('counters', counterId), { 
+          count: 1,
+          financialYear: financialYear,
+          createdAt: Timestamp.now()
+        });
+        setNextOrderDisplayId('001');
+      } else {
+        const currentCount = counterDoc.data().count || 0;
+        const nextCount = currentCount + 1;
+        setNextOrderDisplayId(nextCount.toString().padStart(3, '0'));
+      }
+    } catch (error) {
+      console.error('Error calculating next order ID:', error);
+      // Fallback to counting existing orders
       const ordersRef = getUserCollection('orders');
       const orderQuery = query(ordersRef, orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(orderQuery);
       
-      // Calculate the next order number
       const orderCount = snapshot.docs.length;
       const nextId = (orderCount + 1).toString().padStart(3, '0');
       setNextOrderDisplayId(nextId);
-    } catch (error) {
-      console.error('Error calculating next order ID:', error);
     }
   };
 
@@ -466,6 +550,9 @@ const CreateOrder = () => {
       const docRef = await addDoc(getUserCollection('orders'), orderData);
       setOrderId(docRef.id);
       
+      // Increment the order counter after successful creation
+      await incrementOrderCounter();
+      
       // Add the lens to inventory
       await addLensToInventory(orderData, docRef.id);
       
@@ -481,6 +568,64 @@ const CreateOrder = () => {
       setError('Failed to create order');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Function to increment the order counter
+  const incrementOrderCounter = async () => {
+    try {
+      // Get the current financial year from user-specific settings
+      const settingsDoc = await getDoc(getUserDoc('settings', 'shopSettings'));
+      let financialYear = null;
+      
+      if (settingsDoc.exists()) {
+        const settings = settingsDoc.data();
+        financialYear = settings.financialYear;
+      }
+      
+      if (!financialYear) {
+        // Use simple counter without financial year
+        const counterRef = getUserDoc('counters', 'orderCounter');
+        const counterDoc = await getDoc(counterRef);
+        
+        if (!counterDoc.exists()) {
+          // Create initial counter
+          await setDoc(counterRef, { 
+            count: 1,
+            createdAt: Timestamp.now()
+          });
+        } else {
+          const currentCount = counterDoc.data().count || 0;
+          await updateDoc(counterRef, { 
+            count: currentCount + 1,
+            updatedAt: Timestamp.now()
+          });
+        }
+        return;
+      }
+      
+      // Use financial year-based counter
+      const counterId = `orderCounter_${financialYear}`;
+      const counterRef = getUserDoc('counters', counterId);
+      const counterDoc = await getDoc(counterRef);
+      
+      if (!counterDoc.exists()) {
+        // Create initial counter for this financial year
+        await setDoc(counterRef, { 
+          count: 1,
+          financialYear: financialYear,
+          createdAt: Timestamp.now()
+        });
+      } else {
+        const currentCount = counterDoc.data().count || 0;
+        await updateDoc(counterRef, { 
+          count: currentCount + 1,
+          updatedAt: Timestamp.now()
+        });
+      }
+    } catch (error) {
+      console.error('Error incrementing order counter:', error);
+      // Don't throw error to prevent blocking the order creation
     }
   };
 
@@ -707,6 +852,8 @@ const CreateOrder = () => {
               loading={loading}
               error={error}
               matchingLenses={matchingLenses}
+              shopMatchingLenses={shopMatchingLenses}
+              shopLoading={shopLoading}
               sectionColors={SECTION_COLORS}
             />
             

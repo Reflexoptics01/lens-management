@@ -4,7 +4,7 @@ import { collection, getDocs, query, orderBy, updateDoc, doc, deleteDoc, writeBa
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { safelyParseDate, formatDate, formatDateTime } from '../utils/dateUtils';
-import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
+import { getUserCollection, getUserDoc, diagnoseAuthIssues, attemptAuthFix } from '../utils/multiTenancy';
 
 const ORDER_STATUSES = [
   'PENDING',
@@ -40,6 +40,30 @@ const Orders = () => {
   const [toDate, setToDate] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+
+  // Authentication check and fix on component mount
+  useEffect(() => {
+    const checkAndFixAuth = () => {
+      const diagnosis = diagnoseAuthIssues();
+      
+      if (diagnosis.issues.length > 0) {
+        console.log('Authentication issues detected:', diagnosis.issues);
+        console.log('Attempting to fix authentication...');
+        
+        // Try to fix authentication
+        attemptAuthFix();
+        
+        // If still no auth after fix attempt, show error
+        setTimeout(() => {
+          if (!localStorage.getItem('userUid')) {
+            setError('Authentication issue detected. Please logout and login again to access your data.');
+          }
+        }, 1000);
+      }
+    };
+    
+    checkAndFixAuth();
+  }, []);
 
   useEffect(() => {
     fetchOrders();
@@ -107,14 +131,23 @@ const Orders = () => {
       
       if (!userUid) {
         console.error('fetchOrders: No user UID found in localStorage');
-        setError('User not authenticated');
+        setError('User not authenticated. Please logout and login again.');
+        setOrders([]); // Set empty array to prevent undefined issues
         return;
       }
       
       console.log('Fetching orders from database...');
       
-      const ordersRef = getUserCollection('orders');
-      console.log('fetchOrders: Got orders collection reference');
+      let ordersRef;
+      try {
+        ordersRef = getUserCollection('orders');
+        console.log('fetchOrders: Got orders collection reference');
+      } catch (authError) {
+        console.error('fetchOrders: Authentication error getting collection:', authError);
+        setError('Authentication error. Please logout and login again.');
+        setOrders([]); // Set empty array to prevent undefined issues
+        return;
+      }
       
       let ordersList = [];
       
@@ -131,55 +164,62 @@ const Orders = () => {
         }
         
         ordersList = snapshot.docs
-          .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+          .filter(doc => doc.data() && !doc.data()._placeholder) // Filter out placeholder documents and ensure data exists
           .map((doc) => {
             const data = doc.data();
             return {
               id: doc.id,
-              displayId: data.displayId,
+              displayId: data.displayId || `ORD-${doc.id.slice(-6)}`, // Fallback displayId
               ...data,
               // Keep original createdAt for processing
               createdAt: data.createdAt 
             };
           });
         console.log('orderBy query successful, got', ordersList.length, 'orders');
-      } catch (error) {
-        console.error('Error with standard query, trying fallback:', error);
+      } catch (queryError) {
+        console.error('Error with standard query, trying fallback:', queryError);
         
-        // Fallback: Get all orders without sorting
-        const snapshot = await getDocs(ordersRef);
-        
-        console.log('fetchOrders: Fallback query executed, got', snapshot.docs.length, 'documents');
-        
-        ordersList = snapshot.docs
-          .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
-          .map((doc) => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              displayId: data.displayId,
-              ...data,
-              createdAt: data.createdAt
-            };
-          });
-        
-        console.log('Fallback query successful, got', ordersList.length, 'orders');
-        
-        // Sort manually by createdAt (newest first)
-        ordersList.sort((a, b) => {
-          const dateA = safelyParseDate(a.createdAt);
-          const dateB = safelyParseDate(b.createdAt);
+        try {
+          // Fallback: Get all orders without sorting
+          const snapshot = await getDocs(ordersRef);
           
-          if (dateA && dateB) {
-            return dateB - dateA; // Descending order (newest first)
-          }
-          // If one date is invalid, put the valid one first
-          if (dateA && !dateB) return -1;
-          if (!dateA && dateB) return 1;
-          // If both dates are invalid, maintain original order
-          return 0;
-        });
-        console.log('Manual sorting completed');
+          console.log('fetchOrders: Fallback query executed, got', snapshot.docs.length, 'documents');
+          
+          ordersList = snapshot.docs
+            .filter(doc => doc.data() && !doc.data()._placeholder) // Filter out placeholder documents and ensure data exists
+            .map((doc) => {
+              const data = doc.data();
+              return {
+                id: doc.id,
+                displayId: data.displayId || `ORD-${doc.id.slice(-6)}`, // Fallback displayId
+                ...data,
+                createdAt: data.createdAt
+              };
+            });
+          
+          console.log('Fallback query successful, got', ordersList.length, 'orders');
+          
+          // Sort manually by createdAt (newest first)
+          ordersList.sort((a, b) => {
+            const dateA = safelyParseDate(a.createdAt);
+            const dateB = safelyParseDate(b.createdAt);
+            
+            if (dateA && dateB) {
+              return dateB - dateA; // Descending order (newest first)
+            }
+            // If one date is invalid, put the valid one first
+            if (dateA && !dateB) return -1;
+            if (!dateA && dateB) return 1;
+            // If both dates are invalid, maintain original order
+            return 0;
+          });
+          console.log('Manual sorting completed');
+        } catch (fallbackError) {
+          console.error('Both standard and fallback queries failed:', fallbackError);
+          setError('Failed to fetch orders. Please check your internet connection and try again.');
+          setOrders([]); // Set empty array to prevent undefined issues
+          return;
+        }
       }
       
       // Log final results
@@ -208,6 +248,8 @@ const Orders = () => {
           if (!date) {
             console.warn(`Order ${order.displayId || order.id} has invalid createdAt:`, order.createdAt);
             invalidCount++;
+            // Set a default date if createdAt is invalid
+            order.createdAt = new Date(); // Use current date as fallback
           } else {
             processedCount++;
           }
@@ -218,11 +260,24 @@ const Orders = () => {
             order.displayId = `ORD-${index + 1}`;
           }
           
+          // Ensure required fields exist
+          order.customerName = order.customerName || 'Unknown Customer';
+          order.status = order.status || 'PENDING';
+          order.brandName = order.brandName || 'Unknown Brand';
+          
           return order;
         } catch (error) {
           console.error('Error processing order:', order.id, error);
           invalidCount++;
-          return order;
+          // Return order with defaults to prevent crashes
+          return {
+            ...order,
+            displayId: order.displayId || `ORD-${index + 1}`,
+            customerName: order.customerName || 'Unknown Customer',
+            status: order.status || 'PENDING',
+            brandName: order.brandName || 'Unknown Brand',
+            createdAt: order.createdAt || new Date()
+          };
         }
       });
       
@@ -263,10 +318,12 @@ const Orders = () => {
         formattedDate: safelyParseDate(o.createdAt) ? safelyParseDate(o.createdAt).toLocaleDateString() : 'Invalid'
       })));
       
-      setOrders(processedOrders);
+      // Always set the orders array, even if empty
+      setOrders(processedOrders || []);
     } catch (error) {
       console.error('Error fetching orders:', error);
-      setError('Failed to fetch orders. Please try reloading the page.');
+      setError('Failed to fetch orders. Please try reloading the page or contact support if the issue persists.');
+      setOrders([]); // Set empty array to prevent undefined issues
     } finally {
       setLoading(false);
     }
@@ -291,8 +348,8 @@ const Orders = () => {
   const handleStatusChange = async (e, orderId, newStatus) => {
     e.stopPropagation(); // Prevent row click when changing status
     try {
-      // Get the current order to access its data
-      const orderDoc = await getDoc(doc(db, 'orders', orderId));
+      // Get the current order to access its data - using user-specific collection
+      const orderDoc = await getDoc(getUserDoc('orders', orderId));
       
       if (!orderDoc.exists()) {
         setError('Order not found');
@@ -302,8 +359,8 @@ const Orders = () => {
       const orderData = { id: orderId, ...orderDoc.data() };
       const oldStatus = orderData.status;
       
-      // Update order status
-      await updateDoc(doc(db, 'orders', orderId), {
+      // Update order status - using user-specific collection
+      await updateDoc(getUserDoc('orders', orderId), {
         status: newStatus
       });
       
@@ -694,7 +751,59 @@ const Orders = () => {
             <div className="animate-spin w-8 h-8 border-4 border-[#4169E1] dark:border-[#4169E1] border-t-transparent rounded-full"></div>
           </div>
         ) : error ? (
-          <div className="p-4 text-center text-red-500 dark:text-red-400">{error}</div>
+          <div className="space-y-4">
+            <div className="p-4 text-center text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <div className="font-medium mb-2">⚠️ Error Loading Orders</div>
+              <div className="text-sm">{error}</div>
+            </div>
+            
+            {/* Debug Information Panel */}
+            <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">🔧 Debug Information</div>
+              <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                <div>User ID: {localStorage.getItem('userUid') || 'Not found'}</div>
+                <div>User Email: {localStorage.getItem('userEmail') || 'Not found'}</div>
+                <div>Current URL: {window.location.pathname}</div>
+                <div>Orders Array Length: {orders ? orders.length : 'undefined'}</div>
+                <div>Timestamp: {new Date().toLocaleString()}</div>
+              </div>
+              
+              <div className="mt-3 space-x-2">
+                <button
+                  onClick={() => {
+                    console.log('Debug: Attempting to refetch orders...');
+                    fetchOrders();
+                  }}
+                  className="px-3 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-md hover:bg-blue-200 dark:hover:bg-blue-800"
+                >
+                  Retry Fetch
+                </button>
+                
+                <button
+                  onClick={() => {
+                    console.log('Debug: Running auth diagnosis...');
+                    const diagnosis = diagnoseAuthIssues();
+                    alert(`Auth Status:\n\nUID: ${diagnosis.hasUid ? '✓' : '✗'}\nEmail: ${diagnosis.hasEmail ? '✓' : '✗'}\n\nIssues: ${diagnosis.issues.length}\nRecommendations: ${diagnosis.recommendations.length}`);
+                  }}
+                  className="px-3 py-1 text-xs bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-md hover:bg-yellow-200 dark:hover:bg-yellow-800"
+                >
+                  Check Auth
+                </button>
+                
+                <button
+                  onClick={() => {
+                    if (confirm('This will logout and redirect to login page. Continue?')) {
+                      localStorage.clear();
+                      window.location.href = '/login';
+                    }
+                  }}
+                  className="px-3 py-1 text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-md hover:bg-red-200 dark:hover:bg-red-800"
+                >
+                  Force Logout
+                </button>
+              </div>
+            </div>
+          </div>
         ) : orders.length === 0 ? (
           <div className="text-center py-8">
             <svg className="w-16 h-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

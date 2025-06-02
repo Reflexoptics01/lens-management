@@ -5,6 +5,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import Navbar from '../components/Navbar';
 import PrintInvoiceModal from '../components/PrintInvoiceModal';
 import { safelyParseDate, formatDate, formatDateTime } from '../utils/dateUtils';
+import { getUserDoc } from '../utils/multiTenancy';
 
 const SaleDetail = () => {
   const { saleId } = useParams();
@@ -45,7 +46,8 @@ const SaleDetail = () => {
       
       console.log('Fetching sale details for ID:', saleId);
       
-      const saleDoc = await getDoc(doc(db, 'sales', saleId));
+      // Use user-specific collection instead of global collection
+      const saleDoc = await getDoc(getUserDoc('sales', saleId));
       
       if (!saleDoc.exists()) {
         setError('Sale not found');
@@ -65,7 +67,8 @@ const SaleDetail = () => {
       if (!customerPhone && saleData.customerId) {
         try {
           console.log('Fetching customer details for ID:', saleData.customerId);
-          const customerDoc = await getDoc(doc(db, 'customers', saleData.customerId));
+          // Use user-specific customer collection
+          const customerDoc = await getDoc(getUserDoc('customers', saleData.customerId));
           if (customerDoc.exists()) {
             const customerData = customerDoc.data();
             customerPhone = customerData.phone || '';
@@ -160,7 +163,8 @@ const SaleDetail = () => {
   // Fetch shop information for the address
   const fetchShopInfo = async () => {
     try {
-      const shopSettingsDoc = await getDoc(doc(db, 'settings', 'shopSettings'));
+      // Use user-specific settings collection
+      const shopSettingsDoc = await getDoc(getUserDoc('settings', 'shopSettings'));
       if (shopSettingsDoc.exists()) {
         setShopInfo(shopSettingsDoc.data());
       }
@@ -332,7 +336,7 @@ const SaleDetail = () => {
 
   if (loading) {
     return (
-      <div className="flex flex-col min-h-screen bg-gray-50">
+      <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
         <Navbar />
         <div className="flex-grow flex items-center justify-center">
           <div className="spinner"></div>
@@ -343,24 +347,24 @@ const SaleDetail = () => {
 
   if (error) {
     return (
-      <div className="flex flex-col min-h-screen bg-gray-50">
+      <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
         <Navbar />
         <div className="flex-grow container mx-auto px-4 py-8">
-          <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+          <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400 dark:border-red-500 p-4 mb-4">
             <div className="flex">
               <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <svg className="h-5 w-5 text-red-400 dark:text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
               </div>
               <div className="ml-3">
-                <p className="text-sm text-red-700">{error}</p>
+                <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
               </div>
             </div>
           </div>
           <button
             onClick={() => navigate('/sales')}
-            className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded"
+            className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-4 rounded"
           >
             Back to Sales
           </button>
@@ -371,24 +375,24 @@ const SaleDetail = () => {
 
   if (!sale) {
     return (
-      <div className="flex flex-col min-h-screen bg-gray-50">
+      <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
         <Navbar />
         <div className="flex-grow container mx-auto px-4 py-8">
-          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 dark:border-yellow-500 p-4 mb-4">
             <div className="flex">
               <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <svg className="h-5 w-5 text-yellow-400 dark:text-yellow-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
               </div>
               <div className="ml-3">
-                <p className="text-sm text-yellow-700">No sale data found</p>
+                <p className="text-sm text-yellow-700 dark:text-yellow-400">No sale data found</p>
               </div>
             </div>
           </div>
           <button
             onClick={() => navigate('/sales')}
-            className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded"
+            className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-4 rounded"
           >
             Back to Sales
           </button>
@@ -398,28 +402,28 @@ const SaleDetail = () => {
     }
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navbar />
       
       <div className="flex-grow container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Sale Details</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Sale Details</h1>
           <div className="flex space-x-2">
                 <button
                   onClick={() => navigate('/sales')}
-              className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded"
+              className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-4 rounded"
                 >
               Back
                 </button>
                 <button
                   onClick={() => navigate(`/sales/edit/${saleId}`)}
-              className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded"
+              className="bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded"
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => setShowPrintModal(true)}
-              className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded flex items-center"
+              className="bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 text-white font-semibold py-2 px-4 rounded flex items-center"
                 >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -428,7 +432,7 @@ const SaleDetail = () => {
                 </button>
                 <button
                   onClick={handlePrintAddress}
-                  className="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded flex items-center"
+                  className="bg-purple-500 hover:bg-purple-600 dark:bg-purple-600 dark:hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded flex items-center"
                 >
                   <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -438,32 +442,32 @@ const SaleDetail = () => {
             </div>
           </div>
 
-        <div className="bg-white shadow-md rounded-lg overflow-hidden mb-6">
+        <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-hidden mb-6">
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
-                <h2 className="text-xl font-semibold text-gray-800 mb-4">Invoice Information</h2>
+                <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Invoice Information</h2>
                 <div className="grid grid-cols-2 gap-4">
                       <div>
-                    <p className="text-sm font-medium text-gray-500">Invoice Number</p>
-                    <p className="text-lg font-semibold">{sale.invoiceNumber || 'N/A'}</p>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Invoice Number</p>
+                    <p className="text-lg font-semibold text-gray-900 dark:text-white">{sale.invoiceNumber || 'N/A'}</p>
                       </div>
                       <div>
-                    <p className="text-sm font-medium text-gray-500">Invoice Date</p>
-                    <p className="text-lg">{formatDate(sale.invoiceDate)}</p>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Invoice Date</p>
+                    <p className="text-lg text-gray-900 dark:text-white">{formatDate(sale.invoiceDate)}</p>
                       </div>
                       <div>
-                    <p className="text-sm font-medium text-gray-500">Due Date</p>
-                    <p className="text-lg">{formatDate(sale.dueDate) || 'N/A'}</p>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Due Date</p>
+                    <p className="text-lg text-gray-900 dark:text-white">{formatDate(sale.dueDate) || 'N/A'}</p>
                       </div>
                       <div>
-                    <p className="text-sm font-medium text-gray-500">Payment Status</p>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Payment Status</p>
                     <span className={`px-2 py-1 rounded text-sm font-medium ${
                       sale.paymentStatus === 'PAID' 
-                        ? 'bg-green-100 text-green-800' 
+                        ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' 
                         : sale.paymentStatus === 'PARTIAL' 
-                          ? 'bg-yellow-100 text-yellow-800' 
-                          : 'bg-red-100 text-red-800'
+                          ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' 
+                          : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
                     }`}>
                       {sale.paymentStatus || 'UNPAID'}
                     </span>
@@ -472,41 +476,41 @@ const SaleDetail = () => {
                   </div>
 
                       <div>
-                <h2 className="text-xl font-semibold text-gray-800 mb-4">Customer Information</h2>
+                <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Customer Information</h2>
                       <div>
-                  <p className="text-sm font-medium text-gray-500">Optical Name</p>
-                  <p className="text-lg font-semibold">{sale.customerName || 'N/A'}</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Optical Name</p>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{sale.customerName || 'N/A'}</p>
                       </div>
                 <div className="mt-2">
-                  <p className="text-sm font-medium text-gray-500">Contact</p>
-                  <p className="text-lg">{sale.phone || 'N/A'}</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Contact</p>
+                  <p className="text-lg text-gray-900 dark:text-white">{sale.phone || 'N/A'}</p>
                         </div>
                 <div className="mt-2">
-                  <p className="text-sm font-medium text-gray-500">GST Number</p>
-                  <p className="text-lg">{sale.gstNumber || 'N/A'}</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">GST Number</p>
+                  <p className="text-lg text-gray-900 dark:text-white">{sale.gstNumber || 'N/A'}</p>
                     </div>
                   </div>
                 </div>
 
             <div className="mb-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">Items</h2>
+              <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Items</h2>
                   <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
                         <tr>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">SPH</th>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">CYL</th>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">AXIS</th>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">ADD</th>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Rate</th>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Discount</th>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Tax</th>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Item</th>
+                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">SPH</th>
+                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">CYL</th>
+                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">AXIS</th>
+                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">ADD</th>
+                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Qty</th>
+                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Rate</th>
+                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Discount</th>
+                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tax</th>
+                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total</th>
                         </tr>
                       </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {sale.items && sale.items.length > 0 ? (
                       sale.items.map((item, index) => {
                         // Display separate optical values if they exist directly on the item
@@ -552,22 +556,22 @@ const SaleDetail = () => {
                         
                         return (
                           <tr key={index}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-center">{item.itemName || 'N/A'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">{sph}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">{cyl}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">{axisDisplay}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">{add}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">{quantity} {unit}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">₹{typeof rate === 'number' ? rate.toFixed(2) : parseFloat(rate || 0).toFixed(2)}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">{discount}%</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">{tax}%</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">₹{typeof totalAmount === 'number' ? totalAmount.toFixed(2) : parseFloat(totalAmount || 0).toFixed(2)}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white text-center">{item.itemName || 'N/A'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-center">{sph}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-center">{cyl}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-center">{axisDisplay}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-center">{add}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-center">{quantity} {unit}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-center">₹{typeof rate === 'number' ? rate.toFixed(2) : parseFloat(rate || 0).toFixed(2)}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-center">{discount}%</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-center">{tax}%</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-center">₹{typeof totalAmount === 'number' ? totalAmount.toFixed(2) : parseFloat(totalAmount || 0).toFixed(2)}</td>
                           </tr>
                         );
                       })
                     ) : (
                       <tr>
-                        <td colSpan="10" className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No items found</td>
+                        <td colSpan="10" className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-center">No items found</td>
                       </tr>
                     )}
                       </tbody>
@@ -577,53 +581,53 @@ const SaleDetail = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <h2 className="text-xl font-semibold text-gray-800 mb-4">Payment Information</h2>
+                <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Payment Information</h2>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm font-medium text-gray-500">Payment Method</p>
-                    <p className="text-lg">{sale.paymentMethod || 'N/A'}</p>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Payment Method</p>
+                    <p className="text-lg text-gray-900 dark:text-white">{sale.paymentMethod || 'N/A'}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-500">Payment Status</p>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Payment Status</p>
                     <span className={`px-2 py-1 rounded text-sm font-medium ${
                       sale.paymentStatus === 'PAID' 
-                        ? 'bg-green-100 text-green-800' 
+                        ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' 
                         : sale.paymentStatus === 'PARTIAL' 
-                          ? 'bg-yellow-100 text-yellow-800' 
-                          : 'bg-red-100 text-red-800'
+                          ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' 
+                          : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
                     }`}>
                       {sale.paymentStatus || 'UNPAID'}
                     </span>
                   </div>
                     <div>
-                    <p className="text-sm font-medium text-gray-500">Amount Paid</p>
-                    <p className="text-lg">₹{sale.amountPaid?.toFixed(2) || '0.00'}</p>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Amount Paid</p>
+                    <p className="text-lg text-gray-900 dark:text-white">₹{sale.amountPaid?.toFixed(2) || '0.00'}</p>
                     </div>
                         <div>
-                    <p className="text-sm font-medium text-gray-500">Balance Due</p>
-                    <p className="text-lg">₹{sale.balanceDue?.toFixed(2) || '0.00'}</p>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Balance Due</p>
+                    <p className="text-lg text-gray-900 dark:text-white">₹{sale.balanceDue?.toFixed(2) || '0.00'}</p>
                           </div>
                   </div>
                 </div>
 
                     <div>
-                <h2 className="text-xl font-semibold text-gray-800 mb-4">Summary</h2>
-                <div className="bg-gray-50 p-4 rounded-md">
+                <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Summary</h2>
+                <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md">
                   <div className="flex justify-between mb-2">
-                    <span className="text-gray-600">Subtotal:</span>
-                    <span className="font-medium">₹{sale.subtotal?.toFixed(2) || '0.00'}</span>
+                    <span className="text-gray-600 dark:text-gray-300">Subtotal:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">₹{sale.subtotal?.toFixed(2) || '0.00'}</span>
                     </div>
                   <div className="flex justify-between mb-2">
-                    <span className="text-gray-600">Discount:</span>
-                    <span className="font-medium">₹{sale.totalDiscount?.toFixed(2) || '0.00'}</span>
+                    <span className="text-gray-600 dark:text-gray-300">Discount:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">₹{sale.totalDiscount?.toFixed(2) || '0.00'}</span>
                     </div>
                   <div className="flex justify-between mb-2">
-                    <span className="text-gray-600">Tax:</span>
-                    <span className="font-medium">₹{sale.totalTax?.toFixed(2) || '0.00'}</span>
+                    <span className="text-gray-600 dark:text-gray-300">Tax:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">₹{sale.totalTax?.toFixed(2) || '0.00'}</span>
                     </div>
-                  <div className="flex justify-between pt-2 border-t border-gray-200">
-                    <span className="text-gray-800 font-medium">Total:</span>
-                    <span className="text-gray-800 font-bold">₹{sale.totalAmount?.toFixed(2) || '0.00'}</span>
+                  <div className="flex justify-between pt-2 border-t border-gray-200 dark:border-gray-600">
+                    <span className="text-gray-800 dark:text-gray-200 font-medium">Total:</span>
+                    <span className="text-gray-800 dark:text-white font-bold">₹{sale.totalAmount?.toFixed(2) || '0.00'}</span>
                   </div>
                 </div>
               </div>
@@ -631,9 +635,9 @@ const SaleDetail = () => {
             
             {sale.notes && (
               <div className="mt-6">
-                <h2 className="text-xl font-semibold text-gray-800 mb-2">Notes</h2>
-                <div className="bg-gray-50 p-4 rounded-md">
-                  <p className="text-gray-700">{sale.notes}</p>
+                <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-2">Notes</h2>
+                <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md">
+                  <p className="text-gray-700 dark:text-gray-300">{sale.notes}</p>
                 </div>
               </div>
             )}

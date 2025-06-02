@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
-import { collection, getDocs, getDoc, doc, updateDoc, serverTimestamp, query, where } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, updateDoc, serverTimestamp, query, where, orderBy } from 'firebase/firestore';
 import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import CustomerForm from '../components/CustomerForm';
+import ItemSuggestions from '../components/ItemSuggestions';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 
 const TAX_OPTIONS = [
   { id: 'TAX_FREE', label: 'Tax Free', rate: 0 },
@@ -85,7 +87,7 @@ const EditPurchase = () => {
   const fetchPurchaseData = async () => {
     try {
       setLoading(true);
-      const purchaseDoc = await getDoc(doc(db, 'purchases', purchaseId));
+      const purchaseDoc = await getDoc(getUserDoc('purchases', purchaseId));
       
       if (!purchaseDoc.exists()) {
         setError('Purchase not found');
@@ -123,7 +125,7 @@ const EditPurchase = () => {
       
       // Set vendor
       if (purchaseData.vendorId) {
-        const vendorDoc = await getDoc(doc(db, 'customers', purchaseData.vendorId));
+        const vendorDoc = await getDoc(getUserDoc('customers', purchaseData.vendorId));
         if (vendorDoc.exists()) {
           setSelectedVendor(vendorDoc.data());
         }
@@ -316,7 +318,7 @@ const EditPurchase = () => {
         updatedAt: serverTimestamp()
       };
 
-      await updateDoc(doc(db, 'purchases', purchaseId), purchaseData);
+      await updateDoc(getUserDoc('purchases', purchaseId), purchaseData);
       setSuccess(true);
       navigate('/purchases');
     } catch (error) {

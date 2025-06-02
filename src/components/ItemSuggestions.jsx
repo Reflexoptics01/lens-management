@@ -387,7 +387,7 @@ const ItemSuggestions = ({
       }
 
       // Save to lens_inventory collection
-      await addDoc(collection(db, 'lens_inventory'), productData);
+      await addDoc(getUserCollection('lensInventory'), productData);
 
       console.log(`Created new ${productType} product:`, productData);
 

@@ -71,7 +71,7 @@ const AddLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCancel }
   );
   
   // Styling constants
-  const inputClassName = "block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-sky-500 dark:focus:border-sky-400 focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 text-sm py-1.5 px-2 text-center";
+  const inputClassName = "block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-sky-500 dark:focus:border-sky-400 focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 text-sm py-1.5 px-2 text-left [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
   const selectClassName = "block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-sky-500 dark:focus:border-sky-400 focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 text-sm py-1.5 px-2";
   const labelClassName = "block uppercase tracking-wide text-xs font-bold text-sky-700 dark:text-sky-300 mb-1";
   const sectionClassName = "bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6";
@@ -112,7 +112,7 @@ const AddLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCancel }
         cyl: lensToEdit.cyl || '',
         axis: lensToEdit.axis || '',
         add: lensToEdit.add || '',
-        qty: lensToEdit.qty || 1,
+        qty: parseFloat(lensToEdit.qty) || 1,
         purchasePrice: lensToEdit.purchasePrice || '',
         salePrice: lensToEdit.salePrice || ''
       };
@@ -212,7 +212,7 @@ const AddLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCancel }
           updatedAt: Timestamp.now()
         };
         
-        await updateDoc(doc(db, 'lens_inventory', lensToEdit.id), lensData);
+        await updateDoc(getUserDoc('lensInventory', lensToEdit.id), lensData);
         console.log("Updated lens:", lensData);
         
         // Call the onSubmit callback
@@ -434,7 +434,7 @@ const AddLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCancel }
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">CYL</th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">AXIS</th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">ADD</th>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">QTY</th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">QTY (Pairs)</th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Purchase ₹</th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Sale ₹</th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Action</th>
@@ -509,9 +509,11 @@ const AddLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCancel }
                       <input
                         type="number"
                         value={row.qty}
-                        onChange={(e) => handlePrescriptionChange(index, 'qty', parseInt(e.target.value))}
-                        min="1"
+                        onChange={(e) => handlePrescriptionChange(index, 'qty', parseFloat(e.target.value))}
+                        min="0.5"
+                        step="0.5"
                         className={inputClassName + " text-xs"}
+                        placeholder="1"
                       />
                     </td>
                     <td className="px-2 py-2 whitespace-nowrap">

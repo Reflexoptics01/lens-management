@@ -84,6 +84,58 @@ export const isSuperAdmin = (email) => {
 };
 
 /**
+ * Diagnose authentication issues and provide solutions
+ * @returns {Object} Diagnosis results and recommendations
+ */
+export const diagnoseAuthIssues = () => {
+  const userUid = localStorage.getItem('userUid');
+  const userEmail = localStorage.getItem('userEmail');
+  
+  const diagnosis = {
+    hasUid: !!userUid,
+    hasEmail: !!userEmail,
+    localStorageKeys: Object.keys(localStorage),
+    issues: [],
+    recommendations: []
+  };
+  
+  if (!userUid) {
+    diagnosis.issues.push('No user UID found in localStorage');
+    diagnosis.recommendations.push('Please logout and login again to restore authentication');
+  }
+  
+  if (!userEmail) {
+    diagnosis.issues.push('No user email found in localStorage');
+    diagnosis.recommendations.push('Clear browser data and login again');
+  }
+  
+  console.log('Authentication Diagnosis:', diagnosis);
+  return diagnosis;
+};
+
+/**
+ * Attempt to fix authentication issues
+ * @returns {boolean} True if fix was successful
+ */
+export const attemptAuthFix = () => {
+  try {
+    // Check if Firebase auth has current user but localStorage doesn't
+    import('../firebaseConfig').then(({ auth }) => {
+      if (auth.currentUser && !localStorage.getItem('userUid')) {
+        console.log('Found authenticated user but missing localStorage data');
+        localStorage.setItem('userUid', auth.currentUser.uid);
+        localStorage.setItem('userEmail', auth.currentUser.email);
+        console.log('Restored localStorage authentication data');
+        return true;
+      }
+    });
+  } catch (error) {
+    console.error('Error attempting auth fix:', error);
+  }
+  return false;
+};
+
+/**
  * Filter out placeholder documents from a Firestore query snapshot
  * @param {QuerySnapshot} snapshot - The Firestore query snapshot
  * @returns {Array} Filtered array of documents without placeholders
@@ -103,4 +155,147 @@ export const getUserCollectionPath = (collectionName) => {
     throw new Error('User not authenticated');
   }
   return `users/${userUid}/${collectionName}`;
+};
+
+/**
+ * Validate that a document belongs to the current user
+ * @param {Object} docData - The document data to validate
+ * @param {string} expectedUserId - The expected user ID
+ * @returns {boolean} True if the document belongs to the user
+ */
+export const validateDocumentOwnership = (docData, expectedUserId) => {
+  if (!docData || !expectedUserId) {
+    console.warn('validateDocumentOwnership: Invalid parameters');
+    return false;
+  }
+  
+  // Check if document has user-specific identifiers
+  if (docData.userId && docData.userId !== expectedUserId) {
+    console.error('Document ownership mismatch:', { docUserId: docData.userId, expectedUserId });
+    return false;
+  }
+  
+  return true;
+};
+
+/**
+ * Sanitize document data to ensure it doesn't contain other users' data
+ * @param {Object} docData - The document data to sanitize
+ * @param {string} currentUserId - The current user's ID
+ * @returns {Object} Sanitized document data
+ */
+export const sanitizeDocumentData = (docData, currentUserId) => {
+  if (!docData || typeof docData !== 'object') {
+    return docData;
+  }
+  
+  // Create a copy to avoid modifying the original
+  const sanitized = { ...docData };
+  
+  // Remove any foreign user references
+  if (sanitized.userId && sanitized.userId !== currentUserId) {
+    console.warn('Removing foreign user reference from document');
+    delete sanitized.userId;
+  }
+  
+  // Add current user ID if not present
+  if (!sanitized.userId) {
+    sanitized.userId = currentUserId;
+  }
+  
+  return sanitized;
+};
+
+/**
+ * Validate backup ownership before restoration
+ * @param {Object} backupMetadata - The backup metadata
+ * @param {Object} currentUser - The current Firebase user
+ * @returns {Object} Validation result with success/error
+ */
+export const validateBackupOwnership = (backupMetadata, currentUser) => {
+  const validation = {
+    isValid: false,
+    errors: [],
+    warnings: []
+  };
+  
+  if (!backupMetadata) {
+    validation.errors.push('Backup metadata is missing');
+    return validation;
+  }
+  
+  if (!currentUser) {
+    validation.errors.push('Current user not authenticated');
+    return validation;
+  }
+  
+  // Check user ID
+  if (!backupMetadata.userId) {
+    validation.errors.push('Backup does not contain user ID information');
+  } else if (backupMetadata.userId !== currentUser.uid) {
+    validation.errors.push(`Backup belongs to different user ID: ${backupMetadata.userId} (current: ${currentUser.uid})`);
+  }
+  
+  // Check email
+  if (!backupMetadata.userEmail) {
+    validation.warnings.push('Backup does not contain user email information');
+  } else if (backupMetadata.userEmail !== currentUser.email) {
+    validation.errors.push(`Backup belongs to different email: ${backupMetadata.userEmail} (current: ${currentUser.email})`);
+  }
+  
+  // Check validation hash if present
+  if (backupMetadata.userValidationHash) {
+    try {
+      const decodedHash = atob(backupMetadata.userValidationHash);
+      const [hashUserId, hashUserEmail] = decodedHash.split(':');
+      
+      if (hashUserId !== currentUser.uid) {
+        validation.errors.push('Backup validation hash does not match current user ID');
+      }
+      if (hashUserEmail !== currentUser.email) {
+        validation.errors.push('Backup validation hash does not match current user email');
+      }
+    } catch (error) {
+      validation.warnings.push('Could not validate backup hash');
+    }
+  }
+  
+  validation.isValid = validation.errors.length === 0;
+  return validation;
+};
+
+/**
+ * Create a secure backup metadata object
+ * @param {Object} currentUser - The current Firebase user
+ * @returns {Object} Secure backup metadata
+ */
+export const createSecureBackupMetadata = (currentUser) => {
+  if (!currentUser) {
+    throw new Error('User not authenticated');
+  }
+  
+  const timestamp = Date.now();
+  
+  return {
+    // Basic user identification
+    userId: currentUser.uid,
+    userEmail: currentUser.email,
+    userDisplayName: currentUser.displayName || currentUser.email,
+    
+    // Security information
+    accountCreationTime: currentUser.metadata.creationTime,
+    userValidationHash: btoa(`${currentUser.uid}:${currentUser.email}:${timestamp}`),
+    
+    // Backup information
+    createdAt: new Date(timestamp).toISOString(),
+    version: '2.2',
+    securityLevel: 'user-specific',
+    backupType: 'complete',
+    
+    // Security notes
+    restorationNotes: `This backup belongs to ${currentUser.email} and can only be restored by the same user account. Attempting to restore this backup in a different account will be rejected for security reasons.`,
+    
+    // Validation timestamp
+    validationTimestamp: timestamp
+  };
 }; 

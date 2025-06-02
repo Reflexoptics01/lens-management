@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebaseConfig';
-import { collection, getDocs, query, orderBy, doc, getDoc, deleteDoc, where, Timestamp, addDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, doc, getDoc, deleteDoc, where, Timestamp, addDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
@@ -174,6 +174,87 @@ const SalesReturn = ({ isCreate = false, newReturn = false, isView = false }) =>
     setReturnAmount(total);
   };
   
+  // Generate return number using counter system similar to invoices/purchases
+  const generateReturnNumber = async () => {
+    try {
+      // Get the current financial year from user-specific settings
+      const settingsDoc = await getDoc(getUserDoc('settings', 'shopSettings'));
+      let financialYear = null;
+      
+      if (settingsDoc.exists()) {
+        const settings = settingsDoc.data();
+        financialYear = settings.financialYear;
+      }
+      
+      if (!financialYear) {
+        // Fallback to simple counting method if no financial year is set
+        const returnsRef = getUserCollection('salesReturns');
+        const snapshot = await getDocs(returnsRef);
+        const newReturnNumber = `SR-${(snapshot.docs.length + 1).toString().padStart(3, '0')}`;
+        return newReturnNumber;
+      }
+      
+      // Get or create the user-specific counter document for sales returns in this financial year
+      const counterRef = getUserDoc('counters', `salesReturns_${financialYear}`);
+      const counterDoc = await getDoc(counterRef);
+      
+      let counter;
+      if (!counterDoc.exists()) {
+        // If counter doesn't exist, create it starting from 1
+        counter = {
+          count: 1,
+          prefix: 'SR',
+          separator: '-',
+          format: '${prefix}${separator}${number}'
+        };
+        await setDoc(counterRef, {
+          ...counter,
+          createdAt: Timestamp.now()
+        });
+      } else {
+        counter = counterDoc.data();
+        // Increment the counter
+        const newCount = (counter.count || 0) + 1;
+        
+        // Update the counter in user-specific Firestore
+        await updateDoc(counterRef, {
+          count: newCount,
+          updatedAt: Timestamp.now()
+        });
+        
+        counter.count = newCount;
+      }
+      
+      // Format the return number
+      const paddedNumber = counter.count.toString().padStart(3, '0');
+      
+      // Use the format specified in the counter or fall back to default
+      let returnNumber;
+      if (counter.format) {
+        returnNumber = counter.format
+          .replace('${prefix}', counter.prefix || 'SR')
+          .replace('${separator}', counter.separator || '-')
+          .replace('${number}', paddedNumber);
+      } else {
+        returnNumber = `${counter.prefix || 'SR'}${counter.separator || '-'}${paddedNumber}`;
+      }
+      
+      return returnNumber;
+    } catch (error) {
+      console.error('Error generating return number:', error);
+      // Fallback to simple method
+      try {
+        const returnsRef = getUserCollection('salesReturns');
+        const snapshot = await getDocs(returnsRef);
+        const fallbackNumber = `SR-${(snapshot.docs.length + 1).toString().padStart(3, '0')}`;
+        return fallbackNumber;
+      } catch (fallbackError) {
+        console.error('Error in fallback return numbering:', fallbackError);
+        return 'SR-001';
+      }
+    }
+  };
+  
   const handleCreateReturn = async () => {
     try {
       setLoading(true);
@@ -186,7 +267,11 @@ const SalesReturn = ({ isCreate = false, newReturn = false, isView = false }) =>
         return;
       }
       
+      // Generate the return number
+      const returnNumber = await generateReturnNumber();
+      
       const returnData = {
+        returnNumber: returnNumber,
         originalInvoiceId: selectedSale ? selectedSale.id : null,
         originalInvoiceNumber: selectedSale ? selectedSale.invoiceNumber || selectedSale.displayId : null,
         customerId: selectedSale ? selectedSale.customerId : null,
@@ -240,11 +325,14 @@ const SalesReturn = ({ isCreate = false, newReturn = false, isView = false }) =>
       const returnsRef = getUserCollection('salesReturns');
       const q = query(returnsRef, orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
-      const returnsList = snapshot.docs.map((doc, index) => ({
-        id: doc.id,
-        displayId: `SR-${(snapshot.docs.length - index).toString().padStart(3, '0')}`,
-        ...doc.data()
-      }));
+      const returnsList = snapshot.docs
+        .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+        .map((doc) => ({
+          id: doc.id,
+          // Use the actual stored returnNumber instead of calculating displayId
+          displayId: doc.data().returnNumber || `SR-${doc.id.slice(-3)}`,
+          ...doc.data()
+        }));
       setReturns(returnsList);
     } catch (error) {
       console.error('Error fetching sales returns:', error);

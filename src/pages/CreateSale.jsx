@@ -185,7 +185,8 @@ const CreateSale = () => {
   // Fetch shop information for the address
   const fetchShopInfo = async () => {
     try {
-      const shopSettingsDoc = await getDoc(doc(db, 'settings', 'shopSettings'));
+      // Use user-specific settings collection
+      const shopSettingsDoc = await getDoc(getUserDoc('settings', 'shopSettings'));
       if (shopSettingsDoc.exists()) {
         setShopInfo(shopSettingsDoc.data());
       }
@@ -252,8 +253,8 @@ const CreateSale = () => {
   // Preview the next invoice number without incrementing the counter
   const previewNextInvoiceNumber = async () => {
     try {
-      // Get the current financial year from settings
-      const settingsDoc = await getDoc(doc(db, 'settings', 'shopSettings'));
+      // Get the current financial year from user-specific settings
+      const settingsDoc = await getDoc(getUserDoc('settings', 'shopSettings'));
       if (!settingsDoc.exists()) {
         // Fallback to old method for preview
         const salesRef = getUserCollection('sales');
@@ -275,8 +276,8 @@ const CreateSale = () => {
         return;
       }
       
-      // Get the counter document for this financial year (without incrementing)
-      const counterRef = doc(db, 'counters', `invoices_${financialYear}`);
+      // Get the user-specific counter document for this financial year (without incrementing)
+      const counterRef = getUserDoc('counters', `invoices_${financialYear}`);
       const counterDoc = await getDoc(counterRef);
       
       let counter;
@@ -318,8 +319,8 @@ const CreateSale = () => {
   // Generate actual invoice number and increment counter (only used when saving)
   const generateInvoiceNumberForSave = async () => {
     try {
-      // Get the current financial year from settings
-      const settingsDoc = await getDoc(doc(db, 'settings', 'shopSettings'));
+      // Get the current financial year from user-specific settings
+      const settingsDoc = await getDoc(getUserDoc('settings', 'shopSettings'));
       if (!settingsDoc.exists()) {
         throw new Error('Settings not found');
       }
@@ -335,8 +336,8 @@ const CreateSale = () => {
         return newInvoiceNumber;
       }
       
-      // Get or create the counter document for this financial year
-      const counterRef = doc(db, 'counters', `invoices_${financialYear}`);
+      // Get or create the user-specific counter document for this financial year
+      const counterRef = getUserDoc('counters', `invoices_${financialYear}`);
       const counterDoc = await getDoc(counterRef);
       
       let counter;
@@ -359,7 +360,7 @@ const CreateSale = () => {
       // Increment the counter
       const newCount = (counter.count || 0) + 1;
       
-      // Update the counter in Firestore
+      // Update the counter in user-specific Firestore
       await updateDoc(counterRef, {
         count: newCount,
         updatedAt: serverTimestamp()
@@ -1228,7 +1229,7 @@ const CreateSale = () => {
       } else {
         // Update existing item
         const existingItem = snapshot.docs[0];
-        await updateDoc(doc(db, 'items', existingItem.id), {
+        await updateDoc(getUserDoc('items', existingItem.id), {
           price: parseFloat(price) || 0,
           updatedAt: serverTimestamp()
         });

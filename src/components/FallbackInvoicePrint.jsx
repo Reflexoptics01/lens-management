@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
+import { getUserDoc, getUserCollection } from '../utils/multiTenancy';
 
 const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
   const [saleData, setSaleData] = useState(null);
@@ -8,6 +9,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
   const [bankDetails, setBankDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [printing, setPrinting] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -15,8 +17,8 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
         console.log('Starting to fetch data for invoice:', saleId);
         setLoading(true);
         
-        // Fetch sale data
-        const saleDoc = await getDoc(doc(db, 'sales', saleId));
+        // Fetch sale data from user-specific collection
+        const saleDoc = await getDoc(getUserDoc('sales', saleId));
         if (!saleDoc.exists()) {
           throw new Error('Sale not found');
         }
@@ -24,8 +26,8 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
         const data = { id: saleId, ...saleDoc.data() };
         setSaleData(data);
         
-        // Fetch shop settings
-        const settingsDoc = await getDoc(doc(db, 'settings', 'shopSettings'));
+        // Fetch shop settings from user-specific collection
+        const settingsDoc = await getDoc(getUserDoc('settings', 'shopSettings'));
         let bankDetailsData = null;
         let settingsData = null;
         
@@ -51,8 +53,8 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
             };
             
             // Extract QR code URL from settings
-            if (settings.qrCodeUrl || settings.qrCode || settings.qrcode) {
-              bankDetailsData.qrCodeUrl = settings.qrCodeUrl || settings.qrCode || settings.qrcode;
+            if (settings.qrCodeDataURL || settings.qrCodeUrl || settings.qrCode || settings.qrcode) {
+              bankDetailsData.qrCodeUrl = settings.qrCodeDataURL || settings.qrCodeUrl || settings.qrCode || settings.qrcode;
             }
             
             // Remove undefined fields
@@ -64,11 +66,11 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
           }
         }
         
-        // If bank details are not complete, try dedicated bankDetails document
+        // If bank details are not complete, try dedicated bankDetails document from user-specific collection
         if (!bankDetailsData || Object.keys(bankDetailsData).filter(k => bankDetailsData[k]).length < 3) {
           try {
             console.log('Trying to fetch from dedicated bankDetails document');
-            const bankDoc = await getDoc(doc(db, 'settings', 'bankDetails'));
+            const bankDoc = await getDoc(getUserDoc('settings', 'bankDetails'));
             
             if (bankDoc.exists()) {
               const bankData = bankDoc.data();
@@ -77,8 +79,8 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
             } else {
               console.log('No dedicated bank details document found, searching in other settings');
               
-              // Try to find bank details in any settings document
-              const settingsCollection = await getDocs(collection(db, 'settings'));
+              // Try to find bank details in any settings document from user-specific collection
+              const settingsCollection = await getDocs(getUserCollection('settings'));
               settingsCollection.forEach(doc => {
                 if (doc.id !== 'shopSettings') {
                   const docData = doc.data();
@@ -92,7 +94,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
                     
                     // Copy all relevant fields
                     ['accountName', 'bankName', 'accountNumber', 'branchName', 
-                     'branch', 'ifscCode', 'upiId', 'qrCodeUrl', 'qrCode'].forEach(field => {
+                     'branch', 'ifscCode', 'upiId', 'qrCodeUrl', 'qrCode', 'qrCodeDataURL'].forEach(field => {
                       if (docData[field] && !bankDetailsData[field]) {
                         bankDetailsData[field] = docData[field];
                       }
@@ -145,10 +147,23 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
 
   // Add print handler function
   const handlePrint = () => {
+    if (printing) {
+      console.log('Print already in progress');
+      return;
+    }
+
+    if (!saleData) {
+      alert("Please wait for the invoice data to load completely before printing.");
+      return;
+    }
+
+    setPrinting(true);
+
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       console.error("Couldn't open print window. Make sure popup blocker is disabled.");
-      alert("Please allow popups to print the invoice.");
+      alert("Please allow popups to print the invoice. Check your browser's popup blocker settings.");
+      setPrinting(false);
       return;
     }
 
@@ -156,58 +171,114 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
     const content = document.querySelector('.print-only');
     if (!content) {
       console.error("Print content not found");
+      alert("Print content is not ready. Please wait for the invoice to load completely.");
+      printWindow.close();
+      setPrinting(false);
       return;
     }
 
-    // Write to the new window
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Invoice #${saleData?.invoiceNumber || 'Print'}</title>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              margin: 0;
-              padding: 20px;
-              background-color: white;
-            }
-            table {
-              border-collapse: collapse;
-              width: 100%;
-            }
-            th, td {
-              border: 1px solid #ddd;
-              padding: 4px;
-            }
-            @media print {
-              @page {
-                margin: 10mm;
-              }
+    try {
+      // Write to the new window
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Invoice #${saleData?.invoiceNumber || 'Print'}</title>
+            <meta charset="UTF-8">
+            <style>
               body {
+                font-family: Arial, sans-serif;
                 margin: 0;
-                padding: 0;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
+                padding: 20px;
+                background-color: white;
+                color: black;
+                font-size: 12px;
               }
-            }
-          </style>
-        </head>
-        <body>
-          ${content.innerHTML}
-        </body>
-      </html>
-    `);
+              table {
+                border-collapse: collapse;
+                width: 100%;
+              }
+              th, td {
+                border: 1px solid #ddd;
+                padding: 4px;
+                font-size: 10px;
+              }
+              th {
+                background-color: #f5f5f5;
+                font-weight: bold;
+              }
+              img {
+                max-width: 100%;
+                height: auto;
+              }
+              @media print {
+                @page {
+                  margin: 10mm;
+                  size: A4;
+                }
+                body {
+                  margin: 0;
+                  padding: 0;
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                  background-color: white !important;
+                  color: black !important;
+                }
+                * {
+                  background-color: white !important;
+                  color: black !important;
+                }
+              }
+              .print-header {
+                margin-bottom: 15px;
+              }
+              .print-footer {
+                margin-top: 20px;
+              }
+            </style>
+          </head>
+          <body>
+            ${content.innerHTML}
+            <script>
+              // Wait for images to load before printing
+              window.onload = function() {
+                setTimeout(function() {
+                  window.print();
+                }, 500);
+              };
+              
+              // Handle print dialog close
+              window.onafterprint = function() {
+                console.log('Print dialog closed');
+              };
+            </script>
+          </body>
+        </html>
+      `);
 
-    printWindow.document.close();
-    
-    // Wait for images to load before printing
-    printWindow.addEventListener('load', () => {
-      printWindow.focus();
-      printWindow.print();
-      // Uncomment this line if you want to close the print window after printing:
-      // printWindow.addEventListener('afterprint', () => printWindow.close());
-    });
+      printWindow.document.close();
+      
+      // Fallback if window.onload doesn't trigger
+      setTimeout(() => {
+        if (printWindow && !printWindow.closed) {
+          printWindow.focus();
+          try {
+            printWindow.print();
+          } catch (e) {
+            console.error('Error printing:', e);
+          }
+        }
+        setPrinting(false);
+      }, 1000);
+
+    } catch (error) {
+      console.error('Error setting up print window:', error);
+      alert('Error preparing the invoice for printing. Please try again.');
+      if (printWindow) {
+        printWindow.close();
+      }
+      setPrinting(false);
+    }
   };
 
   // Format currency
@@ -402,15 +473,36 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
           <div className="flex space-x-2">
             <button 
               onClick={handlePrint} 
+              disabled={printing || loading}
               className="px-4 py-2 text-white rounded flex items-center transition-colors"
-              style={{ backgroundColor: '#2563eb' }}
-              onMouseOver={(e) => e.target.style.backgroundColor = '#1d4ed8'}
-              onMouseOut={(e) => e.target.style.backgroundColor = '#2563eb'}
+              style={{ backgroundColor: printing || loading ? '#9ca3af' : '#2563eb' }}
+              onMouseOver={(e) => {
+                if (!printing && !loading) {
+                  e.target.style.backgroundColor = '#1d4ed8';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!printing && !loading) {
+                  e.target.style.backgroundColor = '#2563eb';
+                }
+              }}
             >
-              <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-              </svg>
-              Print Invoice
+              {printing ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Preparing Print...
+                </>
+              ) : (
+                <>
+                  <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  </svg>
+                  Print Invoice
+                </>
+              )}
             </button>
             <button 
               onClick={onClose} 

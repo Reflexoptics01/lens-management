@@ -132,7 +132,7 @@ const EditSale = () => {
   const fetchSaleData = async () => {
     try {
       setLoading(true);
-      const saleDoc = await getDoc(doc(db, 'sales', saleId));
+      const saleDoc = await getDoc(getUserDoc('sales', saleId));
       
       if (!saleDoc.exists()) {
         setError('Sale not found');
@@ -168,7 +168,7 @@ const EditSale = () => {
         // If phone is not in sale data, try to fetch it from customer record
         if (!customer.phone) {
           try {
-            const customerDoc = await getDoc(doc(db, 'customers', saleData.customerId));
+            const customerDoc = await getDoc(getUserDoc('customers', saleData.customerId));
             if (customerDoc.exists()) {
               const customerData = customerDoc.data();
               customer.phone = customerData.phone;
@@ -422,7 +422,7 @@ const EditSale = () => {
         updatedAt: serverTimestamp()
       };
 
-      await updateDoc(doc(db, 'sales', saleId), updatedSaleData);
+      await updateDoc(getUserDoc('sales', saleId), updatedSaleData);
       
       setSavedSaleId(saleId);
       setShowSuccessModal(true);
