@@ -138,6 +138,28 @@ const LensPrescription = ({ formData, onChange, matchingLenses = [], shopMatchin
     navigate(`/lens-inventory/${lensId}`);
   };
 
+  const handleSearchInShop = () => {
+    // Prepare prescription data for shop search
+    const prescriptionData = {
+      rightSph: formData.rightSph,
+      rightCyl: formData.rightCyl,
+      rightAxis: formData.rightAxis,
+      rightAdd: formData.rightAdd,
+      leftSph: formData.leftSph,
+      leftCyl: formData.leftCyl,
+      leftAxis: formData.leftAxis,
+      leftAdd: formData.leftAdd
+    };
+    
+    // Navigate to shop with prescription data
+    navigate('/shop', { 
+      state: { 
+        autoSearch: true, 
+        prescriptionData: prescriptionData 
+      } 
+    });
+  };
+
   // Helper function to get class name for lens value comparison
   const getLensValueClassName = (lensValue, prescriptionValue, isAxis = false) => {
     if (!lensValue || !prescriptionValue) return '';
@@ -403,14 +425,33 @@ const LensPrescription = ({ formData, onChange, matchingLenses = [], shopMatchin
       )}
 
       {/* Matching Lenses Section */}
-      {(matchingLenses && matchingLenses.length > 0) || (shopMatchingLenses && shopMatchingLenses.length > 0) && (
+      {((matchingLenses && matchingLenses.length > 0) || (shopMatchingLenses && shopMatchingLenses.length > 0)) && (
         <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
-          <h4 className="text-sm font-semibold text-sky-800 dark:text-sky-200 flex items-center mb-3">
-            <svg className="h-5 w-5 text-sky-500 dark:text-sky-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Available Matching Lenses ({(matchingLenses || []).length + (shopMatchingLenses || []).length})
-          </h4>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3">
+            <h4 className="text-sm font-semibold text-sky-800 dark:text-sky-200 flex items-center mb-2 sm:mb-0">
+              <svg className="h-5 w-5 text-sky-500 dark:text-sky-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Available Matching Lenses ({(matchingLenses || []).length + (shopMatchingLenses || []).length})
+            </h4>
+            
+            {/* Search in Reflex Shop Button */}
+            {(formData.rightSph || formData.leftSph) && (
+              <button
+                type="button"
+                onClick={handleSearchInShop}
+                className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-medium rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all transform hover:scale-105 duration-200"
+              >
+                <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                Search in Reflex Shop
+                <svg className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </button>
+            )}
+          </div>
           
           <div className="bg-sky-50 dark:bg-sky-900/30 border-l-4 border-sky-300 dark:border-sky-600 p-3 mb-4 text-xs text-sky-700 dark:text-sky-300">
             Lenses are matched with tolerances of ±0.25 for SPH/CYL/ADD and ±10° for AXIS. Click any lens to view details.
@@ -605,6 +646,43 @@ const LensPrescription = ({ formData, onChange, matchingLenses = [], shopMatchin
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Search in Reflex Shop Section - Show when prescription is entered but no matches found */}
+      {(formData.rightSph || formData.leftSph) && 
+       !(matchingLenses && matchingLenses.length > 0) && 
+       !(shopMatchingLenses && shopMatchingLenses.length > 0) && 
+       !shopLoading && (
+        <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
+          <div className="flex flex-col items-center justify-center p-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
+            <div className="flex items-center mb-4">
+              <svg className="h-8 w-8 text-blue-500 dark:text-blue-400 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                No matching lenses found locally
+              </h4>
+            </div>
+            
+            <p className="text-sm text-gray-600 dark:text-gray-400 text-center mb-4">
+              Search our marketplace to find lenses from other verified distributors across the network
+            </p>
+            
+            <button
+              type="button"
+              onClick={handleSearchInShop}
+              className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-lg shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all transform hover:scale-105 duration-200"
+            >
+              <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              Search in Reflex Shop
+              <svg className="h-5 w-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </button>
+          </div>
         </div>
       )}
     </div>

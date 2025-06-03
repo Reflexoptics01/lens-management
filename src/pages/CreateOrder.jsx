@@ -126,8 +126,6 @@ const CreateOrder = () => {
         return;
       }
       
-      console.log("Checking lens inventory for matches...");
-      
       // Search local lens inventory
       const lensInventoryRef = getUserCollection('lensInventory');
       
@@ -138,8 +136,8 @@ const CreateOrder = () => {
       );
       
       const snapshot = await getDocs(rxQuery);
+      
       if (snapshot.empty) {
-        console.log("No RX lenses found in local inventory");
         setMatchingLenses([]);
       } else {
         // Get all lenses
@@ -147,8 +145,6 @@ const CreateOrder = () => {
           id: doc.id,
           ...doc.data()
         }));
-        
-        console.log(`Found ${allLenses.length} RX lenses in local inventory`);
         
         // Apply the existing matching logic for local lenses
         const localMatches = findLocalMatches(allLenses);
@@ -171,7 +167,6 @@ const CreateOrder = () => {
         
         const shopMatches = await searchMatchingLenses(prescriptionData);
         setShopMatchingLenses(shopMatches);
-        console.log(`Found ${shopMatches.length} matching lenses in centralized shop`);
       } catch (error) {
         console.error('Error searching shop lenses:', error);
         setShopMatchingLenses([]);
@@ -196,14 +191,16 @@ const CreateOrder = () => {
     
     // Helper function to check if prescription values match within tolerance
     const isWithinTolerance = (val1, val2, tolerance) => {
-      if (!val1 || !val2) return false;
+      // Handle empty strings and null/undefined values
+      if (!val1 || val1 === '' || !val2 || val2 === '') return false;
       
       try {
         const num1 = parseFloat(val1);
         const num2 = parseFloat(val2);
         if (isNaN(num1) || isNaN(num2)) return false;
         
-        return Math.abs(num1 - num2) <= tolerance;
+        const diff = Math.abs(num1 - num2);
+        return diff <= tolerance;
       } catch (e) {
         return false;
       }
@@ -211,7 +208,8 @@ const CreateOrder = () => {
     
     // Helper function to check if axis values match within tolerance
     const isAxisWithinTolerance = (val1, val2, tolerance = AXIS_TOLERANCE) => {
-      if (!val1 || !val2) return false;
+      // Handle empty strings and null/undefined values
+      if (!val1 || val1 === '' || !val2 || val2 === '') return false;
       
       try {
         const num1 = parseInt(val1);
@@ -220,7 +218,8 @@ const CreateOrder = () => {
         
         // Handle wrap-around case (e.g., 5 degrees is close to 175 degrees in lens terminology)
         const diff = Math.abs(num1 - num2);
-        return diff <= tolerance || diff >= (180 - tolerance);
+        const normalizedDiff = Math.min(diff, 180 - diff);
+        return normalizedDiff <= tolerance;
       } catch (e) {
         return false;
       }
@@ -232,8 +231,6 @@ const CreateOrder = () => {
     
     // If we have right eye prescription data, find matches
     if (formData.rightSph) {
-      console.log(`Searching for right eye matches with SPH: ${formData.rightSph}`);
-      
       // Look for right eye lenses or lenses without specified eye
       for (const lens of allLenses) {
         // Only consider right eye lenses or unspecified eye
@@ -247,51 +244,80 @@ const CreateOrder = () => {
           
           // Check CYL
           // If either the prescription or lens has CYL, both must have it and match
-          if ((formData.rightCyl || lens.cyl) && 
-              (!formData.rightCyl || !lens.cyl || !isWithinTolerance(lens.cyl, formData.rightCyl, CYL_TOLERANCE))) {
-            continue;
+          // But if both are empty, that's also a match
+          if (formData.rightCyl || lens.cyl) {
+            // If one has CYL but the other doesn't, it's not a match
+            if ((!formData.rightCyl || formData.rightCyl === '') && (lens.cyl && lens.cyl !== '')) {
+              continue;
+            }
+            if ((formData.rightCyl && formData.rightCyl !== '') && (!lens.cyl || lens.cyl === '')) {
+              continue;
+            }
+            // If both have CYL, check if they match within tolerance
+            if ((formData.rightCyl && formData.rightCyl !== '') && (lens.cyl && lens.cyl !== '')) {
+              if (!isWithinTolerance(lens.cyl, formData.rightCyl, CYL_TOLERANCE)) {
+                continue;
+              }
+            }
           }
           
           // Check AXIS (only if CYL is present in both)
-          if (formData.rightCyl && lens.cyl) {
+          if ((formData.rightCyl && formData.rightCyl !== '') && (lens.cyl && lens.cyl !== '')) {
             // If either has AXIS, both must have it and match
-            if ((formData.rightAxis || lens.axis) && 
-                (!formData.rightAxis || !lens.axis || !isAxisWithinTolerance(lens.axis, formData.rightAxis))) {
-              continue;
+            if (formData.rightAxis || lens.axis) {
+              if ((!formData.rightAxis || formData.rightAxis === '') && (lens.axis && lens.axis !== '')) {
+                continue;
+              }
+              if ((formData.rightAxis && formData.rightAxis !== '') && (!lens.axis || lens.axis === '')) {
+                continue;
+              }
+              // If both have AXIS, check if they match within tolerance
+              if ((formData.rightAxis && formData.rightAxis !== '') && (lens.axis && lens.axis !== '')) {
+                if (!isAxisWithinTolerance(lens.axis, formData.rightAxis)) {
+                  continue;
+                }
+              }
             }
           }
           
           // Check ADD
           // If either has ADD, both must have it and match
-          if ((formData.rightAdd || lens.add) && 
-              (!formData.rightAdd || !lens.add || !isWithinTolerance(lens.add, formData.rightAdd, ADD_TOLERANCE))) {
-            continue;
+          // But if both are empty, that's also a match
+          if (formData.rightAdd || lens.add) {
+            // If one has ADD but the other doesn't, it's not a match
+            if ((!formData.rightAdd || formData.rightAdd === '') && (lens.add && lens.add !== '')) {
+              continue;
+            }
+            if ((formData.rightAdd && formData.rightAdd !== '') && (!lens.add || lens.add === '')) {
+              continue;
+            }
+            // If both have ADD, check if they match within tolerance
+            if ((formData.rightAdd && formData.rightAdd !== '') && (lens.add && lens.add !== '')) {
+              if (!isWithinTolerance(lens.add, formData.rightAdd, ADD_TOLERANCE)) {
+                continue;
+              }
+            }
           }
           
           // If we got here, all values match within tolerances
-          {
-            console.log(`Found matching lens for right eye:`, lens);
-            rightEyeMatches.push({
-              ...lens,
-              matchedEye: 'right',
-              isLocal: true,
-              matchQuality: calculateMatchQuality(
-                lens, 
-                formData.rightSph, 
-                formData.rightCyl, 
-                formData.rightAxis, 
-                formData.rightAdd
-              )
-            });
-          }
+          rightEyeMatches.push({
+            ...lens,
+            matchedEye: 'right',
+            isLocal: true,
+            matchQuality: calculateMatchQuality(
+              lens, 
+              formData.rightSph, 
+              formData.rightCyl, 
+              formData.rightAxis, 
+              formData.rightAdd
+            )
+          });
         }
       }
     }
     
     // If we have left eye prescription data, find matches
     if (formData.leftSph) {
-      console.log(`Searching for left eye matches with SPH: ${formData.leftSph}`);
-      
       // Look for left eye lenses or lenses without specified eye
       for (const lens of allLenses) {
         // Only consider left eye lenses or unspecified eye
@@ -305,43 +331,72 @@ const CreateOrder = () => {
           
           // Check CYL
           // If either the prescription or lens has CYL, both must have it and match
-          if ((formData.leftCyl || lens.cyl) && 
-              (!formData.leftCyl || !lens.cyl || !isWithinTolerance(lens.cyl, formData.leftCyl, CYL_TOLERANCE))) {
-            continue;
+          if (formData.leftCyl || lens.cyl) {
+            // If one has CYL but the other doesn't, it's not a match
+            if ((!formData.leftCyl || formData.leftCyl === '') && (lens.cyl && lens.cyl !== '')) {
+              continue;
+            }
+            if ((formData.leftCyl && formData.leftCyl !== '') && (!lens.cyl || lens.cyl === '')) {
+              continue;
+            }
+            // If both have CYL, check if they match within tolerance
+            if ((formData.leftCyl && formData.leftCyl !== '') && (lens.cyl && lens.cyl !== '')) {
+              if (!isWithinTolerance(lens.cyl, formData.leftCyl, CYL_TOLERANCE)) {
+                continue;
+              }
+            }
           }
           
           // Check AXIS (only if CYL is present in both)
-          if (formData.leftCyl && lens.cyl) {
+          if ((formData.leftCyl && formData.leftCyl !== '') && (lens.cyl && lens.cyl !== '')) {
             // If either has AXIS, both must have it and match
-            if ((formData.leftAxis || lens.axis) && 
-                (!formData.leftAxis || !lens.axis || !isAxisWithinTolerance(lens.axis, formData.leftAxis))) {
-              continue;
+            if (formData.leftAxis || lens.axis) {
+              if ((!formData.leftAxis || formData.leftAxis === '') && (lens.axis && lens.axis !== '')) {
+                continue;
+              }
+              if ((formData.leftAxis && formData.leftAxis !== '') && (!lens.axis || lens.axis === '')) {
+                continue;
+              }
+              // If both have AXIS, check if they match within tolerance
+              if ((formData.leftAxis && formData.leftAxis !== '') && (lens.axis && lens.axis !== '')) {
+                if (!isAxisWithinTolerance(lens.axis, formData.leftAxis)) {
+                  continue;
+                }
+              }
             }
           }
           
           // Check ADD
           // If either has ADD, both must have it and match
-          if ((formData.leftAdd || lens.add) && 
-              (!formData.leftAdd || !lens.add || !isWithinTolerance(lens.add, formData.leftAdd, ADD_TOLERANCE))) {
-            continue;
+          if (formData.leftAdd || lens.add) {
+            // If one has ADD but the other doesn't, it's not a match
+            if ((!formData.leftAdd || formData.leftAdd === '') && (lens.add && lens.add !== '')) {
+              continue;
+            }
+            if ((formData.leftAdd && formData.leftAdd !== '') && (!lens.add || lens.add === '')) {
+              continue;
+            }
+            // If both have ADD, check if they match within tolerance
+            if ((formData.leftAdd && formData.leftAdd !== '') && (lens.add && lens.add !== '')) {
+              if (!isWithinTolerance(lens.add, formData.leftAdd, ADD_TOLERANCE)) {
+                continue;
+              }
+            }
           }
           
           // If we got here, all values match within tolerances
-          {
-            console.log(`Found matching lens for left eye:`, lens);
-            leftEyeMatches.push({
-              ...lens,
-              matchedEye: 'left',
-              isLocal: true,
-              matchQuality: calculateMatchQuality(
-                lens, 
-                formData.leftSph, 
-                formData.leftCyl, 
-                formData.leftAxis, 
-                formData.leftAdd
-              )
-            });
-          }
+          leftEyeMatches.push({
+            ...lens,
+            matchedEye: 'left',
+            isLocal: true,
+            matchQuality: calculateMatchQuality(
+              lens, 
+              formData.leftSph, 
+              formData.leftCyl, 
+              formData.leftAxis, 
+              formData.leftAdd
+            )
+          });
         }
       }
     }

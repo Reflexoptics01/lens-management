@@ -151,7 +151,7 @@ export const removeLensesFromShop = async (lenses, userInfo = null) => {
 };
 
 // Get all shop lenses (for marketplace)
-export const getAllShopLenses = async (limit = 1000) => {
+export const getAllShopLenses = async (limit = 1000, includeOwnLenses = false) => {
   try {
     const userUid = getUserUid();
     if (!userUid) {
@@ -174,13 +174,19 @@ export const getAllShopLenses = async (limit = 1000) => {
     const allShopLenses = result.data.documents;
     console.log(`Found ${allShopLenses.length} lenses in centralized shop`);
 
-    // Filter out user's own lenses and only show others' lenses
-    const otherUsersLenses = allShopLenses.filter(lens => {
-      return lens.ownerId !== userUid && lens.userInfo?.userId !== userUid;
-    });
+    if (includeOwnLenses) {
+      // Include all lenses (own and others) when explicitly requested
+      console.log(`Including all ${allShopLenses.length} lenses (including own inventory)`);
+      return allShopLenses;
+    } else {
+      // Filter out user's own lenses and only show others' lenses
+      const otherUsersLenses = allShopLenses.filter(lens => {
+        return lens.ownerId !== userUid && lens.userInfo?.userId !== userUid;
+      });
 
-    console.log(`Filtering to ${otherUsersLenses.length} lenses from other distributors`);
-    return otherUsersLenses;
+      console.log(`Filtering to ${otherUsersLenses.length} lenses from other distributors`);
+      return otherUsersLenses;
+    }
   } catch (error) {
     console.error('Error fetching shop lenses:', error);
     throw error;
@@ -188,9 +194,9 @@ export const getAllShopLenses = async (limit = 1000) => {
 };
 
 // Search for matching lenses in the centralized shop (FILTERED BY USER PREFERENCES)
-export const searchMatchingLenses = async (prescriptionData) => {
+export const searchMatchingLenses = async (prescriptionData, includeOwnLenses = false) => {
   try {
-    const allShopLenses = await getAllShopLenses();
+    const allShopLenses = await getAllShopLenses(1000, includeOwnLenses);
     
     if (!allShopLenses || allShopLenses.length === 0) {
       return [];
@@ -209,7 +215,8 @@ export const searchMatchingLenses = async (prescriptionData) => {
 // Search lenses by specifications (for general marketplace search)
 export const searchLensesBySpecs = async (searchCriteria) => {
   try {
-    const allShopLenses = await getAllShopLenses();
+    // Include user's own lenses in shop search results
+    const allShopLenses = await getAllShopLenses(1000, true);
     
     if (!allShopLenses || allShopLenses.length === 0) {
       return [];
@@ -299,6 +306,34 @@ export const searchLensesBySpecs = async (searchCriteria) => {
         const lensDia = parseFloat(lens.diameter);
         return Math.abs(lensDia - diaValue) <= 0.2; // 0.2 tolerance for diameter
       });
+    }
+
+    // Filter by contact lens type (NO TORIC, TORIC)
+    if (searchCriteria.contactType && searchCriteria.contactType.trim()) {
+      filteredLenses = filteredLenses.filter(lens => 
+        lens.contactType && lens.contactType.toLowerCase() === searchCriteria.contactType.toLowerCase()
+      );
+    }
+
+    // Filter by contact lens duration (DAILY, WEEKLY, MONTHLY, YEARLY)
+    if (searchCriteria.duration && searchCriteria.duration.trim()) {
+      filteredLenses = filteredLenses.filter(lens => 
+        lens.duration && lens.duration.toLowerCase() === searchCriteria.duration.toLowerCase()
+      );
+    }
+
+    // Filter by contact lens tint (CLEAR, COLOR)
+    if (searchCriteria.tint && searchCriteria.tint.trim()) {
+      filteredLenses = filteredLenses.filter(lens => 
+        lens.tint && lens.tint.toLowerCase() === searchCriteria.tint.toLowerCase()
+      );
+    }
+
+    // Filter by contact lens color
+    if (searchCriteria.color && searchCriteria.color.trim()) {
+      filteredLenses = filteredLenses.filter(lens => 
+        lens.color && lens.color.toLowerCase() === searchCriteria.color.toLowerCase()
+      );
     }
 
     // Sort by relevance (could be enhanced with better scoring)
