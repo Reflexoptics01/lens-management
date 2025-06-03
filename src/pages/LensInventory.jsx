@@ -8,7 +8,11 @@ import AddLensForm from '../components/AddLensForm';
 import AddStockLensForm from '../components/AddStockLensForm';
 import AddContactLensForm from '../components/AddContactLensForm';
 import AddServiceForm from '../components/AddServiceForm';
-import PowerInventoryModal from '../components/PowerInventoryModal';
+import RxLensTable from '../components/RxLensTable';
+import StockLensTable from '../components/StockLensTable';
+import ContactLensTable from '../components/ContactLensTable';
+import ServiceTable from '../components/ServiceTable';
+import * as XLSX from 'xlsx';
 
 // Constants for dropdowns from OrderForm
 const MATERIALS = ['CR', 'POLY', 'GLASS', 'POLARISED', 'TRIVEX', 'MR8'];
@@ -70,6 +74,10 @@ const LensInventory = () => {
   const [services, setServices] = useState([]);
   const [filteredServices, setFilteredServices] = useState([]);
   
+  // Add import/export states
+  const [importing, setImporting] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
+  
   // Lens specifications (common for all prescriptions)
   const [lensSpecifications, setLensSpecifications] = useState({
     material: '',
@@ -92,7 +100,8 @@ const LensInventory = () => {
     Array(10).fill().map((_, index) => ({
       id: index + 1,
       brandName: '',
-      powerSeries: '',
+      maxSph: '',
+      maxCyl: '',
       purchasePrice: '',
       salePrice: '',
       qty: 1
@@ -156,6 +165,8 @@ const LensInventory = () => {
       const lowercaseSearch = searchTerm.toLowerCase();
       filtered = filtered.filter(lens => 
         (lens.brandName && lens.brandName.toLowerCase().includes(lowercaseSearch)) ||
+        (lens.maxSph && lens.maxSph.toString().includes(lowercaseSearch)) ||
+        (lens.maxCyl && lens.maxCyl.toString().includes(lowercaseSearch)) ||
         (lens.powerSeries && lens.powerSeries.toLowerCase().includes(lowercaseSearch)) ||
         (lens.sph && lens.sph.toString().includes(lowercaseSearch)) ||
         (lens.cyl && lens.cyl.toString().includes(lowercaseSearch)) ||
@@ -199,7 +210,8 @@ const LensInventory = () => {
       {
         id: stockLensRows.length + 1,
         brandName: '',
-        powerSeries: '',
+        maxSph: '',
+        maxCyl: '',
         purchasePrice: '',
         salePrice: '',
         qty: 1
@@ -238,17 +250,34 @@ const LensInventory = () => {
         // Edit existing stock lens - only the first row is used
         const row = validRows[0];
         
-        // Check if it's a power range stock lens (has powerSeries with range like "-6S/-2C")
-        const isPowerRangeLens = row.powerSeries && row.powerSeries.includes('/');
+        // Check if it's a power range stock lens (has maxSph and maxCyl values)
+        const isPowerRangeLens = row.maxSph && row.maxCyl;
         
         if (isPowerRangeLens) {
           // Show PowerInventoryModal for power range lens
+          const maxSphNum = parseFloat(row.maxSph);
+          const maxCylNum = parseFloat(row.maxCyl);
+          
+          // Calculate power ranges
+          const sphMin = maxSphNum < 0 ? maxSphNum : 0;
+          const sphMax = maxSphNum < 0 ? 0 : maxSphNum;
+          const cylMin = maxCylNum < 0 ? maxCylNum : 0;
+          const cylMax = maxCylNum < 0 ? 0 : maxCylNum;
+          
+          const powerRange = `SPH: ${sphMin} to ${sphMax}, CYL: ${cylMin} to ${cylMax}`;
+          
           const lensData = {
             name: row.brandName,
-            powerRange: row.powerSeries,
+            powerRange: powerRange,
+            maxSph: row.maxSph,
+            maxCyl: row.maxCyl,
+            sphMin,
+            sphMax,
+            cylMin,
+            cylMax,
             purchasePrice: row.purchasePrice,
             salePrice: row.salePrice,
-            type: row.powerSeries.toLowerCase().includes('add') || row.powerSeries.toLowerCase().includes('bifocal') ? 'bifocal' : 'single',
+            type: 'single',
             material: '', // Could be added to stock lens form later
             editMode: true,
             editId: lensToEdit.id
@@ -264,7 +293,8 @@ const LensInventory = () => {
         // Regular stock lens update
         const lensData = {
           brandName: row.brandName,
-          powerSeries: row.powerSeries,
+          maxSph: row.maxSph,
+          maxCyl: row.maxCyl,
           purchasePrice: row.purchasePrice,
           salePrice: row.salePrice,
           qty: parseFloat(row.qty) || 1,
@@ -281,17 +311,34 @@ const LensInventory = () => {
         // Add new stock lenses
         // Process each valid stock lens row
         for (const row of validRows) {
-          // Check if it's a power range stock lens (has powerSeries with range like "-6S/-2C")
-          const isPowerRangeLens = row.powerSeries && row.powerSeries.includes('/');
+          // Check if it's a power range stock lens (has maxSph and maxCyl values)
+          const isPowerRangeLens = row.maxSph && row.maxCyl;
           
           if (isPowerRangeLens) {
             // Show PowerInventoryModal for power range lens
+            const maxSphNum = parseFloat(row.maxSph);
+            const maxCylNum = parseFloat(row.maxCyl);
+            
+            // Calculate power ranges
+            const sphMin = maxSphNum < 0 ? maxSphNum : 0;
+            const sphMax = maxSphNum < 0 ? 0 : maxSphNum;
+            const cylMin = maxCylNum < 0 ? maxCylNum : 0;
+            const cylMax = maxCylNum < 0 ? 0 : maxCylNum;
+            
+            const powerRange = `SPH: ${sphMin} to ${sphMax}, CYL: ${cylMin} to ${cylMax}`;
+            
             const lensData = {
               name: row.brandName,
-              powerRange: row.powerSeries,
+              powerRange: powerRange,
+              maxSph: row.maxSph,
+              maxCyl: row.maxCyl,
+              sphMin,
+              sphMax,
+              cylMin,
+              cylMax,
               purchasePrice: row.purchasePrice,
               salePrice: row.salePrice,
-              type: row.powerSeries.toLowerCase().includes('add') || row.powerSeries.toLowerCase().includes('bifocal') ? 'bifocal' : 'single',
+              type: 'single',
               material: '', // Could be added to stock lens form later
               editMode: false
             };
@@ -305,7 +352,8 @@ const LensInventory = () => {
             // Regular stock lens - add directly
             const lensData = {
               brandName: row.brandName,
-              powerSeries: row.powerSeries,
+              maxSph: row.maxSph,
+              maxCyl: row.maxCyl,
               purchasePrice: row.purchasePrice,
               salePrice: row.salePrice,
               qty: parseFloat(row.qty) || 1,
@@ -321,7 +369,8 @@ const LensInventory = () => {
         setStockLensRows(Array(10).fill().map((_, index) => ({
           id: index + 1,
           brandName: '',
-          powerSeries: '',
+          maxSph: '',
+          maxCyl: '',
           purchasePrice: '',
           salePrice: '',
           qty: 1
@@ -510,7 +559,8 @@ const LensInventory = () => {
         const row = validRows[0];
         const lensData = {
           brandName: row.brandName,
-          powerSeries: row.powerSeries,
+          maxSph: row.maxSph,
+          maxCyl: row.maxCyl,
           purchasePrice: row.purchasePrice,
           salePrice: row.salePrice,
           qty: parseFloat(row.qty) || 1,
@@ -598,7 +648,8 @@ const LensInventory = () => {
     setStockLensRows(Array(10).fill().map((_, index) => ({
       id: index + 1,
       brandName: '',
-      powerSeries: '',
+      maxSph: '',
+      maxCyl: '',
       purchasePrice: '',
       salePrice: '',
       qty: 1
@@ -707,7 +758,7 @@ const LensInventory = () => {
         <div className="flex justify-center items-center py-6">
           <svg className="animate-spin h-6 w-6 text-sky-600 dark:border-sky-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 718-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
           <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Loading inventory...</span>
         </div>
@@ -784,11 +835,21 @@ const LensInventory = () => {
 
             {/* Stock lens details */}
             {activeTab === 'stock' && (
-              <div className="grid grid-cols-1 gap-2 text-xs mb-3">
+              <div className="grid grid-cols-2 gap-2 text-xs mb-3">
                 <div>
-                  <span className="font-medium text-gray-500 dark:text-gray-400">Power Series:</span>{' '}
-                  <span className="text-gray-900 dark:text-white">{lens.powerSeries || 'N/A'}</span>
+                  <span className="font-medium text-gray-500 dark:text-gray-400">Max SPH:</span>{' '}
+                  <span className="text-gray-900 dark:text-white">{lens.maxSph || 'N/A'}</span>
                 </div>
+                <div>
+                  <span className="font-medium text-gray-500 dark:text-gray-400">Max CYL:</span>{' '}
+                  <span className="text-gray-900 dark:text-white">{lens.maxCyl || 'N/A'}</span>
+                </div>
+                {lens.powerSeries && (
+                  <div className="col-span-2">
+                    <span className="font-medium text-gray-500 dark:text-gray-400">Power Range:</span>{' '}
+                    <span className="text-gray-900 dark:text-white">{lens.powerSeries}</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -878,6 +939,8 @@ const LensInventory = () => {
         // Save as power range (existing functionality)
         const lensData = {
           brandName: pendingStockLens.name,
+          maxSph: pendingStockLens.maxSph,
+          maxCyl: pendingStockLens.maxCyl,
           powerSeries: pendingStockLens.powerRange,
           purchasePrice: pendingStockLens.purchasePrice,
           salePrice: pendingStockLens.salePrice,
@@ -897,6 +960,8 @@ const LensInventory = () => {
         // Save individual power inventory
         const baseData = {
           brandName: pendingStockLens.name,
+          maxSph: pendingStockLens.maxSph,
+          maxCyl: pendingStockLens.maxCyl,
           powerRange: pendingStockLens.powerRange,
           purchasePrice: pendingStockLens.purchasePrice,
           salePrice: pendingStockLens.salePrice,
@@ -930,7 +995,8 @@ const LensInventory = () => {
         setStockLensRows(Array(10).fill().map((_, index) => ({
           id: index + 1,
           brandName: '',
-          powerSeries: '',
+          maxSph: '',
+          maxCyl: '',
           purchasePrice: '',
           salePrice: '',
           qty: 1
@@ -956,6 +1022,450 @@ const LensInventory = () => {
     setPendingStockLens(null);
     setCurrentStockLensRow(null);
     setLoading(false);
+  };
+
+  // Export functionality
+  const exportToExcel = (type) => {
+    try {
+      setExportLoading(true);
+      
+      let dataToExport = [];
+      let filename = '';
+      
+      // Filter data based on type
+      const filteredData = lenses.filter(lens => {
+        if (type === 'all') return true;
+        return lens.type === type;
+      });
+      
+      if (filteredData.length === 0) {
+        setError(`No ${type} lenses found to export.`);
+        setExportLoading(false);
+        return;
+      }
+      
+      // Format data based on lens type
+      switch (type) {
+        case 'prescription':
+        case 'rx':
+          dataToExport = filteredData.map(lens => ({
+            'Brand Name': lens.brandName || '',
+            'Eye': lens.eye === 'right' ? 'Right' : lens.eye === 'left' ? 'Left' : lens.eye === 'both' ? 'Both' : '',
+            'SPH': lens.sph || '',
+            'CYL': lens.cyl || '',
+            'AXIS': lens.axis || '',
+            'ADD': lens.add || '',
+            'Material': lens.material || '',
+            'Index': lens.index || '',
+            'Base Tint': lens.baseTint || '',
+            'Coating Type': lens.coatingType || '',
+            'Coating Color': lens.coatingColor || '',
+            'Diameter': lens.diameter || '',
+            'Location': lens.location || '',
+            'Purchase Price': lens.purchasePrice || '',
+            'Sale Price': lens.salePrice || '',
+            'Quantity': lens.qty || 1,
+            'Notes': lens.notes || '',
+            'Created Date': lens.createdAt ? new Date(lens.createdAt.seconds * 1000).toLocaleDateString() : '',
+            'Updated Date': lens.updatedAt ? new Date(lens.updatedAt.seconds * 1000).toLocaleDateString() : ''
+          }));
+          filename = 'rx_lenses_inventory.xlsx';
+          break;
+          
+        case 'stock':
+          dataToExport = filteredData.map(lens => ({
+            'Brand Name': lens.brandName || '',
+            'Power Series': lens.powerSeries || '',
+            'Power Range': lens.powerRange || '',
+            'Inventory Type': lens.inventoryType || 'range',
+            'Purchase Price': lens.purchasePrice || '',
+            'Sale Price': lens.salePrice || '',
+            'Quantity': lens.inventoryType === 'individual' ? lens.totalQuantity : lens.qty || 1,
+            'Unit': lens.inventoryType === 'individual' ? 'pieces' : 'pairs',
+            'Created Date': lens.createdAt ? new Date(lens.createdAt.seconds * 1000).toLocaleDateString() : '',
+            'Updated Date': lens.updatedAt ? new Date(lens.updatedAt.seconds * 1000).toLocaleDateString() : ''
+          }));
+          filename = 'stock_lenses_inventory.xlsx';
+          break;
+          
+        case 'contact':
+          dataToExport = filteredData.map(lens => ({
+            'Brand Name': lens.brandName || '',
+            'Power Series': lens.powerSeries || '',
+            'Category': lens.category || '',
+            'Contact Type': lens.contactType || '',
+            'Color': lens.color || '',
+            'Disposal Frequency': lens.disposalFrequency || '',
+            'Purchase Price': lens.purchasePrice || '',
+            'Sale Price': lens.salePrice || '',
+            'Quantity': lens.qty || 1,
+            'Created Date': lens.createdAt ? new Date(lens.createdAt.seconds * 1000).toLocaleDateString() : '',
+            'Updated Date': lens.updatedAt ? new Date(lens.updatedAt.seconds * 1000).toLocaleDateString() : ''
+          }));
+          filename = 'contact_lenses_inventory.xlsx';
+          break;
+          
+        case 'service':
+          dataToExport = filteredData.map(lens => ({
+            'Brand Name': lens.brandName || '',
+            'Service Type': lens.serviceType || '',
+            'Service Description': lens.serviceDescription || '',
+            'Category': lens.category || '',
+            'Purchase Price': lens.purchasePrice || '',
+            'Sale Price': lens.salePrice || '',
+            'Quantity': lens.qty || 1,
+            'Notes': lens.notes || '',
+            'Created Date': lens.createdAt ? new Date(lens.createdAt.seconds * 1000).toLocaleDateString() : '',
+            'Updated Date': lens.updatedAt ? new Date(lens.updatedAt.seconds * 1000).toLocaleDateString() : ''
+          }));
+          filename = 'services_inventory.xlsx';
+          break;
+          
+        case 'all':
+          dataToExport = filteredData.map(lens => ({
+            'Type': lens.type || '',
+            'Brand Name': lens.brandName || '',
+            'Eye': lens.eye === 'right' ? 'Right' : lens.eye === 'left' ? 'Left' : lens.eye === 'both' ? 'Both' : '',
+            'SPH': lens.sph || '',
+            'CYL': lens.cyl || '',
+            'AXIS': lens.axis || '',
+            'ADD': lens.add || '',
+            'Power Series': lens.powerSeries || '',
+            'Material': lens.material || '',
+            'Index': lens.index || '',
+            'Category': lens.category || '',
+            'Contact Type': lens.contactType || '',
+            'Color': lens.color || '',
+            'Service Type': lens.serviceType || '',
+            'Service Description': lens.serviceDescription || '',
+            'Purchase Price': lens.purchasePrice || '',
+            'Sale Price': lens.salePrice || '',
+            'Quantity': lens.qty || 1,
+            'Created Date': lens.createdAt ? new Date(lens.createdAt.seconds * 1000).toLocaleDateString() : '',
+            'Updated Date': lens.updatedAt ? new Date(lens.updatedAt.seconds * 1000).toLocaleDateString() : ''
+          }));
+          filename = 'all_lenses_inventory.xlsx';
+          break;
+          
+        default:
+          setError('Invalid export type selected.');
+          setExportLoading(false);
+          return;
+      }
+      
+      // Create workbook and worksheet
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      
+      // Auto-size columns
+      const colWidths = [];
+      if (dataToExport.length > 0) {
+        Object.keys(dataToExport[0]).forEach((key, index) => {
+          const maxLength = Math.max(
+            key.length,
+            ...dataToExport.map(row => String(row[key] || '').length)
+          );
+          colWidths[index] = { width: Math.min(maxLength + 2, 30) };
+        });
+      }
+      worksheet['!cols'] = colWidths;
+      
+      // Add worksheet to workbook
+      const sheetName = type === 'all' ? 'All Inventory' : 
+                      type === 'prescription' || type === 'rx' ? 'RX Lenses' :
+                      type === 'stock' ? 'Stock Lenses' :
+                      type === 'contact' ? 'Contact Lenses' :
+                      type === 'service' ? 'Services' : 'Inventory';
+      
+      XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+      
+      // Download file
+      XLSX.writeFile(workbook, filename);
+      
+      console.log(`Exported ${dataToExport.length} records to ${filename}`);
+      
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      setError(`Failed to export: ${error.message}`);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+  
+  // Import functionality
+  const importFromExcel = async (file, type) => {
+    try {
+      setImporting(true);
+      setError('');
+      
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+      
+      if (jsonData.length === 0) {
+        setError('The Excel file is empty or has no valid data.');
+        setImporting(false);
+        return;
+      }
+      
+      let importedCount = 0;
+      let errors = [];
+      
+      // Process each row based on lens type
+      for (let i = 0; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        try {
+          let lensData = {};
+          
+          switch (type) {
+            case 'prescription':
+            case 'rx':
+              lensData = {
+                type: 'prescription',
+                brandName: row['Brand Name'] || '',
+                eye: row['Eye'] === 'Right' ? 'right' : row['Eye'] === 'Left' ? 'left' : row['Eye'] === 'Both' ? 'both' : 'right',
+                sph: row['SPH'] || '',
+                cyl: row['CYL'] || '',
+                axis: row['AXIS'] || '',
+                add: row['ADD'] || '',
+                material: row['Material'] || '',
+                index: row['Index'] || '',
+                baseTint: row['Base Tint'] || '',
+                coatingType: row['Coating Type'] || '',
+                coatingColor: row['Coating Color'] || '',
+                diameter: row['Diameter'] || '',
+                location: row['Location'] || 'Main Cabinet',
+                purchasePrice: parseFloat(row['Purchase Price']) || 0,
+                salePrice: parseFloat(row['Sale Price']) || 0,
+                qty: parseInt(row['Quantity']) || 1,
+                notes: row['Notes'] || '',
+                createdAt: Timestamp.now()
+              };
+              break;
+              
+            case 'stock':
+              lensData = {
+                type: 'stock',
+                brandName: row['Brand Name'] || '',
+                powerSeries: row['Power Series'] || '',
+                powerRange: row['Power Range'] || '',
+                inventoryType: row['Inventory Type'] || 'range',
+                purchasePrice: parseFloat(row['Purchase Price']) || 0,
+                salePrice: parseFloat(row['Sale Price']) || 0,
+                qty: parseInt(row['Quantity']) || 1,
+                createdAt: Timestamp.now()
+              };
+              
+              if (lensData.inventoryType === 'individual') {
+                lensData.totalQuantity = parseInt(row['Quantity']) || 1;
+              }
+              break;
+              
+            case 'contact':
+              lensData = {
+                type: 'contact',
+                brandName: row['Brand Name'] || '',
+                powerSeries: row['Power Series'] || '',
+                category: row['Category'] || '',
+                contactType: row['Contact Type'] || '',
+                color: row['Color'] || '',
+                disposalFrequency: row['Disposal Frequency'] || '',
+                purchasePrice: parseFloat(row['Purchase Price']) || 0,
+                salePrice: parseFloat(row['Sale Price']) || 0,
+                qty: parseInt(row['Quantity']) || 1,
+                createdAt: Timestamp.now()
+              };
+              break;
+              
+            case 'service':
+              lensData = {
+                type: 'service',
+                brandName: row['Brand Name'] || '',
+                serviceType: row['Service Type'] || '',
+                serviceDescription: row['Service Description'] || '',
+                category: row['Category'] || '',
+                purchasePrice: parseFloat(row['Purchase Price']) || 0,
+                salePrice: parseFloat(row['Sale Price']) || 0,
+                qty: parseInt(row['Quantity']) || 1,
+                notes: row['Notes'] || '',
+                createdAt: Timestamp.now()
+              };
+              break;
+              
+            default:
+              throw new Error('Invalid import type');
+          }
+          
+          // Validate required fields
+          if (!lensData.brandName || lensData.brandName.trim() === '') {
+            errors.push(`Row ${i + 2}: Brand Name is required`);
+            continue;
+          }
+          
+          // Add to database
+          await addDoc(getUserCollection('lensInventory'), lensData);
+          importedCount++;
+          
+        } catch (error) {
+          errors.push(`Row ${i + 2}: ${error.message}`);
+        }
+      }
+      
+      // Show results
+      if (importedCount > 0) {
+        console.log(`Successfully imported ${importedCount} records`);
+        await fetchLensInventory(); // Refresh the inventory
+      }
+      
+      if (errors.length > 0) {
+        setError(`Import completed with errors:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n... and ${errors.length - 5} more errors` : ''}`);
+      } else if (importedCount === 0) {
+        setError('No valid records found to import.');
+      }
+      
+    } catch (error) {
+      console.error('Error importing from Excel:', error);
+      setError(`Failed to import: ${error.message}`);
+    } finally {
+      setImporting(false);
+    }
+  };
+  
+  // Handle file upload for import
+  const handleFileUpload = (event, type) => {
+    const file = event.target.files[0];
+    if (file) {
+      if (file.type !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' && 
+          file.type !== 'application/vnd.ms-excel') {
+        setError('Please select a valid Excel file (.xlsx or .xls)');
+        return;
+      }
+      
+      importFromExcel(file, type);
+    }
+    // Reset the input
+    event.target.value = '';
+  };
+  
+  // Generate Excel template for each lens type
+  const downloadTemplate = (type) => {
+    let templateData = [];
+    let filename = '';
+    
+    switch (type) {
+      case 'prescription':
+      case 'rx':
+        templateData = [{
+          'Brand Name': 'Example Brand',
+          'Eye': 'Right',
+          'SPH': '-2.00',
+          'CYL': '-0.50',
+          'AXIS': '180',
+          'ADD': '+2.00',
+          'Material': 'CR',
+          'Index': '1.56',
+          'Base Tint': 'WHITE',
+          'Coating Type': 'HMC',
+          'Coating Color': 'GREEN',
+          'Diameter': '70',
+          'Location': 'Main Cabinet',
+          'Purchase Price': '500',
+          'Sale Price': '800',
+          'Quantity': '1',
+          'Notes': 'Example notes'
+        }];
+        filename = 'rx_lenses_template.xlsx';
+        break;
+        
+      case 'stock':
+        templateData = [{
+          'Brand Name': 'Example Stock Brand',
+          'Power Series': '-6.00 to +6.00',
+          'Power Range': '-6S/+6S',
+          'Inventory Type': 'range',
+          'Purchase Price': '300',
+          'Sale Price': '500',
+          'Quantity': '10',
+          'Unit': 'pairs'
+        }];
+        filename = 'stock_lenses_template.xlsx';
+        break;
+        
+      case 'contact':
+        templateData = [{
+          'Brand Name': 'Example Contact Brand',
+          'Power Series': '-6.00 to +6.00',
+          'Category': 'Soft',
+          'Contact Type': 'Daily',
+          'Color': 'Clear',
+          'Disposal Frequency': 'Daily',
+          'Purchase Price': '50',
+          'Sale Price': '100',
+          'Quantity': '30'
+        }];
+        filename = 'contact_lenses_template.xlsx';
+        break;
+        
+      case 'service':
+        templateData = [{
+          'Brand Name': 'Example Service',
+          'Service Type': 'Lens Fitting',
+          'Service Description': 'Professional lens fitting service',
+          'Category': 'Professional Service',
+          'Purchase Price': '100',
+          'Sale Price': '200',
+          'Quantity': '1',
+          'Notes': 'Service notes'
+        }];
+        filename = 'services_template.xlsx';
+        break;
+        
+      default:
+        return;
+    }
+    
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    
+    // Auto-size columns
+    const colWidths = Object.keys(templateData[0]).map(key => ({
+      width: Math.max(key.length, String(templateData[0][key]).length) + 2
+    }));
+    worksheet['!cols'] = colWidths;
+    
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Template');
+    XLSX.writeFile(workbook, filename);
+  };
+
+  // Add a function to handle PowerInventory updates for stock lenses
+  const handleUpdateStockInventory = async (lensId, inventoryData) => {
+    try {
+      setLoading(true);
+      
+      if (inventoryData.type === 'individual') {
+        // Update with individual power inventory data
+        const updateData = {
+          inventoryType: 'individual',
+          powerInventory: inventoryData.data.powerInventory,
+          powerLimits: inventoryData.data.powerLimits,
+          totalQuantity: inventoryData.data.totalQuantity,
+          updatedAt: Timestamp.now()
+        };
+        
+        await updateDoc(getUserDoc('lensInventory', lensId), updateData);
+      }
+      
+      // Refresh inventory
+      await fetchLensInventory();
+      
+    } catch (error) {
+      console.error('Error updating stock inventory:', error);
+      setError(`Failed to update inventory: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -1023,6 +1533,23 @@ const LensInventory = () => {
                     className="px-3 py-1.5 sm:px-4 sm:py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 focus:outline-none shadow-sm transition-colors text-sm flex-1 sm:flex-none"
                   >
                     Add Service
+                  </button>
+                  <button
+                    onClick={() => exportToExcel('all')}
+                    disabled={exportLoading || lenses.length === 0}
+                    className="px-3 py-1.5 sm:px-4 sm:py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 focus:outline-none shadow-sm transition-colors text-sm flex-1 sm:flex-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {exportLoading ? (
+                      <div className="flex items-center justify-center">
+                        <svg className="animate-spin w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Exporting...
+                      </div>
+                    ) : (
+                      'Export All'
+                    )}
                   </button>
                   <button
                     onClick={() => navigate('/lens-inventory-report')}
@@ -1129,9 +1656,64 @@ const LensInventory = () => {
                   </div>
                 </div>
                 <div className="flex space-x-2">
+                  {/* Import/Export buttons for current tab */}
+                  <div className="flex space-x-1">
+                    {/* Export Button */}
+                    <button
+                      onClick={() => exportToExcel(activeTab === 'rx' ? 'prescription' : activeTab)}
+                      disabled={exportLoading || filteredLenses.length === 0}
+                      className="flex items-center justify-center text-sm text-green-600 hover:text-green-700 bg-green-50 dark:bg-green-900/50 hover:bg-green-100 dark:hover:bg-green-900/70 px-3 py-1 rounded-md disabled:opacity-50"
+                    >
+                      {exportLoading ? (
+                        <svg className="animate-spin w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      )}
+                      Export
+                    </button>
+                    
+                    {/* Import Button */}
+                    <label className="flex items-center justify-center text-sm text-blue-600 hover:text-blue-700 bg-blue-50 dark:bg-blue-900/50 hover:bg-blue-100 dark:hover:bg-blue-900/70 px-3 py-1 rounded-md cursor-pointer">
+                      {importing ? (
+                        <svg className="animate-spin w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                        </svg>
+                      )}
+                      Import
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls"
+                        onChange={(e) => handleFileUpload(e, activeTab === 'rx' ? 'prescription' : activeTab)}
+                        className="hidden"
+                        disabled={importing}
+                      />
+                    </label>
+                    
+                    {/* Template Download Button */}
+                    <button
+                      onClick={() => downloadTemplate(activeTab === 'rx' ? 'prescription' : activeTab)}
+                      className="flex items-center justify-center text-sm text-purple-600 hover:text-purple-700 bg-purple-50 dark:bg-purple-900/50 hover:bg-purple-100 dark:hover:bg-purple-900/70 px-3 py-1 rounded-md"
+                    >
+                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Template
+                    </button>
+                  </div>
+                  
                   <button
                     onClick={fetchLensInventory}
-                    className="flex items-center justify-center text-sm text-sky-600 hover:text-sky-700 bg-sky-50 dark:bg-sky-900/50 hover:bg-sky-100 dark:hover:bg-sky-900/70 px-3 py-1 rounded-md sm:ml-2"
+                    className="flex items-center justify-center text-sm text-sky-600 hover:text-sky-700 bg-sky-50 dark:bg-sky-900/50 hover:bg-sky-100 dark:hover:bg-sky-900/70 px-3 py-1 rounded-md sm:ml-2 hidden"
                   >
                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1140,7 +1722,7 @@ const LensInventory = () => {
                   </button>
                   <button
                     onClick={() => setViewMode(viewMode === 'table' ? 'card' : 'table')}
-                    className="flex items-center justify-center text-sm text-purple-600 hover:text-purple-700 bg-purple-50 dark:bg-purple-900/50 hover:bg-purple-100 dark:hover:bg-purple-900/70 px-3 py-1 rounded-md"
+                    className="flex items-center justify-center text-sm text-purple-600 hover:text-purple-700 bg-purple-50 dark:bg-purple-900/50 hover:bg-purple-100 dark:hover:bg-purple-900/70 px-3 py-1 rounded-md hidden"
                   >
                     {viewMode === 'table' ? (
                       <>
@@ -1162,190 +1744,46 @@ const LensInventory = () => {
               </div>
             </div>
             
-            {/* Render card view on mobile or when card view is selected */}
-            {(viewMode === 'card') ? (
-              renderMobileCardView()
-            ) : (
-              <>
-                {filteredLenses.length === 0 && !loading ? (
-                  <div className="border-l-4 border-yellow-400 p-3 sm:p-4 mb-4 rounded-r text-sm bg-yellow-50 dark:bg-yellow-900/50">
-                    <div className="flex">
-                      <div className="flex-shrink-0">
-                        <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-xs sm:text-sm text-yellow-700 dark:text-yellow-200">
-                          {searchTerm ? 'No lenses match your search criteria.' : 'No lenses in inventory yet. Add your first lens to get started!'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto -mx-3 sm:mx-0 shadow border-b rounded-lg border-gray-200 dark:border-gray-700">
-                    <table className="min-w-full divide-y text-xs sm:text-sm divide-gray-200 dark:divide-gray-700">
-                      <thead className="bg-gray-50 dark:bg-gray-700">
-                        <tr>
-                          <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Brand</th>
-                          
-                          {/* Columns for RX lenses */}
-                          {activeTab === 'rx' && (
-                            <>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Eye</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">SPH</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">CYL</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">AXIS</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">ADD</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Material</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Index</th>
-                            </>
-                          )}
-                          
-                          {/* Columns for Stock lenses */}
-                          {activeTab === 'stock' && (
-                            <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Power Series</th>
-                          )}
-                          
-                          {/* Columns for Contact lenses */}
-                          {activeTab === 'contact' && (
-                            <>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Power Series</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Category</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Type</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Color</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Disposal</th>
-                            </>
-                          )}
-                          
-                          {/* Columns for Services */}
-                          {activeTab === 'services' && (
-                            <>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Service Type</th>
-                              <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Service Description</th>
-                            </>
-                          )}
-                          
-                          {/* Common columns for all lens types */}
-                          <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Purchase</th>
-                          <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Sale</th>
-                          <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Qty</th>
-                          <th scope="col" className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y bg-white dark:bg-gray-800 divide-gray-200 dark:divide-gray-700">
-                        {loading ? (
-                          <tr>
-                            <td colSpan={activeTab === 'rx' ? 11 : activeTab === 'stock' ? 5 : activeTab === 'contact' ? 9 : activeTab === 'services' ? 7 : 4} className="px-2 sm:px-3 py-3 text-center">
-                              <div className="flex justify-center items-center">
-                                <svg className="animate-spin h-5 w-5 text-sky-600 dark:border-sky-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                <span className="ml-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400">Loading inventory...</span>
-                              </div>
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredLenses.map((lens, index) => (
-                            <tr key={lens.id} className={`${index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700'} hover:bg-gray-100 dark:hover:bg-gray-600`}>
-                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">
-                                <a href={`/lens-inventory/${lens.id}`} className="text-sky-600 hover:text-sky-800 hover:underline">
-                                  {lens.brandName || 'N/A'}
-                                </a>
-                              </td>
-                              
-                              {/* Conditional rendering for RX lens columns */}
-                              {activeTab === 'rx' && (
-                                <>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white font-medium text-left">
-                                    {lens.eye === 'right' ? 'Right' : lens.eye === 'left' ? 'Left' : lens.eye === 'both' ? 'Both' : 'N/A'}
-                                  </td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.sph || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.cyl || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.axis || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.add || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.material || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.index || 'N/A'}</td>
-                                </>
-                              )}
-                              
-                              {/* Power Series column for stock lenses */}
-                              {activeTab === 'stock' && (
-                                <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">
-                                  {lens.powerSeries || 'N/A'}
-                                </td>
-                              )}
-                              
-                              {/* Contact lens specific columns */}
-                              {activeTab === 'contact' && (
-                                <>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.powerSeries || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.category || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.contactType || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.color || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.disposalFrequency || 'N/A'}</td>
-                                </>
-                              )}
-                              
-                              {/* Service specific columns */}
-                              {activeTab === 'services' && (
-                                <>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.serviceType || 'N/A'}</td>
-                                  <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{lens.serviceDescription || 'N/A'}</td>
-                                </>
-                              )}
-                              
-                              {/* Common columns for all lens types */}
-                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">
-                                {lens.purchasePrice ? `₹${parseFloat(lens.purchasePrice).toFixed(2)}` : 'N/A'}
-                              </td>
-                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">
-                                {lens.salePrice ? `₹${parseFloat(lens.salePrice).toFixed(2)}` : 'N/A'}
-                              </td>
-                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">
-                                {lens.inventoryType === 'individual' && lens.totalQuantity 
-                                  ? `${lens.totalQuantity} pieces` 
-                                  : `${parseFloat(lens.qty) || 1} pairs`}
-                              </td>
-                              <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm font-medium text-left">
-                                <div className="flex gap-1 sm:gap-2">
-                                  <button
-                                    onClick={() => handleEditLens(lens)}
-                                    className="text-sky-600 hover:text-sky-900 bg-sky-50 dark:bg-sky-900/50 hover:bg-sky-100 dark:hover:bg-sky-900/70 px-1.5 sm:px-2 py-1 rounded text-xs sm:text-sm"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    onClick={() => removeLens(lens.id)}
-                                    className="text-red-600 hover:text-red-900 bg-red-50 dark:bg-red-900/50 hover:bg-red-100 dark:hover:bg-red-900/70 px-1.5 sm:px-2 py-1 rounded text-xs sm:text-sm"
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </>
+            {/* Render appropriate table component based on active tab */}
+            {activeTab === 'rx' && (
+              <RxLensTable 
+                lenses={filteredLenses}
+                loading={loading}
+                onEdit={handleEditLens}
+                onDelete={removeLens}
+              />
+            )}
+            
+            {activeTab === 'stock' && (
+              <StockLensTable 
+                lenses={filteredLenses}
+                loading={loading}
+                onEdit={handleEditLens}
+                onDelete={removeLens}
+                onUpdateInventory={handleUpdateStockInventory}
+              />
+            )}
+            
+            {activeTab === 'contact' && (
+              <ContactLensTable 
+                lenses={filteredLenses}
+                loading={loading}
+                onEdit={handleEditLens}
+                onDelete={removeLens}
+              />
+            )}
+            
+            {activeTab === 'services' && (
+              <ServiceTable 
+                services={filteredLenses}
+                loading={loading}
+                onEdit={handleEditLens}
+                onDelete={removeLens}
+              />
             )}
           </div>
         )}
       </main>
-      
-      {/* PowerInventoryModal */}
-      <PowerInventoryModal
-        isOpen={showPowerInventoryModal}
-        onClose={handlePowerInventoryModalClose}
-        onSave={handlePowerInventoryModalSave}
-        lensData={pendingStockLens}
-        isEdit={pendingStockLens?.editMode || false}
-        existingInventory={pendingStockLens?.powerInventory || null}
-      />
     </div>
   );
 };

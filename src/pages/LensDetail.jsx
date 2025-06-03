@@ -51,6 +51,9 @@ const LensDetail = () => {
   });
   const [deductionLoading, setDeductionLoading] = useState(false);
 
+  // Add state for power search
+  const [powerSearch, setPowerSearch] = useState('');
+
   useEffect(() => {
     fetchLensDetails();
   }, [id]);
@@ -209,19 +212,33 @@ const LensDetail = () => {
   };
 
   const calculateFinancialMetrics = (lensData) => {
-    // Calculate total value of inventory
-    const qty = parseInt(lensData.qty || 1);
+    // Calculate correct total quantity based on inventory type
+    let totalQty = 0;
+    
+    if (lensData.type === 'stock' && lensData.inventoryType === 'individual' && lensData.powerInventory) {
+      // For individual power inventory, sum all individual quantities
+      totalQty = Object.values(lensData.powerInventory).reduce((sum, powerData) => {
+        return sum + (parseInt(powerData?.quantity) || 0);
+      }, 0);
+    } else {
+      // For regular inventory, use the qty field
+      totalQty = parseInt(lensData.qty || 0);
+    }
+    
     const purchasePrice = parseFloat(lensData.purchasePrice || 0);
     const salePrice = parseFloat(lensData.salePrice || 0);
     
-    // Total investment
-    const totalValue = qty * purchasePrice;
+    // Total investment (cost of all units)
+    const totalValue = totalQty * purchasePrice;
     
     // Potential revenue if all units are sold
-    const potentialRevenue = qty * salePrice;
+    const potentialRevenue = totalQty * salePrice;
     
     // Potential profit if all units are sold
     const potentialProfit = potentialRevenue - totalValue;
+    
+    // Profit margin percentage
+    const profitMarginPercent = potentialRevenue > 0 ? ((potentialProfit / potentialRevenue) * 100) : 0;
     
     // Calculate break-even quantity - Units needed to recover total investment
     let breakEvenQty = 0;
@@ -231,7 +248,7 @@ const LensDetail = () => {
       breakEvenQty = Math.ceil(totalValue / salePrice);
       
       // If break-even quantity exceeds available quantity, it means we can't break even
-      if (breakEvenQty > qty) {
+      if (breakEvenQty > totalQty) {
         breakEvenQty = Infinity; // Indicates can't break even with current stock
       }
     } else {
@@ -239,11 +256,28 @@ const LensDetail = () => {
       breakEvenQty = Infinity;
     }
     
+    // Calculate inventory turnover potential
+    const inventoryTurnoverPotential = totalQty > 0 ? (potentialRevenue / totalValue) : 0;
+    
+    // Calculate cost per unit and profit per unit
+    const costPerUnit = purchasePrice;
+    const profitPerUnit = salePrice - purchasePrice;
+    
+    // Calculate ROI (Return on Investment) percentage
+    const roiPercent = totalValue > 0 ? ((potentialProfit / totalValue) * 100) : 0;
+    
     setFinancialMetrics(prev => ({
       ...prev,
       totalValue,
       breakEvenQty,
-      potentialProfit
+      potentialProfit,
+      totalQuantity: totalQty,
+      potentialRevenue,
+      profitMarginPercent,
+      inventoryTurnoverPotential,
+      costPerUnit,
+      profitPerUnit,
+      roiPercent
     }));
   };
 
@@ -457,6 +491,24 @@ const LensDetail = () => {
                     <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.powerSeries || 'N/A'}</span>
                   </div>
                 )}
+                {lens.type === 'stock' && lens.maxSph && (
+                  <div>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Max SPH:</span>
+                    <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.maxSph}</span>
+                  </div>
+                )}
+                {lens.type === 'stock' && lens.maxCyl && (
+                  <div>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Max CYL:</span>
+                    <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.maxCyl}</span>
+                  </div>
+                )}
+                {lens.type === 'stock' && lens.inventoryType && (
+                  <div>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Inventory Type:</span>
+                    <span className="ml-2 font-medium text-gray-900 dark:text-white capitalize">{lens.inventoryType}</span>
+                  </div>
+                )}
                 {lens.type === 'prescription' && (
                   <>
                     <div>
@@ -515,7 +567,11 @@ const LensDetail = () => {
               <div className="space-y-2">
                 <div>
                   <span className="text-sm text-gray-500 dark:text-gray-400">Quantity in Stock:</span>
-                  <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.qty || '0'}</span>
+                  <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                    {lens.type === 'stock' && lens.inventoryType === 'individual' && lens.totalQuantity 
+                      ? `${lens.totalQuantity} pieces (Individual tracking)` 
+                      : `${lens.qty || '0'} ${lens.type === 'stock' ? 'pairs' : 'units'}`}
+                  </span>
                 </div>
                 <div>
                   <span className="text-sm text-gray-500 dark:text-gray-400">Purchase Price:</span>
@@ -542,53 +598,350 @@ const LensDetail = () => {
           </div>
         </div>
         
+        {/* Power Inventory Card - Only for stock lenses with individual inventory */}
+        {lens.type === 'stock' && lens.inventoryType === 'individual' && lens.powerInventory && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 border border-gray-200 dark:border-gray-700">
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Individual Power Inventory</h2>
+            
+            {/* Debug info - remove in production */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/30 rounded border text-xs">
+                <p><strong>Debug Info:</strong></p>
+                <p>PowerInventory keys: {Object.keys(lens.powerInventory).slice(0, 5).join(', ')}...</p>
+                <p>PowerLimits: {JSON.stringify(lens.powerLimits)}</p>
+                <p>Sample power data: {JSON.stringify(Object.entries(lens.powerInventory).slice(0, 3))}</p>
+              </div>
+            )}
+            
+            {/* Power Summary */}
+            {(() => {
+              // Calculate ranges from powerLimits if available, otherwise from actual power data
+              const powers = Object.keys(lens.powerInventory);
+              
+              // Use powerLimits if available (it looks like it is!)
+              const finalSphMin = lens.powerLimits?.minSph ?? null;
+              const finalSphMax = lens.powerLimits?.maxSph ?? null;
+              const finalCylMin = lens.powerLimits?.minCyl ?? null;
+              const finalCylMax = lens.powerLimits?.maxCyl ?? null;
+              
+              // Calculate total quantity from the power inventory objects
+              const totalQuantity = Object.values(lens.powerInventory).reduce((sum, powerData) => {
+                return sum + (parseInt(powerData?.quantity) || 0);
+              }, 0);
+              
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                  <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg border border-blue-200 dark:border-blue-700">
+                    <h3 className="text-sm font-semibold text-blue-700 dark:text-blue-300 uppercase mb-2">Total Powers Available</h3>
+                    <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                      {Object.keys(lens.powerInventory).length}
+                    </div>
+                    <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">Different power combinations</p>
+                  </div>
+                  
+                  <div className="bg-green-50 dark:bg-green-900/30 p-4 rounded-lg border border-green-200 dark:border-green-700">
+                    <h3 className="text-sm font-semibold text-green-700 dark:text-green-300 uppercase mb-2">Total Pieces</h3>
+                    <div className="text-2xl font-bold text-green-700 dark:text-green-300">
+                      {lens.totalQuantity || totalQuantity}
+                    </div>
+                    <p className="text-sm text-green-600 dark:text-green-400 mt-1">Individual pieces in stock</p>
+                  </div>
+                  
+                  <div className="bg-purple-50 dark:bg-purple-900/30 p-4 rounded-lg border border-purple-200 dark:border-purple-700">
+                    <h3 className="text-sm font-semibold text-purple-700 dark:text-purple-300 uppercase mb-2">SPH Range</h3>
+                    <div className="text-xl font-bold text-purple-700 dark:text-purple-300">
+                      {finalSphMin !== null && finalSphMax !== null 
+                        ? `${finalSphMin > 0 ? '+' : ''}${finalSphMin} to ${finalSphMax > 0 ? '+' : ''}${finalSphMax}`
+                        : 'N/A'}
+                    </div>
+                    <p className="text-sm text-purple-600 dark:text-purple-400 mt-1">Spherical power range</p>
+                  </div>
+                  
+                  <div className="bg-orange-50 dark:bg-orange-900/30 p-4 rounded-lg border border-orange-200 dark:border-orange-700">
+                    <h3 className="text-sm font-semibold text-orange-700 dark:text-orange-300 uppercase mb-2">CYL Range</h3>
+                    <div className="text-xl font-bold text-orange-700 dark:text-orange-300">
+                      {finalCylMin !== null && finalCylMax !== null 
+                        ? `${finalCylMin > 0 ? '+' : ''}${finalCylMin} to ${finalCylMax > 0 ? '+' : ''}${finalCylMax}`
+                        : 'N/A'}
+                    </div>
+                    <p className="text-sm text-orange-600 dark:text-orange-400 mt-1">Cylindrical power range</p>
+                  </div>
+                </div>
+              );
+            })()}
+            
+            {/* Available Powers List with Search */}
+            {(() => {
+              // Filter powers based on search
+              const availablePowers = Object.entries(lens.powerInventory)
+                .filter(([powerKey, powerData]) => parseInt(powerData?.quantity) > 0)
+                .filter(([powerKey, powerData]) => {
+                  if (!powerSearch) return true;
+                  const [sph, cyl] = powerKey.split('_').map(p => parseFloat(p));
+                  const searchLower = powerSearch.toLowerCase();
+                  const powerDisplay = `SPH: ${sph > 0 ? `+${sph}` : sph}, CYL: ${cyl > 0 ? `+${cyl}` : cyl}`;
+                  return powerDisplay.toLowerCase().includes(searchLower) ||
+                         sph.toString().includes(searchLower) ||
+                         cyl.toString().includes(searchLower);
+                });
+              
+              return (
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-md font-semibold text-gray-700 dark:text-gray-300">Available Powers (In Stock)</h3>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Search powers..."
+                        value={powerSearch}
+                        onChange={(e) => setPowerSearch(e.target.value)}
+                        className="w-64 px-3 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                      />
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg className="h-4 w-4 text-gray-400 dark:text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {availablePowers
+                      .sort(([a], [b]) => {
+                        // Simple sorting since we know the format is "sph_cyl"
+                        const [sphA, cylA] = a.split('_').map(p => parseFloat(p));
+                        const [sphB, cylB] = b.split('_').map(p => parseFloat(p));
+                        if (sphA !== sphB) return sphA - sphB;
+                        return cylA - cylB;
+                      })
+                      .map(([powerKey, powerData]) => {
+                        // Simple power display since we know the format
+                        const [sph, cyl] = powerKey.split('_').map(p => parseFloat(p));
+                        const quantity = parseInt(powerData?.quantity) || 0;
+                        
+                        return (
+                          <div key={powerKey} className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                  SPH: {sph > 0 ? `+${sph}` : sph}, CYL: {cyl > 0 ? `+${cyl}` : cyl}
+                                </span>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-sm font-bold text-green-600 dark:text-green-400">
+                                  {quantity} {quantity === 1 ? 'piece' : 'pieces'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                  
+                  {availablePowers.length === 0 && powerSearch && (
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                      No powers found matching "{powerSearch}"
+                    </div>
+                  )}
+                  
+                  {availablePowers.length === 0 && !powerSearch && (
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                      No powers currently in stock
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+            
+            {/* Out of Stock Powers */}
+            {(() => {
+              const outOfStockPowers = Object.entries(lens.powerInventory)
+                .filter(([powerKey, powerData]) => parseInt(powerData?.quantity) === 0);
+              
+              if (outOfStockPowers.length > 0) {
+                return (
+                  <div className="mt-6">
+                    <h3 className="text-md font-semibold text-gray-700 dark:text-gray-300 mb-4">Out of Stock Powers</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {outOfStockPowers
+                        .sort(([a], [b]) => {
+                          // Simple sorting since we know the format is "sph_cyl"
+                          const [sphA, cylA] = a.split('_').map(p => parseFloat(p));
+                          const [sphB, cylB] = b.split('_').map(p => parseFloat(p));
+                          if (sphA !== sphB) return sphA - sphB;
+                          return cylA - cylB;
+                        })
+                        .map(([powerKey, powerData]) => {
+                          // Simple power display since we know the format
+                          const [sph, cyl] = powerKey.split('_').map(p => parseFloat(p));
+                          
+                          return (
+                            <div key={powerKey} className="bg-red-50 dark:bg-red-900/30 p-3 rounded-lg border border-red-200 dark:border-red-700">
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                    SPH: {sph > 0 ? `+${sph}` : sph}, CYL: {cyl > 0 ? `+${cyl}` : cyl}
+                                  </span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-sm font-bold text-red-600 dark:text-red-400">
+                                    Out of Stock
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+          </div>
+        )}
+        
         {/* Financial Analysis Card */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 border border-gray-200 dark:border-gray-700">
           <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Financial Analysis</h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Primary Financial Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg border border-blue-200 dark:border-blue-700">
-              <h3 className="text-sm font-semibold text-blue-700 dark:text-blue-300 uppercase mb-2">Inventory Value</h3>
+              <h3 className="text-sm font-semibold text-blue-700 dark:text-blue-300 uppercase mb-2">Total Investment</h3>
               <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{formatCurrency(financialMetrics.totalValue)}</div>
-              <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">Total value of {lens.qty || 0} units in stock</p>
+              <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                Cost of {financialMetrics.totalQuantity || 0} units @ {formatCurrency(financialMetrics.costPerUnit || 0)} each
+              </p>
             </div>
             
-            <div className={`${financialMetrics.breakEvenQty === Infinity ? 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700' : 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-700'} p-4 rounded-lg border`}>
-              <h3 className={`text-sm font-semibold ${financialMetrics.breakEvenQty === Infinity ? 'text-red-700 dark:text-red-300' : 'text-green-700 dark:text-green-300'} uppercase mb-2`}>Break-Even Point</h3>
-              <div className={`text-2xl font-bold ${financialMetrics.breakEvenQty === Infinity ? 'text-red-700 dark:text-red-300' : 'text-green-700 dark:text-green-300'}`}>
-                {financialMetrics.breakEvenQty === Infinity ? 
-                  "Not achievable" : 
-                  `${financialMetrics.breakEvenQty} units`}
-              </div>
-              <p className={`text-sm ${financialMetrics.breakEvenQty === Infinity ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'} mt-1`}>
-                {financialMetrics.breakEvenQty === Infinity ?
-                  "Cannot recover investment with current stock" :
-                  "Units needed to recover your total investment"}
+            <div className="bg-green-50 dark:bg-green-900/30 p-4 rounded-lg border border-green-200 dark:border-green-700">
+              <h3 className="text-sm font-semibold text-green-700 dark:text-green-300 uppercase mb-2">Potential Revenue</h3>
+              <div className="text-2xl font-bold text-green-700 dark:text-green-300">{formatCurrency(financialMetrics.potentialRevenue || 0)}</div>
+              <p className="text-sm text-green-600 dark:text-green-400 mt-1">
+                If all {financialMetrics.totalQuantity || 0} units sold @ {formatCurrency(lens.salePrice || 0)} each
               </p>
             </div>
             
             <div className="bg-purple-50 dark:bg-purple-900/30 p-4 rounded-lg border border-purple-200 dark:border-purple-700">
               <h3 className="text-sm font-semibold text-purple-700 dark:text-purple-300 uppercase mb-2">Potential Profit</h3>
               <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">{formatCurrency(financialMetrics.potentialProfit)}</div>
-              <p className="text-sm text-purple-600 dark:text-purple-400 mt-1">If all units are sold at set price</p>
+              <p className="text-sm text-purple-600 dark:text-purple-400 mt-1">
+                {formatCurrency(financialMetrics.profitPerUnit || 0)} profit per unit
+              </p>
             </div>
-            
-            <div className="bg-amber-50 dark:bg-amber-900/30 p-4 rounded-lg border border-amber-200 dark:border-amber-700">
-              <h3 className="text-sm font-semibold text-amber-700 dark:text-amber-300 uppercase mb-2">Total Units Sold (Year)</h3>
-              <div className="text-2xl font-bold text-amber-700 dark:text-amber-300">{financialMetrics.totalUnitsSold}</div>
-              <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">Units sold in the last 12 months</p>
+          </div>
+          
+          {/* Secondary Financial Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className={`${financialMetrics.breakEvenQty === Infinity ? 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700' : 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700'} p-4 rounded-lg border`}>
+              <h3 className={`text-sm font-semibold ${financialMetrics.breakEvenQty === Infinity ? 'text-red-700 dark:text-red-300' : 'text-amber-700 dark:text-amber-300'} uppercase mb-2`}>Break-Even Point</h3>
+              <div className={`text-xl font-bold ${financialMetrics.breakEvenQty === Infinity ? 'text-red-700 dark:text-red-300' : 'text-amber-700 dark:text-amber-300'}`}>
+                {financialMetrics.breakEvenQty === Infinity ? 
+                  "Not achievable" : 
+                  `${financialMetrics.breakEvenQty} units`}
+              </div>
+              <p className={`text-xs ${financialMetrics.breakEvenQty === Infinity ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'} mt-1`}>
+                {financialMetrics.breakEvenQty === Infinity ?
+                  "Cannot recover investment" :
+                  "To recover your investment"}
+              </p>
             </div>
             
             <div className="bg-sky-50 dark:bg-sky-900/30 p-4 rounded-lg border border-sky-200 dark:border-sky-700">
-              <h3 className="text-sm font-semibold text-sky-700 dark:text-sky-300 uppercase mb-2">Total Revenue (Year)</h3>
-              <div className="text-2xl font-bold text-sky-700 dark:text-sky-300">{formatCurrency(financialMetrics.totalRevenue)}</div>
-              <p className="text-sm text-sky-600 dark:text-sky-400 mt-1">Revenue generated in the last 12 months</p>
+              <h3 className="text-sm font-semibold text-sky-700 dark:text-sky-300 uppercase mb-2">Profit Margin</h3>
+              <div className="text-xl font-bold text-sky-700 dark:text-sky-300">
+                {(financialMetrics.profitMarginPercent || 0).toFixed(1)}%
+              </div>
+              <p className="text-xs text-sky-600 dark:text-sky-400 mt-1">Profit as % of revenue</p>
+            </div>
+            
+            <div className="bg-indigo-50 dark:bg-indigo-900/30 p-4 rounded-lg border border-indigo-200 dark:border-indigo-700">
+              <h3 className="text-sm font-semibold text-indigo-700 dark:text-indigo-300 uppercase mb-2">ROI Potential</h3>
+              <div className="text-xl font-bold text-indigo-700 dark:text-indigo-300">
+                {(financialMetrics.roiPercent || 0).toFixed(1)}%
+              </div>
+              <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-1">Return on investment</p>
             </div>
             
             <div className="bg-rose-50 dark:bg-rose-900/30 p-4 rounded-lg border border-rose-200 dark:border-rose-700">
-              <h3 className="text-sm font-semibold text-rose-700 dark:text-rose-300 uppercase mb-2">Average Selling Price</h3>
-              <div className="text-2xl font-bold text-rose-700 dark:text-rose-300">{formatCurrency(financialMetrics.averageSellingPrice)}</div>
-              <p className="text-sm text-rose-600 dark:text-rose-400 mt-1">Average price per unit sold</p>
+              <h3 className="text-sm font-semibold text-rose-700 dark:text-rose-300 uppercase mb-2">Turnover Ratio</h3>
+              <div className="text-xl font-bold text-rose-700 dark:text-rose-300">
+                {(financialMetrics.inventoryTurnoverPotential || 0).toFixed(2)}x
+              </div>
+              <p className="text-xs text-rose-600 dark:text-rose-400 mt-1">Revenue/Investment ratio</p>
+            </div>
+          </div>
+          
+          {/* Performance Insights */}
+          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+            <h3 className="text-md font-semibold text-gray-700 dark:text-gray-300 mb-3">Performance Insights</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-gray-600 dark:text-gray-400">
+                  <span className="font-medium">Investment Efficiency:</span>{' '}
+                  {financialMetrics.totalValue > 0 ? 
+                    (financialMetrics.roiPercent >= 50 ? 
+                      <span className="text-green-600 dark:text-green-400">Excellent (50%+ ROI)</span> :
+                      financialMetrics.roiPercent >= 25 ? 
+                      <span className="text-blue-600 dark:text-blue-400">Good (25%+ ROI)</span> :
+                      financialMetrics.roiPercent >= 10 ? 
+                      <span className="text-yellow-600 dark:text-yellow-400">Fair (10%+ ROI)</span> :
+                      <span className="text-red-600 dark:text-red-400">Poor (&lt;10% ROI)</span>
+                    ) : 'No investment data'
+                  }
+                </p>
+                <p className="text-gray-600 dark:text-gray-400 mt-1">
+                  <span className="font-medium">Break-even Status:</span>{' '}
+                  {financialMetrics.breakEvenQty === Infinity ? 
+                    <span className="text-red-600 dark:text-red-400">Cannot break even with current pricing</span> :
+                    financialMetrics.breakEvenQty <= (financialMetrics.totalQuantity || 0) / 2 ?
+                    <span className="text-green-600 dark:text-green-400">Low risk - Early break-even</span> :
+                    <span className="text-yellow-600 dark:text-yellow-400">Moderate risk - Need to sell {((financialMetrics.breakEvenQty / (financialMetrics.totalQuantity || 1)) * 100).toFixed(0)}% to break even</span>
+                  }
+                </p>
+              </div>
+              <div>
+                <p className="text-gray-600 dark:text-gray-400">
+                  <span className="font-medium">Inventory Value:</span>{' '}
+                  {financialMetrics.totalValue >= 50000 ? 
+                    <span className="text-purple-600 dark:text-purple-400">High-value inventory (₹50K+)</span> :
+                    financialMetrics.totalValue >= 20000 ? 
+                    <span className="text-blue-600 dark:text-blue-400">Medium-value inventory (₹20K+)</span> :
+                    financialMetrics.totalValue >= 5000 ? 
+                    <span className="text-green-600 dark:text-green-400">Standard inventory (₹5K+)</span> :
+                    <span className="text-gray-600 dark:text-gray-400">Low-value inventory (&lt;₹5K)</span>
+                  }
+                </p>
+                <p className="text-gray-600 dark:text-gray-400 mt-1">
+                  <span className="font-medium">Stock Level:</span>{' '}
+                  {lens.type === 'stock' && lens.inventoryType === 'individual' ?
+                    <span className="text-blue-600 dark:text-blue-400">Individual tracking - {financialMetrics.totalQuantity} pieces across {Object.keys(lens.powerInventory || {}).length} powers</span> :
+                    <span className="text-gray-600 dark:text-gray-400">Standard tracking - {financialMetrics.totalQuantity} units</span>
+                  }
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Sales Performance Section */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+            <div className="bg-teal-50 dark:bg-teal-900/30 p-4 rounded-lg border border-teal-200 dark:border-teal-700">
+              <h3 className="text-sm font-semibold text-teal-700 dark:text-teal-300 uppercase mb-2">Units Sold (Year)</h3>
+              <div className="text-2xl font-bold text-teal-700 dark:text-teal-300">{financialMetrics.totalUnitsSold}</div>
+              <p className="text-sm text-teal-600 dark:text-teal-400 mt-1">Last 12 months sales</p>
+            </div>
+            
+            <div className="bg-cyan-50 dark:bg-cyan-900/30 p-4 rounded-lg border border-cyan-200 dark:border-cyan-700">
+              <h3 className="text-sm font-semibold text-cyan-700 dark:text-cyan-300 uppercase mb-2">Revenue Generated</h3>
+              <div className="text-2xl font-bold text-cyan-700 dark:text-cyan-300">{formatCurrency(financialMetrics.totalRevenue)}</div>
+              <p className="text-sm text-cyan-600 dark:text-cyan-400 mt-1">Last 12 months revenue</p>
+            </div>
+            
+            <div className="bg-orange-50 dark:bg-orange-900/30 p-4 rounded-lg border border-orange-200 dark:border-orange-700">
+              <h3 className="text-sm font-semibold text-orange-700 dark:text-orange-300 uppercase mb-2">Avg. Selling Price</h3>
+              <div className="text-2xl font-bold text-orange-700 dark:text-orange-300">{formatCurrency(financialMetrics.averageSellingPrice)}</div>
+              <p className="text-sm text-orange-600 dark:text-orange-400 mt-1">Actual average per unit</p>
             </div>
           </div>
         </div>
