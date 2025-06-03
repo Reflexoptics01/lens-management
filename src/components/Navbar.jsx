@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { auth, db } from '../firebaseConfig';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs, setDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocs } from 'firebase/firestore';
 import React from 'react';
 import ThemeToggle from './ThemeToggle';
 import { 
@@ -14,18 +12,26 @@ import {
   searchMatchingLenses 
 } from '../utils/shopAPI';
 import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
+import { useAuth } from '../contexts/AuthContext';
 
 const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
   const bottomNavRef = useRef(null);
   const [shopName, setShopName] = useState('');
   const [logoDataURL, setLogoDataURL] = useState('');
-  const [userRole, setUserRole] = useState('user');
-  const [userPermissions, setUserPermissions] = useState({});
+  
+  // Use centralized auth
+  const { 
+    user, 
+    userRole, 
+    userPermissions, 
+    isAuthenticated, 
+    hasPermission, 
+    logout,
+    USER_ROLES 
+  } = useAuth();
   
   // Shop states
   const [showShopModal, setShowShopModal] = useState(false);
@@ -35,27 +41,15 @@ const Navbar = () => {
   const [shopError, setShopError] = useState('');
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      
-      if (!currentUser && location.pathname !== '/login') {
+    if (!isAuthenticated() && location.pathname !== '/login') {
         navigate('/login', { replace: true });
-      } else if (currentUser) {
+    } else if (isAuthenticated()) {
         // Fetch shop settings when user is authenticated
         fetchShopSettings();
-        
-        // Fetch user role and permissions
-        await fetchUserPermissions(currentUser.email);
-        
         // Load shop preferences
         loadShopPreferences();
       }
-      
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
+  }, [isAuthenticated, location.pathname, navigate]);
 
   // Load shop preferences on component mount
   useEffect(() => {
@@ -75,37 +69,6 @@ const Navbar = () => {
     } catch (error) {
       console.error('Error fetching shop settings:', error);
       setShopName('Lens Management'); // fallback
-    }
-  };
-
-  // Fetch user role and permissions
-  const fetchUserPermissions = async (email) => {
-    try {
-      // First check localStorage for permissions
-      const storedRole = localStorage.getItem('userRole');
-      const storedPermissions = localStorage.getItem('userPermissions');
-      
-      if (storedRole && storedPermissions) {
-        setUserRole(storedRole);
-        setUserPermissions(JSON.parse(storedPermissions));
-      } else {
-        // Fetch from Firestore if not in localStorage
-        const usersRef = collection(db, 'users');
-        const userQuery = query(usersRef, where('email', '==', email));
-        const userSnapshot = await getDocs(userQuery);
-        
-        if (!userSnapshot.empty) {
-          const userData = userSnapshot.docs[0].data();
-          setUserRole(userData.role || 'user');
-          setUserPermissions(userData.permissions || {});
-          
-          // Save to localStorage for future use
-          localStorage.setItem('userRole', userData.role || 'user');
-          localStorage.setItem('userPermissions', JSON.stringify(userData.permissions || {}));
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching user permissions:', error);
     }
   };
 
@@ -200,29 +163,15 @@ const Navbar = () => {
   // Handle scroll events to save position immediately
   const handleNavScroll = () => {
     if (bottomNavRef.current) {
-      localStorage.setItem('bottomNavScrollPosition', bottomNavRef.current.scrollLeft);
+      localStorage.setItem('bottomNavScrollPosition', bottomNavRef.current.scrollLeft.toString());
     }
   };
 
-  // Additional effect to handle saving scroll position on route changes and unmount
-  useEffect(() => {
-    // Save the current position whenever route changes
-    if (bottomNavRef.current) {
-      localStorage.setItem('bottomNavScrollPosition', bottomNavRef.current.scrollLeft);
-    }
-
-    // Also save on unmount
-    return () => {
-      if (bottomNavRef.current) {
-        localStorage.setItem('bottomNavScrollPosition', bottomNavRef.current.scrollLeft);
-      }
-    };
-  }, [location.pathname]);
-
+  // Handle logout using AuthContext
   const handleLogout = async () => {
     try {
       setIsMenuOpen(false);
-      await signOut(auth);
+      await logout();
       navigate('/login', { replace: true });
     } catch (error) {
       console.error('Error logging out:', error);
@@ -368,34 +317,32 @@ const Navbar = () => {
     },
   ];
 
-  // Check if user has permission to view menu item
-  const hasPermission = (path) => {
-    // Admins have access to everything
-    if (userRole === 'admin') return true;
-    
-    // If no permissions set and user is not admin, deny access
-    if (!userPermissions || Object.keys(userPermissions).length === 0) return false;
-    
-    // Check specific permission
-    return userPermissions[path] === true;
-  };
-
-  // Filter menu items based on permissions
+  // Filter menu items based on permissions using AuthContext
   const getAccessibleMenuItems = () => {
-    return menuItems.filter(item => hasPermission(item.path));
+    return menuItems.filter(item => {
+      // Super admin and admin have access to everything
+      if (userRole === USER_ROLES.SUPER_ADMIN || userRole === USER_ROLES.ADMIN) {
+        return true;
+      }
+      
+      // Use centralized permission checking
+      return hasPermission(item.path);
+    });
   };
 
-  if (loading) {
-    return (
-      <nav className="mobile-header">
-        <div className="flex items-center justify-center h-14 w-14">
-          <div className="bg-gray-200 rounded-full animate-pulse h-14 w-14"></div>
-        </div>
-      </nav>
-    );
+  // Don't render navbar if user is not authenticated
+  if (!isAuthenticated()) {
+    console.log('🔐 Navbar: Not rendering - user not authenticated');
+    console.log('🔐 Auth state:', { 
+      isAuthenticated: isAuthenticated(), 
+      user: user?.email, 
+      userRole, 
+      authState: isAuthenticated() ? 'authenticated' : 'not authenticated' 
+    });
+    return null;
   }
 
-  if (!user) return null;
+  console.log('🔐 Navbar: Rendering for authenticated user:', user?.email);
 
   return (
     <>
@@ -408,67 +355,86 @@ const Navbar = () => {
         <div className="flex items-center justify-between px-4 py-2">
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="p-2 transition-colors duration-300"
-            style={{ color: 'var(--text-muted)' }}
+            className="p-2 rounded-lg transition-colors duration-300"
+            style={{ color: 'var(--text-primary)' }}
             onMouseEnter={(e) => e.target.style.color = 'var(--primary-blue)'}
-            onMouseLeave={(e) => e.target.style.color = 'var(--text-muted)'}
+            onMouseLeave={(e) => e.target.style.color = 'var(--text-primary)'}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
           
-          <h2 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-600">
-            {shopName || 'Lens Management'}
-          </h2>
-          
+          <div className="flex items-center space-x-2">
+            {renderLogoOrInitial()}
+            <span 
+              className="font-bold text-lg"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              {shopName}
+            </span>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <ThemeToggle />
+            
+            {/* Shop Modal Toggle Button */}
           <button
-            onClick={handleLogout}
-            className="p-2 text-red-600 hover:text-red-700 transition-colors duration-300 flex items-center"
+              onClick={() => setShowShopModal(true)}
+              className="p-2 rounded-lg transition-colors duration-300"
+              style={{ 
+                color: shopPreferences.isSharing ? 'white' : 'var(--text-primary)',
+                backgroundColor: shopPreferences.isSharing ? 'var(--primary-blue)' : 'transparent'
+              }}
+              onMouseEnter={(e) => {
+                if (!shopPreferences.isSharing) {
+                  e.target.style.color = 'var(--primary-blue)';
+                  e.target.style.backgroundColor = 'var(--bg-tertiary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!shopPreferences.isSharing) {
+                  e.target.style.color = 'var(--text-primary)';
+                  e.target.style.backgroundColor = 'transparent';
+                }
+              }}
+              title={shopPreferences.isSharing ? 'Shop sharing enabled' : 'Shop sharing disabled'}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
           </button>
-        </div>
-      </nav>
-
-      {/* Mobile Menu */}
-      {isMenuOpen && (
-        <div className="fixed inset-0 z-50 mobile-only">
-          <div 
-            className="fixed inset-0 backdrop-blur-sm transition-opacity duration-300 ease-in-out"
-            style={{ backgroundColor: 'var(--overlay)' }}
-            onClick={() => setIsMenuOpen(false)}
-          />
-          <div className="fixed inset-y-0 left-0 w-72 shadow-xl transform transition-all duration-300 ease-in-out rounded-r-2xl"
-               style={{ backgroundColor: 'var(--bg-secondary)' }}>
-            <div className="flex flex-col h-full">
-              <div className="p-4 flex items-center justify-between"
-                   style={{ borderBottomColor: 'var(--border-primary)', borderBottomWidth: '1px' }}>
-                <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-600">
-                  Menu
-                </h2>
+            
                 <button
-                  onClick={() => setIsMenuOpen(false)}
-                  className="p-1.5 transition-colors duration-300 rounded-full"
-                  style={{ color: 'var(--text-muted)' }}
+              onClick={handleLogout}
+              className="p-2 rounded-lg transition-colors duration-300"
+              style={{ color: 'var(--text-primary)' }}
                   onMouseEnter={(e) => {
-                    e.target.style.color = 'var(--primary-blue)';
-                    e.target.style.backgroundColor = 'var(--bg-tertiary)';
+                e.target.style.color = 'white';
+                e.target.style.backgroundColor = 'var(--danger, #dc2626)';
                   }}
                   onMouseLeave={(e) => {
-                    e.target.style.color = 'var(--text-muted)';
+                e.target.style.color = 'var(--text-primary)';
                     e.target.style.backgroundColor = 'transparent';
                   }}
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                   </svg>
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto py-2">
-                <div className="space-y-1 px-3">
+        </div>
+
+        {/* Mobile Menu Dropdown */}
+        {isMenuOpen && (
+          <div 
+            className="absolute top-full left-0 right-0 shadow-lg border-t z-40"
+            style={{ 
+              backgroundColor: 'var(--bg-secondary)', 
+              borderColor: 'var(--border-color)' 
+            }}
+          >
+            <div className="py-2">
                   {getAccessibleMenuItems().map((item) => (
                     <button
                       key={item.path}
@@ -476,413 +442,281 @@ const Navbar = () => {
                         handleNavigation(item.path);
                         setIsMenuOpen(false);
                       }}
-                      className={`w-full px-3 py-2.5 text-left rounded-xl flex items-center space-x-3 transform transition-all duration-300 hover:scale-105 ${
-                        location.pathname === item.path || location.pathname.startsWith(item.path + '/')
-                          ? `bg-gradient-to-r ${item.color} text-white shadow-md` 
-                          : ''
+                  className={`w-full text-left px-6 py-3 transition-colors duration-200 flex items-center space-x-3 ${
+                    location.pathname === item.path ? 'font-medium' : ''
                       }`}
                       style={{
-                        color: location.pathname === item.path || location.pathname.startsWith(item.path + '/')
-                          ? 'white'
-                          : 'var(--text-secondary)',
-                        backgroundColor: location.pathname === item.path || location.pathname.startsWith(item.path + '/')
-                          ? undefined
-                          : 'transparent'
+                    backgroundColor: location.pathname === item.path ? 'var(--primary-blue)' : 'transparent',
+                    color: location.pathname === item.path ? 'white' : 'var(--text-primary)'
                       }}
                       onMouseEnter={(e) => {
-                        if (!(location.pathname === item.path || location.pathname.startsWith(item.path + '/'))) {
+                    if (location.pathname !== item.path) {
                           e.target.style.backgroundColor = 'var(--bg-tertiary)';
                         }
                       }}
                       onMouseLeave={(e) => {
-                        if (!(location.pathname === item.path || location.pathname.startsWith(item.path + '/'))) {
+                    if (location.pathname !== item.path) {
                           e.target.style.backgroundColor = 'transparent';
                         }
                       }}
                     >
-                      <div className={`${
-                        location.pathname === item.path || location.pathname.startsWith(item.path + '/')
-                          ? 'text-white'
-                          : `text-transparent bg-clip-text bg-gradient-to-r ${item.color}`
-                      }`}>
-                        {React.cloneElement(item.icon, { className: 'w-5 h-5' })}
-                      </div>
-                      <span className="text-sm">{item.title}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="p-4" style={{ borderTopColor: 'var(--border-primary)', borderTopWidth: '1px' }}>
-                <div className="mb-3">
-                  <ThemeToggle className="w-full justify-center" />
-                </div>
-                <button
-                  onClick={handleLogout}
-                  className="w-full px-3 py-2.5 text-left rounded-xl flex items-center space-x-3 text-red-600 transform transition-all duration-300 hover:scale-105"
-                  onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--bg-tertiary)'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                  <span className="text-sm font-medium">Sign out</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Desktop Navbar */}
-      <nav className="desktop-only" style={{ backgroundColor: 'var(--bg-secondary)', boxShadow: '0 1px 3px var(--shadow-secondary)' }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-20">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <div className="transform transition-transform hover:scale-105 duration-300">
-                  {renderLogoOrInitial()}
-                </div>
-              </div>
-              <div className="hidden sm:ml-6 sm:flex sm:space-x-4">
-                {getAccessibleMenuItems().map((item) => (
-                  <button
-                    key={item.path}
-                    onClick={() => handleNavigation(item.path)}
-                    className={`group flex flex-col items-center justify-center px-3 py-1 transition-all duration-300 hover:scale-105 ${
-                      location.pathname === item.path || location.pathname.startsWith(item.path + '/')
-                        ? 'text-transparent bg-clip-text bg-gradient-to-r ' + item.color
-                        : 'hover:text-gray-900'
-                    }`}
+                  <div 
+                    className="text-lg"
                     style={{
-                      color: location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
-                        ? 'transparent' 
-                        : 'var(--text-muted)'
+                      color: location.pathname === item.path ? 'white' : 'var(--primary-blue)'
                     }}
                   >
-                    <div className={`p-2 rounded-lg ${
-                      location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
-                        ? 'bg-gradient-to-r ' + item.color + ' text-white shadow-md' 
-                        : 'group-hover:bg-gradient-to-r group-hover:' + item.color + ' group-hover:text-white'
-                    } transition-all duration-300`}
-                    style={{
-                      color: location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
-                        ? 'white' 
-                        : 'var(--text-muted)'
-                    }}>
                       {item.icon}
                     </div>
-                    <span className={`mt-1 text-xs font-medium ${
-                      location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
-                        ? 'text-transparent bg-clip-text bg-gradient-to-r ' + item.color
-                        : ''
-                    }`}
-                    style={{
-                      color: location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
-                        ? 'transparent' 
-                        : 'var(--text-muted)'
-                    }}>
-                      {item.title}
-                    </span>
+                  <span>{item.title}</span>
                   </button>
                 ))}
-              </div>
-            </div>
             
-            {/* Sign Out Button */}
-            <div className="hidden sm:flex sm:items-center space-x-3">
-              <ThemeToggle />
+              {/* Logout option in mobile menu */}
+              <div 
+                className="border-t my-2"
+                style={{ borderColor: 'var(--border-color)' }}
+              ></div>
               <button
-                onClick={handleLogout}
-                className="flex items-center justify-center p-2 text-red-600 rounded-lg border border-red-200 transition-all duration-300 hover:scale-105 hover:shadow-md"
+                onClick={() => {
+                  handleLogout();
+                  setIsMenuOpen(false);
+                }}
+                className="w-full text-left px-6 py-3 transition-colors duration-200 flex items-center space-x-3"
                 style={{ 
-                  backgroundColor: 'var(--bg-secondary)', 
-                  borderColor: 'var(--border-primary)',
+                  backgroundColor: 'transparent',
                   color: '#dc2626'
                 }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--bg-tertiary)'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--bg-secondary)'}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#fef2f2';
+                  e.target.style.color = '#991b1b';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = '#dc2626';
+                }}
               >
+                <div className="text-lg" style={{ color: 'inherit' }}>
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
+                </div>
+                <span>Logout</span>
               </button>
             </div>
           </div>
+        )}
+      </nav>
+
+      {/* Desktop Bottom Navigation */}
+      <nav 
+        className="desktop-only bottom-nav z-40"
+        style={{ backgroundColor: 'var(--bg-secondary)' }}
+      >
+        <div 
+          ref={bottomNavRef}
+          className="flex overflow-x-auto py-1 px-4 space-x-2 scrollbar-hide"
+          onScroll={handleNavScroll}
+          style={{ 
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none'
+          }}
+        >
+          {/* Desktop Logo */}
+          <button 
+            onClick={() => handleNavigation('/orders')}
+            className="flex-shrink-0 flex flex-col items-center p-2 rounded-xl min-w-[80px] hover:scale-105 transition-all duration-200"
+            style={{
+              backgroundColor: 'transparent'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = 'var(--bg-tertiary)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+            }}
+            title="Go to Orders"
+          >
+            <div className="mb-1">
+              {renderLogoOrInitial()}
+            </div>
+            <span 
+              className="text-xs font-medium transition-colors duration-200"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              {shopName.length > 8 ? shopName.substring(0, 8) + '...' : shopName}
+            </span>
+          </button>
+          
+          {getAccessibleMenuItems().map((item) => (
+            <button
+              key={item.path}
+              onClick={() => handleNavigation(item.path)}
+              className={`flex-shrink-0 flex flex-col items-center p-2 rounded-xl transition-all duration-200 min-w-[80px] ${
+                location.pathname === item.path 
+                  ? 'transform scale-105 shadow-lg' 
+                  : 'hover:scale-105'
+              }`}
+              style={{
+                backgroundColor: location.pathname === item.path ? 'var(--primary-blue)' : 'transparent',
+                boxShadow: location.pathname === item.path ? '0 4px 12px var(--shadow-primary)' : 'none'
+              }}
+              onMouseEnter={(e) => {
+                if (location.pathname !== item.path) {
+                  e.target.style.backgroundColor = 'var(--bg-tertiary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (location.pathname !== item.path) {
+                  e.target.style.backgroundColor = 'transparent';
+                }
+              }}
+            >
+              <div 
+                className="mb-1 transition-colors duration-200"
+                  style={{
+                  color: location.pathname === item.path ? 'white' : 'var(--primary-blue)'
+                }}
+              >
+                {item.icon}
+                  </div>
+              <span 
+                className="text-xs font-medium transition-colors duration-200"
+                style={{
+                  color: location.pathname === item.path ? 'white' : 'var(--text-secondary)'
+                }}
+              >
+                  {item.shortTitle || item.title}
+                </span>
+              </button>
+            ))}
+          
+          {/* Theme Toggle for Desktop */}
+          <div className="flex-shrink-0 flex flex-col items-center p-2 rounded-xl min-w-[80px]">
+            <div className="mb-1">
+              <ThemeToggle className="mx-auto" />
+        </div>
+            <span 
+              className="text-xs font-medium transition-colors duration-200"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              Theme
+            </span>
+      </div>
+
+          {/* Logout Button for Desktop */}
+      <button
+            onClick={handleLogout}
+            className="flex-shrink-0 flex flex-col items-center p-2 rounded-xl transition-all duration-200 min-w-[80px] hover:scale-105"
+        style={{
+              backgroundColor: 'transparent'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#fef2f2';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+            }}
+            title="Logout"
+      >
+            <div 
+              className="mb-1 transition-colors duration-200"
+              style={{ color: '#dc2626' }}
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </div>
+            <span 
+              className="text-xs font-medium transition-colors duration-200"
+              style={{ color: '#dc2626' }}
+            >
+              Logout
+            </span>
+      </button>
         </div>
       </nav>
 
-      {/* Mobile Bottom Navigation */}
-      <div className="mobile-bottom-nav mobile-only fixed bottom-0 left-0 right-0 border-t z-50" 
-           style={{ 
-             backgroundColor: 'var(--bg-secondary)', 
-             borderTopColor: 'var(--border-primary)',
-             boxShadow: '0 -4px 10px var(--shadow-secondary)'
-           }}>
-        <div className="overflow-x-auto scrollbar-hide" ref={bottomNavRef} onScroll={handleNavScroll}>
-          <div className="flex p-1 min-w-max">
-            {getAccessibleMenuItems().map((item) => (
-              <button
-                key={item.path}
-                onClick={() => {
-                  console.log('Bottom nav clicked:', item.path);
-                  handleNavigation(item.path);
-                }}
-                data-path={item.path}
-                className="flex flex-col items-center justify-center py-1.5 px-3 min-w-[60px] relative transition-transform duration-300 hover:scale-110"
-              >
-                <div className={`p-1.5 rounded-lg mb-1 ${
-                  location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
-                    ? 'bg-gradient-to-r ' + item.color + ' shadow-md animate-pulse' 
-                    : ''
-                } transition-all duration-300`}
-                style={{
-                  backgroundColor: location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
-                    ? undefined 
-                    : 'var(--bg-tertiary)'
-                }}>
-                  <div className={`${
-                    location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
-                      ? 'text-white' 
-                      : ''
-                  }`}
-                  style={{
-                    color: location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
-                      ? 'white' 
-                      : 'var(--text-muted)'
-                  }}>
-                    {React.cloneElement(item.icon, { className: 'w-5 h-5' })}
-                  </div>
-                </div>
-                <span className={`text-[10px] font-medium ${
-                  location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
-                    ? 'text-transparent bg-clip-text bg-gradient-to-r ' + item.color
-                    : ''
-                }`}
-                style={{
-                  color: location.pathname === item.path || location.pathname.startsWith(item.path + '/') 
-                    ? 'transparent' 
-                    : 'var(--text-muted)'
-                }}>
-                  {item.shortTitle || item.title}
-                </span>
-                {(location.pathname === item.path || location.pathname.startsWith(item.path + '/')) && (
-                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-1 rounded-full bg-gradient-to-r animate-pulse shadow-md" style={{backgroundImage: `linear-gradient(to right, var(--tw-gradient-stops))`}} />
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Add some custom CSS to hide scrollbar but allow scrolling */}
-      <style jsx="true">{`
-        .scrollbar-hide {
-          scrollbar-width: none;
-          -ms-overflow-style: none;
-        }
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        
-        .animate-pulse {
-          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        
-        @keyframes pulse {
-          0%, 100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.8;
-          }
-        }
-        
-        /* Add smooth page transitions */
-        body {
-          transition: background-color 0.5s ease;
-        }
-        
-        @media (max-width: 768px) {
-          .mobile-only {
-            display: block;
-          }
-          .desktop-only {
-            display: none;
-          }
-          .mobile-bottom-nav {
-            height: 70px;
-          }
-          /* Add padding to bottom of the page content to prevent content from being hidden behind the navbar */
-          main {
-            padding-bottom: 70px;
-          }
-        }
-        
-        @media (min-width: 769px) {
-          .mobile-only {
-            display: none;
-          }
-          .desktop-only {
-            display: block;
-          }
-        }
-      `}</style>
-
-      {/* Floating Shop Button */}
-      <button
-        onClick={() => setShowShopModal(true)}
-        className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 w-14 h-14 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-full shadow-lg hover:shadow-xl transform hover:scale-110 transition-all duration-300 z-40 flex items-center justify-center group"
-        style={{
-          backdropFilter: 'blur(10px)',
-          border: '2px solid rgba(255, 255, 255, 0.2)'
-        }}
-      >
-        <svg className="w-7 h-7 group-hover:animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-        </svg>
-        
-        {/* Notification badge for shop status */}
-        {shopPreferences.isSharing && (
-          <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-            <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
-          </div>
-        )}
-      </button>
-
       {/* Shop Modal */}
       {showShopModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity duration-300 ease-in-out">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden transform transition-all duration-300 ease-in-out scale-100">
-            {/* Modal Header */}
-            <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-emerald-500 to-teal-600">
-              <div className="flex items-center">
-                <svg className="w-8 h-8 text-white mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                </svg>
-                <h3 className="text-xl font-semibold text-white">Lens Marketplace</h3>
-              </div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div 
+            className="rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto"
+            style={{ backgroundColor: 'var(--bg-primary)' }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Lens Shop Settings
+              </h3>
               <button 
                 onClick={() => setShowShopModal(false)} 
-                className="text-white hover:bg-white hover:bg-opacity-20 transition-colors p-2 rounded-md"
+                className="p-1 rounded-lg transition-colors"
+                style={{ color: 'var(--text-muted)' }}
+                onMouseEnter={(e) => e.target.style.color = 'var(--danger)'}
+                onMouseLeave={(e) => e.target.style.color = 'var(--text-muted)'}
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
             
-            {/* Modal Content */}
-            <div className="p-6 max-h-[70vh] overflow-y-auto">
-              {/* Error Display */}
-              {shopError && (
-                <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/50 border-l-4 border-red-500 rounded-md text-red-700 dark:text-red-200 text-sm">
-                  {shopError}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                    Share your lenses in the centralized shop
+                  </label>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    Allow other optical shops to see and contact you about your available lenses
+                  </p>
                 </div>
-              )}
-
-              {/* Permission Toggle Section */}
-              <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-lg font-medium text-gray-900 dark:text-white">Share Your Lenses</h4>
-                  <div className="flex items-center">
                     <button
                       onClick={handleShopPermissionToggle}
                       disabled={shopLoading}
-                      className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors duration-200 ${
-                        shopPreferences.isSharing ? 'bg-green-600' : 'bg-gray-300'
-                      }`}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                    shopPreferences.isSharing 
+                      ? 'bg-blue-600 focus:ring-blue-500' 
+                      : 'bg-gray-200 focus:ring-gray-500'
+                  } ${shopLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <span
-                        className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform duration-200 ${
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                           shopPreferences.isSharing ? 'translate-x-6' : 'translate-x-1'
                         }`}
                       />
                     </button>
                   </div>
+              
+              {shopError && (
+                <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--danger-light)', color: 'var(--danger)' }}>
+                  <p className="text-sm">{shopError}</p>
                 </div>
-                
-                <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
-                  {shopPreferences.isSharing 
-                    ? 'Your RX and Contact lenses are being shared in the marketplace. Other optical shops can find and contact you for lens availability.'
-                    : 'Enable sharing to make your lens inventory visible to other optical shops. Only RX and Contact lenses will be shared.'
-                  }
-                </p>
-
-                <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
-                  <div className={`w-2 h-2 rounded-full mr-2 ${shopPreferences.isSharing ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                  Status: {shopPreferences.isSharing ? 'Sharing Active' : 'Not Sharing'}
+              )}
+              
+              {shopPreferences.isSharing && (
+                <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--success-light)', color: 'var(--success)' }}>
+                  <p className="text-sm">
+                    ✅ Your lenses are visible in the centralized shop. Other optical shops can see your inventory and contact you for purchases.
+                  </p>
                 </div>
+              )}
               </div>
 
-              {/* Search Section */}
-              <div className="mb-6">
-                <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-3 flex items-center">
-                  <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  Search Available Lenses
-                </h4>
-                
-                <div className="bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-400 p-3 mb-3 text-sm text-blue-700 dark:text-blue-300">
-                  <p>💡 Go to the <strong>Create Order</strong> page and enter prescription details to automatically see matching lenses from other optical shops!</p>
-                </div>
-
+            <div className="mt-6 flex justify-end">
                 <button
-                  onClick={() => {
-                    setShowShopModal(false);
-                    navigate('/orders/create');
-                  }}
-                  className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 flex items-center justify-center"
-                >
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  Create New Order
+                onClick={() => setShowShopModal(false)}
+                className="px-4 py-2 rounded-lg transition-colors"
+                style={{ 
+                  backgroundColor: 'var(--primary)', 
+                  color: 'white' 
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--primary-dark)'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--primary)'}
+              >
+                Close
                 </button>
-              </div>
-
-              {/* How it Works Section */}
-              <div className="border-t pt-4 border-gray-200 dark:border-gray-600">
-                <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-3">How It Works</h4>
-                <div className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-                  <div className="flex items-start">
-                    <span className="w-6 h-6 bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center text-xs font-bold mr-3 mt-0.5">1</span>
-                    <div>
-                      <strong>Enable Sharing:</strong> Toggle the switch to share your RX and Contact lens inventory with other shops.
-                    </div>
-                  </div>
-                  <div className="flex items-start">
-                    <span className="w-6 h-6 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center text-xs font-bold mr-3 mt-0.5">2</span>
-                    <div>
-                      <strong>Smart Matching:</strong> When creating orders, the system finds matching lenses (±0.25 power, ±10° axis) from all participating shops.
-                    </div>
-                  </div>
-                  <div className="flex items-start">
-                    <span className="w-6 h-6 bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400 rounded-full flex items-center justify-center text-xs font-bold mr-3 mt-0.5">3</span>
-                    <div>
-                      <strong>Connect & Purchase:</strong> Contact details are shown for available lenses, making it easy to connect with other optical shops.
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
-
-            {/* Loading Overlay */}
-            {shopLoading && (
-              <div className="absolute inset-0 bg-white bg-opacity-80 dark:bg-gray-800 dark:bg-opacity-80 flex items-center justify-center">
-                <div className="flex items-center">
-                  <svg className="animate-spin h-6 w-6 text-emerald-600 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <span className="text-gray-700 dark:text-gray-300">
-                    {shopPreferences.isSharing ? 'Disabling lens sharing...' : 'Enabling lens sharing...'}
-                  </span>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}

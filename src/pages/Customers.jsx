@@ -3,6 +3,8 @@ import { db, auth } from '../firebaseConfig';
 import { collection, deleteDoc, doc, onSnapshot, query, where, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { getUserCollection, getUserDoc, getUserSettings } from '../utils/multiTenancy';
+import { dateToISOString, formatDate, formatDateTime, processRestoredData } from '../utils/dateUtils';
+import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import CustomerForm from '../components/CustomerForm';
 import CustomerCard from '../components/CustomerCard';
@@ -31,6 +33,9 @@ const Customers = () => {
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [shopInfo, setShopInfo] = useState(null);
+
+  // Use centralized auth
+  const { isAuthenticated } = useAuth();
 
   // Global error handler to prevent white screen
   useEffect(() => {
@@ -69,7 +74,7 @@ const Customers = () => {
 
     const initializeContacts = async () => {
       try {
-        if (!auth.currentUser) {
+        if (!isAuthenticated()) {
           navigate('/login');
           return;
         }

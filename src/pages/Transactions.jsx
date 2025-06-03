@@ -1,23 +1,28 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, getDocs, addDoc, serverTimestamp, query, where, orderBy, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { calculateCustomerBalance, formatCurrency, getBalanceColorClass, getBalanceStatusText } from '../utils/ledgerUtils';
-import { formatDate, formatDateTime } from '../utils/dateUtils';
+import { formatDate, formatDateTime, dateToISOString } from '../utils/dateUtils';
 
 const Transactions = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [transactionType, setTransactionType] = useState('received'); // 'received' or 'paid'
   
+  // Helper function to get today's date in YYYY-MM-DD format
+  const getTodayString = () => {
+    return dateToISOString(new Date()).split('T')[0];
+  };
+  
   // For batch transaction entry
   const [batchTransactions, setBatchTransactions] = useState(Array(5).fill().map(() => ({
     entityName: '',
     entityId: '',
     amount: '',
-    date: new Date().toISOString().split('T')[0],
+    date: getTodayString(),
     paymentMethod: 'cash',
     notes: ''
   })));
@@ -37,8 +42,8 @@ const Transactions = () => {
   const [error, setError] = useState('');
   
   // Date range and search filters
-  const [fromDate, setFromDate] = useState(new Date().toISOString().split('T')[0]);
-  const [toDate, setToDate] = useState(new Date().toISOString().split('T')[0]);
+  const [fromDate, setFromDate] = useState(getTodayString());
+  const [toDate, setToDate] = useState(getTodayString());
   const [shopNameSearch, setShopNameSearch] = useState('');
   
   // For editing transactions
@@ -301,7 +306,7 @@ const Transactions = () => {
         entityName: '',
         entityId: '',
         amount: '',
-        date: new Date().toISOString().split('T')[0],
+        date: getTodayString(),
         paymentMethod: 'cash',
         notes: ''
       })));

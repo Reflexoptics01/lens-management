@@ -1,18 +1,30 @@
 import { useState, useEffect } from 'react';
-import { auth, db } from '../firebaseConfig';
-import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
-import { collection, addDoc, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
+import { auth } from '../firebaseConfig';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [initializing, setInitializing] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+  
+  // Use centralized auth state
+  const { 
+    isAuthenticated, 
+    isLoading, 
+    userRole, 
+    authError,
+    USER_ROLES 
+  } = useAuth();
+
+  // Use theme context for proper dark mode
+  const { isDark } = useTheme();
 
   const slides = [
     { 
@@ -37,164 +49,32 @@ const Login = () => {
     },
   ];
 
+  // Handle navigation when user is authenticated
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        console.log('=== LOGIN DEBUG START ===');
-        console.log('Login: User authenticated:', user.email);
-        console.log('Login: User UID:', user.uid);
-        
-        // Check if user is main admin first
-        if (user.email === 'reflexopticsolutions@gmail.com') {
-          console.log('Login: Super admin detected');
-          localStorage.setItem('userRole', 'superadmin');
-          localStorage.setItem('userPermissions', JSON.stringify({}));
-          localStorage.setItem('userUid', user.uid);
+    if (isAuthenticated()) {
+      console.log('🔐 User authenticated, navigating based on role:', userRole);
+      
+      // Navigate based on user role
+      switch (userRole) {
+        case USER_ROLES.SUPER_ADMIN:
           navigate('/admin');
-          return;
-        }
-        
-        try {
-          console.log('Login: Checking if user exists in approved users collection...');
-          // First check if user exists in the approved users collection
-          // IMPORTANT: Check by UID, not email, to ensure exact user match
-          const usersRef = collection(db, 'users');
-          const userQuery = query(usersRef, where('uid', '==', user.uid));
-          const userSnapshot = await getDocs(userQuery);
-          
-          console.log('Login: Users collection query result:', userSnapshot.size, 'documents found');
-          
-          if (!userSnapshot.empty) {
-            console.log('Login: Found approved user in users collection');
-            // Store user role and permissions in localStorage for app-wide access
-            const userData = userSnapshot.docs[0].data();
-            console.log('Login: User data from users collection:', userData);
-            
-            // Double-check that email matches too (additional security)
-            if (userData.email !== user.email) {
-              console.error('Login: UID found but email mismatch - security issue');
-              await auth.signOut();
-              setError('Account verification failed. Please contact an administrator.');
-              setInitializing(false);
-              return;
-            }
-            
-            // Check if user is inactive
-            if (userData.isActive === false) {
-              console.error('User account is inactive');
-              await auth.signOut();
-              setError('Your account has been deactivated. Please contact an administrator.');
-              setInitializing(false);
-              return;
-            }
-            
-            // Check if user is approved (for new registrations)
-            if (userData.status === 'pending') {
-              console.error('User account is pending approval');
-              await auth.signOut();
-              setError('Your account is pending approval. Please wait for admin verification.');
-              setInitializing(false);
-              return;
-            }
-            
-            console.log('Login: User is approved, setting up session...');
-            localStorage.setItem('userRole', userData.role || 'user');
-            localStorage.setItem('userPermissions', JSON.stringify(userData.permissions || {}));
-            localStorage.setItem('userUid', user.uid);
-            
-            // Navigate based on role or permissions
-            if (userData.role === 'admin') {
-              navigate('/dashboard');
-            } else {
-              // For regular users, navigate to the first permitted page
-              const permissions = userData.permissions || {};
-              const availablePaths = Object.entries(permissions)
-                .filter(([_, hasAccess]) => hasAccess)
-                .map(([path]) => path);
-                
-              if (availablePaths.length > 0) {
-                navigate(availablePaths[0]);
-              } else {
-                navigate('/dashboard'); // Default page if no specific permissions
-              }
-            }
-            console.log('=== LOGIN DEBUG: APPROVED USER LOGIN SUCCESS ===');
-          } else {
-            console.log('Login: User NOT found in approved users collection');
-            console.log('Login: Checking userRegistrations collection...');
-            
-            // User not in approved users collection, check if they're in pending registrations
-            // Check by UID for exact match
-            const registrationsRef = collection(db, 'userRegistrations');
-            const registrationQuery = query(registrationsRef, where('uid', '==', user.uid));
-            const registrationSnapshot = await getDocs(registrationQuery);
-            
-            console.log('Login: UserRegistrations collection query result:', registrationSnapshot.size, 'documents found');
-            
-            if (!registrationSnapshot.empty) {
-              const registrationData = registrationSnapshot.docs[0].data();
-              console.log('Login: Found user registration with status:', registrationData.status);
-              console.log('Login: Full registration data:', registrationData);
-              
-              // Double-check that email matches too (additional security)
-              if (registrationData.email !== user.email) {
-                console.error('Login: UID found in registrations but email mismatch - security issue');
-                await auth.signOut();
-                setError('Account verification failed. Please contact an administrator.');
-                setInitializing(false);
-                return;
-              }
-              
-              if (registrationData.status === 'pending') {
-                console.log('Login: User registration is PENDING - BLOCKING LOGIN');
-                await auth.signOut();
-                setError('Your account is pending approval. Please wait for admin verification.');
-                setInitializing(false);
-                console.log('=== LOGIN DEBUG: PENDING USER BLOCKED ===');
-                return;
-              } else if (registrationData.status === 'rejected') {
-                console.log('Login: User registration was REJECTED - BLOCKING LOGIN');
-                await auth.signOut();
-                setError('Your account registration was rejected. Please contact an administrator.');
-                setInitializing(false);
-                console.log('=== LOGIN DEBUG: REJECTED USER BLOCKED ===');
-                return;
-              } else {
-                // Registration exists but status is not pending or rejected
-                // This should not happen - sign out for security
-                console.log('Login: User registration has UNEXPECTED status:', registrationData.status, '- BLOCKING LOGIN');
-                await auth.signOut();
-                setError('Your account is not properly configured. Please contact an administrator.');
-                setInitializing(false);
-                console.log('=== LOGIN DEBUG: UNEXPECTED STATUS BLOCKED ===');
-                return;
-              }
-            } else {
-              // User doesn't exist in either collection - unauthorized
-              console.log('Login: User NOT found in userRegistrations collection either');
-              console.log('Login: UNAUTHORIZED ACCESS - BLOCKING LOGIN');
-              await auth.signOut();
-              setError('Unauthorized access. Please register for an account or contact an administrator.');
-              setInitializing(false);
-              console.log('=== LOGIN DEBUG: UNAUTHORIZED USER BLOCKED ===');
-              return;
-            }
-          }
-        } catch (error) {
-          console.error('Login: Error during authentication check:', error);
-          await auth.signOut();
-          setError('An error occurred during login. Please try again.');
-          setInitializing(false);
-          console.log('=== LOGIN DEBUG: ERROR OCCURRED ===');
-          return;
-        }
+          break;
+        case USER_ROLES.ADMIN:
+          navigate('/orders');
+          break;
+        default:
+          navigate('/orders');
+          break;
       }
-      console.log('Login: No authenticated user or authentication check complete');
-      setInitializing(false);
-    });
+    }
+  }, [isAuthenticated, userRole, navigate]);
 
-    return () => unsubscribe();
-  }, [navigate]);
+  // Show auth error if present
+  useEffect(() => {
+    if (authError) {
+      setError(authError);
+    }
+  }, [authError]);
 
   // Slideshow automation
   useEffect(() => {
@@ -210,22 +90,24 @@ const Login = () => {
     setLoading(true);
 
     try {
-      console.log('Attempting to sign in with email:', email);
+      console.log('🔐 Attempting to sign in with email:', email);
       
       // Trim whitespace from email and password
       const trimmedEmail = email.trim();
       const trimmedPassword = password.trim();
       
       if (trimmedEmail !== email || trimmedPassword !== password) {
-        console.log('Trimmed whitespace from credentials');
+        console.log('🔐 Trimmed whitespace from credentials');
       }
       
       // Sign in user with Firebase authentication
+      // The AuthContext will handle the rest (validation, role assignment, navigation)
       await signInWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
       
-      // Navigation is handled in the onAuthStateChanged listener
+      console.log('🔐 Firebase sign-in successful, AuthContext will handle the rest');
+      
     } catch (error) {
-      console.error('Error signing in:', error);
+      console.error('🔐 Error signing in:', error);
       let errorMessage = 'Failed to sign in';
       
       // Provide more helpful error messages
@@ -247,215 +129,154 @@ const Login = () => {
     }
   };
 
-  if (initializing) {
+  // Show loading while AuthContext initializes
+  if (isLoading()) {
     return (
-      <div className="min-h-screen bg-gradient-to-r from-gray-50 to-white flex items-center justify-center">
-        <div className="text-xl text-gray-800">Loading...</div>
+      <div className="min-h-screen bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400 mx-auto mb-4"></div>
+          <div className="text-xl text-gray-800 dark:text-gray-200">Initializing...</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-r from-white to-gray-50 flex flex-col md:flex-row overflow-hidden">
-      {/* Left Section - Login Form */}
-      <div className="w-full md:w-5/12 flex items-center justify-center p-6 md:p-12 z-10">
-        <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
-          <div className="mb-6">
-            <h2 className="text-center text-xl font-medium text-gray-800">
-              Sign in to your account
-            </h2>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+      {/* Left side - Slideshow */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-800">
+        <div className="absolute inset-0 bg-black bg-opacity-20"></div>
+        <div className="relative z-10 flex flex-col justify-center items-center text-white p-12">
+          <div className="w-full max-w-lg">
+            {slides.map((slide, index) => (
+              <div
+                key={index}
+                className={`transition-all duration-1000 ${
+                  index === currentSlide ? 'opacity-100 transform translate-x-0' : 'opacity-0 transform translate-x-8 absolute'
+                }`}
+              >
+                <div className="text-center">
+                  <img 
+                    src={slide.image} 
+                    alt={slide.title}
+                    className="w-48 h-48 mx-auto mb-8 object-contain"
+                  />
+                  <h2 className="text-3xl font-bold mb-4">{slide.title}</h2>
+                  <p className="text-lg text-blue-100">{slide.description}</p>
+                </div>
+              </div>
+            ))}
           </div>
           
-          <form className="space-y-6" onSubmit={handleLogin}>
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  required
-                  className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    required
-                    className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-gray-700 transition-colors"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                      </svg>
-                    ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-                <div className="mt-2 text-right">
-                  <Link to="/forgot-password" className="text-sm text-blue-600 hover:text-blue-800 transition-colors">
-                    Forgot password?
-                  </Link>
-                </div>
-              </div>
-            </div>
-
-            {error && (
-              <div className="text-sm text-center font-medium text-red-600 bg-red-100 py-2 px-3 rounded-lg">
-                {error}
-              </div>
-            )}
-
-            <div>
+          {/* Slide indicators */}
+          <div className="flex space-x-2 mt-8">
+            {slides.map((_, index) => (
               <button
-                type="submit"
-                disabled={loading}
-                className="relative w-full flex justify-center py-3 px-4 rounded-lg text-white bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-all duration-300 overflow-hidden group"
-              >
-                <span className="relative z-10 font-medium text-sm tracking-wide">
-                  {loading ? 'Signing in...' : 'Sign In'}
-                </span>
-                <span className="absolute bottom-0 left-0 w-full h-full transform translate-y-full bg-gradient-to-r from-indigo-600 to-blue-700 transition-transform duration-300 ease-in-out group-hover:translate-y-0"></span>
-              </button>
-            </div>
-            
-            <div className="text-center mt-4">
-              <span className="text-sm text-gray-600">
-                No account?{' '}
-                <Link 
-                  to="/register" 
-                  className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
-                >
-                  Create one now
-                </Link>
-              </span>
-            </div>
-          </form>
+                key={index}
+                onClick={() => setCurrentSlide(index)}
+                className={`w-3 h-3 rounded-full transition-all ${
+                  index === currentSlide ? 'bg-white' : 'bg-white bg-opacity-50'
+                }`}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Right Section - Slideshow */}
-      <div className="hidden md:block md:w-7/12 relative overflow-hidden">
-        {/* Company header */}
-        <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black to-transparent py-8 px-8 z-30">
-          <div className="max-w-3xl mx-auto">
-            <h1 className="text-3xl font-bold text-white mb-2">
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-500">
-                REFLEX OPTIC SOLUTIONS
-              </span>
-            </h1>
-            <h2 className="text-xl font-medium text-gray-200">
-              Empowering Optical Businesses
-            </h2>
-            <p className="text-sm text-gray-300 mt-1">
-              Affordable Solutions for Every Optical Business
-            </p>
-            
-            {/* Contact Info */}
-            <div className="mt-4 pt-3 border-t border-gray-700 border-opacity-40 flex flex-wrap justify-start items-center gap-4 text-white">
-              <a href="tel:+916361773719" className="flex items-center space-x-2 text-sm hover:text-blue-400 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                </svg>
-                <span>91 - 63617 73719</span>
-              </a>
-              <a href="mailto:Info@reflexoptics.in" className="flex items-center space-x-2 text-sm hover:text-blue-400 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                <span>Info@reflexoptics.in</span>
-              </a>
-              <a href="https://www.reflexoptics.in" target="_blank" rel="noopener noreferrer" className="flex items-center space-x-2 text-sm hover:text-blue-400 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                </svg>
-                <span>www.reflexoptics.in</span>
-              </a>
-            </div>
+      {/* Right side - Login form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white dark:bg-gray-900">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold mb-2 text-gray-900 dark:text-white">Welcome Back</h1>
+            <p className="text-gray-600 dark:text-gray-400">Sign in to your account</p>
           </div>
-        </div>
-        
-        {/* Overlay gradient */}
-        <div className="absolute inset-0 bg-gradient-to-l from-transparent to-black opacity-30 z-10"></div>
-        
-        {/* Slideshow Images */}
-        <div className="absolute inset-0 flex items-center justify-center z-0">
-          {slides.map((slide, index) => (
-            <div 
-              key={index}
-              className={`absolute w-full h-full max-w-3xl max-h-[650px] mx-auto transition-all duration-1000 ease-in-out ${
-                index === currentSlide 
-                  ? 'opacity-100 scale-100' 
-                  : 'opacity-0 scale-105'
-              }`}
-            >
-              <div className="w-full h-full flex items-center justify-center p-8">
-                <img 
-                  src={slide.image} 
-                  alt={slide.title} 
-                  className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-        
-        {/* Content Overlay */}
-        <div className="absolute bottom-16 left-12 right-12 z-20">
-          <div className="bg-black bg-opacity-30 backdrop-blur-sm p-6 rounded-xl border border-white border-opacity-10 transform transition-all duration-700 ease-out translate-y-0 opacity-100">
-            <h3 className="text-3xl font-bold text-white mb-2">
-              {slides[currentSlide].title}
-            </h3>
-            <div className="w-16 h-1 bg-gradient-to-r from-blue-400 to-indigo-500 mb-4"></div>
-            <p className="text-gray-200 mb-2">{slides[currentSlide].description}</p>
-            <div className="mt-4 flex flex-wrap items-center">
-              <span className="text-blue-300 text-sm font-semibold mr-2 mb-2">OUR SERVICES:</span>
-              <div className="flex flex-wrap gap-2">
-                <span className="px-2 py-1 bg-blue-900 bg-opacity-40 rounded text-xs text-white">Billing</span>
-                <span className="px-2 py-1 bg-blue-900 bg-opacity-40 rounded text-xs text-white">CRM</span>
-                <span className="px-2 py-1 bg-blue-900 bg-opacity-40 rounded text-xs text-white">E-commerce</span>
-                <span className="px-2 py-1 bg-blue-900 bg-opacity-40 rounded text-xs text-white">Applications</span>
-                <span className="px-2 py-1 bg-blue-900 bg-opacity-40 rounded text-xs text-white">Hosting</span>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Slideshow Navigation Dots */}
-        <div className="absolute bottom-6 left-0 right-0 flex justify-center space-x-3 z-20">
-          {slides.map((_, index) => (
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent transition-colors bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                placeholder="Enter your email"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent pr-10 transition-colors bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                  placeholder="Enter your password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 transition-colors text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  {showPassword ? '🙈' : '👁️'}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Link
+                to="/forgot-password"
+                className="text-sm transition-colors text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+              >
+                Forgot your password?
+              </Link>
+            </div>
+
             <button
-              key={index}
-              onClick={() => setCurrentSlide(index)}
-              className={`w-12 h-1 rounded-full transition-all duration-300 ${
-                index === currentSlide 
-                  ? 'bg-gradient-to-r from-blue-400 to-indigo-500 w-16' 
-                  : 'bg-gray-400 bg-opacity-40'
-              }`}
-              aria-label={`Go to slide ${index + 1}`}
-            />
-          ))}
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading ? (
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  Signing in...
+                </div>
+              ) : (
+                'Sign In'
+              )}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-gray-600 dark:text-gray-400">
+              Don't have an account?{' '}
+              <Link 
+                to="/register" 
+                className="font-medium transition-colors text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+              >
+                Register here
+              </Link>
+            </p>
+          </div>
+
+          <div className="mt-8 text-center text-xs text-gray-500 dark:text-gray-400">
+            <p>© 2024 Reflex Optic Solutions. All rights reserved.</p>
+          </div>
         </div>
       </div>
     </div>

@@ -111,7 +111,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .mobile-content {
   @apply flex-1 px-4 py-4 overflow-y-auto pb-safe;
-  padding-bottom: calc(env(safe-area-inset-bottom) + 120px);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 110px);
 }
 
 .mobile-bottom-nav {
@@ -119,7 +119,7 @@ h1, h2, h3, h4, h5, h6 {
   border-top: 1px solid var(--border-primary);
   box-shadow: 0 -4px 10px var(--shadow-secondary);
   @apply fixed bottom-0 left-0 right-0 pb-safe z-50;
-  height: 65px;
+  height: 55px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;

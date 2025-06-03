@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { safelyParseDate, formatDate, formatDateTime } from '../utils/dateUtils';
 import { getUserCollection, getUserDoc, diagnoseAuthIssues, attemptAuthFix } from '../utils/multiTenancy';
+import { useAuth } from '../contexts/AuthContext';
+import ShopButton from '../components/ShopButton';
 
 const ORDER_STATUSES = [
   'PENDING',

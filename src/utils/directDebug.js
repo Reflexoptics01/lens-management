@@ -1,19 +1,29 @@
 // Direct debugging functions for browser console
 import { db } from '../firebaseConfig';
 import { collection, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, query, orderBy, where } from 'firebase/firestore';
+import { getUserCollection, getUserSettings, getUserUid } from './multiTenancy';
+import { formatDateTime, dateToISOString } from './dateUtils';
 
 // Function to run directly in browser console
 window.debugInvoiceNumbering = async () => {
   console.log('🔍 Direct Invoice Numbering Debug...');
   
   try {
-    // 1. Check all sales and their invoice numbers
-    console.log('\n1. Checking all sales...');
-    const salesRef = collection(db, 'sales');
+    const userUid = getUserUid();
+    if (!userUid) {
+      console.error('❌ No user authenticated - cannot debug invoice numbering');
+      return { error: 'User not authenticated' };
+    }
+    
+    console.log('👤 Debugging for user:', userUid);
+    
+    // 1. Check all sales and their invoice numbers (USER-SPECIFIC)
+    console.log('\n1. Checking user sales...');
+    const salesRef = getUserCollection('sales');
     const salesQuery = query(salesRef, orderBy('createdAt', 'desc'));
     const salesSnapshot = await getDocs(salesQuery);
     
-    console.log(`📊 Total sales found: ${salesSnapshot.docs.length}`);
+    console.log(`📊 Total user sales found: ${salesSnapshot.docs.length}`);
     
     const invoiceNumbers = [];
     let highestNumber = 0;
@@ -22,7 +32,7 @@ window.debugInvoiceNumbering = async () => {
     salesSnapshot.docs.forEach((doc, index) => {
       const sale = doc.data();
       const invoiceNum = sale.invoiceNumber;
-      const createdAt = sale.createdAt?.toDate?.() || sale.createdAt || 'Unknown date';
+      const createdAt = formatDateTime(sale.createdAt) || 'Unknown date';
       
       // Track duplicates
       if (invoiceNumbers.includes(invoiceNum)) {
@@ -61,31 +71,32 @@ window.debugInvoiceNumbering = async () => {
       });
     }
     
-    // 2. Check settings
-    console.log('\n2. Checking settings...');
-    const settingsDoc = await getDoc(doc(db, 'settings', 'shopSettings'));
+    // 2. Check settings (USER-SPECIFIC)
+    console.log('\n2. Checking user settings...');
+    const settingsDoc = await getDoc(getUserSettings());
     if (settingsDoc.exists()) {
       const settings = settingsDoc.data();
-      console.log('✅ Settings found:', settings);
+      console.log('✅ User settings found:', settings);
     } else {
-      console.log('❌ Settings not found');
+      console.log('❌ User settings not found');
     }
     
-    // 3. Check counters
-    console.log('\n3. Checking counters...');
-    const countersRef = collection(db, 'counters');
+    // 3. Check counters (USER-SPECIFIC)
+    console.log('\n3. Checking user counters...');
+    const countersRef = getUserCollection('counters');
     const countersSnapshot = await getDocs(countersRef);
     
     if (countersSnapshot.empty) {
-      console.log('❌ No counters found');
+      console.log('❌ No user counters found');
     } else {
-      console.log('✅ Counters found:');
+      console.log('✅ User counters found:');
       countersSnapshot.docs.forEach(doc => {
         console.log(`   ${doc.id}:`, doc.data());
       });
     }
-    
+
     return {
+      userId: userUid,
       totalSales: salesSnapshot.docs.length,
       highestNumber,
       duplicates,
@@ -100,23 +111,32 @@ window.debugInvoiceNumbering = async () => {
   }
 };
 
-// Function to forcefully fix the issue
+// Function to forcefully fix the issue (USER-SPECIFIC)
 window.forceFixInvoiceNumbering = async (financialYear = '2024-25') => {
-  console.log('🔧 FORCE FIXING invoice numbering...');
+  console.log('🔧 FORCE FIXING user invoice numbering...');
   
   try {
-    // 1. Force set settings
-    console.log('1. Setting up shop settings...');
-    await setDoc(doc(db, 'settings', 'shopSettings'), {
+    const userUid = getUserUid();
+    if (!userUid) {
+      console.error('❌ No user authenticated - cannot fix invoice numbering');
+      return { error: 'User not authenticated' };
+    }
+    
+    console.log('👤 Force fixing for user:', userUid);
+    
+    // 1. Force set user settings
+    console.log('1. Setting up user shop settings...');
+    await setDoc(getUserSettings(), {
       financialYear: financialYear,
       updatedAt: serverTimestamp(),
-      note: 'Force fixed via debug'
+      note: 'Force fixed via debug',
+      userId: userUid
     }, { merge: true });
-    console.log(`✅ Financial year set to: ${financialYear}`);
+    console.log(`✅ User financial year set to: ${financialYear}`);
     
-    // 2. Get all sales and find highest
-    console.log('2. Analyzing ALL sales...');
-    const salesRef = collection(db, 'sales');
+    // 2. Get all user sales and find highest
+    console.log('2. Analyzing user sales...');
+    const salesRef = getUserCollection('sales');
     const salesSnapshot = await getDocs(salesRef);
     
     let highestNumber = 0;
@@ -133,7 +153,7 @@ window.forceFixInvoiceNumbering = async (financialYear = '2024-25') => {
         }
         invoiceAnalysis[invoiceNum].push({
           id: doc.id,
-          date: sale.createdAt?.toDate?.() || sale.createdAt,
+          date: formatDateTime(sale.createdAt),
           customer: sale.customerName
         });
         
@@ -148,7 +168,7 @@ window.forceFixInvoiceNumbering = async (financialYear = '2024-25') => {
       }
     });
     
-    console.log(`📊 Analyzed ${salesSnapshot.docs.length} sales`);
+    console.log(`📊 Analyzed ${salesSnapshot.docs.length} user sales`);
     console.log(`🔢 Highest number found: ${highestNumber}`);
     
     // Show duplicates
@@ -160,19 +180,19 @@ window.forceFixInvoiceNumbering = async (financialYear = '2024-25') => {
       });
     }
     
-    // 3. Delete ALL existing counters and create fresh one
-    console.log('\n3. Clearing and recreating counters...');
-    const countersRef = collection(db, 'counters');
+    // 3. Delete ALL existing user counters and create fresh one
+    console.log('\n3. Clearing and recreating user counters...');
+    const countersRef = getUserCollection('counters');
     const existingCounters = await getDocs(countersRef);
     
-    // Delete existing counters
+    // Delete existing user counters
     for (const counterDoc of existingCounters.docs) {
-      await deleteDoc(doc(db, 'counters', counterDoc.id));
-      console.log(`🗑️ Deleted counter: ${counterDoc.id}`);
+      await deleteDoc(doc(db, `users/${userUid}/counters`, counterDoc.id));
+      console.log(`🗑️ Deleted user counter: ${counterDoc.id}`);
     }
     
-    // Create new counter
-    const counterRef = doc(db, 'counters', `invoices_${financialYear}`);
+    // Create new user counter
+    const counterRef = doc(db, `users/${userUid}/counters`, `invoices_${financialYear}`);
     const nextNumber = highestNumber + 1;
     
     await setDoc(counterRef, {
@@ -182,14 +202,16 @@ window.forceFixInvoiceNumbering = async (financialYear = '2024-25') => {
       format: '${prefix}${separator}${number}',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      note: `Force fixed on ${new Date().toISOString()}. Highest found: ${highestNumber}`
+      userId: userUid,
+      note: `Force fixed on ${dateToISOString(new Date())}. Highest found: ${highestNumber}`
     });
     
-    console.log(`✅ Created fresh counter: invoices_${financialYear}`);
+    console.log(`✅ Created fresh user counter: invoices_${financialYear}`);
     console.log(`🎯 Next invoice will be: ${financialYear}/${nextNumber.toString().padStart(2, '0')}`);
     
     return {
       success: true,
+      userId: userUid,
       financialYear,
       highestNumber,
       nextNumber,
@@ -204,5 +226,5 @@ window.forceFixInvoiceNumbering = async (financialYear = '2024-25') => {
 };
 
 console.log('🚀 Debug functions loaded! Run these in console:');
-console.log('   debugInvoiceNumbering() - to diagnose issues');
-console.log('   forceFixInvoiceNumbering() - to force fix the numbering'); 
+console.log('   debugInvoiceNumbering() - to diagnose user-specific issues');
+console.log('   forceFixInvoiceNumbering() - to force fix user-specific numbering'); 

@@ -214,4 +214,35 @@ export const getCurrentFinancialYear = () => {
   } else {
     return `${currentYear}-${currentYear+1}`;
   }
+};
+
+// Alias for formatDate (backward compatibility)
+export const displayDate = formatDate;
+
+// Alias for formatDate (backward compatibility) 
+export const formatFieldForDisplay = formatDate;
+
+// Process form data to ensure dates are handled properly
+export const processFormData = (data) => {
+  if (!data || typeof data !== 'object') return data;
+  
+  const processed = { ...data };
+  
+  // Convert any date fields to proper format
+  Object.keys(processed).forEach(key => {
+    const value = processed[key];
+    
+    // If the field name suggests it's a date, try to process it
+    if ((key.toLowerCase().includes('date') || 
+         key.toLowerCase().includes('time') || 
+         key === 'createdAt' || 
+         key === 'updatedAt') && value) {
+      const parsedDate = safelyParseDate(value);
+      if (parsedDate) {
+        processed[key] = parsedDate;
+      }
+    }
+  });
+  
+  return processed;
 }; 

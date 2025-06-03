@@ -21,8 +21,8 @@ const BottomActionBar = ({
   
   // Adjust positioning to account for navigation bar
   const positionClass = fixed 
-    ? 'fixed bottom-0 left-0 right-0 mb-[65px]' // Use 65px to match new nav height
-    : 'sticky bottom-0 -mx-4 mb-[65px]'; // Use 65px to match new nav height
+    ? 'fixed bottom-0 left-0 right-0 mb-[55px]' // Reduced from 65px to match new nav height
+    : 'sticky bottom-0 -mx-4 mb-[55px]'; // Reduced from 65px to match new nav height
   
   return (
     <div className={`${baseClasses} ${positionClass} ${className} safe-area-bottom`}>

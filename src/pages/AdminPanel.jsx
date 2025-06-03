@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auth, db } from '../firebaseConfig';
+import { db } from '../firebaseConfig';
 import { collection, query, where, getDocs, doc, updateDoc, addDoc, deleteDoc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { onAuthStateChanged, deleteUser } from 'firebase/auth';
+import { deleteUser } from 'firebase/auth';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
 import { 
@@ -21,6 +21,7 @@ import {
   ExclamationTriangleIcon,
   EyeIcon
 } from '@heroicons/react/24/outline';
+import { useAuth } from '../contexts/AuthContext';
 
 const AdminPanel = () => {
   const navigate = useNavigate();
@@ -31,47 +32,48 @@ const AdminPanel = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'pending', 'approved', 'rejected'
 
+  // Use centralized auth
+  const { 
+    user, 
+    userRole, 
+    isAuthenticated, 
+    isLoading: authLoading, 
+    USER_ROLES 
+  } = useAuth();
+
   // Check authentication and authorization
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.log('AdminPanel: Auth state changed');
-      console.log('User:', user);
-      console.log('User email:', user?.email);
-      console.log('Expected admin email:', 'reflexopticsolutions@gmail.com');
-      console.log('Email match:', user?.email === 'reflexopticsolutions@gmail.com');
-      
-      if (!user) {
-        console.log('AdminPanel: No user found, redirecting to login');
-        toast.error('Please login to access admin panel');
-        navigate('/login');
-        return;
+    // If we have valid authentication data, proceed regardless of authLoading state
+    const hasValidAuth = user?.email && userRole && isAuthenticated();
+    
+    if (!hasValidAuth && !authLoading) {
+      // Only redirect if auth is complete and we don't have valid auth
+      toast.error('Please login to access admin panel');
+      navigate('/login');
+      return;
+    }
+    
+    if (hasValidAuth && userRole !== USER_ROLES.SUPER_ADMIN) {
+      toast.error('Unauthorized access - Admin privileges required');
+      navigate('/dashboard');
+      return;
+    }
+    
+    // If we have valid super admin auth, load the panel
+    if (hasValidAuth && userRole === USER_ROLES.SUPER_ADMIN) {
+      if (loading) {
+        fetchUsers();
+        setLoading(false);
       }
-      
-      if (user.email !== 'reflexopticsolutions@gmail.com') {
-        console.log('AdminPanel: User email does not match admin email');
-        toast.error('Unauthorized access');
-        navigate('/login');
-        return;
-      }
-      
-      console.log('AdminPanel: Admin user authenticated successfully');
-      await fetchUsers();
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [navigate]);
+    }
+  }, [user?.email, userRole, authLoading, loading, navigate, USER_ROLES.SUPER_ADMIN]);
 
   const fetchUsers = async () => {
     setRefreshing(true);
     try {
-      console.log('Fetching users from database...');
-      
       // Fetch all user registrations regardless of status
       const registrationsRef = collection(db, 'userRegistrations');
       const allRegistrationsSnapshot = await getDocs(registrationsRef);
-      
-      console.log('Found', allRegistrationsSnapshot.size, 'user registrations');
       
       const allUsersData = allRegistrationsSnapshot.docs.map(doc => ({
         id: doc.id,
@@ -82,8 +84,6 @@ const AdminPanel = () => {
       // Also fetch from users collection to see if there are any discrepancies
       const usersRef = collection(db, 'users');
       const allUsersSnapshot = await getDocs(usersRef);
-      
-      console.log('Found', allUsersSnapshot.size, 'approved users');
       
       const approvedUsersData = allUsersSnapshot.docs.map(doc => ({
         id: doc.id,
@@ -99,13 +99,11 @@ const AdminPanel = () => {
       approvedUsersData.forEach(approvedUser => {
         // Skip the main admin user - don't show them in the user list
         if (approvedUser.email === 'reflexopticsolutions@gmail.com') {
-          console.log('Skipping main admin user from user list');
           return;
         }
         
         const existsInRegistrations = allUsersData.find(regUser => regUser.uid === approvedUser.uid);
         if (!existsInRegistrations) {
-          console.log('Found user not in registrations (treating as regular user):', approvedUser.email);
           combinedUsers.push({
             ...approvedUser,
             // Don't override company details - use existing data or set to unknown
@@ -122,15 +120,7 @@ const AdminPanel = () => {
         return dateB - dateA;
       });
 
-      console.log('Total combined users:', combinedUsers.length);
-      console.log('Status distribution:', {
-        pending: combinedUsers.filter(u => u.status === 'pending').length,
-        approved: combinedUsers.filter(u => u.status === 'approved').length,
-        rejected: combinedUsers.filter(u => u.status === 'rejected').length
-      });
-
       setAllUsers(combinedUsers);
-      console.log('User data updated successfully');
 
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -144,13 +134,11 @@ const AdminPanel = () => {
     try {
       setRefreshing(true);
       
-      console.log('Approving user:', registration.email);
-      
       // Update registration status
       await updateDoc(doc(db, 'userRegistrations', registration.id), {
         status: 'approved',
         approvedAt: serverTimestamp(),
-        approvedBy: auth.currentUser.email
+        approvedBy: user.email
       });
 
       // Create or update user document with company-specific data structure
@@ -159,17 +147,30 @@ const AdminPanel = () => {
       const existingUserSnapshot = await getDocs(existingUserQuery);
 
       if (existingUserSnapshot.empty) {
-        // Create new user document
+        // Create new user document with default permissions
+        const defaultPermissions = {
+          '/dashboard': true,
+          '/orders': true,
+          '/customers': true,
+          '/sales': true,
+          '/purchases': true,
+          '/transactions': true,
+          '/ledger': true,
+          '/gst-returns': true,
+          '/lens-inventory': true,
+          '/settings': true
+        };
+
         await addDoc(collection(db, 'users'), {
           uid: registration.uid,
           email: registration.email,
           role: 'admin',
-          permissions: {},
+          permissions: defaultPermissions,
           isActive: true,
           status: 'approved',
           createdAt: serverTimestamp(),
           approvedAt: serverTimestamp(),
-          approvedBy: auth.currentUser.email
+          approvedBy: user.email
         });
 
         // Create company settings for the user
@@ -241,12 +242,11 @@ const AdminPanel = () => {
           status: 'approved',
           isActive: true,
           approvedAt: serverTimestamp(),
-          approvedBy: auth.currentUser.email
+          approvedBy: user.email
         });
       }
 
       toast.success(`User ${registration.email} approved successfully`);
-      console.log('User approved, refreshing data...');
       
       // Close modal first, then refresh
       setShowUserModal(false);
@@ -268,13 +268,11 @@ const AdminPanel = () => {
     try {
       setRefreshing(true);
       
-      console.log('Rejecting user:', registration.email);
-      
       // Update registration status
       await updateDoc(doc(db, 'userRegistrations', registration.id), {
         status: 'rejected',
         rejectedAt: serverTimestamp(),
-        rejectedBy: auth.currentUser.email
+        rejectedBy: user.email
       });
 
       // If user exists in users collection, deactivate them
@@ -288,12 +286,11 @@ const AdminPanel = () => {
           status: 'rejected',
           isActive: false,
           rejectedAt: serverTimestamp(),
-          rejectedBy: auth.currentUser.email
+          rejectedBy: user.email
         });
       }
 
       toast.success(`User ${registration.email} rejected`);
-      console.log('User rejected, refreshing data...');
       
       // Close modal first, then refresh
       setShowUserModal(false);
@@ -315,13 +312,11 @@ const AdminPanel = () => {
     try {
       setRefreshing(true);
       
-      console.log('Disapproving user:', registration.email);
-      
       // Update registration status back to pending
       await updateDoc(doc(db, 'userRegistrations', registration.id), {
         status: 'pending',
         disapprovedAt: serverTimestamp(),
-        disapprovedBy: auth.currentUser.email
+        disapprovedBy: user.email
       });
 
       // Deactivate user in users collection
@@ -335,12 +330,11 @@ const AdminPanel = () => {
           status: 'pending',
           isActive: false,
           disapprovedAt: serverTimestamp(),
-          disapprovedBy: auth.currentUser.email
+          disapprovedBy: user.email
         });
       }
 
       toast.success(`User ${registration.email} disapproved - access revoked`);
-      console.log('User disapproved, refreshing data...');
       
       // Close modal first, then refresh
       setShowUserModal(false);
@@ -373,11 +367,8 @@ const AdminPanel = () => {
     try {
       setRefreshing(true);
       
-      console.log('Deleting user:', registration.email);
-      
       // Delete from userRegistrations first
       await deleteDoc(doc(db, 'userRegistrations', registration.id));
-      console.log('Deleted from userRegistrations');
 
       // Delete from users collection if exists
       const usersRef = collection(db, 'users');
@@ -386,7 +377,6 @@ const AdminPanel = () => {
 
       if (!existingUserSnapshot.empty) {
         await deleteDoc(existingUserSnapshot.docs[0].ref);
-        console.log('Deleted from users collection');
       }
 
       // Note: Unfortunately, we cannot delete Firebase Auth users from client-side code
@@ -395,7 +385,6 @@ const AdminPanel = () => {
       // or we need to implement a cloud function for this
 
       toast.success(`User ${registration.email} deleted from database. Note: Firebase Auth account may still exist - user should contact support if they cannot re-register.`);
-      console.log('User deleted successfully, refreshing data...');
       
       // Close modal first, then refresh
       setShowUserModal(false);
@@ -417,11 +406,8 @@ const AdminPanel = () => {
     try {
       setRefreshing(true);
       
-      console.log('Enabling re-registration for:', registration.email);
-      
       // Delete from userRegistrations to allow fresh registration
       await deleteDoc(doc(db, 'userRegistrations', registration.id));
-      console.log('Deleted registration record to enable re-registration');
 
       // If user exists in users collection, also remove them
       const usersRef = collection(db, 'users');
@@ -430,11 +416,9 @@ const AdminPanel = () => {
 
       if (!existingUserSnapshot.empty) {
         await deleteDoc(existingUserSnapshot.docs[0].ref);
-        console.log('Deleted from users collection');
       }
 
       toast.success(`${registration.email} can now register again with a fresh application. If they still get "email already in use" error, they should contact support.`);
-      console.log('Re-registration enabled, refreshing data...');
       
       // Close modal first, then refresh
       setShowUserModal(false);
@@ -593,13 +577,9 @@ const AdminPanel = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-xl text-gray-800 mb-4">Loading Admin Panel...</div>
-          <div className="text-sm text-gray-600">
-            Current User: {auth.currentUser?.email || 'Not logged in'}
-          </div>
-          <div className="text-sm text-gray-600">
-            Expected Admin: reflexopticsolutions@gmail.com
-          </div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="text-xl text-gray-800">Loading Admin Panel...</div>
+          <div className="text-sm text-gray-600 mt-2">Please wait while we load the user management interface.</div>
         </div>
       </div>
     );

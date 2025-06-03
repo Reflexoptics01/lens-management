@@ -408,11 +408,7 @@ const CreateOrder = () => {
         const counterDoc = await getDoc(getUserDoc('counters', 'orderCounter'));
         
         if (!counterDoc.exists()) {
-          // Create initial counter
-          await setDoc(getUserDoc('counters', 'orderCounter'), { 
-            count: 1,
-            createdAt: Timestamp.now()
-          });
+          // Preview starting from 001 (but don't create counter yet)
           setNextOrderDisplayId('001');
         } else {
           const currentCount = counterDoc.data().count || 0;
@@ -427,12 +423,7 @@ const CreateOrder = () => {
       const counterDoc = await getDoc(getUserDoc('counters', counterId));
       
       if (!counterDoc.exists()) {
-        // Create initial counter for this financial year
-        await setDoc(getUserDoc('counters', counterId), { 
-          count: 1,
-          financialYear: financialYear,
-          createdAt: Timestamp.now()
-        });
+        // Preview starting from 001 for this financial year (but don't create counter yet)
         setNextOrderDisplayId('001');
       } else {
         const currentCount = counterDoc.data().count || 0;

@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { db } from '../firebaseConfig';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { addDoc, serverTimestamp } from 'firebase/firestore';
+import { getUserCollection } from '../utils/multiTenancy';
+import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import { ArrowLeftIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 const CreateCustomer = ({ isVendor = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { isAuthenticated } = useAuth();
   const [isPopupMode, setIsPopupMode] = useState(location.state?.isPopupMode || false);
   const returnToCreatePurchase = location.state?.returnToCreatePurchase || false;
   
@@ -59,6 +62,13 @@ const CreateCustomer = ({ isVendor = false }) => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Check authentication
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      navigate('/login');
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -116,7 +126,7 @@ const CreateCustomer = ({ isVendor = false }) => {
         type: isVendor ? 'vendor' : 'customer'
       };
 
-      const docRef = await addDoc(collection(db, 'customers'), customerData);
+      const docRef = await addDoc(getUserCollection('customers'), customerData);
       
       if (isPopupMode) {
         if (window.opener && typeof window.opener.postMessage === 'function') {

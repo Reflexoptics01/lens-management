@@ -1,11 +1,14 @@
-import { useState, useEffect } from 'react';
-import { db } from '../firebaseConfig';
-import { collection, getDocs, getDoc, doc, updateDoc, serverTimestamp, query, where, orderBy } from 'firebase/firestore';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { db } from '../firebaseConfig';
+import { collection, getDocs, query, where, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
+import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
+import { formatDate, dateToISOString } from '../utils/dateUtils';
+import { ArrowLeftIcon, PlusIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import CustomerForm from '../components/CustomerForm';
 import ItemSuggestions from '../components/ItemSuggestions';
-import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 
 const TAX_OPTIONS = [
   { id: 'TAX_FREE', label: 'Tax Free', rate: 0 },
@@ -43,7 +46,7 @@ const EditPurchase = () => {
   // Purchase details
   const [purchaseNumber, setPurchaseNumber] = useState('');
   const [vendorInvoiceNumber, setVendorInvoiceNumber] = useState('');
-  const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0]);
+  const [purchaseDate, setPurchaseDate] = useState(dateToISOString(new Date()).split('T')[0]);
   const [selectedTaxOption, setSelectedTaxOption] = useState(TAX_OPTIONS[0].id);
   const [discountType, setDiscountType] = useState('amount'); // 'amount' or 'percentage'
   const [discountValue, setDiscountValue] = useState(0);
@@ -57,6 +60,15 @@ const EditPurchase = () => {
 
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
   const [vendorSearchTerm, setVendorSearchTerm] = useState('');
+
+  const auth = useAuth();
+
+  // Check authentication
+  useEffect(() => {
+    if (!auth.isAuthenticated()) {
+      navigate('/login');
+    }
+  }, [auth, navigate]);
 
   useEffect(() => {
     fetchVendors();
@@ -105,13 +117,13 @@ const EditPurchase = () => {
       if (purchaseData.purchaseDate) {
         if (purchaseData.purchaseDate.toDate) {
           // Firebase timestamp
-          setPurchaseDate(purchaseData.purchaseDate.toDate().toISOString().split('T')[0]);
+          setPurchaseDate(dateToISOString(purchaseData.purchaseDate.toDate()).split('T')[0]);
         } else if (typeof purchaseData.purchaseDate === 'string') {
           // Already a string date
           setPurchaseDate(purchaseData.purchaseDate);
         } else {
           // Default to today
-          setPurchaseDate(new Date().toISOString().split('T')[0]);
+          setPurchaseDate(dateToISOString(new Date()).split('T')[0]);
         }
       }
       
@@ -168,7 +180,7 @@ const EditPurchase = () => {
   const fetchVendors = async () => {
     try {
       setLoading(true);
-      const customersRef = collection(db, 'customers');
+      const customersRef = getUserCollection('customers');
       const q = query(customersRef, where('type', '==', 'vendor'));
       const snapshot = await getDocs(q);
       const vendorsList = snapshot.docs.map(doc => ({

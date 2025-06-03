@@ -5,9 +5,13 @@ import { auth, db } from '../firebaseConfig';
 import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { ChevronLeftIcon } from '@heroicons/react/24/outline';
+import { getUserCollection } from '../utils/multiTenancy';
+import { dateToISOString } from '../utils/dateUtils';
+import { useAuth } from '../contexts/AuthContext';
 
 const Register = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1); // Multi-step form
   
@@ -15,8 +19,8 @@ const Register = () => {
   useEffect(() => {
     const clearAuthState = async () => {
       try {
-        if (auth.currentUser) {
-          console.log('Clearing existing auth state for user:', auth.currentUser.email);
+        if (user) {
+          console.log('Clearing existing auth state for user:', user.email);
           await auth.signOut();
           console.log('Auth state cleared successfully');
         }
@@ -26,7 +30,7 @@ const Register = () => {
     };
     
     clearAuthState();
-  }, []);
+  }, [user]);
   
   // Form data
   const [formData, setFormData] = useState({
@@ -429,10 +433,10 @@ const Register = () => {
       }
       
       // If Firebase user was created but registration doc failed, clean up
-      if (auth.currentUser && error.message !== 'Email is already registered') {
+      if (user && error.message !== 'Email is already registered') {
         try {
           console.log('Cleaning up Firebase user due to registration failure...');
-          await deleteUser(auth.currentUser);
+          await deleteUser(user);
           console.log('Firebase user cleaned up');
         } catch (cleanupError) {
           console.error('Failed to cleanup Firebase user:', cleanupError);

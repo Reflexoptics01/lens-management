@@ -1,40 +1,63 @@
 const SHOP_API_BASE_URL = 'https://us-central1-reflex-64925.cloudfunctions.net';
+import { getUserUid } from './multiTenancy';
+import { dateToISOString } from './dateUtils';
 
-// Get current user info for shop operations
+// Get current user info for shop operations (MULTI-TENANT SAFE)
 const getCurrentUserInfo = () => {
-  // This should be replaced with actual user authentication logic
-  const userInfo = localStorage.getItem('userInfo');
-  if (userInfo) {
-    return JSON.parse(userInfo);
+  const userUid = getUserUid();
+  if (!userUid) {
+    throw new Error('User not authenticated - cannot perform shop operations');
   }
   
-  // Fallback - you should implement proper user authentication
+  // Get user info from localStorage but ensure it's tied to current user
+  const userInfo = localStorage.getItem('userInfo');
+  if (userInfo) {
+    const parsedInfo = JSON.parse(userInfo);
+    // Ensure the stored info belongs to current user
+    if (parsedInfo.userId === userUid) {
+      return parsedInfo;
+    }
+  }
+  
+  // Fallback - create basic user info with current UID
+  const userEmail = localStorage.getItem('userEmail');
   return {
-    opticalName: 'Demo Optical Store',
-    city: 'Demo City',
-    phone: '+91XXXXXXXXXX',
-    userId: 'demo-user-id'
+    opticalName: userEmail ? `${userEmail.split('@')[0]} Optical` : 'User Optical Store',
+    city: 'Not specified',
+    phone: 'Not specified',
+    userId: userUid,
+    email: userEmail
   };
 };
 
-// Upload user's lenses to the centralized shop
-export const uploadLensesToShop = async (lenses, userInfo) => {
+// Upload user's lenses to the centralized shop (USER-SPECIFIC)
+export const uploadLensesToShop = async (lenses, userInfo = null) => {
   try {
+    const currentUserInfo = userInfo || getCurrentUserInfo();
+    const userUid = getUserUid();
+    
+    if (!userUid) {
+      throw new Error('User not authenticated');
+    }
+    
+    // Ensure userInfo has correct userId
+    const safeUserInfo = {
+      ...currentUserInfo,
+      userId: userUid
+    };
+    
     const lensesToUpload = lenses
       .filter(lens => lens.type === 'prescription' || lens.type === 'contact') // Only RX and Contact lenses
       .map(lens => ({
         ...lens,
-        // Add user information
-        userInfo: {
-          opticalName: userInfo.opticalName,
-          city: userInfo.city,
-          phone: userInfo.phone,
-          userId: userInfo.userId
-        },
+        // Add user information (USER-SPECIFIC)
+        userInfo: safeUserInfo,
         // Add upload timestamp
-        uploadedAt: new Date().toISOString(),
-        // Create unique shop ID combining user ID and lens ID
-        shopId: `${userInfo.userId}_${lens.id}`
+        uploadedAt: dateToISOString(new Date()),
+        // Create unique shop ID combining user ID and lens ID (PREVENTS CONFLICTS)
+        shopId: `${userUid}_${lens.id}`,
+        // Ensure user ownership
+        ownerId: userUid
       }));
 
     const uploadPromises = lensesToUpload.map(async (lens) => {
@@ -57,21 +80,29 @@ export const uploadLensesToShop = async (lenses, userInfo) => {
     });
 
     const results = await Promise.all(uploadPromises);
-    console.log('Successfully uploaded lenses to shop:', results);
+    console.log('Successfully uploaded user lenses to shop:', results);
     return results;
   } catch (error) {
-    console.error('Error uploading lenses to shop:', error);
+    console.error('Error uploading user lenses to shop:', error);
     throw error;
   }
 };
 
-// Remove user's lenses from the centralized shop
-export const removeLensesFromShop = async (lenses, userInfo) => {
+// Remove user's lenses from the centralized shop (USER-SPECIFIC)
+export const removeLensesFromShop = async (lenses, userInfo = null) => {
   try {
+    const currentUserInfo = userInfo || getCurrentUserInfo();
+    const userUid = getUserUid();
+    
+    if (!userUid) {
+      throw new Error('User not authenticated');
+    }
+
     const removePromises = lenses
       .filter(lens => lens.type === 'prescription' || lens.type === 'contact')
       .map(async (lens) => {
-        const shopId = `${userInfo.userId}_${lens.id}`;
+        // Use user-specific shop ID (PREVENTS CROSS-USER DELETION)
+        const shopId = `${userUid}_${lens.id}`;
         
         const response = await fetch(`${SHOP_API_BASE_URL}/deleteShopItem`, {
           method: 'DELETE',
@@ -86,7 +117,7 @@ export const removeLensesFromShop = async (lenses, userInfo) => {
         if (!response.ok) {
           // Don't throw error if item doesn't exist
           if (response.status === 404) {
-            console.log(`Lens ${lens.id} not found in shop, skipping...`);
+            console.log(`User lens ${lens.id} not found in shop, skipping...`);
             return { success: true, message: 'Not found, skipped' };
           }
           throw new Error(`Failed to remove lens ${lens.id}`);
@@ -96,17 +127,22 @@ export const removeLensesFromShop = async (lenses, userInfo) => {
       });
 
     const results = await Promise.all(removePromises);
-    console.log('Successfully removed lenses from shop:', results);
+    console.log('Successfully removed user lenses from shop:', results);
     return results;
   } catch (error) {
-    console.error('Error removing lenses from shop:', error);
+    console.error('Error removing user lenses from shop:', error);
     throw error;
   }
 };
 
-// Search for matching lenses in the centralized shop
+// Search for matching lenses in the centralized shop (FILTERED BY USER PREFERENCES)
 export const searchMatchingLenses = async (prescriptionData) => {
   try {
+    const userUid = getUserUid();
+    if (!userUid) {
+      throw new Error('User not authenticated');
+    }
+    
     // Get all lenses from shop
     const response = await fetch(`${SHOP_API_BASE_URL}/getShop?limit=1000`);
     
@@ -123,8 +159,16 @@ export const searchMatchingLenses = async (prescriptionData) => {
     const allShopLenses = result.data.documents;
     console.log(`Found ${allShopLenses.length} lenses in centralized shop`);
 
+    // Filter out user's own lenses and only show others' lenses
+    const otherUsersLenses = allShopLenses.filter(lens => {
+      // Exclude user's own lenses
+      return lens.ownerId !== userUid && lens.userInfo?.userId !== userUid;
+    });
+
+    console.log(`Filtering to ${otherUsersLenses.length} lenses from other users`);
+
     // Filter and match lenses using the same logic as local inventory
-    const matchingLenses = findMatchingLenses(allShopLenses, prescriptionData);
+    const matchingLenses = findMatchingLenses(otherUsersLenses, prescriptionData);
     
     return matchingLenses;
   } catch (error) {
@@ -198,111 +242,104 @@ const findMatchingLenses = (lenses, prescriptionData) => {
       factors++;
     }
     
-    return factors > 0 ? Math.round((score / factors) * 100) : 0;
+    return factors > 0 ? score / factors : 0;
   };
 
   const matches = [];
 
-  // Check right eye matches
-  if (prescriptionData.rightSph) {
+  // Check both eyes
+  ['right', 'left'].forEach(eye => {
+    const eyeData = prescriptionData[eye];
+    if (!eyeData) return;
+
     lenses.forEach(lens => {
-      if (lens.eye !== 'left' && lens.type === 'prescription') {
-        // Check SPH match
-        if (!lens.sph || !isWithinTolerance(lens.sph, prescriptionData.rightSph, SPH_TOLERANCE)) {
-          return;
-        }
-        
-        // Check CYL match
-        if ((prescriptionData.rightCyl || lens.cyl) && 
-            (!prescriptionData.rightCyl || !lens.cyl || !isWithinTolerance(lens.cyl, prescriptionData.rightCyl, CYL_TOLERANCE))) {
-          return;
-        }
-        
-        // Check AXIS match
-        if (prescriptionData.rightCyl && lens.cyl) {
-          if ((prescriptionData.rightAxis || lens.axis) && 
-              (!prescriptionData.rightAxis || !lens.axis || !isAxisWithinTolerance(lens.axis, prescriptionData.rightAxis))) {
-            return;
+      let isMatch = false;
+      let matchQuality = 0;
+      
+      // For contact lenses, match against specific eye
+      if (lens.type === 'contact' && lens.eye === eye) {
+        if (lens.sph && eyeData.sph && isWithinTolerance(lens.sph, eyeData.sph, SPH_TOLERANCE)) {
+          isMatch = true;
+          if (lens.cyl && eyeData.cyl) {
+            isMatch = isMatch && isWithinTolerance(lens.cyl, eyeData.cyl, CYL_TOLERANCE);
+            if (lens.axis && eyeData.axis && isMatch) {
+              isMatch = isAxisWithinTolerance(lens.axis, eyeData.axis);
+            }
           }
         }
         
-        // Check ADD match
-        if ((prescriptionData.rightAdd || lens.add) && 
-            (!prescriptionData.rightAdd || !lens.add || !isWithinTolerance(lens.add, prescriptionData.rightAdd, ADD_TOLERANCE))) {
-          return;
+        if (isMatch) {
+          matchQuality = calculateMatchQuality(lens, eyeData.sph, eyeData.cyl, eyeData.axis, eyeData.add);
         }
-        
-        matches.push({
-          ...lens,
-          matchedEye: 'right',
-          matchQuality: calculateMatchQuality(
-            lens, 
-            prescriptionData.rightSph, 
-            prescriptionData.rightCyl, 
-            prescriptionData.rightAxis, 
-            prescriptionData.rightAdd
-          )
-        });
       }
-    });
-  }
-
-  // Check left eye matches
-  if (prescriptionData.leftSph) {
-    lenses.forEach(lens => {
-      if (lens.eye !== 'right' && lens.type === 'prescription') {
-        // Check SPH match
-        if (!lens.sph || !isWithinTolerance(lens.sph, prescriptionData.leftSph, SPH_TOLERANCE)) {
-          return;
-        }
-        
-        // Check CYL match
-        if ((prescriptionData.leftCyl || lens.cyl) && 
-            (!prescriptionData.leftCyl || !lens.cyl || !isWithinTolerance(lens.cyl, prescriptionData.leftCyl, CYL_TOLERANCE))) {
-          return;
-        }
-        
-        // Check AXIS match
-        if (prescriptionData.leftCyl && lens.cyl) {
-          if ((prescriptionData.leftAxis || lens.axis) && 
-              (!prescriptionData.leftAxis || !lens.axis || !isAxisWithinTolerance(lens.axis, prescriptionData.leftAxis))) {
-            return;
+      
+      // For prescription lenses, they can be used for either eye
+      else if (lens.type === 'prescription') {
+        if (lens.sph && eyeData.sph && isWithinTolerance(lens.sph, eyeData.sph, SPH_TOLERANCE)) {
+          isMatch = true;
+          if (lens.cyl && eyeData.cyl) {
+            isMatch = isMatch && isWithinTolerance(lens.cyl, eyeData.cyl, CYL_TOLERANCE);
+            if (lens.axis && eyeData.axis && isMatch) {
+              isMatch = isAxisWithinTolerance(lens.axis, eyeData.axis);
+            }
+          }
+          if (lens.add && eyeData.add && isMatch) {
+            isMatch = isWithinTolerance(lens.add, eyeData.add, ADD_TOLERANCE);
           }
         }
         
-        // Check ADD match
-        if ((prescriptionData.leftAdd || lens.add) && 
-            (!prescriptionData.leftAdd || !lens.add || !isWithinTolerance(lens.add, prescriptionData.leftAdd, ADD_TOLERANCE))) {
-          return;
+        if (isMatch) {
+          matchQuality = calculateMatchQuality(lens, eyeData.sph, eyeData.cyl, eyeData.axis, eyeData.add);
         }
-        
+      }
+
+      if (isMatch && matchQuality > 0.7) { // Only show high-quality matches
         matches.push({
           ...lens,
-          matchedEye: 'left',
-          matchQuality: calculateMatchQuality(
-            lens, 
-            prescriptionData.leftSph, 
-            prescriptionData.leftCyl, 
-            prescriptionData.leftAxis, 
-            prescriptionData.leftAdd
-          )
+          matchedFor: eye,
+          matchQuality: Math.round(matchQuality * 100),
+          matchDetails: {
+            sph: { lens: lens.sph, prescription: eyeData.sph },
+            cyl: { lens: lens.cyl, prescription: eyeData.cyl },
+            axis: { lens: lens.axis, prescription: eyeData.axis },
+            add: { lens: lens.add, prescription: eyeData.add }
+          }
         });
       }
     });
-  }
+  });
 
-  return matches.sort((a, b) => b.matchQuality - a.matchQuality);
+  // Sort by match quality and remove duplicates
+  return matches
+    .sort((a, b) => b.matchQuality - a.matchQuality)
+    .filter((lens, index, arr) => 
+      arr.findIndex(l => l.id === lens.id && l.matchedFor === lens.matchedFor) === index
+    );
 };
 
-// Get user's shop sharing preferences
+// Get shop preferences (USER-SPECIFIC)
 export const getShopPreferences = () => {
-  const prefs = localStorage.getItem('shopPreferences');
-  return prefs ? JSON.parse(prefs) : { isSharing: false };
+  const userUid = getUserUid();
+  if (!userUid) {
+    return { isSharing: false }; // Return default object instead of null
+  }
+  
+  const preferences = localStorage.getItem(`shopPreferences_${userUid}`);
+  return preferences ? JSON.parse(preferences) : { isSharing: false }; // Return default object instead of null
 };
 
-// Set user's shop sharing preferences
+// Set shop preferences (USER-SPECIFIC)
 export const setShopPreferences = (preferences) => {
-  localStorage.setItem('shopPreferences', JSON.stringify(preferences));
+  const userUid = getUserUid();
+  if (!userUid) {
+    throw new Error('User not authenticated');
+  }
+  
+  localStorage.setItem(`shopPreferences_${userUid}`, JSON.stringify({
+    ...preferences,
+    userId: userUid,
+    updatedAt: dateToISOString(new Date())
+  }));
 };
 
 export { getCurrentUserInfo }; 

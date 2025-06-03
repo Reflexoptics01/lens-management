@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, addDoc, getDocs, query, orderBy, doc, updateDoc, deleteDoc, Timestamp, where } from 'firebase/firestore';
 import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
+import { formatDate as utilFormatDate } from '../utils/dateUtils';
 import Navbar from '../components/Navbar';
 import ItemSuggestions from '../components/ItemSuggestions';
 import AutocompleteInput from '../components/AutocompleteInput';
@@ -408,9 +409,7 @@ const DailyDispatchLog = () => {
   };
 
   const formatDate = (timestamp) => {
-    if (!timestamp) return 'N/A';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString('en-IN');
+    return utilFormatDate(timestamp) || 'N/A';
   };
 
   const renderOpticalShop = (customer, index, isSelected) => (

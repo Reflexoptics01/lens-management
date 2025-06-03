@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
 import { collection, getDocs } from 'firebase/firestore';
 import { getUserCollection } from '../utils/multiTenancy';
+import { formatDate } from '../utils/dateUtils';
 import Navbar from '../components/Navbar';
 import { BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useTheme } from '../contexts/ThemeContext';
@@ -15,11 +16,7 @@ const LensInventoryReport = () => {
   const { isDark } = useTheme();
   
   // Get current date for report generation
-  const currentDate = new Date().toLocaleDateString('en-IN', { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
-  });
+  const currentDate = formatDate(new Date());
   
   useEffect(() => {
     fetchLensInventory();

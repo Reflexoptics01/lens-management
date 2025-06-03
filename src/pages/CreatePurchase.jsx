@@ -6,6 +6,7 @@ import Navbar from '../components/Navbar';
 import CustomerForm from '../components/CustomerForm';
 import ItemSuggestions from '../components/ItemSuggestions';
 import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
+import { dateToISOString } from '../utils/dateUtils';
 
 const TAX_OPTIONS = [
   { id: 'TAX_FREE', label: 'Tax Free', rate: 0 },
@@ -57,7 +58,7 @@ const CreatePurchase = () => {
   // Purchase details
   const [purchaseNumber, setPurchaseNumber] = useState('');
   const [vendorInvoiceNumber, setVendorInvoiceNumber] = useState('');
-  const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0]);
+  const [purchaseDate, setPurchaseDate] = useState(dateToISOString(new Date()).split('T')[0]);
   const [selectedTaxOption, setSelectedTaxOption] = useState(TAX_OPTIONS[0].id);
   const [discountType, setDiscountType] = useState('amount'); // 'amount' or 'percentage'
   const [discountValue, setDiscountValue] = useState(0);
@@ -143,38 +144,26 @@ const CreatePurchase = () => {
         return;
       }
       
-      // Get or create the user-specific counter document for purchases in this financial year
+      // Get the user-specific counter document for purchases in this financial year (DO NOT INCREMENT YET)
       const counterRef = getUserDoc('counters', `purchases_${financialYear}`);
       const counterDoc = await getDoc(counterRef);
       
       let counter;
       if (!counterDoc.exists()) {
-        // If counter doesn't exist, create it starting from 1
+        // If counter doesn't exist, preview starting from 1 (but don't create the counter yet)
         counter = {
           count: 1,
           prefix: 'P',
           separator: '-',
           format: '${prefix}${separator}${number}'
         };
-        await setDoc(counterRef, {
-          ...counter,
-          createdAt: serverTimestamp()
-        });
       } else {
         counter = counterDoc.data();
-        // Increment the counter for preview
-        const newCount = (counter.count || 0) + 1;
-        
-        // Update the counter in user-specific Firestore
-        await updateDoc(counterRef, {
-          count: newCount,
-          updatedAt: serverTimestamp()
-        });
-        
-        counter.count = newCount;
+        // Preview the next count (current + 1) without incrementing in Firestore
+        counter.count = (counter.count || 0) + 1;
       }
       
-      // Format the purchase number
+      // Format the purchase number for preview
       const paddedNumber = counter.count.toString().padStart(4, '0');
       
       // Use the format specified in the counter or fall back to default
@@ -384,6 +373,50 @@ const CreatePurchase = () => {
     }
   };
 
+  // Function to increment the purchase counter after successful creation
+  const incrementPurchaseCounter = async () => {
+    try {
+      // Get the current financial year from user-specific settings
+      const settingsDoc = await getDoc(getUserDoc('settings', 'shopSettings'));
+      let financialYear = null;
+      
+      if (settingsDoc.exists()) {
+        const settings = settingsDoc.data();
+        financialYear = settings.financialYear;
+      }
+      
+      if (!financialYear) {
+        // Simple counter without financial year - not needed for fallback method
+        return;
+      }
+      
+      // Get or create the user-specific counter document for purchases in this financial year
+      const counterRef = getUserDoc('counters', `purchases_${financialYear}`);
+      const counterDoc = await getDoc(counterRef);
+      
+      if (!counterDoc.exists()) {
+        // Create initial counter
+        await setDoc(counterRef, {
+          count: 1,
+          prefix: 'P',
+          separator: '-',
+          format: '${prefix}${separator}${number}',
+          createdAt: serverTimestamp()
+        });
+      } else {
+        // Increment the counter
+        const currentCount = counterDoc.data().count || 0;
+        await updateDoc(counterRef, {
+          count: currentCount + 1,
+          updatedAt: serverTimestamp()
+        });
+      }
+    } catch (error) {
+      console.error('Error incrementing purchase counter:', error);
+      // Don't throw error to prevent blocking the purchase creation
+    }
+  };
+
   const addLensesToInventory = async (purchaseId) => {
     try {
       const stockLenses = [];
@@ -504,6 +537,9 @@ const CreatePurchase = () => {
         const addedLensCount = await addLensesToInventory(docRef.id);
         console.log(`Successfully added ${addedLensCount} lens items to inventory`);
       }
+      
+      // Increment the purchase counter
+      await incrementPurchaseCounter();
       
       setSuccess(true);
       navigate('/purchases');

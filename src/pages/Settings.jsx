@@ -4,10 +4,21 @@ import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, addDoc,
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential, createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { getUserCollection, getUserDoc, createSecureBackupMetadata, validateBackupOwnership } from '../utils/multiTenancy';
-import { dateToISOString, processRestoredData, safelyParseDate } from '../utils/dateUtils';
+import { dateToISOString, processRestoredData, safelyParseDate, formatDateTime } from '../utils/dateUtils';
+import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
+import { 
+  getShopPreferences, 
+  setShopPreferences, 
+  uploadLensesToShop, 
+  removeLensesFromShop, 
+  getCurrentUserInfo 
+} from '../utils/shopAPI';
 
 const Settings = () => {
+  // Use centralized auth
+  const { user, userRole, isAuthenticated, USER_ROLES } = useAuth();
+  
   // Shop information
   const [shopName, setShopName] = useState('');
   const [gstNumber, setGstNumber] = useState('');
@@ -71,6 +82,11 @@ const Settings = () => {
   const [userSuccess, setUserSuccess] = useState('');
   const [usersTab, setUsersTab] = useState('active'); // 'active' or 'inactive'
   
+  // Add shop-related states
+  const [shopPreferences, setShopPreferencesState] = useState({ isSharing: false });
+  const [shopLoading, setShopLoading] = useState(false);
+  const [shopError, setShopError] = useState('');
+  
   // Define menu items to display in permissions checkboxes
   const menuItems = [
     { path: '/dashboard', title: 'Dashboard' },
@@ -105,10 +121,10 @@ const Settings = () => {
   
   useEffect(() => {
     fetchSettings();
-    if (auth.currentUser) {
+    if (isAuthenticated() && user) {
       fetchUsers();
     }
-  }, []);
+  }, [isAuthenticated, user]);
   
   const fetchSettings = async () => {
     try {
@@ -455,7 +471,6 @@ const Settings = () => {
       setLoading(true);
       
       // Re-authenticate the user
-      const user = auth.currentUser;
       const credential = EmailAuthProvider.credential(user.email, currentPassword);
       await reauthenticateWithCredential(user, credential);
       
@@ -779,8 +794,7 @@ const Settings = () => {
       setBackupSuccess('');
       
       // Get current user information for validation
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
+      if (!user) {
         throw new Error('User not authenticated. Please login again.');
       }
       
@@ -809,7 +823,7 @@ const Settings = () => {
       const backupData = {};
       
       console.log('Starting backup process for collections:', collectionsToBackup);
-      console.log('Current user creating backup:', currentUser.uid, currentUser.email);
+      console.log('Current user creating backup:', user.uid, user.email);
       
       // Fetch data from each user-specific collection
       for (const collectionName of collectionsToBackup) {
@@ -853,7 +867,7 @@ const Settings = () => {
       
       // Enhanced metadata with strict user identification
       backupData.metadata = {
-        ...createSecureBackupMetadata(currentUser),
+        ...createSecureBackupMetadata(user),
         collections: collectionsToBackup,
         totalDocuments: 0, // Will be updated below
         collectionsCount: collectionsToBackup.length
@@ -884,7 +898,7 @@ const Settings = () => {
       const timeString = date.toTimeString().slice(0, 5).replace(/:/g, '');
       
       // Include user email in filename for easier identification
-      const safeEmail = currentUser.email.replace(/[^a-zA-Z0-9]/g, '_');
+      const safeEmail = user.email.replace(/[^a-zA-Z0-9]/g, '_');
       
       // Create a link element and trigger download
       const a = document.createElement('a');
@@ -902,12 +916,12 @@ const Settings = () => {
       setBackupSuccess(`✅ Your personal backup created successfully! 
       
       📊 Backup Summary:
-      • User: ${currentUser.email}
+      • User: ${user.email}
       • ${totalDocuments} documents backed up
       • ${collectionsToBackup.length} collections included
       • File: lens-management-${safeEmail}-${dateString}-${timeString}.json
       
-      🔒 Security: This backup can only be restored by your account (${currentUser.email}).
+      🔒 Security: This backup can only be restored by your account (${user.email}).
       
       Your backup file is downloading now.`);
     } catch (error) {
@@ -947,12 +961,11 @@ const Settings = () => {
       setBackupSuccess('');
       
       // Get current user information for validation
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
+      if (!user) {
         throw new Error('User not authenticated. Please login again to restore backup.');
       }
       
-      console.log('Current user attempting restore:', currentUser.uid, currentUser.email);
+      console.log('Current user attempting restore:', user.uid, user.email);
       
       // Read the file
       const reader = new FileReader();
@@ -970,7 +983,7 @@ const Settings = () => {
           console.log('Backup metadata:', backupData.metadata);
           
           // CRITICAL: Validate backup ownership
-          const validationResult = validateBackupOwnership(backupData.metadata, currentUser);
+          const validationResult = validateBackupOwnership(backupData.metadata, user);
           
           console.log('Backup ownership validation result:', validationResult);
           
@@ -981,7 +994,7 @@ ${validationResult.errors.join('\n')}
 
 Backup Details:
 • Backup Owner: ${backupData.metadata.userEmail || 'Unknown'}
-• Current User: ${currentUser.email}
+• Current User: ${user.email}
 
 For security reasons, you can only restore backups created by your own account.`;
             
@@ -1001,7 +1014,7 @@ For security reasons, you can only restore backups created by your own account.`
           
           // Enhanced confirmation dialog with security information
           if (!window.confirm(
-            `🔒 RESTORE CONFIRMATION FOR ${currentUser.email}
+            `🔒 RESTORE CONFIRMATION FOR ${user.email}
             
 This backup was created by: ${backupData.metadata.userEmail}
 Backup created: ${new Date(backupData.metadata.createdAt).toLocaleString()}
@@ -1060,7 +1073,7 @@ Are you sure you want to continue with the restoration?`
                     
                     // Update progress every 10 documents
                     if (restoredCount % 10 === 0) {
-                      setBackupSuccess(`Restoring to ${currentUser.email}... ${restoredCount} documents processed`);
+                      setBackupSuccess(`Restoring to ${user.email}... ${restoredCount} documents processed`);
                     }
                   } catch (docError) {
                     console.error(`Error restoring document ${docId} in ${collectionName}:`, docError);
@@ -1187,7 +1200,7 @@ The page will refresh in 3 seconds to load your restored data...`;
         inactiveAt: null,
         inactiveBy: null,
         restoredAt: new Date(),
-        restoredBy: auth.currentUser.uid
+        restoredBy: user.uid
       });
       
       setUserSuccess(`User ${userEmail} has been restored and can now log in again.`);
@@ -1269,7 +1282,7 @@ The page will refresh in 3 seconds to load your restored data...`;
         role: newUserRole,
         permissions: newUserPermissions,
         createdAt: new Date(),
-        createdBy: auth.currentUser.uid,
+        createdBy: user.uid,
         isActive: true
       });
       
@@ -1335,7 +1348,7 @@ The page will refresh in 3 seconds to load your restored data...`;
       await updateDoc(getUserDoc('teamMembers', userId), {
         isActive: false,
         inactiveAt: new Date(),
-        inactiveBy: auth.currentUser.uid
+        inactiveBy: user.uid
       });
       
       setUserSuccess(`User ${userEmail} has been marked as inactive and will no longer be able to log in.`);
@@ -1480,7 +1493,6 @@ The page will refresh in 3 seconds to load your restored data...`;
       setPasswordConfirmError('');
       
       // Re-authenticate the user with the provided password
-      const user = auth.currentUser;
       const credential = EmailAuthProvider.credential(user.email, adminPassword);
       await reauthenticateWithCredential(user, credential);
       
@@ -1666,6 +1678,103 @@ The page will refresh in 3 seconds to load your restored data...`;
       </div>
     </div>
   );
+
+  useEffect(() => {
+    checkFinancialYearEnd();
+  }, []);
+
+  // Load shop preferences on component mount
+  useEffect(() => {
+    loadShopPreferences();
+  }, []);
+
+  // Load shop preferences function
+  const loadShopPreferences = () => {
+    try {
+      const preferences = getShopPreferences();
+      setShopPreferencesState(preferences || { isSharing: false });
+    } catch (error) {
+      console.error('Error loading shop preferences:', error);
+      setShopPreferencesState({ isSharing: false });
+    }
+  };
+
+  // Handle shop inventory sharing toggle
+  const handleShopPermissionToggle = async () => {
+    try {
+      setShopLoading(true);
+      setShopError('');
+      
+      const newSharingState = !shopPreferences.isSharing;
+      
+      if (newSharingState) {
+        // Enable sharing - upload lenses to shop
+        const { db } = await import('../firebaseConfig');
+        const { collection, getDocs } = await import('firebase/firestore');
+        const { getUserCollection } = await import('../utils/multiTenancy');
+        
+        // Fetch current lens inventory
+        const lensRef = getUserCollection('lensInventory');
+        const snapshot = await getDocs(lensRef);
+        
+        const lenses = snapshot.docs
+          .filter(doc => !doc.data()._placeholder)
+          .map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }))
+          .filter(lens => lens.type === 'prescription' || lens.type === 'contact'); // Only prescription and contact lenses
+        
+        if (lenses.length > 0) {
+          // Get current user info for shop operations
+          const userInfo = getCurrentUserInfo();
+          await uploadLensesToShop(lenses, userInfo);
+          console.log(`Uploaded ${lenses.length} lenses to shop`);
+        }
+        
+        displaySuccess(`Successfully enabled inventory sharing! ${lenses.length} lenses uploaded to Reflex Shop.`);
+      } else {
+        // Disable sharing - remove lenses from shop
+        const { db } = await import('../firebaseConfig');
+        const { collection, getDocs } = await import('firebase/firestore');
+        const { getUserCollection } = await import('../utils/multiTenancy');
+        
+        // Fetch current lens inventory to remove from shop
+        const lensRef = getUserCollection('lensInventory');
+        const snapshot = await getDocs(lensRef);
+        
+        const lenses = snapshot.docs
+          .filter(doc => !doc.data()._placeholder)
+          .map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }))
+          .filter(lens => lens.type === 'prescription' || lens.type === 'contact');
+        
+        if (lenses.length > 0) {
+          await removeLensesFromShop(lenses);
+          console.log(`Removed ${lenses.length} lenses from shop`);
+        }
+        
+        displaySuccess('Successfully disabled inventory sharing! Your lenses have been removed from Reflex Shop.');
+      }
+      
+      // Update preferences
+      const updatedPreferences = {
+        ...shopPreferences,
+        isSharing: newSharingState
+      };
+      
+      setShopPreferences(updatedPreferences);
+      setShopPreferencesState(updatedPreferences);
+      
+    } catch (error) {
+      console.error('Error toggling shop permissions:', error);
+      setShopError(`Failed to ${shopPreferences.isSharing ? 'disable' : 'enable'} inventory sharing: ${error.message}`);
+    } finally {
+      setShopLoading(false);
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-gray-900">
@@ -2129,7 +2238,7 @@ The page will refresh in 3 seconds to load your restored data...`;
                   <div className="mt-3 p-3 bg-blue-100 dark:bg-blue-800/50 border border-blue-200 dark:border-blue-600 rounded-md">
                     <p className="text-sm font-medium text-blue-800 dark:text-blue-200">🔒 Security Notice:</p>
                     <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                      Backups are personal and account-specific. You can only restore backups created by your own account ({auth.currentUser?.email}). 
+                      Backups are personal and account-specific. You can only restore backups created by your own account ({user?.email}). 
                       This prevents accidental data mixing between different users.
                     </p>
                   </div>
@@ -2410,7 +2519,7 @@ The page will refresh in 3 seconds to load your restored data...`;
                                 <p className="text-sm font-medium text-gray-900 dark:text-white">{user.email}</p>
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
                                   Role: {user.role || 'user'} • 
-                                  Created: {user.createdAt ? new Date(user.createdAt.toDate()).toLocaleDateString() : 'N/A'}
+                                  Created: {formatDateTime(user.createdAt)}
                                 </p>
                               </div>
                               <div className="flex space-x-2">
@@ -2446,7 +2555,7 @@ The page will refresh in 3 seconds to load your restored data...`;
                                 <p className="text-sm font-medium text-gray-900 dark:text-white">{user.email}</p>
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
                                   Role: {user.role || 'user'} • 
-                                  Deleted: {user.deletedAt ? new Date(user.deletedAt.toDate()).toLocaleDateString() : 'N/A'}
+                                  Deleted: {formatDateTime(user.deletedAt)}
                                 </p>
                               </div>
                               <button
@@ -2572,6 +2681,85 @@ The page will refresh in 3 seconds to load your restored data...`;
       
       {/* Password Confirm Modal */}
       {showPasswordConfirmModal && <PasswordConfirmModal />}
+
+      {/* Reflex Shop - Inventory Sharing Section */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Reflex Shop - Inventory Sharing</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Share your prescription and contact lenses in the centralized Reflex Shop marketplace. 
+              Other distributors can discover and contact you for lens orders.
+            </p>
+          </div>
+          <div className="flex items-center">
+            <button
+              onClick={handleShopPermissionToggle}
+              disabled={shopLoading}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                shopPreferences.isSharing 
+                  ? 'bg-blue-600 focus:ring-blue-500' 
+                  : 'bg-gray-200 dark:bg-gray-700 focus:ring-gray-500'
+              } ${shopLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  shopPreferences.isSharing ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+
+        {shopError && (
+          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <p className="text-red-600 dark:text-red-400 text-sm">{shopError}</p>
+          </div>
+        )}
+
+        <div className="space-y-3 text-sm">
+          <div className="flex items-center space-x-2">
+            <div className={`w-3 h-3 rounded-full ${shopPreferences.isSharing ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+            <span className="text-gray-700 dark:text-gray-300">
+              {shopPreferences.isSharing ? 'Inventory sharing is enabled' : 'Inventory sharing is disabled'}
+            </span>
+          </div>
+          
+          {shopPreferences.isSharing && (
+            <>
+              <div className="flex items-center space-x-2">
+                <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <span className="text-gray-700 dark:text-gray-300">
+                  Your prescription and contact lenses are visible in Reflex Shop
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <span className="text-gray-700 dark:text-gray-300">
+                  Other distributors can find and contact you for orders
+                </span>
+              </div>
+            </>
+          )}
+          
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+            <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-1">What gets shared:</h4>
+            <ul className="text-blue-800 dark:text-blue-200 text-xs space-y-1">
+              <li>• Prescription lenses (SPH, CYL, AXIS, ADD details)</li>
+              <li>• Contact lenses (power, brand, type information)</li>
+              <li>• Your shop name, location, and contact details</li>
+              <li>• Lens pricing and availability</li>
+            </ul>
+            <p className="text-blue-700 dark:text-blue-300 text-xs mt-2">
+              <strong>Note:</strong> Stock lenses and services are not shared in the marketplace.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

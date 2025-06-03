@@ -2,15 +2,43 @@ import { collection, doc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 
 /**
- * Get the current user's UID from localStorage
+ * Get the current user's UID from localStorage or AuthContext
  * @returns {string|null} The user's UID or null if not found
  */
 export const getUserUid = () => {
-  const uid = localStorage.getItem('userUid');
-  console.log('getUserUid: Retrieved UID from localStorage:', uid);
+  // First try localStorage (existing approach)
+  let uid = localStorage.getItem('userUid');
+  console.log('getUserUid: localStorage userUid:', uid);
+  
+  // If not found in localStorage, try the global auth user (new approach)
+  if (!uid && typeof window !== 'undefined' && window.__authUser) {
+    uid = window.__authUser.uid;
+    console.log('getUserUid: Using AuthContext user UID:', uid);
+  }
+  
+  // Try Firebase auth directly as last resort
   if (!uid) {
-    console.error('No user UID found in localStorage');
+    try {
+      // Dynamic import to avoid circular dependency
+      import('../firebaseConfig').then(({ auth }) => {
+        if (auth.currentUser) {
+          uid = auth.currentUser.uid;
+          console.log('getUserUid: Using Firebase currentUser UID:', uid);
+          // Update localStorage if we found a user
+          localStorage.setItem('userUid', uid);
+          localStorage.setItem('userEmail', auth.currentUser.email);
+        }
+      });
+    } catch (error) {
+      console.warn('getUserUid: Could not access Firebase auth:', error);
+    }
+  }
+  
+  console.log('getUserUid: Final retrieved UID:', uid);
+  if (!uid) {
+    console.error('No user UID found in localStorage, AuthContext, or Firebase auth');
     console.log('localStorage contents:', Object.keys(localStorage));
+    console.log('window.__authUser:', typeof window !== 'undefined' ? window.__authUser : 'Window not available');
   }
   return uid;
 };

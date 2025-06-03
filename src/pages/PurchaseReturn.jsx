@@ -4,6 +4,7 @@ import { collection, getDocs, query, orderBy, doc, getDoc, deleteDoc, where, Tim
 import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import { formatDate as utilFormatDate, formatDateTime, dateToISOString } from '../utils/dateUtils';
 
 const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false }) => {
   const [returns, setReturns] = useState([]);
@@ -32,7 +33,7 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
   // Form state for return creation
   const [returnItems, setReturnItems] = useState([]);
   const [returnNote, setReturnNote] = useState('');
-  const [returnDate, setReturnDate] = useState(new Date().toISOString().split('T')[0]);
+  const [returnDate, setReturnDate] = useState(dateToISOString(new Date()).split('T')[0]);
   const [returnAmount, setReturnAmount] = useState(0);
 
   useEffect(() => {
@@ -371,10 +372,21 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
 
   const formatDate = (timestamp) => {
     if (!timestamp) return { date: '-', time: '-' };
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    
+    // Use dateUtils for consistent formatting
+    const date = utilFormatDate(timestamp);
+    const dateTime = formatDateTime(timestamp);
+    
+    if (!date || date === '') {
+      return { date: '-', time: '-' };
+    }
+    
+    // Extract time from formatted datetime
+    const time = dateTime ? dateTime.split(', ')[1] || '-' : '-';
+    
     return {
-      date: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-      time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+      date: date,
+      time: time
     };
   };
 

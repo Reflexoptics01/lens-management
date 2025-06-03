@@ -7,7 +7,20 @@ const ThemeToggle = ({ className = '' }) => {
   return (
     <button
       onClick={toggleTheme}
-      className={`theme-toggle ${className}`}
+      className={`theme-toggle p-2 rounded-lg transition-all duration-300 ${className}`}
+      style={{
+        color: 'var(--text-primary)',
+        backgroundColor: 'transparent',
+        border: '1px solid var(--border-primary)'
+      }}
+      onMouseEnter={(e) => {
+        e.target.style.backgroundColor = 'var(--bg-tertiary)';
+        e.target.style.color = 'var(--primary-blue)';
+      }}
+      onMouseLeave={(e) => {
+        e.target.style.backgroundColor = 'transparent';
+        e.target.style.color = 'var(--text-primary)';
+      }}
       title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
       aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
     >
