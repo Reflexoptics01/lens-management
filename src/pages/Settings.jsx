@@ -848,7 +848,58 @@ const Settings = () => {
             const processedData = JSON.parse(
               JSON.stringify(data, (key, value) => {
                 // Use dateToISOString from dateUtils for consistent date handling
-                return dateToISOString(value) || value;
+                if (dateToISOString(value)) {
+                  return dateToISOString(value);
+                }
+                
+                // Special handling for lens inventory data structures
+                if (collectionName === 'lensInventory') {
+                  // Ensure powerInventory is properly serialized
+                  if (key === 'powerInventory' && value && typeof value === 'object') {
+                    const serializedPowerInventory = {};
+                    for (const [powerKey, powerData] of Object.entries(value)) {
+                      if (powerData && typeof powerData === 'object') {
+                        serializedPowerInventory[powerKey] = {
+                          sph: typeof powerData.sph === 'number' ? powerData.sph : parseFloat(powerData.sph) || 0,
+                          cyl: typeof powerData.cyl === 'number' ? powerData.cyl : parseFloat(powerData.cyl) || 0,
+                          quantity: typeof powerData.quantity === 'number' ? powerData.quantity : parseInt(powerData.quantity) || 0
+                        };
+                      } else {
+                        serializedPowerInventory[powerKey] = powerData;
+                      }
+                    }
+                    return serializedPowerInventory;
+                  }
+                  
+                  // Ensure powerLimits is properly serialized
+                  if (key === 'powerLimits' && value && typeof value === 'object') {
+                    return {
+                      minSph: typeof value.minSph === 'number' ? value.minSph : parseFloat(value.minSph) || 0,
+                      maxSph: typeof value.maxSph === 'number' ? value.maxSph : parseFloat(value.maxSph) || 0,
+                      minCyl: typeof value.minCyl === 'number' ? value.minCyl : parseFloat(value.minCyl) || 0,
+                      maxCyl: typeof value.maxCyl === 'number' ? value.maxCyl : parseFloat(value.maxCyl) || 0,
+                      addition: typeof value.addition === 'number' ? value.addition : parseFloat(value.addition) || 0,
+                      axis: typeof value.axis === 'number' ? value.axis : parseInt(value.axis) || 0
+                    };
+                  }
+                  
+                  // Ensure numeric lens fields are properly typed
+                  if ((key === 'maxSph' || key === 'maxCyl' || key === 'sph' || key === 'cyl' || 
+                       key === 'add' || key === 'purchasePrice' || key === 'salePrice') && 
+                      value !== null && value !== undefined && value !== '') {
+                    const numValue = typeof value === 'number' ? value : parseFloat(value);
+                    return isNaN(numValue) ? value : numValue;
+                  }
+                  
+                  // Ensure integer lens fields are properly typed
+                  if ((key === 'qty' || key === 'axis' || key === 'totalQuantity') && 
+                      value !== null && value !== undefined && value !== '') {
+                    const intValue = typeof value === 'number' ? value : parseInt(value);
+                    return isNaN(intValue) ? value : intValue;
+                  }
+                }
+                
+                return value;
               })
             );
             
@@ -880,6 +931,31 @@ const Settings = () => {
       
       backupData.metadata.totalDocuments = totalDocuments;
       
+      // Calculate lens inventory statistics for better user feedback
+      let lensInventoryStats = '';
+      if (backupData.lensInventory) {
+        const lensCount = Object.keys(backupData.lensInventory).length;
+        const individualPowerLenses = Object.values(backupData.lensInventory)
+          .filter(lens => lens.inventoryType === 'individual' && lens.powerInventory).length;
+        const stockLenses = Object.values(backupData.lensInventory)
+          .filter(lens => lens.type === 'stock').length;
+        const rxLenses = Object.values(backupData.lensInventory)
+          .filter(lens => lens.type === 'prescription').length;
+        const contactLenses = Object.values(backupData.lensInventory)
+          .filter(lens => lens.type === 'contact').length;
+        
+        if (lensCount > 0) {
+          lensInventoryStats = `
+      
+      📋 Lens Inventory Backup Details:
+      • Total lenses: ${lensCount}
+      • RX lenses: ${rxLenses}
+      • Stock lenses: ${stockLenses}${individualPowerLenses > 0 ? ` (${individualPowerLenses} with individual power tracking)` : ''}
+      • Contact lenses: ${contactLenses}`;
+        }
+      }
+      
+      console.log(`Backup completed: ${totalDocuments} documents across ${collectionsToBackup.length} collections`);
       console.log(`Backup completed: ${totalDocuments} documents across ${collectionsToBackup.length} collections`);
       console.log('Backup metadata:', {
         userId: backupData.metadata.userId,
@@ -919,7 +995,7 @@ const Settings = () => {
       • User: ${user.email}
       • ${totalDocuments} documents backed up
       • ${collectionsToBackup.length} collections included
-      • File: lens-management-${safeEmail}-${dateString}-${timeString}.json
+      • File: lens-management-${safeEmail}-${dateString}-${timeString}.json${lensInventoryStats}
       
       🔒 Security: This backup can only be restored by your account (${user.email}).
       
@@ -1012,6 +1088,30 @@ For security reasons, you can only restore backups created by your own account.`
           const collections = backupData.metadata.collections;
           const totalDocuments = backupData.metadata.totalDocuments || 'unknown';
           
+          // Calculate lens inventory information for confirmation dialog
+          let lensInventoryInfo = '';
+          if (backupData.lensInventory) {
+            const lensCount = Object.keys(backupData.lensInventory).length;
+            const individualPowerLenses = Object.values(backupData.lensInventory)
+              .filter(lens => lens.inventoryType === 'individual' && lens.powerInventory).length;
+            const stockLenses = Object.values(backupData.lensInventory)
+              .filter(lens => lens.type === 'stock').length;
+            const rxLenses = Object.values(backupData.lensInventory)
+              .filter(lens => lens.type === 'prescription').length;
+            const contactLenses = Object.values(backupData.lensInventory)
+              .filter(lens => lens.type === 'contact').length;
+            
+            if (lensCount > 0) {
+              lensInventoryInfo = `
+
+📋 Lens Inventory to Restore:
+• Total lenses: ${lensCount}
+• RX lenses: ${rxLenses}
+• Stock lenses: ${stockLenses}${individualPowerLenses > 0 ? ` (${individualPowerLenses} with individual power tracking)` : ''}
+• Contact lenses: ${contactLenses}`;
+            }
+          }
+          
           // Enhanced confirmation dialog with security information
           if (!window.confirm(
             `🔒 RESTORE CONFIRMATION FOR ${user.email}
@@ -1023,7 +1123,7 @@ Backup created: ${new Date(backupData.metadata.createdAt).toLocaleString()}
 • Collections: ${collections.length}
 • Total documents: ${totalDocuments}
 • Backup version: ${backupData.metadata.version || 'unknown'}
-• Security level: ${backupData.metadata.securityLevel || 'standard'}
+• Security level: ${backupData.metadata.securityLevel || 'standard'}${lensInventoryInfo}
 
 ⚠️  WARNING: This will OVERWRITE your current data!
 
@@ -1101,7 +1201,7 @@ Are you sure you want to continue with the restoration?`
 • ${restoredCount} documents restored
 • ${skippedCount} documents skipped
 • ${errorCount} errors encountered
-• ${collections.length} collections processed
+• ${collections.length} collections processed${lensInventoryInfo ? `${lensInventoryInfo.replace('📋 Lens Inventory to Restore:', '📋 Lens Inventory Restored:')}` : ''}
 
 The page will refresh in 3 seconds to load your restored data...`;
           
@@ -2349,13 +2449,15 @@ The page will refresh in 3 seconds to load your restored data...`;
                         <li>Orders and sales</li>
                         <li>Transactions</li>
                         <li>Shop settings</li>
-                        <li>Lens inventory</li>
+                        <li>Lens inventory (RX, Stock with individual power tracking, Contact lenses)</li>
                         <li>Purchase records</li>
                         <li>Vendor information</li>
                         <li>Product catalog</li>
                         <li>Invoice data</li>
                         <li>Payment records</li>
                         <li>User management</li>
+                        <li>Prescription data</li>
+                        <li>Appointment data</li>
                         <li>All other business data</li>
                       </ul>
                     </div>

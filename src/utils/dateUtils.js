@@ -108,6 +108,46 @@ export const processRestoredData = (data) => {
         processed[key] = value.value; // Store as string if conversion fails
       }
     } 
+    // Special handling for powerInventory data structure
+    else if (key === 'powerInventory' && value && typeof value === 'object') {
+      processed[key] = {};
+      // PowerInventory has keys like "-5.5_-1.75" with values like {sph: -5.5, cyl: -1.75, quantity: 1}
+      for (const [powerKey, powerData] of Object.entries(value)) {
+        if (powerData && typeof powerData === 'object') {
+          processed[key][powerKey] = {
+            sph: typeof powerData.sph === 'number' ? powerData.sph : parseFloat(powerData.sph) || 0,
+            cyl: typeof powerData.cyl === 'number' ? powerData.cyl : parseFloat(powerData.cyl) || 0,
+            quantity: typeof powerData.quantity === 'number' ? powerData.quantity : parseInt(powerData.quantity) || 0
+          };
+        } else {
+          processed[key][powerKey] = powerData;
+        }
+      }
+    }
+    // Special handling for powerLimits data structure  
+    else if (key === 'powerLimits' && value && typeof value === 'object') {
+      processed[key] = {
+        minSph: typeof value.minSph === 'number' ? value.minSph : parseFloat(value.minSph) || 0,
+        maxSph: typeof value.maxSph === 'number' ? value.maxSph : parseFloat(value.maxSph) || 0,
+        minCyl: typeof value.minCyl === 'number' ? value.minCyl : parseFloat(value.minCyl) || 0,
+        maxCyl: typeof value.maxCyl === 'number' ? value.maxCyl : parseFloat(value.maxCyl) || 0,
+        addition: typeof value.addition === 'number' ? value.addition : parseFloat(value.addition) || 0,
+        axis: typeof value.axis === 'number' ? value.axis : parseInt(value.axis) || 0
+      };
+    }
+    // Ensure numeric fields are properly converted for lens data
+    else if ((key === 'maxSph' || key === 'maxCyl' || key === 'sph' || key === 'cyl' || 
+              key === 'add' || key === 'purchasePrice' || key === 'salePrice') && 
+             value !== null && value !== undefined && value !== '') {
+      const numValue = typeof value === 'number' ? value : parseFloat(value);
+      processed[key] = isNaN(numValue) ? value : numValue;
+    }
+    // Ensure integer fields are properly converted
+    else if ((key === 'qty' || key === 'axis' || key === 'totalQuantity') && 
+             value !== null && value !== undefined && value !== '') {
+      const intValue = typeof value === 'number' ? value : parseInt(value);
+      processed[key] = isNaN(intValue) ? value : intValue;
+    }
     // Handle nested objects
     else if (value && typeof value === 'object') {
       processed[key] = processRestoredData(value);

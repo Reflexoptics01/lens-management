@@ -1031,6 +1031,8 @@ const LensInventory = () => {
       
       let dataToExport = [];
       let filename = '';
+      let hasIndividualInventory = false;
+      let individualInventoryData = [];
       
       // Filter data based on type
       const filteredData = lenses.filter(lens => {
@@ -1042,6 +1044,33 @@ const LensInventory = () => {
         setError(`No ${type} lenses found to export.`);
         setExportLoading(false);
         return;
+      }
+      
+      // Check if there are any lenses with individual power inventory
+      if (type === 'stock' || type === 'all') {
+        const individualInventoryLenses = filteredData.filter(lens => 
+          lens.type === 'stock' && lens.inventoryType === 'individual' && lens.powerInventory
+        );
+        
+        if (individualInventoryLenses.length > 0) {
+          hasIndividualInventory = true;
+          
+          // Create detailed power inventory data
+          individualInventoryLenses.forEach(lens => {
+            Object.entries(lens.powerInventory).forEach(([powerKey, powerData]) => {
+              const [sph, cyl] = powerKey.split('_').map(p => parseFloat(p));
+              individualInventoryData.push({
+                'Brand Name': lens.brandName || '',
+                'Lens ID': lens.id,
+                'SPH': sph,
+                'CYL': cyl,
+                'Quantity': parseInt(powerData?.quantity) || 0,
+                'Power Key': powerKey,
+                'In Stock': parseInt(powerData?.quantity) > 0 ? 'Yes' : 'No'
+              });
+            });
+          });
+        }
       }
       
       // Format data based on lens type
@@ -1075,13 +1104,18 @@ const LensInventory = () => {
         case 'stock':
           dataToExport = filteredData.map(lens => ({
             'Brand Name': lens.brandName || '',
+            'Max SPH': lens.maxSph || '',
+            'Max CYL': lens.maxCyl || '',
             'Power Series': lens.powerSeries || '',
             'Power Range': lens.powerRange || '',
             'Inventory Type': lens.inventoryType || 'range',
             'Purchase Price': lens.purchasePrice || '',
             'Sale Price': lens.salePrice || '',
-            'Quantity': lens.inventoryType === 'individual' ? lens.totalQuantity : lens.qty || 1,
+            'Quantity': lens.inventoryType === 'individual' ? (lens.totalQuantity || 0) : (lens.qty || 1),
             'Unit': lens.inventoryType === 'individual' ? 'pieces' : 'pairs',
+            'Individual Powers Count': lens.inventoryType === 'individual' && lens.powerInventory ? Object.keys(lens.powerInventory).length : '',
+            'SPH Range': lens.powerLimits ? `${lens.powerLimits.minSph} to ${lens.powerLimits.maxSph}` : '',
+            'CYL Range': lens.powerLimits ? `${lens.powerLimits.minCyl} to ${lens.powerLimits.maxCyl}` : '',
             'Created Date': lens.createdAt ? new Date(lens.createdAt.seconds * 1000).toLocaleDateString() : '',
             'Updated Date': lens.updatedAt ? new Date(lens.updatedAt.seconds * 1000).toLocaleDateString() : ''
           }));
@@ -1130,7 +1164,11 @@ const LensInventory = () => {
             'CYL': lens.cyl || '',
             'AXIS': lens.axis || '',
             'ADD': lens.add || '',
+            'Max SPH': lens.maxSph || '',
+            'Max CYL': lens.maxCyl || '',
             'Power Series': lens.powerSeries || '',
+            'Power Range': lens.powerRange || '',
+            'Inventory Type': lens.inventoryType || '',
             'Material': lens.material || '',
             'Index': lens.index || '',
             'Category': lens.category || '',
@@ -1140,7 +1178,8 @@ const LensInventory = () => {
             'Service Description': lens.serviceDescription || '',
             'Purchase Price': lens.purchasePrice || '',
             'Sale Price': lens.salePrice || '',
-            'Quantity': lens.qty || 1,
+            'Quantity': lens.inventoryType === 'individual' ? (lens.totalQuantity || 0) : (lens.qty || 1),
+            'Unit': lens.inventoryType === 'individual' ? 'pieces' : 'pairs',
             'Created Date': lens.createdAt ? new Date(lens.createdAt.seconds * 1000).toLocaleDateString() : '',
             'Updated Date': lens.updatedAt ? new Date(lens.updatedAt.seconds * 1000).toLocaleDateString() : ''
           }));
@@ -1179,10 +1218,31 @@ const LensInventory = () => {
       
       XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
       
+      // Add individual power inventory sheet if available
+      if (hasIndividualInventory && individualInventoryData.length > 0) {
+        const individualWorksheet = XLSX.utils.json_to_sheet(individualInventoryData);
+        
+        // Auto-size columns for individual inventory sheet
+        const individualColWidths = [];
+        if (individualInventoryData.length > 0) {
+          Object.keys(individualInventoryData[0]).forEach((key, index) => {
+            const maxLength = Math.max(
+              key.length,
+              ...individualInventoryData.map(row => String(row[key] || '').length)
+            );
+            individualColWidths[index] = { width: Math.min(maxLength + 2, 30) };
+          });
+        }
+        individualWorksheet['!cols'] = individualColWidths;
+        
+        XLSX.utils.book_append_sheet(workbook, individualWorksheet, 'Individual Powers');
+      }
+      
       // Download file
       XLSX.writeFile(workbook, filename);
       
-      console.log(`Exported ${dataToExport.length} records to ${filename}`);
+      const totalExported = dataToExport.length + (individualInventoryData.length || 0);
+      console.log(`Exported ${dataToExport.length} main records${hasIndividualInventory ? ` and ${individualInventoryData.length} individual power entries` : ''} to ${filename}`);
       
     } catch (error) {
       console.error('Error exporting to Excel:', error);
@@ -1191,7 +1251,7 @@ const LensInventory = () => {
       setExportLoading(false);
     }
   };
-  
+
   // Import functionality
   const importFromExcel = async (file, type) => {
     try {
@@ -1249,6 +1309,8 @@ const LensInventory = () => {
               lensData = {
                 type: 'stock',
                 brandName: row['Brand Name'] || '',
+                maxSph: row['Max SPH'] || '',
+                maxCyl: row['Max CYL'] || '',
                 powerSeries: row['Power Series'] || '',
                 powerRange: row['Power Range'] || '',
                 inventoryType: row['Inventory Type'] || 'range',
@@ -1260,6 +1322,8 @@ const LensInventory = () => {
               
               if (lensData.inventoryType === 'individual') {
                 lensData.totalQuantity = parseInt(row['Quantity']) || 1;
+                // Note: Individual power inventory data would need to be imported separately
+                // as it's complex nested data that's not suitable for Excel format
               }
               break;
               
@@ -1302,6 +1366,14 @@ const LensInventory = () => {
           if (!lensData.brandName || lensData.brandName.trim() === '') {
             errors.push(`Row ${i + 2}: Brand Name is required`);
             continue;
+          }
+          
+          // Additional validation for stock lenses
+          if (lensData.type === 'stock') {
+            if (!lensData.maxSph && !lensData.maxCyl && !lensData.powerSeries) {
+              errors.push(`Row ${i + 2}: Stock lens must have either Max SPH/Max CYL or Power Series specified`);
+              continue;
+            }
           }
           
           // Add to database
@@ -1382,8 +1454,10 @@ const LensInventory = () => {
       case 'stock':
         templateData = [{
           'Brand Name': 'Example Stock Brand',
-          'Power Series': '-6.00 to +6.00',
-          'Power Range': '-6S/+6S',
+          'Max SPH': '-6.00',
+          'Max CYL': '-2.00',
+          'Power Series': '-6.00 to +6.00, -2.00 to 0.00',
+          'Power Range': 'SPH: -6 to +6, CYL: -2 to 0',
           'Inventory Type': 'range',
           'Purchase Price': '300',
           'Sale Price': '500',

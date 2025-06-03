@@ -603,16 +603,6 @@ const LensDetail = () => {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 border border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Individual Power Inventory</h2>
             
-            {/* Debug info - remove in production */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/30 rounded border text-xs">
-                <p><strong>Debug Info:</strong></p>
-                <p>PowerInventory keys: {Object.keys(lens.powerInventory).slice(0, 5).join(', ')}...</p>
-                <p>PowerLimits: {JSON.stringify(lens.powerLimits)}</p>
-                <p>Sample power data: {JSON.stringify(Object.entries(lens.powerInventory).slice(0, 3))}</p>
-              </div>
-            )}
-            
             {/* Power Summary */}
             {(() => {
               // Calculate ranges from powerLimits if available, otherwise from actual power data
