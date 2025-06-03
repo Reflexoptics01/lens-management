@@ -540,12 +540,6 @@ const Navbar = () => {
             <div className="mb-1">
               {renderLogoOrInitial()}
             </div>
-            <span 
-              className="text-xs font-medium transition-colors duration-200"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              {shopName.length > 8 ? shopName.substring(0, 8) + '...' : shopName}
-            </span>
           </button>
           
           {getAccessibleMenuItems().map((item) => (

@@ -1081,7 +1081,7 @@ Are you sure you want to continue with the restoration?`
                   }
                 }
                 
-                console.log(`Collection ${collectionName}: restored ${documents.length} documents to user ${currentUser.uid}`);
+                console.log(`Collection ${collectionName}: restored ${documents.length} documents to user ${user.uid}`);
               } else {
                 console.log(`Collection ${collectionName}: no data to restore`);
               }
@@ -1092,12 +1092,12 @@ Are you sure you want to continue with the restoration?`
           }
           
           // Final success message with statistics and user verification
-          const successMessage = `✅ Restore completed successfully for ${currentUser.email}!
+          const successMessage = `✅ Restore completed successfully for ${user.email}!
 
 🔒 Security Verified: Data restored to your account only.
 
 📊 Restoration Summary:
-• User Account: ${currentUser.email}
+• User Account: ${user.email}
 • ${restoredCount} documents restored
 • ${skippedCount} documents skipped
 • ${errorCount} errors encountered
@@ -1106,7 +1106,7 @@ Are you sure you want to continue with the restoration?`
 The page will refresh in 3 seconds to load your restored data...`;
           
           setBackupSuccess(successMessage);
-          console.log('Restoration completed for user:', currentUser.uid, { restoredCount, skippedCount, errorCount });
+          console.log('Restoration completed for user:', user.uid, { restoredCount, skippedCount, errorCount });
           
           // Refresh page after 3 seconds to load new data
           setTimeout(() => {
@@ -1781,8 +1781,6 @@ The page will refresh in 3 seconds to load your restored data...`;
       <Navbar />
       
       <div className="flex-grow p-4 pb-24">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Settings</h1>
-        
         {error && (
           <div className="bg-red-50 dark:bg-red-900/50 border-l-4 border-red-400 dark:border-red-600 p-4 mb-6 text-red-700 dark:text-red-200 flex justify-between items-center">
             <p>{error}</p>
@@ -2310,21 +2308,6 @@ The page will refresh in 3 seconds to load your restored data...`;
                   </div>
                 )}
                 
-                <div className="bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-400 dark:border-blue-500 p-4 mb-6 text-blue-700 dark:text-blue-200">
-                  <h3 className="text-md font-medium">About Backup & Restore</h3>
-                  <p className="text-sm mt-1">
-                    Backup your data to a local file that you can use to restore your shop's data in case of data loss.
-                    Regular backups are recommended to protect your business data.
-                  </p>
-                  <div className="mt-3 p-3 bg-blue-100 dark:bg-blue-800/50 border border-blue-200 dark:border-blue-600 rounded-md">
-                    <p className="text-sm font-medium text-blue-800 dark:text-blue-200">🔒 Security Notice:</p>
-                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                      Backups are personal and account-specific. You can only restore backups created by your own account ({user?.email}). 
-                      This prevents accidental data mixing between different users.
-                    </p>
-                  </div>
-                </div>
-                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   {/* Backup Section */}
                   <div className="bg-white dark:bg-gray-700 p-6 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm">
@@ -2384,13 +2367,6 @@ The page will refresh in 3 seconds to load your restored data...`;
                     <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
                       Restore your data from a previously created backup file. This will overwrite your current data.
                     </p>
-                    
-                    {/* Security Warning */}
-                    <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-md">
-                      <p className="text-xs text-amber-800 dark:text-amber-200 font-medium">
-                        🔒 Security Validation: Only backups created by your account can be restored here.
-                      </p>
-                    </div>
                     
                     <div className="mt-4">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select Backup File</label>
