@@ -25,11 +25,8 @@ const Sales = () => {
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [filteredSales, setFilteredSales] = useState([]);
 
-  // Enhanced search state - replace party search with general search
+  // Enhanced search state - simplified without suggestions
   const [searchTerm, setSearchTerm] = useState('');
-  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
-  const [searchSuggestions, setSearchSuggestions] = useState([]);
-  const searchRef = useRef(null);
 
   // Import states
   const [importLoading, setImportLoading] = useState(false);
@@ -47,60 +44,6 @@ const Sales = () => {
       setFilteredSales([]);
     }
   }, [sales, dateFrom, dateTo, selectedCustomerId, searchTerm]);
-
-  // Update useEffect to handle outside clicks for party search
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (searchRef.current && !searchRef.current.contains(event.target)) {
-        setShowSearchSuggestions(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  // Update useEffect to filter customers and invoices when search term changes
-  useEffect(() => {
-    if (searchTerm.trim()) {
-      const lowercasedFilter = searchTerm.toLowerCase();
-      
-      // Filter customers
-      const filteredCustomers = customers.filter(customer => 
-        customer.opticalName.toLowerCase().includes(lowercasedFilter) ||
-        (customer.city && customer.city.toLowerCase().includes(lowercasedFilter))
-      ).map(customer => ({
-        ...customer,
-        type: 'customer'
-      }));
-      
-      // Filter invoices that match the search term
-      const matchingInvoices = sales.filter(sale => {
-        const invoiceMatch = (sale.invoiceNumber || sale.displayId || '').toLowerCase().includes(lowercasedFilter);
-        return invoiceMatch;
-      }).slice(0, 5).map(sale => ({
-        id: `invoice_${sale.id}`,
-        type: 'invoice',
-        invoiceNumber: sale.invoiceNumber || sale.displayId,
-        customerName: sale.isImported ? sale.customerName : getCustomerDetails(sale.customerId)?.opticalName || 'Unknown Customer',
-        totalAmount: sale.totalAmount,
-        sale: sale
-      }));
-      
-      // Combine suggestions
-      const suggestions = [
-        ...filteredCustomers.slice(0, 5), // Limit customers to 5
-        ...matchingInvoices
-      ];
-      
-      setSearchSuggestions(suggestions);
-      setShowSearchSuggestions(true);
-    } else {
-      setSearchSuggestions([]);
-      setShowSearchSuggestions(false);
-    }
-  }, [searchTerm, customers, sales]);
 
   const fetchSales = async () => {
     try {
@@ -465,7 +408,6 @@ const Sales = () => {
   const handlePartySelect = (customer) => {
     setSelectedCustomerId(customer.id);
     setSearchTerm(customer.opticalName);
-    setShowSearchSuggestions(false);
   };
 
   // Function to reset filters
@@ -736,7 +678,7 @@ const Sales = () => {
                 />
               </div>
               
-              <div className="relative flex-grow max-w-xs" ref={searchRef}>
+              <div className="relative flex-grow max-w-xs">
                 <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden bg-white dark:bg-gray-700 shadow-sm">
                   <div className="px-3 py-2 bg-gray-50 dark:bg-gray-600 border-r border-gray-300 dark:border-gray-600">
                     <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -749,7 +691,6 @@ const Sales = () => {
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="border-none focus:ring-0 text-sm w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                     placeholder="Search Invoice # or Customer Name"
-                    onFocus={() => searchTerm.trim() && setShowSearchSuggestions(true)}
                   />
                   {searchTerm && (
                     <button 
@@ -765,66 +706,6 @@ const Sales = () => {
                     </button>
                   )}
                 </div>
-                
-                {/* Search suggestions */}
-                {showSearchSuggestions && searchSuggestions.length > 0 && (
-                  <div className="absolute mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg z-10 max-h-60 overflow-auto">
-                    {searchSuggestions.map(suggestion => (
-                      <div
-                        key={suggestion.id}
-                        className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-600 last:border-b-0"
-                        onClick={() => {
-                          if (suggestion.type === 'customer') {
-                            handlePartySelect(suggestion);
-                          } else if (suggestion.type === 'invoice') {
-                            // Don't navigate if it's an imported sale
-                            if (suggestion.sale.isImported) {
-                              alert('This is an imported sales record and cannot be opened for editing.');
-                              setSearchTerm(suggestion.invoiceNumber);
-                              setShowSearchSuggestions(false);
-                            } else {
-                              navigate(`/sales/${suggestion.sale.id}`);
-                            }
-                          }
-                        }}
-                      >
-                        {suggestion.type === 'customer' ? (
-                          <>
-                            <div className="flex items-center">
-                              <div className="font-medium text-gray-900 dark:text-white">{suggestion.opticalName}</div>
-                              <span className="ml-2 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full">
-                                Customer
-                              </span>
-                            </div>
-                            {suggestion.city && <div className="text-xs text-gray-500 dark:text-gray-400">{suggestion.city}</div>}
-                          </>
-                        ) : (
-                          <>
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <div className="flex items-center">
-                                  <div className="font-medium text-gray-900 dark:text-white">{suggestion.invoiceNumber}</div>
-                                  <span className="ml-2 px-2 py-0.5 text-xs bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 rounded-full">
-                                    Invoice
-                                  </span>
-                                  {suggestion.sale.isImported && (
-                                    <span className="ml-1 px-2 py-0.5 text-xs bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 rounded-full">
-                                      Imported
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400">{suggestion.customerName}</div>
-                              </div>
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                ₹{parseFloat(suggestion.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </div>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
               
               {(dateFrom || dateTo || selectedCustomerId || searchTerm) && (
