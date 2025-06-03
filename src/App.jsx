@@ -33,6 +33,7 @@ import LensInventoryReport from './pages/LensInventoryReport';
 import SalesReturn from "./pages/SalesReturn";
 import PurchaseReturn from "./pages/PurchaseReturn";
 import Shop from './pages/Shop';
+import FloatingShopIcon from './components/FloatingShopIcon';
 import './App.css';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
@@ -283,6 +284,9 @@ function App() {
               <Route path="/" element={<Navigate to="/orders" replace />} />
               <Route path="*" element={<Navigate to="/orders" replace />} />
             </Routes>
+            
+            {/* Floating Shop Icon - appears only on specific pages */}
+            <FloatingShopIcon />
           </Router>
         </ThemeProvider>
       </AuthProvider>

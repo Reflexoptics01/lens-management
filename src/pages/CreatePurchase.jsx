@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import CustomerForm from '../components/CustomerForm';
 import ItemSuggestions from '../components/ItemSuggestions';
+import PowerInventoryModal from '../components/PowerInventoryModal';
 import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 import { dateToISOString } from '../utils/dateUtils';
 
@@ -36,12 +37,13 @@ const LENS_TYPES = [
 // Move the EMPTY_ROW constant above the CreatePurchase component
 const EMPTY_ROW = {
   itemName: '',
-  description: '',
   lensType: 'Stock Lens',
+  maxSph: '',
+  maxCyl: '',
+  powerInventorySetup: false,
+  powerInventoryData: null,
   qty: 1,
   unit: 'Pairs',
-  itemDiscount: 0,
-  itemDiscountType: 'amount',
   price: 0,
   total: 0
 };
@@ -75,6 +77,11 @@ const CreatePurchase = () => {
 
   // Add item suggestions state
   const [itemSuggestions, setItemSuggestions] = useState([]);
+  
+  // PowerInventoryModal states
+  const [showPowerInventoryModal, setShowPowerInventoryModal] = useState(false);
+  const [pendingStockLens, setPendingStockLens] = useState(null);
+  const [pendingPurchaseItems, setPendingPurchaseItems] = useState([]);
 
   useEffect(() => {
     fetchVendors();
@@ -266,25 +273,14 @@ const CreatePurchase = () => {
     }
   };
 
-  // Calculate item discount
-  const calculateItemDiscount = (item) => {
-    if (item.itemDiscountType === 'percentage') {
-      return (item.price * item.qty * parseFloat(item.itemDiscount || 0)) / 100;
-    }
-    return parseFloat(item.itemDiscount || 0);
-  };
-
-  // Calculate row total with discount
+  // Calculate row total
   const calculateRowTotal = (item) => {
-    const subtotal = item.qty * item.price;
-    const discountAmount = calculateItemDiscount(item);
-    return subtotal - discountAmount;
+    return item.qty * item.price;
   };
 
   // Calculate subtotal before tax/discount
   const calculateSubtotal = () => {
     return tableRows.reduce((sum, row) => {
-      // Recalculate total with item discount
       return sum + calculateRowTotal(row);
     }, 0);
   };
@@ -347,7 +343,7 @@ const CreatePurchase = () => {
     };
     
     // Update the total when relevant fields change
-    if (['qty', 'price', 'itemDiscount', 'itemDiscountType'].includes(field)) {
+    if (['qty', 'price'].includes(field)) {
       updatedRows[index].total = calculateRowTotal(updatedRows[index]);
     }
     
@@ -423,44 +419,68 @@ const CreatePurchase = () => {
       const contactLenses = [];
       
       // Filter out lens items from the purchase
-      tableRows.forEach(row => {
+      for (const row of tableRows) {
         if (row.itemName && row.qty > 0 && (row.lensType === 'Stock Lens' || row.lensType === 'Contact Lens')) {
-          // Try to extract power series from item name if it's in parentheses
+          // Generate power series from maxSph and maxCyl if available
           let powerSeries = 'N/A';
-          const powerMatch = row.itemName.match(/\(([^)]+)\)$/);
-          if (powerMatch) {
-            powerSeries = powerMatch[1].trim();
+          if (row.maxSph && row.maxCyl) {
+            const maxSphNum = parseFloat(row.maxSph);
+            const maxCylNum = parseFloat(row.maxCyl);
+            const sphRange = maxSphNum < 0 ? `${maxSphNum} to 0` : `0 to +${maxSphNum}`;
+            const cylRange = maxCylNum < 0 ? `${maxCylNum} to 0` : `0 to +${maxCylNum}`;
+            powerSeries = `SPH: ${sphRange}, CYL: ${cylRange}`;
           }
           
-          const lensData = {
-            brandName: row.itemName,
-            powerSeries: powerSeries, // Extract from item name or default to N/A
-            purchasePrice: parseFloat(row.price) || 0,
-            salePrice: (parseFloat(row.price) * 1.3) || 0, // 30% markup for sale price
-            qty: parseInt(row.qty) || 1,
-            createdAt: serverTimestamp(),
-            purchaseId: purchaseId,
-            notes: `Added from Purchase #${purchaseNumber}`,
-            location: 'Main Cabinet'
-          };
-          
           if (row.lensType === 'Stock Lens') {
-            stockLenses.push({
-              ...lensData,
-              type: 'stock'
-            });
+            let lensData = {
+              brandName: row.itemName,
+              powerSeries: powerSeries,
+              maxSph: row.maxSph,
+              maxCyl: row.maxCyl,
+              purchasePrice: parseFloat(row.price) || 0,
+              salePrice: (parseFloat(row.price) * 1.3) || 0, // 30% markup for sale price
+              type: 'stock',
+              createdAt: serverTimestamp(),
+              purchaseId: purchaseId,
+              notes: `Added from Purchase #${purchaseNumber}`,
+              location: 'Main Cabinet'
+            };
+            
+            // If power inventory was set up for this row, include that data
+            if (row.powerInventorySetup && row.powerInventoryData) {
+              lensData = {
+                ...lensData,
+                inventoryType: 'individual',
+                powerInventory: row.powerInventoryData.powerInventory,
+                powerLimits: row.powerInventoryData.powerLimits,
+                totalQuantity: row.powerInventoryData.totalQuantity
+              };
+            } else {
+              // Default to simple quantity
+              lensData.qty = parseInt(row.qty) || 1;
+            }
+            
+            stockLenses.push(lensData);
           } else if (row.lensType === 'Contact Lens') {
             contactLenses.push({
-              ...lensData,
+              brandName: row.itemName,
+              powerSeries: powerSeries,
+              purchasePrice: parseFloat(row.price) || 0,
+              salePrice: (parseFloat(row.price) * 1.3) || 0,
+              qty: parseInt(row.qty) || 1,
               type: 'contact',
               category: row.description || 'Standard',
-              contactType: 'Standard', // Default contact type
-              color: 'Clear', // Default color
-              disposalFrequency: 'Daily' // Default disposal frequency
+              contactType: 'Standard',
+              color: 'Clear',
+              disposalFrequency: 'Daily',
+              createdAt: serverTimestamp(),
+              purchaseId: purchaseId,
+              notes: `Added from Purchase #${purchaseNumber}`,
+              location: 'Main Cabinet'
             });
           }
         }
-      });
+      }
       
       // Add stock lenses to inventory
       for (const lens of stockLenses) {
@@ -484,6 +504,44 @@ const CreatePurchase = () => {
     }
   };
 
+  // PowerInventoryModal handlers for CreatePurchase
+  const handlePowerInventoryModalSave = async (inventoryData) => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      // Update the current row to mark power inventory as set up
+      const updatedRows = [...tableRows];
+      const rowIndex = pendingStockLens.rowIndex;
+      
+      updatedRows[rowIndex] = {
+        ...updatedRows[rowIndex],
+        powerInventorySetup: inventoryData.type === 'individual',
+        powerInventoryData: inventoryData.type === 'individual' ? inventoryData.data : null
+      };
+      setTableRows(updatedRows);
+      
+      // Close modal and reset states
+      setShowPowerInventoryModal(false);
+      setPendingStockLens(null);
+      
+      setError('');
+      
+    } catch (error) {
+      console.error('Error setting up power inventory:', error);
+      setError(`Failed to setup power inventory: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handlePowerInventoryModalClose = () => {
+    setShowPowerInventoryModal(false);
+    setPendingStockLens(null);
+    setPendingPurchaseItems([]);
+    setLoading(false);
+  };
+  
   const handleSavePurchase = async () => {
     if (!selectedVendor) {
       setError('Please select a vendor');
@@ -507,10 +565,7 @@ const CreatePurchase = () => {
         vendorInvoiceNumber,
         purchaseNumber,
         purchaseDate,
-        items: filteredRows.map(row => ({
-          ...row,
-          itemDiscountAmount: calculateItemDiscount(row)
-        })),
+        items: filteredRows,
         subtotal: calculateSubtotal(),
         discountType,
         discountValue: parseFloat(discountValue) || 0,
@@ -566,6 +621,58 @@ const CreatePurchase = () => {
         vendor.contactPerson?.toLowerCase().includes(vendorSearchTerm.toLowerCase())
       )
     : vendors;
+
+  const handleSetupPowerInventoryForPurchase = (index) => {
+    const row = tableRows[index];
+    
+    if (!row.itemName || !row.maxSph || !row.maxCyl) {
+      setError('Please fill in Item Name, Max SPH, and Max CYL before setting up individual power inventory.');
+      return;
+    }
+    
+    if (row.lensType === 'Not Lens') {
+      setError('Individual power inventory is only available for Stock Lens and Contact Lens items.');
+      return;
+    }
+    
+    // Convert to numbers
+    const maxSphNum = parseFloat(row.maxSph);
+    const maxCylNum = parseFloat(row.maxCyl);
+    
+    if (isNaN(maxSphNum) || isNaN(maxCylNum)) {
+      setError('Max SPH and Max CYL must be valid numbers.');
+      return;
+    }
+    
+    // Calculate power ranges based on the logic:
+    // If negative: range is from entered value to 0 (e.g., -6 to 0)
+    // If positive: range is from 0 to entered value (e.g., 0 to +3)
+    const sphMin = maxSphNum < 0 ? maxSphNum : 0;
+    const sphMax = maxSphNum < 0 ? 0 : maxSphNum;
+    const cylMin = maxCylNum < 0 ? maxCylNum : 0;
+    const cylMax = maxCylNum < 0 ? 0 : maxCylNum;
+    
+    // Create power range string for display
+    const powerRange = `SPH: ${sphMin} to ${sphMax}, CYL: ${cylMin} to ${cylMax}`;
+    
+    // Clear any existing error
+    setError('');
+    
+    setPendingStockLens({
+      name: row.itemName,
+      powerRange: powerRange,
+      maxSph: row.maxSph,
+      maxCyl: row.maxCyl,
+      sphMin,
+      sphMax,
+      cylMin,
+      cylMax,
+      purchasePrice: row.price,
+      salePrice: row.price * 1.2, // Default 20% markup
+      rowIndex: index
+    });
+    setShowPowerInventoryModal(true);
+  };
 
   return (
     <div className="mobile-page bg-gray-50 dark:bg-gray-900">
@@ -719,6 +826,15 @@ const CreatePurchase = () => {
                   <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-28">
                     Lens Type
                   </th>
+                  <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20">
+                    Max SPH
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20">
+                    Max CYL
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
+                    Setup
+                  </th>
                   <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20">
                     Qty
                   </th>
@@ -726,9 +842,6 @@ const CreatePurchase = () => {
                     Unit
                   </th>
                   <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-28">
-                    Discount
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
                     Price
                   </th>
                   <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-28">
@@ -756,13 +869,6 @@ const CreatePurchase = () => {
                         className="block w-full border-0 bg-transparent focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm font-medium text-gray-900 dark:text-white"
                         currentPrice={parseFloat(row.price) || 0}
                       />
-                      <input 
-                        type="text" 
-                        value={row.description}
-                        onChange={(e) => handleTableRowChange(index, 'description', e.target.value)}
-                        className="block w-full border-0 bg-transparent text-gray-500 dark:text-gray-400 text-xs focus:ring-0 focus:border-b focus:border-sky-400 mt-1"
-                        placeholder="Description (optional)"
-                      />
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       <select
@@ -778,11 +884,57 @@ const CreatePurchase = () => {
                     <td className="px-3 py-2 whitespace-nowrap">
                       <input 
                         type="number" 
-                        value={row.qty}
-                        onChange={(e) => handleTableRowChange(index, 'qty', e.target.value)}
-                        className="block w-full border-0 bg-transparent text-right focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-gray-900 dark:text-white"
-                        min="1"
+                        value={row.maxSph}
+                        onChange={(e) => handleTableRowChange(index, 'maxSph', e.target.value)}
+                        disabled={row.lensType === 'Not Lens'}
+                        className="block w-full border-0 bg-transparent text-right focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        placeholder="-6.00"
+                        step="0.25"
                       />
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <input 
+                        type="number" 
+                        value={row.maxCyl}
+                        onChange={(e) => handleTableRowChange(index, 'maxCyl', e.target.value)}
+                        disabled={row.lensType === 'Not Lens'}
+                        className="block w-full border-0 bg-transparent text-right focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        placeholder="-2.00"
+                        step="0.25"
+                      />
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap w-24 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleSetupPowerInventoryForPurchase(index)}
+                        disabled={!row.itemName || !row.maxSph || !row.maxCyl || row.lensType === 'Not Lens'}
+                        className={`text-xs px-2 py-1 rounded text-center ${
+                          row.powerInventorySetup 
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-700' 
+                            : 'bg-sky-50 hover:bg-sky-100 dark:bg-sky-900/50 dark:hover:bg-sky-900/70 text-sky-600 dark:text-sky-400 border-sky-200 dark:border-sky-700'
+                        } border disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        {row.powerInventorySetup ? '✅' : '📊'}
+                      </button>
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {row.powerInventorySetup && row.powerInventoryData && row.lensType !== 'Not Lens' ? (
+                        <input
+                          type="number"
+                          value={row.powerInventoryData.totalQuantity || 0}
+                          readOnly
+                          className="block w-full border-0 bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 cursor-not-allowed text-right focus:ring-0 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          title="Quantity calculated from individual power inventory"
+                        />
+                      ) : (
+                        <input 
+                          type="number" 
+                          value={row.qty}
+                          onChange={(e) => handleTableRowChange(index, 'qty', e.target.value)}
+                          className="block w-full border-0 bg-transparent text-right focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-gray-900 dark:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          min="1"
+                        />
+                      )}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       <select
@@ -796,31 +948,11 @@ const CreatePurchase = () => {
                       </select>
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
-                      <div className="flex items-center space-x-1">
-                        <select
-                          value={row.itemDiscountType}
-                          onChange={(e) => handleTableRowChange(index, 'itemDiscountType', e.target.value)}
-                          className="w-12 border-0 bg-transparent focus:ring-0 focus:border-b-2 focus:border-sky-500 text-xs pr-0 text-gray-900 dark:text-white dark:bg-gray-700"
-                        >
-                          <option value="amount">₹</option>
-                          <option value="percentage">%</option>
-                        </select>
-                        <input 
-                          type="number" 
-                          value={row.itemDiscount}
-                          onChange={(e) => handleTableRowChange(index, 'itemDiscount', e.target.value)}
-                          className="block w-full border-0 bg-transparent text-right focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-gray-900 dark:text-white"
-                          min="0"
-                          step="0.01"
-                        />
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
                       <input 
                         type="number" 
                         value={row.price}
                         onChange={(e) => handleTableRowChange(index, 'price', e.target.value)}
-                        className="block w-full border-0 bg-transparent text-right focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-gray-900 dark:text-white"
+                        className="block w-full border-0 bg-transparent text-right focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-gray-900 dark:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         min="0"
                         step="0.01"
                       />
@@ -847,7 +979,7 @@ const CreatePurchase = () => {
                 ))}
                 {tableRows.length === 0 && (
                   <tr>
-                    <td colSpan="8" className="px-3 py-4 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan="10" className="px-3 py-4 text-center text-gray-500 dark:text-gray-400">
                       No items added yet. Click the "Add 5 Rows" button to add purchase items.
                     </td>
                   </tr>
@@ -1025,6 +1157,16 @@ const CreatePurchase = () => {
       {/* Vendor Modal */}
       {showVendorModal && (
         <CustomerForm isVendor={true} onClose={handleVendorModalClose} />
+      )}
+
+      {/* PowerInventoryModal */}
+      {showPowerInventoryModal && (
+        <PowerInventoryModal
+          isOpen={showPowerInventoryModal}
+          onClose={handlePowerInventoryModalClose}
+          onSave={handlePowerInventoryModalSave}
+          lensData={pendingStockLens}
+        />
       )}
     </div>
   );

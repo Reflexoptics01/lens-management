@@ -8,6 +8,7 @@ import AddLensForm from '../components/AddLensForm';
 import AddStockLensForm from '../components/AddStockLensForm';
 import AddContactLensForm from '../components/AddContactLensForm';
 import AddServiceForm from '../components/AddServiceForm';
+import PowerInventoryModal from '../components/PowerInventoryModal';
 
 // Constants for dropdowns from OrderForm
 const MATERIALS = ['CR', 'POLY', 'GLASS', 'POLARISED', 'TRIVEX', 'MR8'];
@@ -97,6 +98,11 @@ const LensInventory = () => {
       qty: 1
     }))
   );
+  
+  // PowerInventoryModal states
+  const [showPowerInventoryModal, setShowPowerInventoryModal] = useState(false);
+  const [pendingStockLens, setPendingStockLens] = useState(null);
+  const [currentStockLensRow, setCurrentStockLensRow] = useState(null);
   
   // Styling constants
   const inputClassName = "block w-full rounded-md border-gray-300 shadow-sm focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm py-1.5 px-2 text-left [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
@@ -231,6 +237,31 @@ const LensInventory = () => {
       if (editMode && lensToEdit) {
         // Edit existing stock lens - only the first row is used
         const row = validRows[0];
+        
+        // Check if it's a power range stock lens (has powerSeries with range like "-6S/-2C")
+        const isPowerRangeLens = row.powerSeries && row.powerSeries.includes('/');
+        
+        if (isPowerRangeLens) {
+          // Show PowerInventoryModal for power range lens
+          const lensData = {
+            name: row.brandName,
+            powerRange: row.powerSeries,
+            purchasePrice: row.purchasePrice,
+            salePrice: row.salePrice,
+            type: row.powerSeries.toLowerCase().includes('add') || row.powerSeries.toLowerCase().includes('bifocal') ? 'bifocal' : 'single',
+            material: '', // Could be added to stock lens form later
+            editMode: true,
+            editId: lensToEdit.id
+          };
+          
+          setPendingStockLens(lensData);
+          setCurrentStockLensRow(row);
+          setShowPowerInventoryModal(true);
+          setLoading(false);
+          return;
+        }
+        
+        // Regular stock lens update
         const lensData = {
           brandName: row.brandName,
           powerSeries: row.powerSeries,
@@ -248,22 +279,45 @@ const LensInventory = () => {
         resetForms();
       } else {
         // Add new stock lenses
-        // For each valid stock lens row, create a lens in inventory
+        // Process each valid stock lens row
         for (const row of validRows) {
-          const lensData = {
-            brandName: row.brandName,
-            powerSeries: row.powerSeries,
-            purchasePrice: row.purchasePrice,
-            salePrice: row.salePrice,
-            qty: parseFloat(row.qty) || 1,
-            type: 'stock',
-            createdAt: Timestamp.now()
-          };
+          // Check if it's a power range stock lens (has powerSeries with range like "-6S/-2C")
+          const isPowerRangeLens = row.powerSeries && row.powerSeries.includes('/');
           
-          await addDoc(getUserCollection('lensInventory'), lensData);
+          if (isPowerRangeLens) {
+            // Show PowerInventoryModal for power range lens
+            const lensData = {
+              name: row.brandName,
+              powerRange: row.powerSeries,
+              purchasePrice: row.purchasePrice,
+              salePrice: row.salePrice,
+              type: row.powerSeries.toLowerCase().includes('add') || row.powerSeries.toLowerCase().includes('bifocal') ? 'bifocal' : 'single',
+              material: '', // Could be added to stock lens form later
+              editMode: false
+            };
+            
+            setPendingStockLens(lensData);
+            setCurrentStockLensRow(row);
+            setShowPowerInventoryModal(true);
+            setLoading(false);
+            return; // Show modal for the first power range lens
+          } else {
+            // Regular stock lens - add directly
+            const lensData = {
+              brandName: row.brandName,
+              powerSeries: row.powerSeries,
+              purchasePrice: row.purchasePrice,
+              salePrice: row.salePrice,
+              qty: parseFloat(row.qty) || 1,
+              type: 'stock',
+              createdAt: Timestamp.now()
+            };
+            
+            await addDoc(getUserCollection('lensInventory'), lensData);
+          }
         }
         
-        // Reset form
+        // Reset form if no power range lenses were found
         setStockLensRows(Array(10).fill().map((_, index) => ({
           id: index + 1,
           brandName: '',
@@ -814,6 +868,96 @@ const LensInventory = () => {
     );
   };
 
+  // PowerInventoryModal handlers
+  const handlePowerInventoryModalSave = async (inventoryData) => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      if (inventoryData.type === 'range') {
+        // Save as power range (existing functionality)
+        const lensData = {
+          brandName: pendingStockLens.name,
+          powerSeries: pendingStockLens.powerRange,
+          purchasePrice: pendingStockLens.purchasePrice,
+          salePrice: pendingStockLens.salePrice,
+          qty: parseFloat(currentStockLensRow.qty) || 1,
+          type: 'stock',
+          createdAt: Timestamp.now()
+        };
+        
+        if (pendingStockLens.editMode) {
+          lensData.updatedAt = Timestamp.now();
+          delete lensData.createdAt;
+          await updateDoc(getUserDoc('lensInventory', pendingStockLens.editId), lensData);
+        } else {
+          await addDoc(getUserCollection('lensInventory'), lensData);
+        }
+      } else {
+        // Save individual power inventory
+        const baseData = {
+          brandName: pendingStockLens.name,
+          powerRange: pendingStockLens.powerRange,
+          purchasePrice: pendingStockLens.purchasePrice,
+          salePrice: pendingStockLens.salePrice,
+          type: 'stock',
+          inventoryType: 'individual',
+          powerLimits: inventoryData.data.powerLimits,
+          totalQuantity: inventoryData.data.totalQuantity
+        };
+        
+        if (pendingStockLens.editMode) {
+          baseData.updatedAt = Timestamp.now();
+          await updateDoc(getUserDoc('lensInventory', pendingStockLens.editId), {
+            ...baseData,
+            powerInventory: inventoryData.data.powerInventory
+          });
+        } else {
+          // Save the main stock lens entry with power inventory
+          baseData.createdAt = Timestamp.now();
+          baseData.powerInventory = inventoryData.data.powerInventory;
+          await addDoc(getUserCollection('lensInventory'), baseData);
+        }
+      }
+      
+      // Close modal and reset states
+      setShowPowerInventoryModal(false);
+      setPendingStockLens(null);
+      setCurrentStockLensRow(null);
+      
+      // Reset forms
+      if (!pendingStockLens.editMode) {
+        setStockLensRows(Array(10).fill().map((_, index) => ({
+          id: index + 1,
+          brandName: '',
+          powerSeries: '',
+          purchasePrice: '',
+          salePrice: '',
+          qty: 1
+        })));
+        setShowStockLensForm(false);
+      } else {
+        resetForms();
+      }
+      
+      // Refresh inventory
+      await fetchLensInventory();
+      
+    } catch (error) {
+      console.error('Error saving power inventory:', error);
+      setError(`Failed to save power inventory: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handlePowerInventoryModalClose = () => {
+    setShowPowerInventoryModal(false);
+    setPendingStockLens(null);
+    setCurrentStockLensRow(null);
+    setLoading(false);
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navbar />
@@ -1160,7 +1304,9 @@ const LensInventory = () => {
                                 {lens.salePrice ? `₹${parseFloat(lens.salePrice).toFixed(2)}` : 'N/A'}
                               </td>
                               <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">
-                                {parseFloat(lens.qty) || 1} pairs
+                                {lens.inventoryType === 'individual' && lens.totalQuantity 
+                                  ? `${lens.totalQuantity} pieces` 
+                                  : `${parseFloat(lens.qty) || 1} pairs`}
                               </td>
                               <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm font-medium text-left">
                                 <div className="flex gap-1 sm:gap-2">
@@ -1190,8 +1336,18 @@ const LensInventory = () => {
           </div>
         )}
       </main>
+      
+      {/* PowerInventoryModal */}
+      <PowerInventoryModal
+        isOpen={showPowerInventoryModal}
+        onClose={handlePowerInventoryModalClose}
+        onSave={handlePowerInventoryModalSave}
+        lensData={pendingStockLens}
+        isEdit={pendingStockLens?.editMode || false}
+        existingInventory={pendingStockLens?.powerInventory || null}
+      />
     </div>
   );
 };
 
-export default LensInventory; 
+export default LensInventory;

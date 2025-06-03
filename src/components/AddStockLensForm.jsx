@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, addDoc, doc, updateDoc, Timestamp, getDocs, query, orderBy } from 'firebase/firestore';
 import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
+import PowerInventoryModal from './PowerInventoryModal';
 
 const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCancel }) => {
   const [loading, setLoading] = useState(false);
@@ -12,15 +13,23 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
     Array(10).fill().map((_, index) => ({
       id: index + 1,
       brandName: '',
-      powerSeries: '',
+      maxSph: '',
+      maxCyl: '',
       purchasePrice: '',
       salePrice: '',
-      qty: 1
+      qty: 1,
+      powerInventorySetup: false,
+      powerInventoryData: null
     }))
   );
   
+  // PowerInventoryModal states
+  const [showPowerInventoryModal, setShowPowerInventoryModal] = useState(false);
+  const [pendingStockLens, setPendingStockLens] = useState(null);
+  const [currentRowIndex, setCurrentRowIndex] = useState(null);
+  
   // Styling constants
-  const inputClassName = "block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-sky-500 dark:focus:border-sky-400 focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 text-sm py-1.5 px-2 text-left [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+  const inputClassName = "block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-sky-500 dark:focus:border-sky-400 focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 text-sm py-1.5 px-2 text-left [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-moz-appearance]:textfield";
   const selectClassName = "block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-sky-500 dark:focus:border-sky-400 focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 text-sm py-1.5 px-2";
   const labelClassName = "block uppercase tracking-wide text-xs font-bold text-sky-700 dark:text-sky-300 mb-1";
   const sectionClassName = "bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6";
@@ -31,10 +40,18 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
       const stockLensData = {
         id: 1,
         brandName: lensToEdit.brandName || '',
-        powerSeries: lensToEdit.powerSeries || '',
+        maxSph: lensToEdit.maxSph || '',
+        maxCyl: lensToEdit.maxCyl || '',
         purchasePrice: lensToEdit.purchasePrice || '',
         salePrice: lensToEdit.salePrice || '',
-        qty: parseFloat(lensToEdit.qty) || 1
+        qty: parseFloat(lensToEdit.qty) || lensToEdit.totalQuantity || 1,
+        powerInventorySetup: lensToEdit.inventoryType === 'individual',
+        powerInventoryData: lensToEdit.inventoryType === 'individual' ? {
+          type: 'individual',
+          powerInventory: lensToEdit.powerInventory || {},
+          powerLimits: lensToEdit.powerLimits || {},
+          totalQuantity: lensToEdit.totalQuantity || 0
+        } : null
       };
       
       setStockLensRows([stockLensData]);
@@ -56,10 +73,13 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
       {
         id: stockLensRows.length + 1,
         brandName: '',
-        powerSeries: '',
+        maxSph: '',
+        maxCyl: '',
         purchasePrice: '',
         salePrice: '',
-        qty: 1
+        qty: 1,
+        powerInventorySetup: false,
+        powerInventoryData: null
       }
     ]);
   };
@@ -73,6 +93,108 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
       id: i + 1
     }));
     setStockLensRows(reindexedRows);
+  };
+  
+  // PowerInventoryModal handlers
+  const handlePowerInventoryModalSave = async (inventoryData) => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      console.log('PowerInventoryModal data received:', inventoryData);
+      
+      // Update the current row to mark power inventory as set up
+      const updatedRows = [...stockLensRows];
+      updatedRows[currentRowIndex] = {
+        ...updatedRows[currentRowIndex],
+        powerInventorySetup: inventoryData.type === 'individual',
+        powerInventoryData: inventoryData.type === 'individual' ? inventoryData.data : null
+      };
+      
+      console.log('Updated row data:', updatedRows[currentRowIndex]);
+      
+      setStockLensRows(updatedRows);
+      
+      setShowPowerInventoryModal(false);
+      setPendingStockLens(null);
+      setCurrentRowIndex(null);
+      
+      setError('');
+      
+    } catch (error) {
+      console.error('Error setting up power inventory:', error);
+      setError(`Failed to setup power inventory: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handlePowerInventoryModalClose = () => {
+    setShowPowerInventoryModal(false);
+    setPendingStockLens(null);
+    setCurrentRowIndex(null);
+  };
+  
+  // Function to handle power inventory setup for a row
+  const handleSetupPowerInventory = (index) => {
+    const row = stockLensRows[index];
+    
+    if (!row.brandName || !row.maxSph || !row.maxCyl) {
+      setError('Please fill in Brand Name, Max SPH, and Max CYL before setting up individual power inventory.');
+      return;
+    }
+    
+    // Convert to numbers
+    const maxSphNum = parseFloat(row.maxSph);
+    const maxCylNum = parseFloat(row.maxCyl);
+    
+    if (isNaN(maxSphNum) || isNaN(maxCylNum)) {
+      setError('Max SPH and Max CYL must be valid numbers.');
+      return;
+    }
+    
+    // Calculate power ranges based on the logic:
+    // If negative: range is from entered value to 0 (e.g., -6 to 0)
+    // If positive: range is from 0 to entered value (e.g., 0 to +3)
+    const sphMin = maxSphNum < 0 ? maxSphNum : 0;
+    const sphMax = maxSphNum < 0 ? 0 : maxSphNum;
+    const cylMin = maxCylNum < 0 ? maxCylNum : 0;
+    const cylMax = maxCylNum < 0 ? 0 : maxCylNum;
+    
+    // Create power range string for display
+    const powerRange = `SPH: ${sphMin} to ${sphMax}, CYL: ${cylMin} to ${cylMax}`;
+    
+    // Debug logging
+    console.log('Setting up power inventory for:', {
+      brandName: row.brandName,
+      enteredMaxSph: row.maxSph,
+      enteredMaxCyl: row.maxCyl,
+      calculatedRanges: {
+        sphMin,
+        sphMax,
+        cylMin,
+        cylMax
+      },
+      powerRange
+    });
+    
+    // Clear any existing error
+    setError('');
+    
+    setPendingStockLens({
+      name: row.brandName,
+      powerRange: powerRange,
+      maxSph: row.maxSph,
+      maxCyl: row.maxCyl,
+      sphMin,
+      sphMax,
+      cylMin,
+      cylMax,
+      purchasePrice: row.purchasePrice,
+      salePrice: row.salePrice
+    });
+    setCurrentRowIndex(index);
+    setShowPowerInventoryModal(true);
   };
   
   const handleSubmit = async (e) => {
@@ -94,15 +216,45 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
       if (editMode && lensToEdit) {
         // Edit existing stock lens - only the first row is used
         const row = validRows[0];
-        const lensData = {
+        
+        // Generate power series from maxSph and maxCyl
+        const maxSphNum = parseFloat(row.maxSph);
+        const maxCylNum = parseFloat(row.maxCyl);
+        const sphRange = maxSphNum < 0 ? `${maxSphNum} to 0` : `0 to +${maxSphNum}`;
+        const cylRange = maxCylNum < 0 ? `${maxCylNum} to 0` : `0 to +${maxCylNum}`;
+        const powerSeries = `SPH: ${sphRange}, CYL: ${cylRange}`;
+        
+        let lensData = {
           brandName: row.brandName,
-          powerSeries: row.powerSeries,
+          powerSeries: powerSeries,
+          maxSph: row.maxSph,
+          maxCyl: row.maxCyl,
           purchasePrice: row.purchasePrice,
           salePrice: row.salePrice,
-          qty: parseFloat(row.qty) || 1,
           type: 'stock',
           updatedAt: Timestamp.now()
         };
+        
+        // If power inventory was set up for this row, include that data
+        if (row.powerInventorySetup && row.powerInventoryData) {
+          lensData = {
+            ...lensData,
+            inventoryType: 'individual',
+            powerInventory: row.powerInventoryData.powerInventory,
+            powerLimits: row.powerInventoryData.powerLimits,
+            totalQuantity: row.powerInventoryData.totalQuantity
+          };
+          // Remove qty if using individual power inventory
+          delete lensData.qty;
+        } else {
+          // Default to simple quantity and remove individual power data
+          lensData.qty = parseFloat(row.qty) || 1;
+          lensData.inventoryType = 'range';
+          // Remove individual power inventory fields
+          delete lensData.powerInventory;
+          delete lensData.powerLimits;
+          delete lensData.totalQuantity;
+        }
         
         await updateDoc(getUserDoc('lensInventory', lensToEdit.id), lensData);
         console.log("Updated stock lens:", lensData);
@@ -115,15 +267,37 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
         
         // For each valid stock lens row, create a lens in inventory
         for (const row of validRows) {
-          const lensData = {
+          // Generate power series from maxSph and maxCyl
+          const maxSphNum = parseFloat(row.maxSph);
+          const maxCylNum = parseFloat(row.maxCyl);
+          const sphRange = maxSphNum < 0 ? `${maxSphNum} to 0` : `0 to +${maxSphNum}`;
+          const cylRange = maxCylNum < 0 ? `${maxCylNum} to 0` : `0 to +${maxCylNum}`;
+          const powerSeries = `SPH: ${sphRange}, CYL: ${cylRange}`;
+          
+          let lensData = {
             brandName: row.brandName,
-            powerSeries: row.powerSeries,
+            powerSeries: powerSeries,
+            maxSph: row.maxSph,
+            maxCyl: row.maxCyl,
             purchasePrice: row.purchasePrice,
             salePrice: row.salePrice,
-            qty: parseFloat(row.qty) || 1,
             type: 'stock',
             createdAt: Timestamp.now()
           };
+          
+          // If power inventory was set up for this row, include that data
+          if (row.powerInventorySetup && row.powerInventoryData) {
+            lensData = {
+              ...lensData,
+              inventoryType: 'individual',
+              powerInventory: row.powerInventoryData.powerInventory,
+              powerLimits: row.powerInventoryData.powerLimits,
+              totalQuantity: row.powerInventoryData.totalQuantity
+            };
+          } else {
+            // Default to simple quantity
+            lensData.qty = parseFloat(row.qty) || 1;
+          }
           
           // Add document to Firestore
           const docRef = await addDoc(getUserCollection('lensInventory'), lensData);
@@ -172,10 +346,12 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
                 <tr>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">SL No</th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Lens Brand Name</th>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Power Series</th>
+                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-20">Max SPH</th>
+                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-20">Max CYL</th>
+                  <th scope="col" className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24">Setup</th>
+                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-20">QTY (Pairs)</th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Purchase Price</th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Sale Price</th>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">QTY (Pairs)</th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Action</th>
                 </tr>
               </thead>
@@ -194,14 +370,60 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
                         placeholder="Brand Name"
                       />
                     </td>
-                    <td className="px-2 py-2 whitespace-nowrap">
+                    <td className="px-2 py-2 whitespace-nowrap w-20">
                       <input
-                        type="text"
-                        value={row.powerSeries}
-                        onChange={(e) => handleStockLensChange(index, 'powerSeries', e.target.value)}
-                        className={inputClassName + " text-xs"}
-                        placeholder="e.g. -1.00 to -6.00"
+                        type="number"
+                        value={row.maxSph}
+                        onChange={(e) => handleStockLensChange(index, 'maxSph', e.target.value)}
+                        className={inputClassName + " text-xs w-full"}
+                        placeholder="-6.00"
+                        step="0.25"
                       />
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap w-20">
+                      <input
+                        type="number"
+                        value={row.maxCyl}
+                        onChange={(e) => handleStockLensChange(index, 'maxCyl', e.target.value)}
+                        className={inputClassName + " text-xs w-full"}
+                        placeholder="-2.00"
+                        step="0.25"
+                      />
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap w-24 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleSetupPowerInventory(index)}
+                        disabled={!row.brandName || !row.maxSph || !row.maxCyl}
+                        className={`text-xs px-2 py-1 rounded text-center ${
+                          row.powerInventorySetup 
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-700' 
+                            : 'bg-sky-50 hover:bg-sky-100 dark:bg-sky-900/50 dark:hover:bg-sky-900/70 text-sky-600 dark:text-sky-400 border-sky-200 dark:border-sky-700'
+                        } border disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        {row.powerInventorySetup ? '✅' : '📊'}
+                      </button>
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap w-20">
+                      {row.powerInventorySetup && row.powerInventoryData ? (
+                        <input
+                          type="number"
+                          value={row.powerInventoryData.totalQuantity || 0}
+                          readOnly
+                          className={inputClassName + " text-xs w-full bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 cursor-not-allowed"}
+                          title="Quantity calculated from individual power inventory"
+                        />
+                      ) : (
+                        <input
+                          type="number"
+                          value={row.qty}
+                          onChange={(e) => handleStockLensChange(index, 'qty', e.target.value)}
+                          className={inputClassName + " text-xs w-full"}
+                          placeholder="1"
+                          min="1"
+                          step="1"
+                        />
+                      )}
                     </td>
                     <td className="px-2 py-2 whitespace-nowrap">
                       <input
@@ -226,17 +448,6 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
                       />
                     </td>
                     <td className="px-2 py-2 whitespace-nowrap">
-                      <input
-                        type="number"
-                        value={row.qty}
-                        onChange={(e) => handleStockLensChange(index, 'qty', parseFloat(e.target.value))}
-                        min="0.5"
-                        step="0.5"
-                        className={inputClassName + " text-xs"}
-                        placeholder="1"
-                      />
-                    </td>
-                    <td className="px-2 py-2 whitespace-nowrap">
                       <button
                         type="button"
                         onClick={() => removeStockLensRow(index)}
@@ -250,6 +461,13 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
                     </td>
                   </tr>
                 ))}
+                {stockLensRows.length === 0 && (
+                  <tr>
+                    <td colSpan="9" className="px-3 py-4 text-center text-gray-500 dark:text-gray-400">
+                      No stock lenses added yet. Click the "Add Row" button to add stock lens details.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -297,6 +515,18 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
           </button>
         </div>
       </form>
+      
+      {/* PowerInventoryModal */}
+      {showPowerInventoryModal && (
+        <PowerInventoryModal
+          isOpen={showPowerInventoryModal}
+          onClose={handlePowerInventoryModalClose}
+          onSave={handlePowerInventoryModalSave}
+          lensData={pendingStockLens}
+          isEdit={false}
+          existingInventory={null}
+        />
+      )}
     </div>
   );
 };

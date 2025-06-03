@@ -3,7 +3,7 @@ import { getUserUid } from './multiTenancy';
 import { dateToISOString } from './dateUtils';
 
 // Get current user info for shop operations (MULTI-TENANT SAFE)
-const getCurrentUserInfo = () => {
+export const getCurrentUserInfo = () => {
   const userUid = getUserUid();
   if (!userUid) {
     throw new Error('User not authenticated - cannot perform shop operations');
@@ -12,15 +12,19 @@ const getCurrentUserInfo = () => {
   // Get user info from localStorage but ensure it's tied to current user
   const userInfo = localStorage.getItem('userInfo');
   if (userInfo) {
-    const parsedInfo = JSON.parse(userInfo);
-    // Ensure the stored info belongs to current user
-    if (parsedInfo.userId === userUid) {
-      return parsedInfo;
+    try {
+      const parsedInfo = JSON.parse(userInfo);
+      // Ensure the stored info belongs to current user
+      if (parsedInfo.userId === userUid) {
+        return parsedInfo;
+      }
+    } catch (e) {
+      console.warn('Error parsing stored user info:', e);
     }
   }
   
   // Fallback - create basic user info with current UID
-  const userEmail = localStorage.getItem('userEmail');
+  const userEmail = localStorage.getItem('userEmail') || '';
   return {
     opticalName: userEmail ? `${userEmail.split('@')[0]} Optical` : 'User Optical Store',
     city: 'Not specified',
@@ -61,26 +65,32 @@ export const uploadLensesToShop = async (lenses, userInfo = null) => {
       }));
 
     const uploadPromises = lensesToUpload.map(async (lens) => {
-      const response = await fetch(`${SHOP_API_BASE_URL}/createShopItem`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          data: lens,
-          documentId: lens.shopId
-        })
-      });
+      try {
+        const response = await fetch(`${SHOP_API_BASE_URL}/createShopItem`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            data: lens,
+            documentId: lens.shopId
+          })
+        });
 
-      if (!response.ok) {
-        throw new Error(`Failed to upload lens ${lens.id}`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to upload lens ${lens.id}: ${errorText}`);
+        }
+
+        return await response.json();
+      } catch (error) {
+        console.error(`Error uploading lens ${lens.id}:`, error);
+        throw error;
       }
-
-      return response.json();
     });
 
     const results = await Promise.all(uploadPromises);
-    console.log('Successfully uploaded user lenses to shop:', results);
+    console.log(`Successfully uploaded ${results.length} user lenses to shop`);
     return results;
   } catch (error) {
     console.error('Error uploading user lenses to shop:', error);
@@ -91,7 +101,6 @@ export const uploadLensesToShop = async (lenses, userInfo = null) => {
 // Remove user's lenses from the centralized shop (USER-SPECIFIC)
 export const removeLensesFromShop = async (lenses, userInfo = null) => {
   try {
-    const currentUserInfo = userInfo || getCurrentUserInfo();
     const userUid = getUserUid();
     
     if (!userUid) {
@@ -101,33 +110,39 @@ export const removeLensesFromShop = async (lenses, userInfo = null) => {
     const removePromises = lenses
       .filter(lens => lens.type === 'prescription' || lens.type === 'contact')
       .map(async (lens) => {
-        // Use user-specific shop ID (PREVENTS CROSS-USER DELETION)
-        const shopId = `${userUid}_${lens.id}`;
-        
-        const response = await fetch(`${SHOP_API_BASE_URL}/deleteShopItem`, {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            documentId: shopId
-          })
-        });
+        try {
+          // Use user-specific shop ID (PREVENTS CROSS-USER DELETION)
+          const shopId = `${userUid}_${lens.id}`;
+          
+          const response = await fetch(`${SHOP_API_BASE_URL}/deleteShopItem`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              documentId: shopId
+            })
+          });
 
-        if (!response.ok) {
-          // Don't throw error if item doesn't exist
-          if (response.status === 404) {
-            console.log(`User lens ${lens.id} not found in shop, skipping...`);
-            return { success: true, message: 'Not found, skipped' };
+          if (!response.ok) {
+            // Don't throw error if item doesn't exist
+            if (response.status === 404) {
+              console.log(`User lens ${lens.id} not found in shop, skipping...`);
+              return { success: true, message: 'Not found, skipped' };
+            }
+            const errorText = await response.text();
+            throw new Error(`Failed to remove lens ${lens.id}: ${errorText}`);
           }
-          throw new Error(`Failed to remove lens ${lens.id}`);
-        }
 
-        return response.json();
+          return await response.json();
+        } catch (error) {
+          console.error(`Error removing lens ${lens.id}:`, error);
+          throw error;
+        }
       });
 
     const results = await Promise.all(removePromises);
-    console.log('Successfully removed user lenses from shop:', results);
+    console.log(`Successfully processed ${results.length} lens removals from shop`);
     return results;
   } catch (error) {
     console.error('Error removing user lenses from shop:', error);
@@ -135,24 +150,24 @@ export const removeLensesFromShop = async (lenses, userInfo = null) => {
   }
 };
 
-// Search for matching lenses in the centralized shop (FILTERED BY USER PREFERENCES)
-export const searchMatchingLenses = async (prescriptionData) => {
+// Get all shop lenses (for marketplace)
+export const getAllShopLenses = async (limit = 1000) => {
   try {
     const userUid = getUserUid();
     if (!userUid) {
       throw new Error('User not authenticated');
     }
     
-    // Get all lenses from shop
-    const response = await fetch(`${SHOP_API_BASE_URL}/getShop?limit=1000`);
+    const response = await fetch(`${SHOP_API_BASE_URL}/getShop?limit=${limit}`);
     
     if (!response.ok) {
-      throw new Error('Failed to fetch shop data');
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch shop data: ${errorText}`);
     }
 
     const result = await response.json();
     
-    if (!result.success || !result.data.documents) {
+    if (!result.success || !result.data?.documents) {
       return [];
     }
 
@@ -161,18 +176,145 @@ export const searchMatchingLenses = async (prescriptionData) => {
 
     // Filter out user's own lenses and only show others' lenses
     const otherUsersLenses = allShopLenses.filter(lens => {
-      // Exclude user's own lenses
       return lens.ownerId !== userUid && lens.userInfo?.userId !== userUid;
     });
 
-    console.log(`Filtering to ${otherUsersLenses.length} lenses from other users`);
+    console.log(`Filtering to ${otherUsersLenses.length} lenses from other distributors`);
+    return otherUsersLenses;
+  } catch (error) {
+    console.error('Error fetching shop lenses:', error);
+    throw error;
+  }
+};
+
+// Search for matching lenses in the centralized shop (FILTERED BY USER PREFERENCES)
+export const searchMatchingLenses = async (prescriptionData) => {
+  try {
+    const allShopLenses = await getAllShopLenses();
+    
+    if (!allShopLenses || allShopLenses.length === 0) {
+      return [];
+    }
 
     // Filter and match lenses using the same logic as local inventory
-    const matchingLenses = findMatchingLenses(otherUsersLenses, prescriptionData);
+    const matchingLenses = findMatchingLenses(allShopLenses, prescriptionData);
     
     return matchingLenses;
   } catch (error) {
     console.error('Error searching matching lenses:', error);
+    return [];
+  }
+};
+
+// Search lenses by specifications (for general marketplace search)
+export const searchLensesBySpecs = async (searchCriteria) => {
+  try {
+    const allShopLenses = await getAllShopLenses();
+    
+    if (!allShopLenses || allShopLenses.length === 0) {
+      return [];
+    }
+
+    // Apply search filters
+    let filteredLenses = allShopLenses;
+
+    // Filter by lens type
+    if (searchCriteria.type && searchCriteria.type !== 'all') {
+      filteredLenses = filteredLenses.filter(lens => lens.type === searchCriteria.type);
+    }
+
+    // Filter by specifications
+    if (searchCriteria.sph) {
+      const sphValue = parseFloat(searchCriteria.sph);
+      filteredLenses = filteredLenses.filter(lens => {
+        if (!lens.sph) return false;
+        const lensSph = parseFloat(lens.sph);
+        return Math.abs(lensSph - sphValue) <= 0.25; // 0.25 tolerance
+      });
+    }
+
+    if (searchCriteria.cyl) {
+      const cylValue = parseFloat(searchCriteria.cyl);
+      filteredLenses = filteredLenses.filter(lens => {
+        if (!lens.cyl) return false;
+        const lensCyl = parseFloat(lens.cyl);
+        return Math.abs(lensCyl - cylValue) <= 0.25; // 0.25 tolerance
+      });
+    }
+
+    if (searchCriteria.axis) {
+      const axisValue = parseInt(searchCriteria.axis);
+      filteredLenses = filteredLenses.filter(lens => {
+        if (!lens.axis) return false;
+        const lensAxis = parseInt(lens.axis);
+        const diff = Math.abs(lensAxis - axisValue);
+        return diff <= 10 || diff >= 170; // 10 degree tolerance, considering 180 wrap-around
+      });
+    }
+
+    if (searchCriteria.add) {
+      const addValue = parseFloat(searchCriteria.add);
+      filteredLenses = filteredLenses.filter(lens => {
+        if (!lens.add) return false;
+        const lensAdd = parseFloat(lens.add);
+        return Math.abs(lensAdd - addValue) <= 0.25; // 0.25 tolerance
+      });
+    }
+
+    // Filter by brand
+    if (searchCriteria.brand && searchCriteria.brand.trim()) {
+      filteredLenses = filteredLenses.filter(lens => 
+        lens.brand && lens.brand.toLowerCase().includes(searchCriteria.brand.toLowerCase())
+      );
+    }
+
+    // Filter by material
+    if (searchCriteria.material && searchCriteria.material.trim()) {
+      filteredLenses = filteredLenses.filter(lens => 
+        lens.material && lens.material.toLowerCase().includes(searchCriteria.material.toLowerCase())
+      );
+    }
+
+    // Filter by coating
+    if (searchCriteria.coating && searchCriteria.coating.trim()) {
+      filteredLenses = filteredLenses.filter(lens => 
+        lens.coating && lens.coating.toLowerCase().includes(searchCriteria.coating.toLowerCase())
+      );
+    }
+
+    // Filter by contact lens specific fields
+    if (searchCriteria.baseCurve) {
+      const bcValue = parseFloat(searchCriteria.baseCurve);
+      filteredLenses = filteredLenses.filter(lens => {
+        if (!lens.baseCurve) return false;
+        const lensBc = parseFloat(lens.baseCurve);
+        return Math.abs(lensBc - bcValue) <= 0.1; // 0.1 tolerance for base curve
+      });
+    }
+
+    if (searchCriteria.diameter) {
+      const diaValue = parseFloat(searchCriteria.diameter);
+      filteredLenses = filteredLenses.filter(lens => {
+        if (!lens.diameter) return false;
+        const lensDia = parseFloat(lens.diameter);
+        return Math.abs(lensDia - diaValue) <= 0.2; // 0.2 tolerance for diameter
+      });
+    }
+
+    // Sort by relevance (could be enhanced with better scoring)
+    return filteredLenses.sort((a, b) => {
+      // Sort by lens type first (prescription, then contact)
+      if (a.type !== b.type) {
+        if (a.type === 'prescription') return -1;
+        if (b.type === 'prescription') return 1;
+      }
+      // Then by upload date (newer first)
+      const aDate = new Date(a.uploadedAt || 0);
+      const bDate = new Date(b.uploadedAt || 0);
+      return bDate - aDate;
+    });
+  } catch (error) {
+    console.error('Error searching lenses by specs:', error);
     return [];
   }
 };
@@ -321,11 +463,16 @@ const findMatchingLenses = (lenses, prescriptionData) => {
 export const getShopPreferences = () => {
   const userUid = getUserUid();
   if (!userUid) {
-    return { isSharing: false }; // Return default object instead of null
+    return { isSharing: false };
   }
   
-  const preferences = localStorage.getItem(`shopPreferences_${userUid}`);
-  return preferences ? JSON.parse(preferences) : { isSharing: false }; // Return default object instead of null
+  try {
+    const preferences = localStorage.getItem(`shopPreferences_${userUid}`);
+    return preferences ? JSON.parse(preferences) : { isSharing: false };
+  } catch (error) {
+    console.error('Error getting shop preferences:', error);
+    return { isSharing: false };
+  }
 };
 
 // Set shop preferences (USER-SPECIFIC)
@@ -335,11 +482,14 @@ export const setShopPreferences = (preferences) => {
     throw new Error('User not authenticated');
   }
   
-  localStorage.setItem(`shopPreferences_${userUid}`, JSON.stringify({
-    ...preferences,
-    userId: userUid,
-    updatedAt: dateToISOString(new Date())
-  }));
-};
-
-export { getCurrentUserInfo }; 
+  try {
+    localStorage.setItem(`shopPreferences_${userUid}`, JSON.stringify({
+      ...preferences,
+      userId: userUid,
+      updatedAt: dateToISOString(new Date())
+    }));
+  } catch (error) {
+    console.error('Error setting shop preferences:', error);
+    throw error;
+  }
+}; 

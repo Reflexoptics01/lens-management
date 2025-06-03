@@ -2084,6 +2084,87 @@ The page will refresh in 3 seconds to load your restored data...`;
                     <span className="text-gray-500 dark:text-gray-400 italic">Large images will be automatically compressed to fit size limits.</span>
                   </p>
                 </div>
+                
+                {/* Reflex Shop - Inventory Sharing Section */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                        🛒 Reflex Shop - Inventory Sharing
+                      </h3>
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        Share your prescription and contact lenses in the centralized Reflex Shop marketplace. 
+                        Other distributors can discover and contact you for lens orders.
+                      </p>
+                    </div>
+                    <div className="flex items-center">
+                      <button
+                        onClick={handleShopPermissionToggle}
+                        disabled={shopLoading}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                          shopPreferences.isSharing 
+                            ? 'bg-blue-600 focus:ring-blue-500' 
+                            : 'bg-gray-200 dark:bg-gray-700 focus:ring-gray-500'
+                        } ${shopLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            shopPreferences.isSharing ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {shopError && (
+                    <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                      <p className="text-red-600 dark:text-red-400 text-sm">{shopError}</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-3 text-sm">
+                    <div className="flex items-center space-x-2">
+                      <div className={`w-3 h-3 rounded-full ${shopPreferences.isSharing ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                      <span className="text-blue-800 dark:text-blue-200">
+                        {shopPreferences.isSharing ? 'Inventory sharing is enabled' : 'Inventory sharing is disabled'}
+                      </span>
+                    </div>
+                    
+                    {shopPreferences.isSharing && (
+                      <>
+                        <div className="flex items-center space-x-2">
+                          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          <span className="text-blue-800 dark:text-blue-200">
+                            Your prescription and contact lenses are visible in Reflex Shop
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                          <span className="text-blue-800 dark:text-blue-200">
+                            Other distributors can find and contact you for orders
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    
+                    <div className="bg-blue-100 dark:bg-blue-800/50 p-3 rounded-lg">
+                      <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-1">What gets shared:</h4>
+                      <ul className="text-blue-800 dark:text-blue-200 text-xs space-y-1">
+                        <li>• Prescription lenses (SPH, CYL, AXIS, ADD details)</li>
+                        <li>• Contact lenses (power, brand, type information)</li>
+                        <li>• Your shop name, location, and contact details</li>
+                        <li>• Lens pricing and availability</li>
+                      </ul>
+                      <p className="text-blue-700 dark:text-blue-300 text-xs mt-2">
+                        <strong>Note:</strong> Stock lenses and services are not shared in the marketplace.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
             
@@ -2681,85 +2762,6 @@ The page will refresh in 3 seconds to load your restored data...`;
       
       {/* Password Confirm Modal */}
       {showPasswordConfirmModal && <PasswordConfirmModal />}
-
-      {/* Reflex Shop - Inventory Sharing Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Reflex Shop - Inventory Sharing</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Share your prescription and contact lenses in the centralized Reflex Shop marketplace. 
-              Other distributors can discover and contact you for lens orders.
-            </p>
-          </div>
-          <div className="flex items-center">
-            <button
-              onClick={handleShopPermissionToggle}
-              disabled={shopLoading}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                shopPreferences.isSharing 
-                  ? 'bg-blue-600 focus:ring-blue-500' 
-                  : 'bg-gray-200 dark:bg-gray-700 focus:ring-gray-500'
-              } ${shopLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  shopPreferences.isSharing ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
-        </div>
-
-        {shopError && (
-          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <p className="text-red-600 dark:text-red-400 text-sm">{shopError}</p>
-          </div>
-        )}
-
-        <div className="space-y-3 text-sm">
-          <div className="flex items-center space-x-2">
-            <div className={`w-3 h-3 rounded-full ${shopPreferences.isSharing ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-            <span className="text-gray-700 dark:text-gray-300">
-              {shopPreferences.isSharing ? 'Inventory sharing is enabled' : 'Inventory sharing is disabled'}
-            </span>
-          </div>
-          
-          {shopPreferences.isSharing && (
-            <>
-              <div className="flex items-center space-x-2">
-                <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                <span className="text-gray-700 dark:text-gray-300">
-                  Your prescription and contact lenses are visible in Reflex Shop
-                </span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                <span className="text-gray-700 dark:text-gray-300">
-                  Other distributors can find and contact you for orders
-                </span>
-              </div>
-            </>
-          )}
-          
-          <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
-            <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-1">What gets shared:</h4>
-            <ul className="text-blue-800 dark:text-blue-200 text-xs space-y-1">
-              <li>• Prescription lenses (SPH, CYL, AXIS, ADD details)</li>
-              <li>• Contact lenses (power, brand, type information)</li>
-              <li>• Your shop name, location, and contact details</li>
-              <li>• Lens pricing and availability</li>
-            </ul>
-            <p className="text-blue-700 dark:text-blue-300 text-xs mt-2">
-              <strong>Note:</strong> Stock lenses and services are not shared in the marketplace.
-            </p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };
