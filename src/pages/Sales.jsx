@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { db } from '../firebaseConfig';
-import { collection, getDocs, query, orderBy, doc, getDoc, deleteDoc, updateDoc, where } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, doc, getDoc, deleteDoc, updateDoc, where, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import PrintInvoiceModal from '../components/PrintInvoiceModal';
 import { formatDate, formatDateTime, safelyParseDate } from '../utils/dateUtils';
+import * as XLSX from 'xlsx';
 
 const Sales = () => {
   const [sales, setSales] = useState([]);
@@ -29,6 +30,10 @@ const Sales = () => {
   const [showPartySearch, setShowPartySearch] = useState(false);
   const [filteredCustomers, setFilteredCustomers] = useState([]);
   const partySearchRef = useRef(null);
+
+  // Import states
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState('');
 
   useEffect(() => {
     fetchSales();
@@ -423,6 +428,234 @@ const Sales = () => {
     setPartySearchTerm('');
   };
 
+  // One-time Sales Import Function
+  const handleSalesImport = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    const fileType = file.name.split('.').pop().toLowerCase();
+    if (!['xlsx', 'xls'].includes(fileType)) {
+      setImportError('Please select a valid Excel file (.xlsx or .xls)');
+      event.target.value = ''; // Clear the input
+      return;
+    }
+
+    setImportLoading(true);
+    setImportError('');
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        
+        // Get the first worksheet
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        // Convert to JSON
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        
+        if (jsonData.length === 0) {
+          setImportError('The Excel file appears to be empty');
+          setImportLoading(false);
+          event.target.value = '';
+          return;
+        }
+
+        // Validate required columns (case-insensitive)
+        const requiredColumns = ['sl no', 'bill date', 'bill no', 'party name', 'net amount'];
+        const fileColumns = Object.keys(jsonData[0]).map(col => col.toLowerCase().trim());
+        const missingColumns = requiredColumns.filter(col => 
+          !fileColumns.includes(col.toLowerCase())
+        );
+
+        if (missingColumns.length > 0) {
+          setImportError(`Missing required columns: ${missingColumns.join(', ')}`);
+          setImportLoading(false);
+          event.target.value = '';
+          return;
+        }
+
+        // Process and import data
+        let successCount = 0;
+        let errorCount = 0;
+        const errors = [];
+
+        for (let i = 0; i < jsonData.length; i++) {
+          const row = jsonData[i];
+          try {
+            // Map Excel columns to sales data structure (case-insensitive)
+            const getColumnValue = (row, columnName) => {
+              const key = Object.keys(row).find(k => 
+                k.toLowerCase().trim() === columnName.toLowerCase()
+              );
+              return key ? row[key] : '';
+            };
+
+            const billDate = getColumnValue(row, 'bill date');
+            const billNo = getColumnValue(row, 'bill no');
+            const partyName = getColumnValue(row, 'party name');
+            const netAmount = getColumnValue(row, 'net amount');
+
+            // Validate required fields
+            if (!billNo?.toString().trim()) {
+              errors.push(`Row ${i + 2}: Bill No is required`);
+              errorCount++;
+              continue;
+            }
+
+            if (!partyName?.toString().trim()) {
+              errors.push(`Row ${i + 2}: Party Name is required`);
+              errorCount++;
+              continue;
+            }
+
+            if (!billDate) {
+              errors.push(`Row ${i + 2}: Bill Date is required`);
+              errorCount++;
+              continue;
+            }
+
+            if (!netAmount || isNaN(parseFloat(netAmount))) {
+              errors.push(`Row ${i + 2}: Valid Net Amount is required`);
+              errorCount++;
+              continue;
+            }
+
+            // Parse date
+            let invoiceDate;
+            try {
+              // Handle different date formats
+              if (typeof billDate === 'number') {
+                // Excel date serial number
+                const excelDate = new Date((billDate - 25569) * 86400 * 1000);
+                invoiceDate = excelDate;
+              } else {
+                // String date
+                invoiceDate = new Date(billDate);
+              }
+              
+              if (isNaN(invoiceDate.getTime())) {
+                throw new Error('Invalid date');
+              }
+            } catch (e) {
+              errors.push(`Row ${i + 2}: Invalid date format for Bill Date`);
+              errorCount++;
+              continue;
+            }
+
+            // Create minimal sales data for import
+            const salesData = {
+              invoiceNumber: billNo.toString().trim(),
+              invoiceDate: invoiceDate,
+              customerName: partyName.toString().trim(),
+              totalAmount: parseFloat(netAmount),
+              // Mark as imported data
+              isImported: true,
+              importedAt: serverTimestamp(),
+              // Minimal required fields
+              customerId: '', // Empty since we don't have customer mapping
+              items: [], // Empty items array
+              subtotal: parseFloat(netAmount),
+              taxAmount: 0,
+              discountAmount: 0,
+              frieghtCharge: 0,
+              amountPaid: 0,
+              balanceDue: parseFloat(netAmount),
+              paymentStatus: 'UNPAID',
+              createdAt: serverTimestamp()
+            };
+
+            // Add to Firestore
+            await addDoc(getUserCollection('sales'), salesData);
+            successCount++;
+
+          } catch (error) {
+            console.error(`Error importing row ${i + 2}:`, error);
+            errors.push(`Row ${i + 2}: ${error.message}`);
+            errorCount++;
+          }
+        }
+
+        // Show results
+        let message = `Import completed!\n`;
+        message += `✅ Successfully imported: ${successCount} sales records\n`;
+        if (errorCount > 0) {
+          message += `❌ Failed to import: ${errorCount} records\n\n`;
+          if (errors.length > 0) {
+            message += `Errors:\n${errors.slice(0, 10).join('\n')}`;
+            if (errors.length > 10) {
+              message += `\n... and ${errors.length - 10} more errors`;
+            }
+          }
+        }
+
+        alert(message);
+        
+        // Refresh sales list
+        if (successCount > 0) {
+          fetchSales();
+        }
+
+        // Clear the file input
+        event.target.value = '';
+
+      } catch (error) {
+        console.error('Error parsing Excel file:', error);
+        setImportError('Failed to parse Excel file. Please check the file format.');
+        event.target.value = '';
+      } finally {
+        setImportLoading(false);
+      }
+    };
+
+    reader.onerror = () => {
+      setImportError('Failed to read the file');
+      setImportLoading(false);
+      event.target.value = '';
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
+  // Download template function for the import
+  const downloadImportTemplate = () => {
+    const templateData = [
+      {
+        'sl no': 1,
+        'bill date': '2024-06-01',
+        'bill no': 'INV-001',
+        'party name': 'ABC Optical Store',
+        'net amount': 5000
+      },
+      {
+        'sl no': 2,
+        'bill date': '2024-06-02',
+        'bill no': 'INV-002',
+        'party name': 'XYZ Vision Center',
+        'net amount': 7500
+      }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sales Import Template');
+
+    // Set column widths
+    const columnWidths = [
+      { wch: 8 },  // sl no
+      { wch: 12 }, // bill date
+      { wch: 15 }, // bill no
+      { wch: 25 }, // party name
+      { wch: 12 }  // net amount
+    ];
+    ws['!cols'] = columnWidths;
+
+    XLSX.writeFile(wb, 'Sales_Import_Template.xlsx');
+  };
+
   return (
     <div className="mobile-page">
       <Navbar />
@@ -516,6 +749,33 @@ const Sales = () => {
             </div>
             
             <div className="flex space-x-2">
+              {/* Import Template Button */}
+              <button
+                onClick={downloadImportTemplate}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                title="Download Sales Import Template"
+              >
+                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Template
+              </button>
+
+              {/* Import Button */}
+              <label className="inline-flex items-center px-3 py-2 border border-orange-300 text-sm font-medium rounded-lg text-orange-700 bg-orange-50 hover:bg-orange-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 cursor-pointer">
+                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                {importLoading ? 'Importing...' : 'Import Sales'}
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleSalesImport}
+                  className="sr-only"
+                  disabled={importLoading}
+                />
+              </label>
+
               <button
                 onClick={() => navigate('/sales/new')}
                 className="btn-primary inline-flex items-center space-x-2 whitespace-nowrap px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700"
@@ -539,6 +799,20 @@ const Sales = () => {
             </div>
           </div>
         </div>
+
+        {/* Import Error Display */}
+        {importError && (
+          <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-400 text-red-700 rounded-md">
+            <p className="font-medium">Import Error</p>
+            <p className="text-sm">{importError}</p>
+            <button 
+              onClick={() => setImportError('')}
+              className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* Sales List */}
         {loading ? (
@@ -579,16 +853,16 @@ const Sales = () => {
                   <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead className="bg-gray-50 dark:bg-gray-700">
                       <tr>
-                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[100px]">
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[100px] text-left">
                           Invoice #
                         </th>
-                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[140px]">
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[140px] text-left">
                           Date
                         </th>
-                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider pl-6">
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider text-left">
                           Customer
                         </th>
-                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider text-right">
+                        <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider text-left">
                           Amount
                         </th>
                         <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider text-center">
@@ -601,34 +875,55 @@ const Sales = () => {
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         {filteredSales.map((sale) => {
-                        const { date, time } = formatDisplayDate(sale.createdAt);
+                        // For imported sales, use invoiceDate instead of createdAt, and customerName directly
+                        const displayDate = sale.isImported ? sale.invoiceDate : sale.createdAt;
+                        const { date, time } = formatDisplayDate(displayDate);
                         const customerDetails = getCustomerDetails(sale.customerId);
+                        const displayCustomerName = sale.isImported ? sale.customerName : (customerDetails?.opticalName || 'Unknown Customer');
+                        const displayCustomerCity = sale.isImported ? '' : customerDetails?.city;
+                        
                         return (
                           <tr 
                             key={sale.id} 
-                            onClick={() => navigate(`/sales/${sale.id}`)}
-                            className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors duration-150"
+                            onClick={() => {
+                              // Don't allow opening imported sales in detail view
+                              if (sale.isImported) {
+                                alert('This is an imported sales record and cannot be opened for editing.');
+                                return;
+                              }
+                              navigate(`/sales/${sale.id}`);
+                            }}
+                            className={`hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors duration-150 ${
+                              sale.isImported ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
+                            }`}
                           >
                             <td className="px-6 py-4">
-                              <span className="text-sm font-medium text-sky-600 dark:text-sky-400">{sale.invoiceNumber || sale.displayId}</span>
+                              <div className="flex items-center">
+                                <span className="text-sm font-medium text-sky-600 dark:text-sky-400">{sale.invoiceNumber || sale.displayId}</span>
+                                {sale.isImported && (
+                                  <span className="ml-2 px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full">
+                                    Imported
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="px-6 py-4">
                               <div className="text-sm text-gray-900 dark:text-white">{date}</div>
                               <div className="text-sm text-gray-500 dark:text-gray-400">{time}</div>
                             </td>
-                            <td className="px-6 py-4">
+                            <td className="px-6 py-4 text-left">
                               <div className="flex flex-col">
                                 <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                  {customerDetails?.opticalName || 'Unknown Customer'}
+                                  {displayCustomerName}
                                 </span>
-                                {customerDetails?.city && (
+                                {displayCustomerCity && (
                                   <span className="text-xs text-gray-500 dark:text-gray-400">
-                                    {customerDetails.city}
+                                    {displayCustomerCity}
                                   </span>
                                 )}
                               </div>
                             </td>
-                            <td className="px-6 py-4 text-right">
+                            <td className="px-6 py-4 text-left">
                               <span className="text-sm font-medium text-gray-900 dark:text-white">
                                 {formatCurrency(sale.totalAmount)}
                               </span>
@@ -649,19 +944,38 @@ const Sales = () => {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    if (sale.isImported) {
+                                      alert('Imported sales cannot be edited.');
+                                      return;
+                                    }
                                     navigate(`/sales/edit/${sale.id}`);
                                   }}
-                                  className="text-sky-600 dark:text-sky-400 hover:text-sky-900 dark:hover:text-sky-300"
-                                  title="Edit Sale"
+                                  className={`${sale.isImported 
+                                    ? 'text-gray-400 cursor-not-allowed' 
+                                    : 'text-sky-600 dark:text-sky-400 hover:text-sky-900 dark:hover:text-sky-300'
+                                  }`}
+                                  title={sale.isImported ? 'Cannot edit imported sales' : 'Edit Sale'}
+                                  disabled={sale.isImported}
                                 >
                                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                   </svg>
                                 </button>
                                 <button
-                                  onClick={(e) => handlePrintSale(e, sale.id)}
-                                  className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300"
-                                  title="Print Invoice"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (sale.isImported) {
+                                      alert('Cannot print imported sales - no detailed invoice data available.');
+                                      return;
+                                    }
+                                    handlePrintSale(e, sale.id);
+                                  }}
+                                  className={`${sale.isImported 
+                                    ? 'text-gray-400 cursor-not-allowed' 
+                                    : 'text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300'
+                                  }`}
+                                  title={sale.isImported ? 'Cannot print imported sales' : 'Print Invoice'}
+                                  disabled={sale.isImported}
                                 >
                                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -695,16 +1009,37 @@ const Sales = () => {
                 </div>
               ) : (
                 filteredSales.map((sale) => {
-                const { date } = formatDisplayDate(sale.createdAt);
+                // For imported sales, use invoiceDate instead of createdAt, and customerName directly
+                const displayDate = sale.isImported ? sale.invoiceDate : sale.createdAt;
+                const { date } = formatDisplayDate(displayDate);
                 const customerDetails = getCustomerDetails(sale.customerId);
+                const displayCustomerName = sale.isImported ? sale.customerName : (customerDetails?.opticalName || 'Unknown Customer');
+                const displayCustomerCity = sale.isImported ? '' : customerDetails?.city;
+                
                 return (
                   <div 
                     key={sale.id}
-                    onClick={() => navigate(`/sales/${sale.id}`)}
-                    className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 cursor-pointer"
+                    onClick={() => {
+                      // Don't allow opening imported sales in detail view
+                      if (sale.isImported) {
+                        alert('This is an imported sales record and cannot be opened for editing.');
+                        return;
+                      }
+                      navigate(`/sales/${sale.id}`);
+                    }}
+                    className={`bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 cursor-pointer ${
+                      sale.isImported ? 'bg-yellow-50 dark:bg-yellow-900/20 border-orange-200' : ''
+                    }`}
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <span className="text-sm font-medium text-sky-600 dark:text-sky-400">{sale.invoiceNumber || sale.displayId}</span>
+                      <div className="flex items-center">
+                        <span className="text-sm font-medium text-sky-600 dark:text-sky-400">{sale.invoiceNumber || sale.displayId}</span>
+                        {sale.isImported && (
+                          <span className="ml-2 px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full">
+                            Imported
+                          </span>
+                        )}
+                      </div>
                       <span className={`px-2 py-1 text-xs font-semibold rounded-full 
                         ${sale.paymentStatus === 'PAID' 
                           ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200' 
@@ -717,11 +1052,11 @@ const Sales = () => {
                     </div>
                     <div className="mb-2">
                       <h3 className="font-medium text-gray-900 dark:text-white">
-                        {customerDetails?.opticalName || 'Unknown Customer'}
+                        {displayCustomerName}
                       </h3>
-                      {customerDetails?.city && (
+                      {displayCustomerCity && (
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {customerDetails.city}
+                          {displayCustomerCity}
                         </p>
                       )}
                     </div>
@@ -735,9 +1070,18 @@ const Sales = () => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          if (sale.isImported) {
+                            alert('Imported sales cannot be edited.');
+                            return;
+                          }
                           navigate(`/sales/edit/${sale.id}`);
                         }}
-                        className="text-sky-600 dark:text-sky-400 flex items-center"
+                        className={`${sale.isImported 
+                          ? 'text-gray-400 cursor-not-allowed' 
+                          : 'text-sky-600 dark:text-sky-400 hover:text-sky-900 dark:hover:text-sky-300'
+                        }`}
+                        title={sale.isImported ? 'Cannot edit imported sales' : 'Edit Sale'}
+                        disabled={sale.isImported}
                       >
                         <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -745,8 +1089,20 @@ const Sales = () => {
                         Edit
                       </button>
                       <button
-                        onClick={(e) => handlePrintSale(e, sale.id)}
-                        className="text-indigo-600 dark:text-indigo-400 flex items-center"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (sale.isImported) {
+                            alert('Cannot print imported sales - no detailed invoice data available.');
+                            return;
+                          }
+                          handlePrintSale(e, sale.id);
+                        }}
+                        className={`${sale.isImported 
+                          ? 'text-gray-400 cursor-not-allowed' 
+                          : 'text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300'
+                        }`}
+                        title={sale.isImported ? 'Cannot print imported sales' : 'Print Invoice'}
+                        disabled={sale.isImported}
                       >
                         <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />

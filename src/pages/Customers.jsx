@@ -710,6 +710,9 @@ const Customers = () => {
                   <table className="min-w-full divide-y" style={{ borderColor: 'var(--border-primary)' }}>
                     <thead style={{ backgroundColor: 'var(--bg-tertiary)' }}>
                       <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)', width: '60px' }}>
+                          S.No
+                        </th>
                         <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                           {activeTab === 'customers' ? 'Optical Name' : 'Business Name'}
                         </th>
@@ -722,15 +725,20 @@ const Customers = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                           Financial
                         </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                           Actions
                         </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
-                      {filteredItems.map((item) => (
+                      {filteredItems.map((item, index) => (
                         <tr key={item.id} className="hover:bg-opacity-50" style={{ ':hover': { backgroundColor: 'var(--bg-tertiary)' } }}>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-4 py-4 whitespace-nowrap text-left">
+                            <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                              {index + 1}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-left">
                             <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                               {safeGet(item, 'opticalName', '[No Name]')}
                             </div>
@@ -762,27 +770,27 @@ const Customers = () => {
                             {(item.creditLimit !== undefined || item.openingBalance !== undefined || item.creditPeriod !== undefined) && (
                               <div className="space-y-1 text-sm">
                                 {item.creditLimit !== undefined && (
-                                  <div className="flex justify-between">
-                                    <span style={{ color: 'var(--text-muted)' }}>Credit Limit:</span>
+                                  <div className="text-left">
+                                    <span style={{ color: 'var(--text-muted)' }}>Credit Limit: </span>
                                     <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{formatCurrency(item.creditLimit)}</span>
                                   </div>
                                 )}
                                 {item.openingBalance !== undefined && (
-                                  <div className="flex justify-between">
-                                    <span style={{ color: 'var(--text-muted)' }}>Opening Bal:</span>
+                                  <div className="text-left">
+                                    <span style={{ color: 'var(--text-muted)' }}>Opening Bal: </span>
                                     <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{formatCurrency(item.openingBalance)}</span>
                                   </div>
                                 )}
                                 {item.creditPeriod !== undefined && (
-                                  <div className="flex justify-between">
-                                    <span style={{ color: 'var(--text-muted)' }}>Credit Period:</span>
+                                  <div className="text-left">
+                                    <span style={{ color: 'var(--text-muted)' }}>Credit Period: </span>
                                     <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{item.creditPeriod} days</span>
                                   </div>
                                 )}
                               </div>
                             )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <td className="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
                             <button
                               onClick={() => handleEdit(item)}
                               className="text-sky-600 hover:text-sky-900 mr-4"
