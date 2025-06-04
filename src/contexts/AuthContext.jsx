@@ -54,23 +54,6 @@ export const AuthProvider = ({ children }) => {
       try {
         await setPersistence(auth, browserLocalPersistence);
         console.log('🔐 Firebase Auth persistence set to LOCAL');
-        
-        // Add environment detection and debugging
-        const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-        console.log('🔐 Environment:', {
-          hostname: window.location.hostname,
-          isProduction,
-          userAgent: navigator.userAgent,
-          localStorage: {
-            userUid: localStorage.getItem('userUid'),
-            userEmail: localStorage.getItem('userEmail'),
-            userRole: localStorage.getItem('userRole')
-          }
-        });
-        
-        if (isProduction) {
-          console.log('🔐 Production environment detected - enhanced logging enabled');
-        }
       } catch (error) {
         console.error('🔐 Error setting auth persistence:', error);
       }
@@ -89,37 +72,7 @@ export const AuthProvider = ({ children }) => {
         console.log('🔐 Auth state changed:', firebaseUser ? firebaseUser.email : 'No user');
         
         if (!firebaseUser) {
-          // Check if we have valid session data in localStorage
-          const storedUid = localStorage.getItem('userUid');
-          const storedEmail = localStorage.getItem('userEmail');
-          
-          if (storedUid && storedEmail) {
-            console.log('🔐 No Firebase user but localStorage has auth data - attempting recovery...');
-            
-            // Check if this user data is still valid in Firestore
-            try {
-              const userDoc = await getDoc(doc(db, 'users', storedUid));
-              if (userDoc.exists()) {
-                const userData = userDoc.data();
-                if (userData.email === storedEmail && userData.isActive !== false) {
-                  console.log('🔐 Auth recovery failed - Firebase session lost. User needs to re-login.');
-                  // Don't auto-recover, but provide a helpful error message
-                  setAuthError('Your session has expired. Please log in again.');
-                  setAuthState(AUTH_STATES.UNAUTHENTICATED);
-                  // Clear localStorage to prevent confusion
-                  localStorage.removeItem('userUid');
-                  localStorage.removeItem('userEmail');
-                  localStorage.removeItem('userRole');
-                  localStorage.removeItem('userPermissions');
-                  return;
-                }
-              }
-            } catch (recoveryError) {
-              console.error('🔐 Error during auth recovery:', recoveryError);
-            }
-          }
-          
-          // User signed out or no valid recovery data
+          // User signed out
           handleSignOut();
           return;
         }
@@ -147,13 +100,11 @@ export const AuthProvider = ({ children }) => {
     if (typeof window !== 'undefined') {
       // Make current user available globally for backward compatibility
       window.__authUser = user;
-      console.log('🔐 AuthContext: Updated global auth user for backward compatibility');
     }
   }, [user]);
 
   // Handle user sign out
   const handleSignOut = () => {
-    console.log('🔐 Handling user sign out...');
     setAuthState(AUTH_STATES.UNAUTHENTICATED);
     setUser(null);
     setUserRole(USER_ROLES.GUEST);
@@ -165,8 +116,6 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('userEmail');
     localStorage.removeItem('userRole');
     localStorage.removeItem('userPermissions');
-    
-    console.log('🔐 User sign out complete');
   };
 
   // Validate and setup authenticated user
@@ -234,8 +183,6 @@ export const AuthProvider = ({ children }) => {
 
   // Setup super admin user
   const setupSuperAdmin = async (firebaseUser) => {
-    console.log('🔐 Setting up super admin...');
-    
     setUser(firebaseUser);
     setUserRole(USER_ROLES.SUPER_ADMIN);
     setUserPermissions({});
@@ -252,14 +199,6 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('userEmail', firebaseUser.email);
     localStorage.setItem('userRole', USER_ROLES.SUPER_ADMIN);
     localStorage.setItem('userPermissions', JSON.stringify({}));
-    
-    console.log('🔐 Super admin setup complete');
-    console.log('🔐 localStorage after super admin setup:', {
-      userUid: localStorage.getItem('userUid'),
-      userEmail: localStorage.getItem('userEmail'),
-      userRole: localStorage.getItem('userRole'),
-      userPermissions: localStorage.getItem('userPermissions')
-    });
   };
 
   // Check if user exists in approved users collection
@@ -289,8 +228,6 @@ export const AuthProvider = ({ children }) => {
 
   // Setup approved user
   const setupApprovedUser = async (firebaseUser, userData) => {
-    console.log('🔐 Setting up approved user...');
-    
     // Check if user is active
     if (userData.isActive === false) {
       setAuthState(AUTH_STATES.INACTIVE);
@@ -324,14 +261,6 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('userEmail', firebaseUser.email);
     localStorage.setItem('userRole', userData.role || USER_ROLES.USER);
     localStorage.setItem('userPermissions', JSON.stringify(userData.permissions || {}));
-    
-    console.log('🔐 Approved user setup complete');
-    console.log('🔐 localStorage after approved user setup:', {
-      userUid: localStorage.getItem('userUid'),
-      userEmail: localStorage.getItem('userEmail'),
-      userRole: localStorage.getItem('userRole'),
-      userPermissions: localStorage.getItem('userPermissions')
-    });
   };
 
   // Check user registration status

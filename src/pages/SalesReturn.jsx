@@ -693,20 +693,20 @@ const SalesReturn = ({ isCreate = false, newReturn = false, isView = false }) =>
   // Return details view component
   const ReturnDetailsView = () => (
     <div className="mb-6">
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-4">
+      <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-4">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 mb-2">
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
               Sales Return Details
             </h1>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               View details for this sales return
             </p>
           </div>
           <div className="flex space-x-2">
             <button
               onClick={() => navigate('/sales-returns')}
-              className="btn-secondary inline-flex items-center space-x-2 whitespace-nowrap px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg shadow-sm"
+              className="btn-secondary inline-flex items-center space-x-2 whitespace-nowrap px-4 py-2 bg-sky-600 hover:bg-sky-700 dark:bg-sky-600 dark:hover:bg-sky-700 text-white rounded-lg shadow-sm"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -715,7 +715,7 @@ const SalesReturn = ({ isCreate = false, newReturn = false, isView = false }) =>
             </button>
             <button
               onClick={handlePrintReturn}
-              className="btn-secondary inline-flex items-center space-x-2 whitespace-nowrap px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm"
+              className="btn-secondary inline-flex items-center space-x-2 whitespace-nowrap px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white rounded-lg shadow-sm"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -728,82 +728,82 @@ const SalesReturn = ({ isCreate = false, newReturn = false, isView = false }) =>
       
       {loading ? (
         <div className="flex items-center justify-center py-8">
-          <div className="animate-spin w-8 h-8 border-4 border-sky-600 border-t-transparent rounded-full"></div>
+          <div className="animate-spin w-8 h-8 border-4 border-sky-600 dark:border-sky-400 border-t-transparent rounded-full"></div>
         </div>
       ) : error ? (
-        <div className="p-4 text-center text-red-500 bg-red-50 rounded-lg border border-red-200">
+        <div className="p-4 text-center text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
           {error}
         </div>
       ) : returnData ? (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex flex-col md:flex-row justify-between mb-6 pb-6 border-b border-gray-200">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex flex-col md:flex-row justify-between mb-6 pb-6 border-b border-gray-200 dark:border-gray-700">
             <div className="mb-4 md:mb-0">
-              <p className="text-sm text-gray-500 mb-1">Return #</p>
-              <p className="text-lg font-semibold text-indigo-600">{returnData.displayId || 'SR-001'}</p>
-              <p className="text-sm text-gray-500 mt-3 mb-1">Return Date</p>
-              <p className="font-medium">{formatDate(returnData.returnDate || returnData.createdAt).date}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Return #</p>
+              <p className="text-lg font-semibold text-indigo-600 dark:text-indigo-400">{returnData.displayId || 'SR-001'}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-3 mb-1">Return Date</p>
+              <p className="font-medium text-gray-900 dark:text-white">{formatDate(returnData.returnDate || returnData.createdAt).date}</p>
             </div>
             
             <div className="mb-4 md:mb-0">
-              <p className="text-sm text-gray-500 mb-1">Customer</p>
-              <p className="font-semibold">{returnData.customer?.opticalName || 'Unknown Customer'}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Customer</p>
+              <p className="font-semibold text-gray-900 dark:text-white">{returnData.customer?.opticalName || 'Unknown Customer'}</p>
               {returnData.customer?.city && (
-                <p className="text-sm text-gray-600">{returnData.customer.city}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{returnData.customer.city}</p>
               )}
               {returnData.customer?.phone && (
-                <p className="text-sm text-gray-600">{returnData.customer.phone}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{returnData.customer.phone}</p>
               )}
             </div>
             
             <div>
-              <p className="text-sm text-gray-500 mb-1">Original Invoice</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Original Invoice</p>
               {returnData.originalInvoiceId ? (
                 <p 
-                  className="font-semibold text-sky-600 cursor-pointer" 
+                  className="font-semibold text-sky-600 dark:text-sky-400 cursor-pointer hover:text-sky-800 dark:hover:text-sky-300" 
                   onClick={() => navigate(`/sales/${returnData.originalInvoiceId}`)}
                 >
                   {returnData.originalInvoiceNumber || '#'}
                 </p>
               ) : (
-                <p className="font-medium">N/A</p>
+                <p className="font-medium text-gray-900 dark:text-white">N/A</p>
               )}
-              <p className="text-sm text-gray-500 mt-3 mb-1">Return Total</p>
-              <p className="text-lg font-bold text-indigo-600">{formatCurrency(returnData.totalAmount)}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-3 mb-1">Return Total</p>
+              <p className="text-lg font-bold text-indigo-600 dark:text-indigo-400">{formatCurrency(returnData.totalAmount)}</p>
             </div>
           </div>
           
           <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-3">Returned Items</h3>
-            <div className="overflow-x-auto border border-gray-200 rounded-lg">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Returned Items</h3>
+            <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Item</th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Qty</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Price</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {returnData.items && returnData.items.length > 0 ? (
                     returnData.items.map((item, index) => (
-                      <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{item.itemName}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">{item.qtyToReturn}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{formatCurrency(item.price)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">{formatCurrency(item.returnAmount)}</td>
+                      <tr key={index} className={index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700'}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white font-medium">{item.itemName}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-center">{item.qtyToReturn}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right">{formatCurrency(item.price)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white text-right">{formatCurrency(item.returnAmount)}</td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">No items in this return</td>
+                      <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">No items in this return</td>
                     </tr>
                   )}
                 </tbody>
-                <tfoot className="bg-gray-50">
+                <tfoot className="bg-gray-50 dark:bg-gray-700">
                   <tr>
-                    <td colSpan="3" className="px-6 py-3 text-right text-sm font-medium text-gray-900">Total:</td>
-                    <td className="px-6 py-3 text-right text-sm font-bold text-indigo-600">{formatCurrency(returnData.totalAmount)}</td>
+                    <td colSpan="3" className="px-6 py-3 text-right text-sm font-medium text-gray-900 dark:text-white">Total:</td>
+                    <td className="px-6 py-3 text-right text-sm font-bold text-indigo-600 dark:text-indigo-400">{formatCurrency(returnData.totalAmount)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -812,16 +812,16 @@ const SalesReturn = ({ isCreate = false, newReturn = false, isView = false }) =>
           
           {returnData.notes && (
             <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-3">Notes</h3>
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <p className="text-gray-700">{returnData.notes}</p>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Notes</h3>
+              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                <p className="text-gray-700 dark:text-gray-300">{returnData.notes}</p>
               </div>
             </div>
           )}
         </div>
       ) : (
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 text-center">
-          <p className="text-gray-500">No return data found</p>
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 text-center">
+          <p className="text-gray-500 dark:text-gray-400">No return data found</p>
         </div>
       )}
       

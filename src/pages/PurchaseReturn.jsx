@@ -773,7 +773,7 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
           </div>
           
           <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-3">Returned Items</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Returned Items</h3>
             <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gray-50 dark:bg-gray-700">
@@ -812,9 +812,9 @@ const PurchaseReturn = ({ isCreate = false, newReturn = false, isView = false })
           
           {returnData.notes && (
             <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-3">Notes</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Notes</h3>
               <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-                <p className="text-gray-700 dark:text-white">{returnData.notes}</p>
+                <p className="text-gray-700 dark:text-gray-300">{returnData.notes}</p>
               </div>
             </div>
           )}
