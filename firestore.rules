@@ -78,6 +78,14 @@ service cloud.firestore {
       allow read, write: if canAccessUserData(userId);
     }
 
+    match /users/{userId}/salesReturns/{document} {
+      allow read, write: if canAccessUserData(userId);
+    }
+
+    match /users/{userId}/purchaseReturns/{document} {
+      allow read, write: if canAccessUserData(userId);
+    }
+
     match /users/{userId}/transactions/{document} {
       allow read, write: if canAccessUserData(userId);
     }
