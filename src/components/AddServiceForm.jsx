@@ -7,6 +7,7 @@ const SERVICE_TYPES = [
   'Eye Examination',
   'Contact Lens Fitting',
   'Frame Adjustment',
+  'Frame Fitting',
   'Lens Replacement',
   'Prescription Update',
   'Eye Pressure Check',

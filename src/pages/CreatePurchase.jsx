@@ -675,376 +675,479 @@ const CreatePurchase = () => {
   };
 
   return (
-    <div className="mobile-page bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
       <Navbar />
       
-      <div className="mobile-content">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Create Purchase</h1>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Add new purchase details</p>
-          </div>
-          <button
-            onClick={() => navigate('/purchases')}
-            className="btn-secondary inline-flex items-center space-x-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
-          >
-            <span>Cancel</span>
-          </button>
-        </div>
-
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/50 border-l-4 border-red-400 dark:border-red-500 text-red-700 dark:text-red-200 rounded-md">
-            {error}
-          </div>
-        )}
-
-        {/* Purchase Form */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
-          <h2 className="text-lg font-medium text-gray-800 dark:text-white mb-4">Purchase Information</h2>
-          
-          {/* Vendor Selection */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Vendor *
-            </label>
-            <div className="flex space-x-2">
-              <div className="relative flex-1">
-                <input 
-                  type="text" 
-                  value={selectedVendor ? selectedVendor.opticalName : vendorSearchTerm}
-                  onChange={(e) => {
-                    setVendorSearchTerm(e.target.value);
-                    setSelectedVendor(null);
-                    setShowVendorDropdown(true);
-                  }}
-                  onClick={() => setShowVendorDropdown(true)}
-                  className="block w-full rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  placeholder="Search for vendor..."
-                />
-                
-                {showVendorDropdown && (
-                  <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 border border-gray-200 dark:border-gray-600">
-                    {filteredVendors.length === 0 ? (
-                      <div className="py-2 px-3 text-gray-500 dark:text-gray-400">No vendors found</div>
-                    ) : (
-                      filteredVendors.map(vendor => (
-                        <div
-                          key={vendor.id}
-                          className="cursor-pointer py-2 px-3 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
-                          onClick={() => handleVendorSelect(vendor)}
-                        >
-                          <div className="font-medium">{vendor.opticalName}</div>
-                          {vendor.contactPerson && (
-                            <div className="text-xs text-gray-500 dark:text-gray-400">{vendor.contactPerson}</div>
-                          )}
-                        </div>
-                      ))
-                    )}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Enhanced Header with Progress */}
+        <div className="mb-8">
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start space-y-4 lg:space-y-0">
+            <div className="flex-1">
+              <div className="flex items-center space-x-3 mb-2">
+                <div className="flex-shrink-0">
+                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/50 rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
                   </div>
-                )}
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                    Create Purchase Order
+                  </h1>
+                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                    Add new purchase from vendor with detailed item information
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <div className="text-right">
+                <div className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Purchase Number</div>
+                <div className="text-lg font-bold text-blue-600 dark:text-blue-400">{purchaseNumber}</div>
               </div>
               <button
-                onClick={() => setShowVendorModal(true)}
-                className="flex items-center justify-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-sky-600 dark:text-sky-400 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+                onClick={() => navigate('/purchases')}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
-                + Add Vendor
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Cancel
               </button>
             </div>
           </div>
+        </div>
 
-          {/* Purchase Details */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Purchase Number
-              </label>
-              <input 
-                type="text" 
-                value={purchaseNumber}
-                onChange={(e) => setPurchaseNumber(e.target.value)}
-                className="block w-full rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white"
-                readOnly
-              />
+        {/* Error Alert */}
+        {error && (
+          <div className="mb-6 p-4 border-l-4 border-red-400 dark:border-red-500 rounded-r-lg" 
+               style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-700 dark:text-red-200">{error}</p>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          </div>
+        )}
+
+        <div className="space-y-6">
+          {/* Vendor Selection Card */}
+          <div className="card p-6">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/50 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </div>
+              </div>
+              <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Vendor Information
+              </h2>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+                  Select Vendor *
+                </label>
+                <div className="flex space-x-2">
+                  <div className="relative flex-1">
+                    <input 
+                      type="text" 
+                      value={selectedVendor ? selectedVendor.opticalName : vendorSearchTerm}
+                      onChange={(e) => {
+                        setVendorSearchTerm(e.target.value);
+                        setSelectedVendor(null);
+                        setShowVendorDropdown(true);
+                      }}
+                      onClick={() => setShowVendorDropdown(true)}
+                      className="form-input w-full"
+                      placeholder="Search for vendor..."
+                    />
+                    
+                    {showVendorDropdown && (
+                      <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white dark:bg-gray-800 py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 border border-gray-200 dark:border-gray-600">
+                        {filteredVendors.length === 0 ? (
+                          <div className="py-3 px-4 text-gray-500 dark:text-gray-400 text-center">No vendors found</div>
+                        ) : (
+                          filteredVendors.map(vendor => (
+                            <div
+                              key={vendor.id}
+                              className="cursor-pointer py-3 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-600 last:border-b-0"
+                              onClick={() => handleVendorSelect(vendor)}
+                            >
+                              <div className="font-medium text-gray-900 dark:text-white">{vendor.opticalName}</div>
+                              {vendor.contactPerson && (
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Contact: {vendor.contactPerson}</div>
+                              )}
+                              {vendor.phone && (
+                                <div className="text-xs text-gray-500 dark:text-gray-400">Phone: {vendor.phone}</div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setShowVendorModal(true)}
+                    className="btn-primary flex items-center px-4 py-2 text-sm"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Vendor
+                  </button>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+                  Purchase Date
+                </label>
+                <input 
+                  type="date" 
+                  value={purchaseDate}
+                  onChange={(e) => setPurchaseDate(e.target.value)}
+                  className="form-input w-full"
+                />
+              </div>
+            </div>
+            
+            <div className="mt-4">
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
                 Vendor Invoice Number
               </label>
               <input 
                 type="text" 
                 value={vendorInvoiceNumber}
                 onChange={(e) => setVendorInvoiceNumber(e.target.value)}
-                className="block w-full rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                className="form-input w-full md:w-1/3"
                 placeholder="Enter vendor's invoice number"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Purchase Date
-              </label>
-              <input 
-                type="date" 
-                value={purchaseDate}
-                onChange={(e) => setPurchaseDate(e.target.value)}
-                className="block w-full rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
           </div>
-        </div>
 
-        {/* Purchase Items */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6 overflow-x-auto">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-medium text-gray-800 dark:text-white">Purchase Items</h2>
-            <div>
+          {/* Purchase Items Card */}
+          <div className="card p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-green-100 dark:bg-green-900/50 rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                  </div>
+                </div>
+                <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  Purchase Items
+                </h2>
+              </div>
+              
               <button
                 onClick={() => {
                   const newRows = Array(5).fill().map(() => ({...EMPTY_ROW}));
                   setTableRows([...tableRows, ...newRows]);
                 }}
-                className="px-3 py-1.5 text-sm font-medium rounded-md text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 flex items-center"
+                className="btn-primary flex items-center px-4 py-2 text-sm"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
                 </svg>
                 Add 5 Rows
               </button>
             </div>
-          </div>
-          
-          <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-12">
-                    #
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Item Details
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-28">
-                    Lens Type
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20">
-                    Max SPH
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20">
-                    Max CYL
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
-                    Setup
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20">
-                    Qty
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
-                    Unit
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-28">
-                    Price
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-28">
-                    Total
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-16">
-                    Action
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {tableRows.map((row, index) => (
-                  <tr key={index} className={index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700'}>
-                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-center">
-                      {index + 1}
-                    </td>
-                    <td className="px-3 py-2">
-                      <ItemSuggestions
-                        items={itemSuggestions}
-                        value={row.itemName}
-                        onChange={handleTableRowChange}
-                        onSelect={handleItemSelect}
-                        index={index}
-                        placeholder="Item name"
-                        className="block w-full border-0 bg-transparent focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm font-medium text-gray-900 dark:text-white"
-                        currentPrice={parseFloat(row.price) || 0}
-                      />
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <select
-                        value={row.lensType}
-                        onChange={(e) => handleTableRowChange(index, 'lensType', e.target.value)}
-                        className="block w-full border-0 bg-transparent focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-center text-gray-900 dark:text-white dark:bg-gray-700"
-                      >
-                        {LENS_TYPES.map(type => (
-                          <option key={type} value={type}>{type}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <input 
-                        type="number" 
-                        value={row.maxSph}
-                        onChange={(e) => handleTableRowChange(index, 'maxSph', e.target.value)}
-                        disabled={row.lensType === 'Not Lens'}
-                        className="block w-full border-0 bg-transparent text-right focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        placeholder="-6.00"
-                        step="0.25"
-                      />
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <input 
-                        type="number" 
-                        value={row.maxCyl}
-                        onChange={(e) => handleTableRowChange(index, 'maxCyl', e.target.value)}
-                        disabled={row.lensType === 'Not Lens'}
-                        className="block w-full border-0 bg-transparent text-right focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        placeholder="-2.00"
-                        step="0.25"
-                      />
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap w-24 text-center">
-                      <button
-                        type="button"
-                        onClick={() => handleSetupPowerInventoryForPurchase(index)}
-                        disabled={!row.itemName || !row.maxSph || !row.maxCyl || row.lensType === 'Not Lens'}
-                        className={`text-xs px-2 py-1 rounded text-center ${
-                          row.powerInventorySetup 
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-700' 
-                            : 'bg-sky-50 hover:bg-sky-100 dark:bg-sky-900/50 dark:hover:bg-sky-900/70 text-sky-600 dark:text-sky-400 border-sky-200 dark:border-sky-700'
-                        } border disabled:opacity-50 disabled:cursor-not-allowed`}
-                      >
-                        {row.powerInventorySetup ? '✅' : '📊'}
-                      </button>
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {row.powerInventorySetup && row.powerInventoryData && row.lensType !== 'Not Lens' ? (
-                        <input
-                          type="number"
-                          value={row.powerInventoryData.totalQuantity || 0}
-                          readOnly
-                          className="block w-full border-0 bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 cursor-not-allowed text-right focus:ring-0 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          title="Quantity calculated from individual power inventory"
-                        />
-                      ) : (
-                        <input 
-                          type="number" 
-                          value={row.qty}
-                          onChange={(e) => handleTableRowChange(index, 'qty', e.target.value)}
-                          className="block w-full border-0 bg-transparent text-right focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-gray-900 dark:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          min="1"
-                        />
+            
+            <div className="overflow-x-auto">
+              <div className="inline-block min-w-full align-middle">
+                <div className="overflow-hidden rounded-lg border" style={{ borderColor: 'var(--border-primary)' }}>
+                  <table className="min-w-full divide-y" style={{ borderColor: 'var(--border-primary)' }}>
+                    <thead style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+                      <tr>
+                        <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" 
+                            style={{ color: 'var(--text-muted)', width: '50px' }}>
+                          #
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" 
+                            style={{ color: 'var(--text-muted)', minWidth: '250px' }}>
+                          Item Details
+                        </th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" 
+                            style={{ color: 'var(--text-muted)', width: '120px' }}>
+                          Lens Type
+                        </th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" 
+                            style={{ color: 'var(--text-muted)', width: '100px' }}>
+                          Max SPH
+                        </th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" 
+                            style={{ color: 'var(--text-muted)', width: '100px' }}>
+                          Max CYL
+                        </th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" 
+                            style={{ color: 'var(--text-muted)', width: '80px' }}>
+                          Setup
+                        </th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" 
+                            style={{ color: 'var(--text-muted)', width: '80px' }}>
+                          Qty
+                        </th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" 
+                            style={{ color: 'var(--text-muted)', width: '80px' }}>
+                          Unit
+                        </th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" 
+                            style={{ color: 'var(--text-muted)', width: '100px' }}>
+                          Price
+                        </th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" 
+                            style={{ color: 'var(--text-muted)', width: '100px' }}>
+                          Total
+                        </th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" 
+                            style={{ color: 'var(--text-muted)', width: '60px' }}>
+                          Action
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+                      {tableRows.map((row, index) => (
+                        <tr key={index} className="hover:bg-opacity-50" style={{ ':hover': { backgroundColor: 'var(--bg-tertiary)' } }}>
+                          <td className="px-3 py-3 text-center">
+                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+                              {index + 1}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <ItemSuggestions
+                              items={itemSuggestions}
+                              value={row.itemName}
+                              onChange={handleTableRowChange}
+                              onSelect={handleItemSelect}
+                              index={index}
+                              placeholder="Enter item name..."
+                              className="w-full px-3 py-2 text-sm border rounded-lg form-input"
+                              onRefreshItems={fetchItems}
+                              currentPrice={parseFloat(row.price) || 0}
+                            />
+                          </td>
+                          <td className="px-3 py-3">
+                            <select
+                              value={row.lensType}
+                              onChange={(e) => handleTableRowChange(index, 'lensType', e.target.value)}
+                              className="form-input w-full text-sm text-center"
+                            >
+                              {LENS_TYPES.map(type => (
+                                <option key={type} value={type}>{type}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-3 py-3">
+                            <input 
+                              type="number" 
+                              value={row.maxSph}
+                              onChange={(e) => handleTableRowChange(index, 'maxSph', e.target.value)}
+                              disabled={row.lensType === 'Not Lens'}
+                              className="form-input w-full text-sm text-center"
+                              placeholder="-6.00"
+                              step="0.25"
+                            />
+                          </td>
+                          <td className="px-3 py-3">
+                            <input 
+                              type="number" 
+                              value={row.maxCyl}
+                              onChange={(e) => handleTableRowChange(index, 'maxCyl', e.target.value)}
+                              disabled={row.lensType === 'Not Lens'}
+                              className="form-input w-full text-sm text-center"
+                              placeholder="-2.00"
+                              step="0.25"
+                            />
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleSetupPowerInventoryForPurchase(index)}
+                              disabled={!row.itemName || !row.maxSph || !row.maxCyl || row.lensType === 'Not Lens'}
+                              className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                                row.powerInventorySetup 
+                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
+                                  : 'bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-400'
+                              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                              title={row.powerInventorySetup ? 'Power inventory configured' : 'Setup power inventory'}
+                            >
+                              {row.powerInventorySetup ? '✓' : '⚙️'}
+                            </button>
+                          </td>
+                          <td className="px-3 py-3">
+                            {row.powerInventorySetup && row.powerInventoryData && row.lensType !== 'Not Lens' ? (
+                              <input
+                                type="number"
+                                value={row.powerInventoryData.totalQuantity || 0}
+                                readOnly
+                                className="form-input w-full text-sm text-center bg-gray-100 dark:bg-gray-600 cursor-not-allowed"
+                                title="Quantity calculated from power inventory"
+                              />
+                            ) : (
+                              <input 
+                                type="number" 
+                                value={row.qty}
+                                onChange={(e) => handleTableRowChange(index, 'qty', e.target.value)}
+                                className="form-input w-full text-sm text-center"
+                                min="1"
+                              />
+                            )}
+                          </td>
+                          <td className="px-3 py-3">
+                            <select
+                              value={row.unit}
+                              onChange={(e) => handleTableRowChange(index, 'unit', e.target.value)}
+                              className="form-input w-full text-sm text-center"
+                            >
+                              {UNIT_OPTIONS.map(unit => (
+                                <option key={unit} value={unit}>{unit}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-3 py-3">
+                            <input 
+                              type="number" 
+                              value={row.price}
+                              onChange={(e) => handleTableRowChange(index, 'price', e.target.value)}
+                              className="form-input w-full text-sm text-center"
+                              min="0"
+                              step="0.01"
+                              placeholder="0.00"
+                            />
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <span className="font-semibold text-gray-900 dark:text-white">
+                              {formatCurrency(row.total)}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <button
+                              onClick={() => {
+                                const updatedRows = [...tableRows];
+                                updatedRows.splice(index, 1);
+                                setTableRows(updatedRows);
+                              }}
+                              className="w-8 h-8 rounded-lg bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 transition-colors"
+                              title="Remove item"
+                            >
+                              <svg className="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {tableRows.length === 0 && (
+                        <tr>
+                          <td colSpan="11" className="px-6 py-12 text-center">
+                            <div className="flex flex-col items-center">
+                              <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                              </svg>
+                              <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">No items added yet</h3>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">Click the "Add 5 Rows" button to start adding purchase items.</p>
+                            </div>
+                          </td>
+                        </tr>
                       )}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <select
-                        value={row.unit}
-                        onChange={(e) => handleTableRowChange(index, 'unit', e.target.value)}
-                        className="block w-full border-0 bg-transparent focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-center text-gray-900 dark:text-white dark:bg-gray-700"
-                      >
-                        {UNIT_OPTIONS.map(unit => (
-                          <option key={unit} value={unit}>{unit}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <input 
-                        type="number" 
-                        value={row.price}
-                        onChange={(e) => handleTableRowChange(index, 'price', e.target.value)}
-                        className="block w-full border-0 bg-transparent text-right focus:ring-0 focus:border-b-2 focus:border-sky-500 text-sm text-gray-900 dark:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        min="0"
-                        step="0.01"
-                      />
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-right font-medium text-gray-900 dark:text-white">
-                      {formatCurrency(row.total)}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-center">
-                      <button
-                        onClick={() => {
-                          const updatedRows = [...tableRows];
-                          updatedRows.splice(index, 1);
-                          setTableRows(updatedRows);
-                        }}
-                        className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 focus:outline-none"
-                        title="Remove item"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {tableRows.length === 0 && (
-                  <tr>
-                    <td colSpan="10" className="px-3 py-4 text-center text-gray-500 dark:text-gray-400">
-                      No items added yet. Click the "Add 5 Rows" button to add purchase items.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          
-          <div className="mt-4 flex justify-between">
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              {tableRows.length} items
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-            <button
-              onClick={() => {
-                const newRows = Array(5).fill().map(() => ({...EMPTY_ROW}));
-                setTableRows([...tableRows, ...newRows]);
-              }}
-              className="text-sm text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 flex items-center"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add 5 More Items
-            </button>
+            
+            {tableRows.length > 0 && (
+              <div className="mt-4 flex justify-between items-center">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  <span className="font-medium">{tableRows.length}</span> items added
+                </div>
+                <button
+                  onClick={() => {
+                    const newRows = Array(5).fill().map(() => ({...EMPTY_ROW}));
+                    setTableRows([...tableRows, ...newRows]);
+                  }}
+                  className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center font-medium"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add 5 More Items
+                </button>
+              </div>
+            )}
           </div>
-        </div>
 
-        {/* Summary */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
-          <h2 className="text-lg font-medium text-gray-800 dark:text-white mb-4">Summary</h2>
-          
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-gray-500 dark:text-gray-400">Subtotal:</span>
-              <span className="text-gray-900 dark:text-white">{formatCurrency(calculateSubtotal())}</span>
+          {/* Purchase Summary Card */}
+          <div className="card p-6">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/50 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                </div>
+              </div>
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Purchase Summary
+              </h3>
             </div>
             
-            <div className="flex items-center gap-2 pb-2">
-              <span className="text-gray-500 dark:text-gray-400">Discount:</span>
-              <select
-                value={discountType}
-                onChange={(e) => setDiscountType(e.target.value)}
-                className="rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              >
-                <option value="amount">₹</option>
-                <option value="percentage">%</option>
-              </select>
-              <input 
-                type="number" 
-                value={discountValue}
-                onChange={(e) => setDiscountValue(e.target.value)}
-                className="block w-24 rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                min="0"
-                step={discountType === 'percentage' ? "0.01" : "1"}
-              />
-              <span className="ml-auto text-gray-900 dark:text-white">{formatCurrency(calculateDiscountAmount())}</span>
-            </div>
-            
-            <div className="flex justify-between items-center pb-2">
-              <div className="flex gap-2 items-center">
-                <span className="text-gray-500 dark:text-gray-400">Tax:</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Subtotal:</span>
+                  <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{formatCurrency(calculateSubtotal())}</span>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Discount:</span>
+                    <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{formatCurrency(calculateDiscountAmount())}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <select
+                      value={discountType}
+                      onChange={(e) => setDiscountType(e.target.value)}
+                      className="form-input text-xs px-2 py-1 w-16"
+                    >
+                      <option value="amount">₹</option>
+                      <option value="percentage">%</option>
+                    </select>
+                    <input 
+                      type="number" 
+                      value={discountValue}
+                      onChange={(e) => setDiscountValue(e.target.value)}
+                      className="form-input text-xs px-2 py-1 flex-1"
+                      min="0"
+                      step={discountType === 'percentage' ? "0.01" : "1"}
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Tax:</span>
+                  <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{formatCurrency(calculateTaxAmount())}</span>
+                </div>
                 <select
                   value={selectedTaxOption}
                   onChange={(e) => setSelectedTaxOption(e.target.value)}
-                  className="rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="form-input text-xs w-full"
                 >
                   {TAX_OPTIONS.map(option => (
                     <option key={option.id} value={option.id}>
@@ -1053,113 +1156,142 @@ const CreatePurchase = () => {
                   ))}
                 </select>
               </div>
-              <span className="text-gray-900 dark:text-white">{formatCurrency(calculateTaxAmount())}</span>
-            </div>
-            
-            <div className="flex justify-between items-center pb-2 border-b border-gray-200 dark:border-gray-600">
-              <div className="flex gap-2 items-center">
-                <span className="text-gray-500 dark:text-gray-400">Freight Charges:</span>
+              
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Freight:</span>
+                  <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{formatCurrency(parseFloat(frieghtCharge) || 0)}</span>
+                </div>
                 <input 
                   type="number" 
                   value={frieghtCharge}
                   onChange={(e) => setFrieghtCharge(e.target.value)}
-                  className="block w-24 rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="form-input text-xs w-full"
                   min="0"
+                  placeholder="0.00"
                 />
               </div>
-              <span className="text-gray-900 dark:text-white">{formatCurrency(parseFloat(frieghtCharge) || 0)}</span>
-            </div>
-            
-            <div className="flex justify-between font-medium text-lg pt-2">
-              <span className="text-gray-900 dark:text-white">Total:</span>
-              <span className="text-gray-900 dark:text-white">{formatCurrency(calculateTotal())}</span>
+              
+              <div className="pt-3 border-t border-gray-200 dark:border-gray-600 lg:border-t-0 lg:pt-0">
+                <div className="flex justify-between items-center">
+                  <span className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Total:</span>
+                  <span className="text-xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(calculateTotal())}</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Payment Details */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
-          <h2 className="text-lg font-medium text-gray-800 dark:text-white mb-4">Payment Details</h2>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Payment Status
-              </label>
-              <select
-                value={paymentStatus}
-                onChange={(e) => {
-                  setPaymentStatus(e.target.value);
-                  if (e.target.value === 'PAID') {
-                    setAmountPaid(calculateTotal());
-                  } else if (e.target.value === 'UNPAID') {
-                    setAmountPaid(0);
-                  }
-                }}
-                className="block w-full rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              >
-                <option value="UNPAID">Unpaid</option>
-                <option value="PARTIAL">Partially Paid</option>
-                <option value="PAID">Paid</option>
-              </select>
+          {/* Payment Details Card */}
+          <div className="card p-6">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-green-100 dark:bg-green-900/50 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                </div>
+              </div>
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Payment Details
+              </h3>
             </div>
             
-            {paymentStatus !== 'UNPAID' && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Amount Paid
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+                  Payment Status
                 </label>
-                <input 
-                  type="number" 
-                  value={amountPaid}
-                  onChange={(e) => setAmountPaid(e.target.value)}
-                  className="block w-full rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  min="0"
-                  max={calculateTotal()}
-                  step="0.01"
-                />
+                <select
+                  value={paymentStatus}
+                  onChange={(e) => {
+                    setPaymentStatus(e.target.value);
+                    if (e.target.value === 'PAID') {
+                      setAmountPaid(calculateTotal());
+                    } else if (e.target.value === 'UNPAID') {
+                      setAmountPaid(0);
+                    }
+                  }}
+                  className="form-input w-full"
+                >
+                  <option value="UNPAID">Unpaid</option>
+                  <option value="PARTIAL">Partially Paid</option>
+                  <option value="PAID">Paid</option>
+                </select>
               </div>
-            )}
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Notes (Optional)
-              </label>
-              <textarea 
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="block w-full rounded border-gray-300 dark:border-gray-600 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                rows="2"
-                placeholder="Additional notes about this purchase"
-              ></textarea>
+              
+              {paymentStatus !== 'UNPAID' && (
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+                    Amount Paid
+                  </label>
+                  <input 
+                    type="number" 
+                    value={amountPaid}
+                    onChange={(e) => setAmountPaid(e.target.value)}
+                    className="form-input w-full"
+                    min="0"
+                    max={calculateTotal()}
+                    step="0.01"
+                    placeholder="0.00"
+                  />
+                </div>
+              )}
+              
+              <div className={paymentStatus === 'UNPAID' ? 'md:col-span-2' : ''}>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+                  Notes (Optional)
+                </label>
+                <textarea 
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="form-input w-full"
+                  rows="3"
+                  placeholder="Additional notes about this purchase..."
+                ></textarea>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Action Buttons */}
-        <div className="flex justify-end space-x-3 mb-10">
-          <button
-            onClick={() => navigate('/purchases')}
-            className="px-4 py-2 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSavePurchase}
-            disabled={loading}
-            className="px-4 py-2 text-sm font-medium rounded-lg text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50"
-          >
-            {loading ? 'Saving...' : 'Save Purchase'}
-          </button>
+          {/* Action Buttons */}
+          <div className="flex justify-end space-x-4 pb-8">
+            <button
+              onClick={() => navigate('/purchases')}
+              className="px-6 py-3 text-base font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              Cancel & Return
+            </button>
+            
+            <button
+              onClick={handleSavePurchase}
+              disabled={loading || !selectedVendor || tableRows.filter(row => row.itemName).length === 0}
+              className="btn-primary px-6 py-3 text-base font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            >
+              {loading ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Saving Purchase...
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                  Save Purchase Order
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Vendor Modal */}
+      {/* Modals */}
       {showVendorModal && (
         <CustomerForm isVendor={true} onClose={handleVendorModalClose} />
       )}
 
-      {/* PowerInventoryModal */}
       {showPowerInventoryModal && (
         <PowerInventoryModal
           isOpen={showPowerInventoryModal}

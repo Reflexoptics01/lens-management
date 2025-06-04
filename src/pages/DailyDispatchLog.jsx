@@ -444,11 +444,8 @@ const DailyDispatchLog = () => {
         {/* Header */}
         <div className="mb-8">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
-            <div>
-              <h1 className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                Daily Dispatch Log
-              </h1>
-              <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
+            <div className="w-full">
+              <p className="text-center text-lg" style={{ color: 'var(--text-muted)' }}>
                 Track daily lens dispatches to optical shops
               </p>
             </div>
@@ -622,6 +619,7 @@ const DailyDispatchLog = () => {
                               rowQty={row.qty}
                               placeholder="Enter item name..."
                               className="w-full px-3 py-2 text-sm border rounded-lg form-input"
+                              onRefreshItems={fetchLensInventory}
                               currentPrice={0}
                             />
                           </td>

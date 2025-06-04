@@ -508,6 +508,59 @@ const Navbar = () => {
         )}
       </nav>
 
+      {/* Mobile Bottom Navigation */}
+      <nav className="mobile-bottom-nav mobile-only">
+        <div className="flex justify-around items-center h-full px-2">
+          {(() => {
+            // Filter to get only the 5 specific items for bottom nav
+            const bottomNavItems = getAccessibleMenuItems().filter(item => 
+              ['/orders', '/sales', '/transactions', '/ledger', '/lens-inventory'].includes(item.path)
+            );
+            
+            return bottomNavItems.map((item) => (
+              <button
+                key={item.path}
+                onClick={() => handleNavigation(item.path)}
+                className={`flex flex-col items-center justify-center px-2 py-1 rounded-lg transition-all duration-200 min-w-0 flex-1 ${
+                  location.pathname === item.path ? 'transform scale-105' : ''
+                }`}
+                style={{
+                  backgroundColor: location.pathname === item.path ? 'var(--primary-blue)' : 'transparent',
+                  color: location.pathname === item.path ? 'white' : 'var(--text-muted)'
+                }}
+                onMouseEnter={(e) => {
+                  if (location.pathname !== item.path) {
+                    e.target.style.backgroundColor = 'var(--bg-tertiary)';
+                    e.target.style.color = 'var(--text-primary)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (location.pathname !== item.path) {
+                    e.target.style.backgroundColor = 'transparent';
+                    e.target.style.color = 'var(--text-muted)';
+                  }
+                }}
+              >
+                <div 
+                  className="text-lg mb-1"
+                  style={{
+                    color: 'inherit'
+                  }}
+                >
+                  {item.icon}
+                </div>
+                <span 
+                  className="text-xs font-medium truncate w-full text-center"
+                  style={{ color: 'inherit' }}
+                >
+                  {item.shortTitle || item.title}
+                </span>
+              </button>
+            ));
+          })()}
+        </div>
+      </nav>
+
       {/* Desktop Bottom Navigation */}
       <nav 
         className="desktop-only bottom-nav z-40"

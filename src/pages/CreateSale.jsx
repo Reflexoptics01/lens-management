@@ -2001,6 +2001,7 @@ const CreateSale = () => {
                       index={index}
                       rowQty={row.qty}
                       saveItemToDatabase={saveItemToDatabase}
+                      onRefreshItems={fetchItems}
                       currentPrice={parseFloat(row.price) || 0}
                     />
                     {row.powerSeries && (

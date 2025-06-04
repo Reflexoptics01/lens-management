@@ -178,7 +178,9 @@ const Dashboard = () => {
       const daysPassed = selectedDateObj.getDate();
       const monthlyProjection = daysPassed > 0 ? (monthSales / daysPassed) * daysInMonth : 0;
       
-      const daysInYear = new Date(selectedDateObj.getFullYear(), 11, 31).getDate() === 31 ? 366 : 365;
+      // Fix yearly projection calculation - properly calculate days in year
+      const startOfNextYear = new Date(selectedDateObj.getFullYear() + 1, 0, 1);
+      const daysInYear = Math.floor((startOfNextYear - startOfYear) / (24 * 60 * 60 * 1000));
       const dayOfYear = Math.floor((selectedDateObj - startOfYear) / (24 * 60 * 60 * 1000)) + 1;
       const yearlyProjection = dayOfYear > 0 ? (yearSales / dayOfYear) * daysInYear : 0;
       

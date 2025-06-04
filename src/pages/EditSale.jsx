@@ -774,6 +774,7 @@ const EditSale = () => {
                           index={index}
                           rowQty={row.qty}
                           saveItemToDatabase={saveItemToDatabase}
+                          onRefreshItems={fetchItems}
                         />
                       </td>
                       

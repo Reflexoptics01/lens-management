@@ -11,6 +11,7 @@ const ItemSuggestions = ({
   index, 
   rowQty,
   saveItemToDatabase,
+  onRefreshItems,
   placeholder = "Brand/Item Name",
   className = "",
   currentPrice = 0 // Add currentPrice prop to get the price from parent
@@ -416,6 +417,11 @@ const ItemSuggestions = ({
       // Reset states
       setNewProductName('');
       setNewProductPrice(0);
+      
+      // Refresh items list from parent
+      if (onRefreshItems) {
+        await onRefreshItems();
+      }
       
       // Show success message
       alert(`Successfully created new ${productType} product: "${newProductName}"`);
