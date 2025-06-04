@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { auth, db } from '../firebaseConfig';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
 import { getUserUid, isSuperAdmin } from '../utils/multiTenancy';
 import { dateToISOString } from '../utils/dateUtils';
 
@@ -187,12 +187,12 @@ export const AuthProvider = ({ children }) => {
   // Check if user exists in approved users collection
   const checkApprovedUser = async (firebaseUser) => {
     try {
-      const usersRef = collection(db, 'users');
-      const userQuery = query(usersRef, where('uid', '==', firebaseUser.uid));
-      const userSnapshot = await getDocs(userQuery);
+      // Use direct document access instead of query since document ID = UID
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
+      const userDoc = await getDoc(userDocRef);
       
-      if (!userSnapshot.empty) {
-        const userData = userSnapshot.docs[0].data();
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
         
         // Security check - ensure email matches
         if (userData.email !== firebaseUser.email) {
@@ -298,12 +298,65 @@ export const AuthProvider = ({ children }) => {
         await signOut(auth);
         break;
         
+      case 'approved':
+        // User has approved registration but no user document - complete the setup
+        console.log('🔐 User has approved registration but no user document - completing setup...');
+        try {
+          await completeApprovedUserSetup(firebaseUser, registrationData);
+        } catch (error) {
+          console.error('🔐 Error completing approved user setup:', error);
+          setAuthState(AUTH_STATES.UNAUTHENTICATED);
+          setAuthError('Error setting up your account. Please contact an administrator.');
+          await signOut(auth);
+        }
+        break;
+        
       default:
         setAuthState(AUTH_STATES.UNAUTHENTICATED);
         setAuthError('Your account is not properly configured. Please contact an administrator.');
         await signOut(auth);
         break;
     }
+  };
+
+  // Complete setup for approved user who doesn't have a user document yet
+  const completeApprovedUserSetup = async (firebaseUser, registrationData) => {
+    console.log('🔐 Completing approved user setup...');
+    
+    // Create the user document that should have been created during approval
+    const defaultPermissions = {
+      '/dashboard': true,
+      '/orders': true,
+      '/customers': true,
+      '/sales': true,
+      '/purchases': true,
+      '/transactions': true,
+      '/ledger': true,
+      '/gst-returns': true,
+      '/lens-inventory': true,
+      '/settings': true
+    };
+
+    const userData = {
+      uid: firebaseUser.uid,
+      email: firebaseUser.email,
+      role: 'admin',
+      permissions: defaultPermissions,
+      isActive: true,
+      status: 'approved',
+      approvedAt: registrationData.approvedAt,
+      approvedBy: registrationData.approvedBy,
+      // Use current timestamp for creation since this is a recovery operation
+      createdAt: new Date()
+    };
+
+    // Create the user document
+    await setDoc(doc(db, 'users', firebaseUser.uid), userData);
+    
+    console.log('🔐 User document created during recovery setup');
+    
+    // Now set up the user normally
+    await setupApprovedUser(firebaseUser, userData);
   };
 
   // Permission checking utilities

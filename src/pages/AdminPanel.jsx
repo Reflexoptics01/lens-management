@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
-import { collection, query, where, getDocs, doc, updateDoc, addDoc, deleteDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, addDoc, deleteDoc, serverTimestamp, setDoc, getDoc } from 'firebase/firestore';
 import { deleteUser } from 'firebase/auth';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
@@ -95,7 +95,7 @@ const AdminPanel = () => {
       // Combine and deduplicate by UID, prioritizing registration data
       const combinedUsers = [...allUsersData];
       
-      // Add users from users collection that aren't in registrations
+      // Add users from users collection that aren't in registrations (orphaned users)
       approvedUsersData.forEach(approvedUser => {
         // Skip the main admin user - don't show them in the user list
         if (approvedUser.email === 'reflexopticsolutions@gmail.com') {
@@ -104,12 +104,22 @@ const AdminPanel = () => {
         
         const existsInRegistrations = allUsersData.find(regUser => regUser.uid === approvedUser.uid);
         if (!existsInRegistrations) {
-          combinedUsers.push({
+          console.warn(`⚠️ Orphaned user found in users collection: ${approvedUser.email} (UID: ${approvedUser.uid})`);
+          console.log('🔍 Orphaned user full data:', approvedUser);
+          
+          const orphanedUser = {
             ...approvedUser,
-            // Don't override company details - use existing data or set to unknown
-            companyDetails: approvedUser.companyDetails || { companyName: 'Unknown Company' },
-            status: 'approved'
-          });
+            // Mark as orphaned and add warning
+            companyDetails: approvedUser.companyDetails || { 
+              companyName: 'Unknown Company (ORPHANED - Registration Deleted)' 
+            },
+            status: 'orphaned', // Special status for orphaned users
+            isOrphaned: true,
+            source: 'users' // Keep track that this came from users collection only
+          };
+          
+          console.log('🔍 Orphaned user processed data:', orphanedUser);
+          combinedUsers.push(orphanedUser);
         }
       });
 
@@ -141,12 +151,11 @@ const AdminPanel = () => {
         approvedBy: user.email
       });
 
-      // Create or update user document with company-specific data structure
-      const usersRef = collection(db, 'users');
-      const existingUserQuery = query(usersRef, where('uid', '==', registration.uid));
-      const existingUserSnapshot = await getDocs(existingUserQuery);
+      // Check if user document already exists
+      const userDocRef = doc(db, 'users', registration.uid);
+      const existingUserDoc = await getDoc(userDocRef);
 
-      if (existingUserSnapshot.empty) {
+      if (!existingUserDoc.exists()) {
         // Create new user document with default permissions
         const defaultPermissions = {
           '/dashboard': true,
@@ -161,7 +170,7 @@ const AdminPanel = () => {
           '/settings': true
         };
 
-        await addDoc(collection(db, 'users'), {
+        await setDoc(doc(db, 'users', registration.uid), {
           uid: registration.uid,
           email: registration.email,
           role: 'admin',
@@ -230,14 +239,13 @@ const AdminPanel = () => {
 
         // Create initial documents for each collection to establish the structure
         for (const collectionName of collections) {
-          await addDoc(collection(db, `users/${registration.uid}/${collectionName}`), {
+          await setDoc(doc(db, `users/${registration.uid}/${collectionName}/_placeholder`), {
             _placeholder: true,
             createdAt: serverTimestamp()
           });
         }
       } else {
         // Update existing user document
-        const userDocRef = existingUserSnapshot.docs[0].ref;
         await updateDoc(userDocRef, {
           status: 'approved',
           isActive: true,
@@ -275,13 +283,11 @@ const AdminPanel = () => {
         rejectedBy: user.email
       });
 
-      // If user exists in users collection, deactivate them
-      const usersRef = collection(db, 'users');
-      const existingUserQuery = query(usersRef, where('uid', '==', registration.uid));
-      const existingUserSnapshot = await getDocs(existingUserQuery);
+      // Check if user exists in users collection and deactivate them
+      const userDocRef = doc(db, 'users', registration.uid);
+      const existingUserDoc = await getDoc(userDocRef);
 
-      if (!existingUserSnapshot.empty) {
-        const userDocRef = existingUserSnapshot.docs[0].ref;
+      if (existingUserDoc.exists()) {
         await updateDoc(userDocRef, {
           status: 'rejected',
           isActive: false,
@@ -320,12 +326,10 @@ const AdminPanel = () => {
       });
 
       // Deactivate user in users collection
-      const usersRef = collection(db, 'users');
-      const existingUserQuery = query(usersRef, where('uid', '==', registration.uid));
-      const existingUserSnapshot = await getDocs(existingUserQuery);
+      const userDocRef = doc(db, 'users', registration.uid);
+      const existingUserDoc = await getDoc(userDocRef);
 
-      if (!existingUserSnapshot.empty) {
-        const userDocRef = existingUserSnapshot.docs[0].ref;
+      if (existingUserDoc.exists()) {
         await updateDoc(userDocRef, {
           status: 'pending',
           isActive: false,
@@ -349,6 +353,16 @@ const AdminPanel = () => {
   };
 
   const handleDeleteUser = async (registration) => {
+    console.log('🗑️ handleDeleteUser called with data:', registration);
+    console.log('🗑️ User properties:', {
+      id: registration.id,
+      uid: registration.uid,
+      email: registration.email,
+      isOrphaned: registration.isOrphaned,
+      source: registration.source,
+      status: registration.status
+    });
+    
     // First confirmation
     if (!window.confirm(`Are you sure you want to PERMANENTLY DELETE ${registration.email}?\n\nThis will delete ALL user data including their business records and cannot be undone.`)) {
       return;
@@ -367,16 +381,46 @@ const AdminPanel = () => {
     try {
       setRefreshing(true);
       
-      // Delete from userRegistrations first
-      await deleteDoc(doc(db, 'userRegistrations', registration.id));
+      // Check if this is an orphaned user (no registration document)
+      if (registration.isOrphaned || !registration.id || registration.source === 'users') {
+        console.log(`🗑️ Deleting orphaned user: ${registration.email} (UID: ${registration.uid})`);
+        console.log('🗑️ Document path will be: users/' + registration.uid);
+        
+        // For orphaned users, only delete from users collection
+        const userDocRef = doc(db, 'users', registration.uid);
+        console.log('🗑️ Created document reference:', userDocRef);
+        
+        const existingUserDoc = await getDoc(userDocRef);
+        console.log('🗑️ Document exists check:', existingUserDoc.exists());
+        
+        if (existingUserDoc.exists()) {
+          console.log('🗑️ Document data:', existingUserDoc.data());
+          console.log('🗑️ Attempting to delete document...');
+          await deleteDoc(userDocRef);
+          console.log(`✅ Orphaned user ${registration.email} deleted from users collection`);
+        } else {
+          console.warn(`❌ User document not found for ${registration.email} at path users/${registration.uid}`);
+        }
+      } else {
+        // For regular users, delete from both collections
+        console.log(`🗑️ Deleting regular user: ${registration.email}`);
+        
+        // Delete from userRegistrations first
+        if (registration.id) {
+          console.log('🗑️ Deleting from userRegistrations:', registration.id);
+          await deleteDoc(doc(db, 'userRegistrations', registration.id));
+          console.log(`✅ Registration document deleted for ${registration.email}`);
+        }
 
-      // Delete from users collection if exists
-      const usersRef = collection(db, 'users');
-      const existingUserQuery = query(usersRef, where('uid', '==', registration.uid));
-      const existingUserSnapshot = await getDocs(existingUserQuery);
+        // Delete from users collection if exists
+        const userDocRef = doc(db, 'users', registration.uid);
+        const existingUserDoc = await getDoc(userDocRef);
 
-      if (!existingUserSnapshot.empty) {
-        await deleteDoc(existingUserSnapshot.docs[0].ref);
+        if (existingUserDoc.exists()) {
+          console.log('🗑️ Deleting from users collection:', registration.uid);
+          await deleteDoc(userDocRef);
+          console.log(`✅ User document deleted for ${registration.email}`);
+        }
       }
 
       // Note: Unfortunately, we cannot delete Firebase Auth users from client-side code
@@ -391,7 +435,12 @@ const AdminPanel = () => {
       await fetchUsers();
       
     } catch (error) {
-      console.error('Error deleting user:', error);
+      console.error('🗑️ Error deleting user:', error);
+      console.error('🗑️ Error details:', {
+        code: error.code,
+        message: error.message,
+        stack: error.stack
+      });
       toast.error('Failed to delete user: ' + error.message);
     } finally {
       setRefreshing(false);
@@ -410,12 +459,11 @@ const AdminPanel = () => {
       await deleteDoc(doc(db, 'userRegistrations', registration.id));
 
       // If user exists in users collection, also remove them
-      const usersRef = collection(db, 'users');
-      const existingUserQuery = query(usersRef, where('uid', '==', registration.uid));
-      const existingUserSnapshot = await getDocs(existingUserQuery);
+      const userDocRef = doc(db, 'users', registration.uid);
+      const existingUserDoc = await getDoc(userDocRef);
 
-      if (!existingUserSnapshot.empty) {
-        await deleteDoc(existingUserSnapshot.docs[0].ref);
+      if (existingUserDoc.exists()) {
+        await deleteDoc(userDocRef);
       }
 
       toast.success(`${registration.email} can now register again with a fresh application. If they still get "email already in use" error, they should contact support.`);
@@ -448,19 +496,21 @@ const AdminPanel = () => {
     const badges = {
       pending: 'bg-yellow-100 text-yellow-800 border-yellow-300',
       approved: 'bg-green-100 text-green-800 border-green-300',
-      rejected: 'bg-red-100 text-red-800 border-red-300'
+      rejected: 'bg-red-100 text-red-800 border-red-300',
+      orphaned: 'bg-orange-100 text-orange-800 border-orange-300'
     };
 
     const icons = {
       pending: <ClockIcon className="w-4 h-4" />,
       approved: <CheckCircleIcon className="w-4 h-4" />,
-      rejected: <XCircleIcon className="w-4 h-4" />
+      rejected: <XCircleIcon className="w-4 h-4" />,
+      orphaned: <ExclamationTriangleIcon className="w-4 h-4" />
     };
 
     return (
       <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${badges[status] || badges.pending}`}>
         {icons[status] || icons.pending}
-        {status?.charAt(0).toUpperCase() + status?.slice(1) || 'Unknown'}
+        {status === 'orphaned' ? 'Orphaned' : status?.charAt(0).toUpperCase() + status?.slice(1) || 'Unknown'}
       </span>
     );
   };
@@ -468,6 +518,28 @@ const AdminPanel = () => {
   const getActionButtons = (user) => {
     const buttonClass = "px-3 py-1 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
     const isOperating = refreshing; // Disable buttons during any operation
+    
+    // Special handling for orphaned users
+    if (user.isOrphaned) {
+      return (
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleDeleteOrphanedUser(user)}
+            disabled={isOperating}
+            className={`${buttonClass} bg-orange-100 text-orange-700 hover:bg-orange-200`}
+          >
+            {isOperating ? 'Processing...' : 'Clean Up'}
+          </button>
+          <button
+            onClick={() => handleDeleteUser(user)}
+            disabled={isOperating}
+            className={`${buttonClass} bg-red-100 text-red-700 hover:bg-red-200`}
+          >
+            {isOperating ? 'Processing...' : 'Force Delete'}
+          </button>
+        </div>
+      );
+    }
     
     switch (user.status) {
       case 'pending':
@@ -557,6 +629,34 @@ const AdminPanel = () => {
     }
   };
 
+  // New function to handle orphaned user cleanup
+  const handleDeleteOrphanedUser = async (user) => {
+    if (!window.confirm(`Clean up orphaned user ${user.email}?\n\nThis user exists in the users collection but has no registration record. This will remove them from the users collection only.`)) {
+      return;
+    }
+
+    try {
+      setRefreshing(true);
+      
+      // For orphaned users, we only need to delete from users collection
+      // since they don't exist in userRegistrations
+      const userDocRef = doc(db, 'users', user.uid);
+      await deleteDoc(userDocRef);
+
+      toast.success(`Orphaned user ${user.email} cleaned up successfully`);
+      
+      // Close modal first, then refresh
+      setShowUserModal(false);
+      await fetchUsers();
+      
+    } catch (error) {
+      console.error('Error cleaning up orphaned user:', error);
+      toast.error('Failed to clean up orphaned user: ' + error.message);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const filteredUsers = allUsers.filter(user => {
     if (filterStatus === 'all') return true;
     return user.status === filterStatus;
@@ -567,7 +667,8 @@ const AdminPanel = () => {
       all: allUsers.length,
       pending: allUsers.filter(u => u.status === 'pending').length,
       approved: allUsers.filter(u => u.status === 'approved').length,
-      rejected: allUsers.filter(u => u.status === 'rejected').length
+      rejected: allUsers.filter(u => u.status === 'rejected').length,
+      orphaned: allUsers.filter(u => u.status === 'orphaned').length
     };
   };
 
@@ -639,6 +740,24 @@ const AdminPanel = () => {
           </div>
         </div>
 
+        {/* Add warning for orphaned users if any exist */}
+        {statusCounts.orphaned > 0 && (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center">
+              <ExclamationTriangleIcon className="w-5 h-5 text-orange-500 mr-2" />
+              <div>
+                <h3 className="text-sm font-medium text-orange-800">
+                  Orphaned Users Detected ({statusCounts.orphaned})
+                </h3>
+                <p className="text-sm text-orange-700 mt-1">
+                  These users exist in the users collection but have no registration records. 
+                  Use "Clean Up" to remove them or "Force Delete" for complete removal.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-sm mb-6">
           <div className="border-b border-gray-200">
@@ -683,6 +802,18 @@ const AdminPanel = () => {
               >
                 Rejected ({statusCounts.rejected})
               </button>
+              {statusCounts.orphaned > 0 && (
+                <button
+                  onClick={() => setFilterStatus('orphaned')}
+                  className={`px-6 py-3 text-sm font-medium transition-colors ${
+                    filterStatus === 'orphaned'
+                      ? 'border-b-2 border-blue-500 text-blue-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Orphaned ({statusCounts.orphaned})
+                </button>
+              )}
             </nav>
           </div>
 

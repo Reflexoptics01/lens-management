@@ -6,9 +6,150 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // All collections
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function isSuperAdmin() {
+      return request.auth != null && 
+             (request.auth.email in [
+               'admin@reflexoptics.in',
+               'info@reflexoptics.in',
+               'reflexopticsolutions@gmail.com'
+             ] || request.auth.uid == 'CKmjkoMLBoXnun1GntgB0V7Wn1b2');
+    }
+
+    function isTeamMember(userId) {
+      return request.auth != null && 
+             exists(/databases/$(database)/documents/users/$(userId)/teamMembers/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(userId)/teamMembers/$(request.auth.uid)).data.isActive == true;
+    }
+
+    function canAccessUserData(userId) {
+      return isOwner(userId) || isTeamMember(userId) || isSuperAdmin();
+    }
+
+    // Global collections - secured rules
+    match /userRegistrations/{document} {
+      // Super admin can read/write everything
+      allow read, write: if isSuperAdmin();
+      
+      // Allow any authenticated user to create a registration
+      allow create: if isAuthenticated();
+      
+      // Allow users to read their own registration status
+      allow read: if isAuthenticated() && 
+                     request.auth.uid == resource.data.uid;
+    }
+
+    match /users/{userId} {
+      // Super admin can read/write everything
+      allow read, write: if isSuperAdmin();
+      
+      // Users can read their own document (document ID should match their UID)
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Allow users to create their own document if it doesn't exist (for recovery scenarios)
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    match /globalSettings/{document} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    // User-specific data collections
+    match /users/{userId}/settings/{document} {
+      allow read, write: if canAccessUserData(userId);
+    }
+
+    match /users/{userId}/customers/{document} {
+      allow read, write: if canAccessUserData(userId);
+    }
+
+    match /users/{userId}/orders/{document} {
+      allow read, write: if canAccessUserData(userId);
+    }
+
+    match /users/{userId}/sales/{document} {
+      allow read, write: if canAccessUserData(userId);
+    }
+
+    match /users/{userId}/purchases/{document} {
+      allow read, write: if canAccessUserData(userId);
+    }
+
+    match /users/{userId}/transactions/{document} {
+      allow read, write: if canAccessUserData(userId);
+    }
+
+    match /users/{userId}/lensInventory/{document} {
+      allow read, write: if canAccessUserData(userId);
+    }
+
+    match /users/{userId}/counters/{document} {
+      allow read, write: if canAccessUserData(userId);
+    }
+
+    match /users/{userId}/vendors/{document} {
+      allow read, write: if canAccessUserData(userId);
+    }
+
+    match /users/{userId}/products/{document} {
+      allow read, write: if canAccessUserData(userId);
+    }
+
+    match /users/{userId}/inventory/{document} {
+      allow read, write: if canAccessUserData(userId);
+    }
+
+    match /users/{userId}/payments/{document} {
+      allow read, write: if canAccessUserData(userId);
+    }
+
+    match /users/{userId}/invoices/{document} {
+      allow read, write: if canAccessUserData(userId);
+    }
+
+    match /users/{userId}/categories/{document} {
+      allow read, write: if canAccessUserData(userId);
+    }
+
+    match /users/{userId}/brands/{document} {
+      allow read, write: if canAccessUserData(userId);
+    }
+
+    match /users/{userId}/prescriptions/{document} {
+      allow read, write: if canAccessUserData(userId);
+    }
+
+    match /users/{userId}/appointments/{document} {
+      allow read, write: if canAccessUserData(userId);
+    }
+
+    match /users/{userId}/reports/{document} {
+      allow read, write: if canAccessUserData(userId);
+    }
+
+    // Team members collection - owner can manage, team members can read their own data
+    match /users/{userId}/teamMembers/{memberId} {
+      allow read: if canAccessUserData(userId) || request.auth.uid == memberId;
+      allow write: if isOwner(userId) || isSuperAdmin();
+    }
+
+    // Shop sharing collections (if implemented)
+    match /shop/{document} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Read-only for now
+    }
+
+    // Backup collections - only owner can access
+    match /users/{userId}/backups/{document} {
+      allow read, write: if isOwner(userId) || isSuperAdmin();
+    }
+
+    // Deny all other access
     match /{document=**} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if false;
     }
   }
 } 

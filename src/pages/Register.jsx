@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createUserWithEmailAndPassword, sendEmailVerification, deleteUser } from 'firebase/auth';
+import { createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { useNavigate, Link } from 'react-router-dom';
@@ -29,8 +29,12 @@ const Register = () => {
       }
     };
     
-    clearAuthState();
-  }, [user]);
+    // Only clear auth state if user is not already registering
+    // This prevents clearing the auth state during the registration process
+    if (user && !loading) {
+      clearAuthState();
+    }
+  }, [user?.email]); // Remove user dependency to prevent clearing during registration
   
   // Form data
   const [formData, setFormData] = useState({
@@ -82,56 +86,22 @@ const Register = () => {
     try {
       console.log('Checking email existence for:', email);
       
-      // Check in userRegistrations collection
-      const registrationsRef = collection(db, 'userRegistrations');
-      const registrationQuery = query(registrationsRef, where('email', '==', email.toLowerCase()));
-      const registrationSnapshot = await getDocs(registrationQuery);
+      // Since we can't check unauthenticated, we'll rely on Firebase Auth
+      // to be the primary check for email existence
+      console.log('⚠️ Cannot check email in Firestore due to security rules');
+      console.log('Firebase Auth will be the final check for email availability');
       
-      console.log('Found in userRegistrations:', registrationSnapshot.size, 'documents');
-      
-      // Check in users collection
-      const usersRef = collection(db, 'users');
-      const userQuery = query(usersRef, where('email', '==', email.toLowerCase()));
-      const userSnapshot = await getDocs(userQuery);
-      
-      console.log('Found in users collection:', userSnapshot.size, 'documents');
-      
-      const result = {
-        inRegistrations: !registrationSnapshot.empty,
-        inUsers: !userSnapshot.empty,
-        registrationData: registrationSnapshot.empty ? null : registrationSnapshot.docs[0].data(),
-        userData: userSnapshot.empty ? null : userSnapshot.docs[0].data()
+      return { 
+        inRegistrations: false, 
+        inUsers: false, 
+        registrationData: null, 
+        userData: null,
+        securityRestricted: true 
       };
-      
-      console.log('Email check result:', result);
-      
-      // If found in either collection, log the details
-      if (result.inRegistrations) {
-        console.log('Registration data:', result.registrationData);
-      }
-      if (result.inUsers) {
-        console.log('User data:', result.userData);
-      }
-      
-      return result;
     } catch (error) {
       console.error('Error checking email:', error);
       
-      // If it's a permissions error, assume email is available for registration
-      // This allows users to register even if they can't read the collections
-      if (error.code === 'permission-denied' || error.message.includes('permissions')) {
-        console.log('⚠️ Permissions error - assuming email is available for registration');
-        console.log('Firebase Auth will be the final check for email availability');
-        return { 
-          inRegistrations: false, 
-          inUsers: false, 
-          registrationData: null, 
-          userData: null,
-          permissionsError: true 
-        };
-      }
-      
-      // For other errors, also assume available to prevent blocking legitimate registrations
+      // For any errors, assume email is available to prevent blocking legitimate registrations
       console.log('⚠️ Database check failed - assuming email is available');
       return { 
         inRegistrations: false, 
@@ -249,9 +219,9 @@ const Register = () => {
         try {
           const emailExists = await checkEmailExists(formData.email);
           
-          // Handle permissions errors gracefully
-          if (emailExists.permissionsError) {
-            console.log('⚠️ Cannot check email due to permissions - proceeding to step 2');
+          // Handle security-restricted checks gracefully
+          if (emailExists.securityRestricted) {
+            console.log('✅ Email check restricted due to security rules - proceeding to step 2');
             toast.success('Proceeding to next step. Email availability will be verified during registration.');
           } else if (emailExists.checkFailed) {
             console.log('⚠️ Email check failed - proceeding to step 2');
@@ -349,15 +319,6 @@ const Register = () => {
       const user = userCredential.user;
       console.log('Firebase user created with UID:', user.uid);
       
-      try {
-        // Send email verification
-        await sendEmailVerification(user);
-        console.log('Email verification sent');
-      } catch (emailError) {
-        console.warn('Failed to send verification email:', emailError);
-        // Don't fail registration if email verification fails
-      }
-      
       // Create user registration request in Firestore
       console.log('Creating registration document...');
       await addDoc(collection(db, 'userRegistrations'), {
@@ -395,18 +356,17 @@ const Register = () => {
           enableMultipleBranches: formData.enableMultipleBranches
         },
         status: 'pending', // Needs admin approval
-        createdAt: serverTimestamp(),
-        emailVerified: false
+        createdAt: serverTimestamp()
       });
       
       console.log('User registration document created successfully');
       
-      // Sign out the user immediately (they can't login until approved)
-      await auth.signOut();
-      console.log('User signed out after registration');
+      // Don't sign out the user immediately - let them see their registration status
+      // await auth.signOut();
+      // console.log('User signed out after registration');
       
-      toast.success('Registration successful! Please verify your email and wait for admin approval.');
-      navigate('/login');
+      toast.success('Registration successful! Please wait for admin approval. You can check your registration status in your profile.');
+      navigate('/dashboard'); // Navigate to dashboard where they can see pending approval status
       
     } catch (error) {
       console.error('Registration error:', error);
