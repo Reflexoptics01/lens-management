@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db, auth } from '../firebaseConfig';
-import { collection, deleteDoc, doc, onSnapshot, query, where, getDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, onSnapshot, query, where, getDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { getUserCollection, getUserDoc, getUserSettings } from '../utils/multiTenancy';
 import { dateToISOString, formatDate, formatDateTime, processRestoredData } from '../utils/dateUtils';
@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import CustomerForm from '../components/CustomerForm';
 import CustomerCard from '../components/CustomerCard';
+import * as XLSX from 'xlsx';
 import { 
   MagnifyingGlassIcon, 
   PlusIcon, 
@@ -28,6 +29,10 @@ const Customers = () => {
   const [isAddingVendor, setIsAddingVendor] = useState(false);
   const [componentError, setComponentError] = useState(null); // For overall component errors
   const navigate = useNavigate();
+
+  // Import/Export states
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState('');
 
   // States for address modal
   const [showAddressModal, setShowAddressModal] = useState(false);
@@ -304,6 +309,302 @@ const Customers = () => {
     filteredItemsCount: filteredItems.length
   });
 
+  // Import function for customers/vendors
+  const handleImport = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    const fileType = file.name.split('.').pop().toLowerCase();
+    if (!['xlsx', 'xls'].includes(fileType)) {
+      setImportError('Please select a valid Excel file (.xlsx or .xls)');
+      event.target.value = '';
+      return;
+    }
+
+    setImportLoading(true);
+    setImportError('');
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        
+        if (jsonData.length === 0) {
+          setImportError('The Excel file appears to be empty');
+          setImportLoading(false);
+          event.target.value = '';
+          return;
+        }
+
+        // Validate required columns based on active tab
+        const requiredColumns = activeTab === 'customers' 
+          ? ['optical name', 'contact person', 'phone', 'city']
+          : ['business name', 'contact person', 'phone', 'city'];
+        
+        const fileColumns = Object.keys(jsonData[0]).map(col => col.toLowerCase().trim());
+        const missingColumns = requiredColumns.filter(col => 
+          !fileColumns.includes(col.toLowerCase())
+        );
+
+        if (missingColumns.length > 0) {
+          setImportError(`Missing required columns: ${missingColumns.join(', ')}`);
+          setImportLoading(false);
+          event.target.value = '';
+          return;
+        }
+
+        // Process and import data
+        let successCount = 0;
+        let errorCount = 0;
+        const errors = [];
+
+        for (let i = 0; i < jsonData.length; i++) {
+          const row = jsonData[i];
+          try {
+            const getColumnValue = (row, columnName) => {
+              const key = Object.keys(row).find(k => 
+                k.toLowerCase().trim() === columnName.toLowerCase()
+              );
+              return key ? row[key] : '';
+            };
+
+            const opticalName = getColumnValue(row, activeTab === 'customers' ? 'optical name' : 'business name');
+            const contactPerson = getColumnValue(row, 'contact person');
+            const phone = getColumnValue(row, 'phone');
+            const city = getColumnValue(row, 'city');
+            const state = getColumnValue(row, 'state');
+            const address = getColumnValue(row, 'address');
+            const email = getColumnValue(row, 'email');
+            const gstNumber = getColumnValue(row, 'gst number');
+            const creditLimit = getColumnValue(row, 'credit limit');
+            const openingBalance = getColumnValue(row, 'opening balance');
+
+            // Validate required fields
+            if (!opticalName?.toString().trim()) {
+              errors.push(`Row ${i + 2}: ${activeTab === 'customers' ? 'Optical Name' : 'Business Name'} is required`);
+              errorCount++;
+              continue;
+            }
+
+            if (!contactPerson?.toString().trim()) {
+              errors.push(`Row ${i + 2}: Contact Person is required`);
+              errorCount++;
+              continue;
+            }
+
+            if (!phone?.toString().trim()) {
+              errors.push(`Row ${i + 2}: Phone is required`);
+              errorCount++;
+              continue;
+            }
+
+            if (!city?.toString().trim()) {
+              errors.push(`Row ${i + 2}: City is required`);
+              errorCount++;
+              continue;
+            }
+
+            // Create customer/vendor data
+            const itemData = {
+              opticalName: opticalName.toString().trim(),
+              contactPerson: contactPerson.toString().trim(),
+              phone: phone.toString().trim(),
+              city: city.toString().trim(),
+              state: state?.toString().trim() || '',
+              address: address?.toString().trim() || '',
+              email: email?.toString().trim() || '',
+              gstNumber: gstNumber?.toString().trim() || '',
+              type: activeTab === 'vendors' ? 'vendor' : 'customer',
+              isImported: true,
+              importedAt: serverTimestamp(),
+              createdAt: serverTimestamp()
+            };
+
+            // Add financial fields if provided
+            if (creditLimit && !isNaN(parseFloat(creditLimit))) {
+              itemData.creditLimit = parseFloat(creditLimit);
+            }
+            if (openingBalance && !isNaN(parseFloat(openingBalance))) {
+              itemData.openingBalance = parseFloat(openingBalance);
+            }
+
+            // Add to Firestore
+            await addDoc(getUserCollection('customers'), itemData);
+            successCount++;
+
+          } catch (error) {
+            console.error(`Error importing row ${i + 2}:`, error);
+            errors.push(`Row ${i + 2}: ${error.message}`);
+            errorCount++;
+          }
+        }
+
+        // Show results
+        let message = `Import completed!\n`;
+        message += `✅ Successfully imported: ${successCount} ${activeTab}\n`;
+        if (errorCount > 0) {
+          message += `❌ Failed to import: ${errorCount} records\n\n`;
+          if (errors.length > 0) {
+            message += `Errors:\n${errors.slice(0, 10).join('\n')}`;
+            if (errors.length > 10) {
+              message += `\n... and ${errors.length - 10} more errors`;
+            }
+          }
+        }
+
+        alert(message);
+        event.target.value = '';
+
+      } catch (error) {
+        console.error('Error parsing Excel file:', error);
+        setImportError('Failed to parse Excel file. Please check the file format.');
+        event.target.value = '';
+      } finally {
+        setImportLoading(false);
+      }
+    };
+
+    reader.onerror = () => {
+      setImportError('Failed to read the file');
+      setImportLoading(false);
+      event.target.value = '';
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
+  // Download template function
+  const downloadImportTemplate = () => {
+    const templateData = activeTab === 'customers' 
+      ? [
+          {
+            'optical name': 'ABC Vision Center',
+            'contact person': 'John Doe',
+            'phone': '9876543210',
+            'city': 'Mumbai',
+            'state': 'Maharashtra',
+            'address': '123 Main Street',
+            'email': 'john@abcvision.com',
+            'gst number': '27ABCDE1234F1Z5',
+            'credit limit': 50000,
+            'opening balance': 0
+          },
+          {
+            'optical name': 'XYZ Optical Store',
+            'contact person': 'Jane Smith',
+            'phone': '9876543211',
+            'city': 'Delhi',
+            'state': 'Delhi',
+            'address': '456 Market Road',
+            'email': 'jane@xyzoptical.com',
+            'gst number': '07FGHIJ5678K2L9',
+            'credit limit': 75000,
+            'opening balance': 5000
+          }
+        ]
+      : [
+          {
+            'business name': 'Lens Suppliers Pvt Ltd',
+            'contact person': 'Mike Johnson',
+            'phone': '9876543212',
+            'city': 'Bangalore',
+            'state': 'Karnataka',
+            'address': '789 Industrial Area',
+            'email': 'mike@lenssuppliers.com',
+            'gst number': '29MNOPQ9012R3S4',
+            'credit limit': 100000,
+            'opening balance': 0
+          },
+          {
+            'business name': 'Frame Distributors Inc',
+            'contact person': 'Sarah Wilson',
+            'phone': '9876543213',
+            'city': 'Chennai',
+            'state': 'Tamil Nadu',
+            'address': '321 Commerce Street',
+            'email': 'sarah@framedist.com',
+            'gst number': '33TUVWX3456Y7Z8',
+            'credit limit': 150000,
+            'opening balance': 10000
+          }
+        ];
+
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, `${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Import Template`);
+
+    // Set column widths
+    const columnWidths = [
+      { wch: 25 }, // optical/business name
+      { wch: 20 }, // contact person
+      { wch: 15 }, // phone
+      { wch: 15 }, // city
+      { wch: 15 }, // state
+      { wch: 30 }, // address
+      { wch: 25 }, // email
+      { wch: 20 }, // gst number
+      { wch: 15 }, // credit limit
+      { wch: 15 }  // opening balance
+    ];
+    ws['!cols'] = columnWidths;
+
+    XLSX.writeFile(wb, `${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}_Import_Template.xlsx`);
+  };
+
+  // Export function
+  const handleExport = () => {
+    const dataToExport = activeTab === 'customers' ? customers : vendors;
+    
+    if (dataToExport.length === 0) {
+      alert(`No ${activeTab} to export`);
+      return;
+    }
+
+    const exportData = dataToExport.map(item => ({
+      [activeTab === 'customers' ? 'Optical Name' : 'Business Name']: item.opticalName || '',
+      'Contact Person': item.contactPerson || '',
+      'Phone': item.phone || '',
+      'City': item.city || '',
+      'State': item.state || '',
+      'Address': item.address || '',
+      'Email': item.email || '',
+      'GST Number': item.gstNumber || '',
+      'Credit Limit': item.creditLimit || 0,
+      'Opening Balance': item.openingBalance || 0,
+      'Credit Period': item.creditPeriod || 0,
+      'Created Date': item.createdAt ? formatDate(item.createdAt) : ''
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, activeTab.charAt(0).toUpperCase() + activeTab.slice(1));
+
+    // Set column widths
+    const columnWidths = [
+      { wch: 25 }, // name
+      { wch: 20 }, // contact person
+      { wch: 15 }, // phone
+      { wch: 15 }, // city
+      { wch: 15 }, // state
+      { wch: 30 }, // address
+      { wch: 25 }, // email
+      { wch: 20 }, // gst number
+      { wch: 15 }, // credit limit
+      { wch: 15 }, // opening balance
+      { wch: 15 }, // credit period
+      { wch: 15 }  // created date
+    ];
+    ws['!cols'] = columnWidths;
+
+    XLSX.writeFile(wb, `${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}_Export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
   // Function to print the address content
   const printAddressContent = () => {
     const content = document.getElementById('address-content');
@@ -579,6 +880,44 @@ const Customers = () => {
               />
             </div>
             
+            {/* Import Template Button */}
+            <button
+              onClick={downloadImportTemplate}
+              className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500"
+              title={`Download ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Import Template`}
+            >
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Template
+            </button>
+
+            {/* Import Button */}
+            <label className="inline-flex items-center px-3 py-2 border border-orange-300 text-sm font-medium rounded-lg text-orange-700 bg-orange-50 hover:bg-orange-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 cursor-pointer">
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              {importLoading ? 'Importing...' : `Import ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`}
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleImport}
+                className="sr-only"
+                disabled={importLoading}
+              />
+            </label>
+
+            {/* Export Button */}
+            <button
+              onClick={handleExport}
+              className="inline-flex items-center px-3 py-2 border border-green-300 text-sm font-medium rounded-lg text-green-700 bg-green-50 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+            >
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Export {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+            </button>
+            
             <button
               onClick={handleAddNew}
               className="btn-primary inline-flex items-center justify-center px-4 py-2"
@@ -642,6 +981,20 @@ const Customers = () => {
             </button>
           </div>
         </div>
+
+        {/* Import Error Display */}
+        {importError && (
+          <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-400 text-red-700 rounded-md">
+            <p className="font-medium">Import Error</p>
+            <p className="text-sm">{importError}</p>
+            <button 
+              onClick={() => setImportError('')}
+              className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {error && (
           <div className="mb-6 p-4 border-l-4 border-red-400 text-red-700 rounded-md" style={{ backgroundColor: 'var(--bg-tertiary)' }}>

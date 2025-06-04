@@ -1,5 +1,5 @@
 import { collection, doc } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { db, auth } from '../firebaseConfig';
 
 /**
  * Get the current user's UID from localStorage or AuthContext
@@ -19,16 +19,14 @@ export const getUserUid = () => {
   // Try Firebase auth directly as last resort
   if (!uid) {
     try {
-      // Dynamic import to avoid circular dependency
-      import('../firebaseConfig').then(({ auth }) => {
-        if (auth.currentUser) {
-          uid = auth.currentUser.uid;
-          console.log('getUserUid: Using Firebase currentUser UID:', uid);
-          // Update localStorage if we found a user
-          localStorage.setItem('userUid', uid);
-          localStorage.setItem('userEmail', auth.currentUser.email);
-        }
-      });
+      // Use static import instead of dynamic import
+      if (auth.currentUser) {
+        uid = auth.currentUser.uid;
+        console.log('getUserUid: Using Firebase currentUser UID:', uid);
+        // Update localStorage if we found a user
+        localStorage.setItem('userUid', uid);
+        localStorage.setItem('userEmail', auth.currentUser.email);
+      }
     } catch (error) {
       console.warn('getUserUid: Could not access Firebase auth:', error);
     }
@@ -148,15 +146,13 @@ export const diagnoseAuthIssues = () => {
 export const attemptAuthFix = () => {
   try {
     // Check if Firebase auth has current user but localStorage doesn't
-    import('../firebaseConfig').then(({ auth }) => {
-      if (auth.currentUser && !localStorage.getItem('userUid')) {
-        console.log('Found authenticated user but missing localStorage data');
-        localStorage.setItem('userUid', auth.currentUser.uid);
-        localStorage.setItem('userEmail', auth.currentUser.email);
-        console.log('Restored localStorage authentication data');
-        return true;
-      }
-    });
+    if (auth.currentUser && !localStorage.getItem('userUid')) {
+      console.log('Found authenticated user but missing localStorage data');
+      localStorage.setItem('userUid', auth.currentUser.uid);
+      localStorage.setItem('userEmail', auth.currentUser.email);
+      console.log('Restored localStorage authentication data');
+      return true;
+    }
   } catch (error) {
     console.error('Error attempting auth fix:', error);
   }

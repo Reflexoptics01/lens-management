@@ -1809,9 +1809,7 @@ The page will refresh in 3 seconds to load your restored data...`;
       
       if (newSharingState) {
         // Enable sharing - upload lenses to shop
-        const { db } = await import('../firebaseConfig');
-        const { collection, getDocs } = await import('firebase/firestore');
-        const { getUserCollection } = await import('../utils/multiTenancy');
+        // Firebase modules already imported at top of file
         
         // Fetch current lens inventory
         const lensRef = getUserCollection('lensInventory');
@@ -1835,9 +1833,7 @@ The page will refresh in 3 seconds to load your restored data...`;
         displaySuccess(`Successfully enabled inventory sharing! ${lenses.length} lenses uploaded to Reflex Shop.`);
       } else {
         // Disable sharing - remove lenses from shop
-        const { db } = await import('../firebaseConfig');
-        const { collection, getDocs } = await import('firebase/firestore');
-        const { getUserCollection } = await import('../utils/multiTenancy');
+        // Firebase modules already imported at top of file
         
         // Fetch current lens inventory to remove from shop
         const lensRef = getUserCollection('lensInventory');

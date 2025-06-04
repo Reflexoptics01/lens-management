@@ -8,7 +8,6 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        'sansa': ['Sansa', 'sans-serif'],
         'sans': ['Open Sans', 'sans-serif'],
       },
       colors: {

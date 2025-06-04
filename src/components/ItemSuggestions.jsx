@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { db } from '../firebaseConfig';
+import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { getUserCollection } from '../utils/multiTenancy';
 
 const ItemSuggestions = ({ 
   items, 
@@ -324,10 +327,6 @@ const ItemSuggestions = ({
 
     try {
       setCreatingProduct(true);
-
-      // Import Firebase functions
-      const { db } = await import('../firebaseConfig');
-      const { collection, addDoc, Timestamp } = await import('firebase/firestore');
 
       let productData = {
         brandName: newProductName,

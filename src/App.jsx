@@ -44,12 +44,8 @@ import './utils/debugFirestore';
 
 function App() {
   useEffect(() => {
-    console.log('App component mounted');
-    console.log('Environment variables loaded:', {
-      apiKey: import.meta.env.VITE_FIREBASE_API_KEY ? 'Present' : 'Missing',
-      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ? 'Present' : 'Missing',
-      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID ? 'Present' : 'Missing'
-    });
+    // Remove console.log statements for production
+    // Environment validation is handled by firebaseConfig.js
   }, []);
 
   return (

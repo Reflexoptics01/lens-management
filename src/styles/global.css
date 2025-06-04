@@ -4,14 +4,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@font-face {
-  font-family: 'Sansa';
-  src: url('/fonts/Sansa-Regular.woff2') format('woff2'),
-       url('/fonts/Sansa-Regular.woff') format('woff');
-  font-weight: normal;
-  font-style: normal;
-}
-
 :root {
   /* Primary Colors */
   --primary-blue: #4169E1;
@@ -89,7 +81,8 @@ body {
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Sansa', sans-serif;
+  font-family: 'Open Sans', sans-serif;
+  font-weight: 600;
   color: var(--text-primary);
 }
 
