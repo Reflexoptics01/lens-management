@@ -34,6 +34,8 @@ import SalesReturn from "./pages/SalesReturn";
 import PurchaseReturn from "./pages/PurchaseReturn";
 import Shop from './pages/Shop';
 import FloatingShopIcon from './components/FloatingShopIcon';
+import UserManagement from './pages/UserManagement';
+import SystemAnalytics from './pages/SystemAnalytics';
 import './App.css';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
@@ -42,10 +44,22 @@ import ProtectedRoute from './components/ProtectedRoute';
 // Import debug utility for development
 import './utils/debugFirestore';
 
+// Import production monitoring
+import { initializeMonitoring } from './utils/productionMonitoring';
+
 function App() {
   useEffect(() => {
     // Remove console.log statements for production
     // Environment validation is handled by firebaseConfig.js
+
+    // Initialize production monitoring in production environment
+    // Safe check for environment variable
+    const isProduction = import.meta.env?.REACT_APP_ENV === 'production' || 
+                        (typeof process !== 'undefined' && process.env?.REACT_APP_ENV === 'production');
+    
+    if (isProduction) {
+      initializeMonitoring();
+    }
   }, []);
 
   return (
@@ -266,6 +280,20 @@ function App() {
               <Route path="/test-print" element={
                 <ProtectedRoute requiredRoles={['superadmin', 'admin']}>
                   <TestPrintPage />
+                </ProtectedRoute>
+              } />
+              
+              {/* User Management - super admin only */}
+              <Route path="/user-management" element={
+                <ProtectedRoute requiredRoles={['superadmin']}>
+                  <UserManagement />
+                </ProtectedRoute>
+              } />
+              
+              {/* System Analytics - super admin only */}
+              <Route path="/system-analytics" element={
+                <ProtectedRoute requiredRoles={['superadmin']}>
+                  <SystemAnalytics />
                 </ProtectedRoute>
               } />
               
