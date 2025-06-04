@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { auth, db } from '../firebaseConfig';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { collection, query, where, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
 import { getUserUid, isSuperAdmin } from '../utils/multiTenancy';
 import { dateToISOString } from '../utils/dateUtils';
@@ -48,6 +48,37 @@ export const AuthProvider = ({ children }) => {
   // Error handling
   const [authError, setAuthError] = useState(null);
 
+  // Set Firebase Auth persistence on component mount
+  useEffect(() => {
+    const setupAuthPersistence = async () => {
+      try {
+        await setPersistence(auth, browserLocalPersistence);
+        console.log('🔐 Firebase Auth persistence set to LOCAL');
+        
+        // Add environment detection and debugging
+        const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+        console.log('🔐 Environment:', {
+          hostname: window.location.hostname,
+          isProduction,
+          userAgent: navigator.userAgent,
+          localStorage: {
+            userUid: localStorage.getItem('userUid'),
+            userEmail: localStorage.getItem('userEmail'),
+            userRole: localStorage.getItem('userRole')
+          }
+        });
+        
+        if (isProduction) {
+          console.log('🔐 Production environment detected - enhanced logging enabled');
+        }
+      } catch (error) {
+        console.error('🔐 Error setting auth persistence:', error);
+      }
+    };
+    
+    setupAuthPersistence();
+  }, []);
+
   // Initialize auth listener
   useEffect(() => {
     console.log('🔐 AuthContext: Initializing auth listener...');
@@ -58,7 +89,37 @@ export const AuthProvider = ({ children }) => {
         console.log('🔐 Auth state changed:', firebaseUser ? firebaseUser.email : 'No user');
         
         if (!firebaseUser) {
-          // User signed out
+          // Check if we have valid session data in localStorage
+          const storedUid = localStorage.getItem('userUid');
+          const storedEmail = localStorage.getItem('userEmail');
+          
+          if (storedUid && storedEmail) {
+            console.log('🔐 No Firebase user but localStorage has auth data - attempting recovery...');
+            
+            // Check if this user data is still valid in Firestore
+            try {
+              const userDoc = await getDoc(doc(db, 'users', storedUid));
+              if (userDoc.exists()) {
+                const userData = userDoc.data();
+                if (userData.email === storedEmail && userData.isActive !== false) {
+                  console.log('🔐 Auth recovery failed - Firebase session lost. User needs to re-login.');
+                  // Don't auto-recover, but provide a helpful error message
+                  setAuthError('Your session has expired. Please log in again.');
+                  setAuthState(AUTH_STATES.UNAUTHENTICATED);
+                  // Clear localStorage to prevent confusion
+                  localStorage.removeItem('userUid');
+                  localStorage.removeItem('userEmail');
+                  localStorage.removeItem('userRole');
+                  localStorage.removeItem('userPermissions');
+                  return;
+                }
+              }
+            } catch (recoveryError) {
+              console.error('🔐 Error during auth recovery:', recoveryError);
+            }
+          }
+          
+          // User signed out or no valid recovery data
           handleSignOut();
           return;
         }
@@ -146,9 +207,26 @@ export const AuthProvider = ({ children }) => {
       
     } catch (error) {
       console.error('🔐 Error validating user:', error);
-      setAuthError('Authentication error. Please try again.');
-      setAuthState(AUTH_STATES.UNAUTHENTICATED);
-      await signOut(auth);
+      
+      // Handle specific network and authentication errors
+      if (error.code === 'auth/network-request-failed') {
+        setAuthError('Network error. Please check your internet connection and try again.');
+        console.log('🔐 Network error detected - not signing out user');
+        // Don't sign out on network errors, just show error
+        setAuthState(AUTH_STATES.UNAUTHENTICATED);
+      } else if (error.code === 'auth/internal-error') {
+        setAuthError('Authentication service temporarily unavailable. Please try again.');
+        console.log('🔐 Internal auth error - not signing out user');
+        setAuthState(AUTH_STATES.UNAUTHENTICATED);
+      } else if (error.message?.includes('Missing or insufficient permissions')) {
+        setAuthError('Database access error. Please contact an administrator.');
+        console.log('🔐 Firestore permissions error - not signing out user');
+        setAuthState(AUTH_STATES.UNAUTHENTICATED);
+      } else {
+        setAuthError('Authentication error. Please try again.');
+        setAuthState(AUTH_STATES.UNAUTHENTICATED);
+        await signOut(auth);
+      }
     } finally {
       setCheckingPermissions(false);
     }

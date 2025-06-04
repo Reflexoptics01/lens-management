@@ -64,7 +64,26 @@ let auth;
 try {
   auth = getAuth(app);
   auth.useDeviceLanguage(); // Set language to device's language
+  
+  // Add domain validation for production debugging
+  const currentDomain = window.location.hostname;
+  const authDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
+  
   console.log('✅ Firebase Auth initialized successfully');
+  console.log('🔧 Domain configuration:', {
+    currentDomain,
+    authDomain,
+    isLocalhost: currentDomain === 'localhost' || currentDomain === '127.0.0.1',
+    isProduction: currentDomain !== 'localhost' && currentDomain !== '127.0.0.1'
+  });
+  
+  // Warn if domain mismatch (common cause of auth issues)
+  if (currentDomain !== 'localhost' && currentDomain !== '127.0.0.1' && authDomain) {
+    console.log('🔧 Production domain detected. Ensure this domain is authorized in Firebase Console:');
+    console.log('   Firebase Console > Authentication > Settings > Authorized domains');
+    console.log(`   Current domain: ${currentDomain}`);
+    console.log(`   Auth domain: ${authDomain}`);
+  }
 } catch (error) {
   console.error('❌ Error initializing Firebase Auth:', error);
   throw error;
