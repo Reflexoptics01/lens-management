@@ -104,7 +104,7 @@ const InvoiceNumberingTest = () => {
         <ol className="text-sm space-y-1 text-blue-800 dark:text-blue-300 list-decimal list-inside">
           <li>Click "Diagnose System" to check current state</li>
           <li>Click "Quick Fix" to automatically fix invoice numbering</li>
-          <li>Check browser console for detailed logs</li>
+          <li>Check browser for detailed logs</li>
           <li>Test creating a new sale to verify numbering continues correctly</li>
         </ol>
       </div>

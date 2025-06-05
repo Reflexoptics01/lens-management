@@ -601,7 +601,14 @@ const LensDetail = () => {
         {/* Power Inventory Card - Only for stock lenses with individual inventory */}
         {lens.type === 'stock' && lens.inventoryType === 'individual' && lens.powerInventory && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 border border-gray-200 dark:border-gray-700">
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Individual Power Inventory</h2>
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+              Individual Power Inventory
+              {lens.lensType === 'bifocal' && (
+                <span className="ml-2 text-sm font-normal text-blue-600 dark:text-blue-400">
+                  (Bifocal/Progressive - Axis: {lens.axis || 90}°)
+                </span>
+              )}
+            </h2>
             
             {/* Power Summary */}
             {(() => {
@@ -660,6 +667,42 @@ const LensDetail = () => {
               );
             })()}
             
+            {/* Additional summary for bifocal lenses */}
+            {lens.lensType === 'bifocal' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="bg-cyan-50 dark:bg-cyan-900/30 p-4 rounded-lg border border-cyan-200 dark:border-cyan-700">
+                  <h3 className="text-sm font-semibold text-cyan-700 dark:text-cyan-300 uppercase mb-2">Addition Range</h3>
+                  <div className="text-xl font-bold text-cyan-700 dark:text-cyan-300">
+                    {(() => {
+                      // Calculate addition range from power inventory keys
+                      const additionPowers = Object.keys(lens.powerInventory)
+                        .map(key => {
+                          const parts = key.split('_');
+                          return parts.length >= 3 ? parseFloat(parts[2]) : null;
+                        })
+                        .filter(add => add !== null);
+                      
+                      if (additionPowers.length > 0) {
+                        const minAdd = Math.min(...additionPowers);
+                        const maxAdd = Math.max(...additionPowers);
+                        return `+${minAdd} to +${maxAdd}`;
+                      }
+                      return 'N/A';
+                    })()}
+                  </div>
+                  <p className="text-sm text-cyan-600 dark:text-cyan-400 mt-1">Addition power range</p>
+                </div>
+                
+                <div className="bg-indigo-50 dark:bg-indigo-900/30 p-4 rounded-lg border border-indigo-200 dark:border-indigo-700">
+                  <h3 className="text-sm font-semibold text-indigo-700 dark:text-indigo-300 uppercase mb-2">Axis</h3>
+                  <div className="text-xl font-bold text-indigo-700 dark:text-indigo-300">
+                    {lens.axis || 90}°
+                  </div>
+                  <p className="text-sm text-indigo-600 dark:text-indigo-400 mt-1">Standard axis orientation</p>
+                </div>
+              </div>
+            )}
+            
             {/* Available Powers List with Search */}
             {(() => {
               // Filter powers based on search
@@ -667,12 +710,23 @@ const LensDetail = () => {
                 .filter(([powerKey, powerData]) => parseInt(powerData?.quantity) > 0)
                 .filter(([powerKey, powerData]) => {
                   if (!powerSearch) return true;
-                  const [sph, cyl] = powerKey.split('_').map(p => parseFloat(p));
+                  
+                  // Handle different key formats for single vs bifocal lenses
+                  let searchText;
+                  const parts = powerKey.split('_');
+                  
+                  if (parts.length >= 3) {
+                    // Bifocal format detected: "sph_cyl_addition"
+                    const [sph, cyl, addition] = parts.map(p => parseFloat(p));
+                    searchText = `SPH: ${sph > 0 ? `+${sph}` : sph}, CYL: ${cyl > 0 ? `+${cyl}` : cyl}, ADD: +${addition}, AXIS: ${lens.axis || 90}°`;
+                  } else {
+                    // Single vision format: "sph_cyl"
+                    const [sph, cyl] = parts.map(p => parseFloat(p));
+                    searchText = `SPH: ${sph > 0 ? `+${sph}` : sph}, CYL: ${cyl > 0 ? `+${cyl}` : cyl}${lens.axis ? `, AXIS: ${lens.axis}°` : ''}`;
+                  }
+                  
                   const searchLower = powerSearch.toLowerCase();
-                  const powerDisplay = `SPH: ${sph > 0 ? `+${sph}` : sph}, CYL: ${cyl > 0 ? `+${cyl}` : cyl}`;
-                  return powerDisplay.toLowerCase().includes(searchLower) ||
-                         sph.toString().includes(searchLower) ||
-                         cyl.toString().includes(searchLower);
+                  return searchText.toLowerCase().includes(searchLower);
                 });
               
               return (
@@ -698,15 +752,68 @@ const LensDetail = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {availablePowers
                       .sort(([a], [b]) => {
-                        // Simple sorting since we know the format is "sph_cyl"
-                        const [sphA, cylA] = a.split('_').map(p => parseFloat(p));
-                        const [sphB, cylB] = b.split('_').map(p => parseFloat(p));
-                        if (sphA !== sphB) return sphA - sphB;
-                        return cylA - cylB;
+                        // Handle different sorting for single vs bifocal lenses
+                        const partsA = a.split('_');
+                        const partsB = b.split('_');
+                        
+                        if (partsA.length >= 3 && partsB.length >= 3) {
+                          // Bifocal format detected: "sph_cyl_addition"
+                          const [sphA, cylA, addA] = partsA.map(p => parseFloat(p));
+                          const [sphB, cylB, addB] = partsB.map(p => parseFloat(p));
+                          if (sphA !== sphB) return sphA - sphB;
+                          if (cylA !== cylB) return cylA - cylB;
+                          return addA - addB;
+                        } else {
+                          // Single vision format: "sph_cyl"
+                          const [sphA, cylA] = partsA.map(p => parseFloat(p));
+                          const [sphB, cylB] = partsB.map(p => parseFloat(p));
+                          if (sphA !== sphB) return sphA - sphB;
+                          return cylA - cylB;
+                        }
                       })
                       .map(([powerKey, powerData]) => {
-                        // Simple power display since we know the format
-                        const [sph, cyl] = powerKey.split('_').map(p => parseFloat(p));
+                        // Handle different display for single vs bifocal lenses
+                        let powerDisplay;
+                        
+                        const parts = powerKey.split('_');
+                        if (parts.length >= 3) {
+                          // Bifocal format detected: "sph_cyl_addition"
+                          const [sph, cyl, addition] = parts.map(p => parseFloat(p));
+                          
+                          // Try to get axis from power inventory data or use lens.axis or default to 90
+                          let axisValue = lens.axis || 90;
+                          if (!lens.axis && lens.powerInventory && lens.powerInventory[powerKey] && lens.powerInventory[powerKey].axis) {
+                            axisValue = lens.powerInventory[powerKey].axis;
+                          }
+                          
+                          powerDisplay = (
+                            <div>
+                              <div>SPH: {sph > 0 ? `+${sph}` : sph}, CYL: {cyl > 0 ? `+${cyl}` : cyl}</div>
+                              <div className="text-xs text-blue-600 dark:text-blue-400">
+                                ADD: +{addition} | AXIS: {axisValue}°
+                              </div>
+                            </div>
+                          );
+                        } else {
+                          // Single vision format: "sph_cyl" - Always show axis
+                          const [sph, cyl] = parts.map(p => parseFloat(p));
+                          
+                          // Try to get axis from power inventory data or use lens.axis or default to 90
+                          let axisValue = lens.axis || 90;
+                          if (!lens.axis && lens.powerInventory && lens.powerInventory[powerKey] && lens.powerInventory[powerKey].axis) {
+                            axisValue = lens.powerInventory[powerKey].axis;
+                          }
+                          
+                          powerDisplay = (
+                            <div>
+                              <div>SPH: {sph > 0 ? `+${sph}` : sph}, CYL: {cyl > 0 ? `+${cyl}` : cyl}</div>
+                              <div className="text-xs text-gray-600 dark:text-gray-400">
+                                AXIS: {axisValue}°
+                              </div>
+                            </div>
+                          );
+                        }
+                        
                         const quantity = parseInt(powerData?.quantity) || 0;
                         
                         return (
@@ -714,7 +821,7 @@ const LensDetail = () => {
                             <div className="flex justify-between items-center">
                               <div>
                                 <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                  SPH: {sph > 0 ? `+${sph}` : sph}, CYL: {cyl > 0 ? `+${cyl}` : cyl}
+                                  {powerDisplay}
                                 </span>
                               </div>
                               <div className="text-right">
@@ -755,22 +862,74 @@ const LensDetail = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                       {outOfStockPowers
                         .sort(([a], [b]) => {
-                          // Simple sorting since we know the format is "sph_cyl"
-                          const [sphA, cylA] = a.split('_').map(p => parseFloat(p));
-                          const [sphB, cylB] = b.split('_').map(p => parseFloat(p));
-                          if (sphA !== sphB) return sphA - sphB;
-                          return cylA - cylB;
+                          // Handle different sorting for single vs bifocal lenses
+                          const partsA = a.split('_');
+                          const partsB = b.split('_');
+                          
+                          if (partsA.length >= 3 && partsB.length >= 3) {
+                            // Bifocal format detected: "sph_cyl_addition"
+                            const [sphA, cylA, addA] = partsA.map(p => parseFloat(p));
+                            const [sphB, cylB, addB] = partsB.map(p => parseFloat(p));
+                            if (sphA !== sphB) return sphA - sphB;
+                            if (cylA !== cylB) return cylA - cylB;
+                            return addA - addB;
+                          } else {
+                            // Single vision format: "sph_cyl"
+                            const [sphA, cylA] = partsA.map(p => parseFloat(p));
+                            const [sphB, cylB] = partsB.map(p => parseFloat(p));
+                            if (sphA !== sphB) return sphA - sphB;
+                            return cylA - cylB;
+                          }
                         })
                         .map(([powerKey, powerData]) => {
-                          // Simple power display since we know the format
-                          const [sph, cyl] = powerKey.split('_').map(p => parseFloat(p));
+                          // Handle different display for single vs bifocal lenses
+                          let powerDisplay;
+                          
+                          const parts = powerKey.split('_');
+                          if (parts.length >= 3) {
+                            // Bifocal format detected: "sph_cyl_addition"
+                            const [sph, cyl, addition] = parts.map(p => parseFloat(p));
+                            
+                            // Try to get axis from power inventory data or use lens.axis or default to 90
+                            let axisValue = lens.axis || 90;
+                            if (!lens.axis && lens.powerInventory && lens.powerInventory[powerKey] && lens.powerInventory[powerKey].axis) {
+                              axisValue = lens.powerInventory[powerKey].axis;
+                            }
+                            
+                            powerDisplay = (
+                              <div>
+                                <div>SPH: {sph > 0 ? `+${sph}` : sph}, CYL: {cyl > 0 ? `+${cyl}` : cyl}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">
+                                  ADD: +{addition} | AXIS: {axisValue}°
+                                </div>
+                              </div>
+                            );
+                          } else {
+                            // Single vision format: "sph_cyl" - Always show axis
+                            const [sph, cyl] = parts.map(p => parseFloat(p));
+                            
+                            // Try to get axis from power inventory data or use lens.axis or default to 90
+                            let axisValue = lens.axis || 90;
+                            if (!lens.axis && lens.powerInventory && lens.powerInventory[powerKey] && lens.powerInventory[powerKey].axis) {
+                              axisValue = lens.powerInventory[powerKey].axis;
+                            }
+                            
+                            powerDisplay = (
+                              <div>
+                                <div>SPH: {sph > 0 ? `+${sph}` : sph}, CYL: {cyl > 0 ? `+${cyl}` : cyl}</div>
+                                <div className="text-xs text-gray-600 dark:text-gray-400">
+                                  AXIS: {axisValue}°
+                                </div>
+                              </div>
+                            );
+                          }
                           
                           return (
                             <div key={powerKey} className="bg-red-50 dark:bg-red-900/30 p-3 rounded-lg border border-red-200 dark:border-red-700">
                               <div className="flex justify-between items-center">
                                 <div>
                                   <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                    SPH: {sph > 0 ? `+${sph}` : sph}, CYL: {cyl > 0 ? `+${cyl}` : cyl}
+                                    {powerDisplay}
                                   </span>
                                 </div>
                                 <div className="text-right">

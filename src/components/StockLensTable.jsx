@@ -120,7 +120,9 @@ const StockLensTable = ({
                       title="View Individual Power Inventory"
                     >
                       <span className="mr-1">📊</span>
-                      <span className="text-xs">Individual</span>
+                      <span className="text-xs">
+                        {lens.lensType === 'bifocal' ? 'Bifocal' : 'Individual'}
+                      </span>
                     </button>
                   ) : (
                     <span className="text-xs text-gray-500 dark:text-gray-400">Range Only</span>
@@ -134,7 +136,7 @@ const StockLensTable = ({
                 </td>
                 <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">
                   {lens.inventoryType === 'individual' && lens.totalQuantity 
-                    ? `${lens.totalQuantity} pieces` 
+                    ? `${lens.totalQuantity} pieces${lens.lensType === 'bifocal' ? ` (Axis: ${lens.axis || 90}°)` : ''}` 
                     : `${parseFloat(lens.qty) || 1} pairs`}
                 </td>
                 <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm font-medium text-left">
@@ -173,7 +175,9 @@ const StockLensTable = ({
             cylMin: selectedLens.cylMin,
             cylMax: selectedLens.cylMax,
             purchasePrice: selectedLens.purchasePrice,
-            salePrice: selectedLens.salePrice
+            salePrice: selectedLens.salePrice,
+            type: selectedLens.lensType || 'single',
+            axis: selectedLens.axis || 90
           }}
           isEdit={true}
           existingInventory={selectedLens.powerInventory || null}

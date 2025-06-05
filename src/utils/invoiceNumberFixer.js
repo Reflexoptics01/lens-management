@@ -161,7 +161,7 @@ export const fixInvoiceNumbering = async (financialYear = '2024-25') => {
   }
 };
 
-// Quick fix function that can be called from browser console (USER-SPECIFIC)
+// Quick fix function that can be called from browser (USER-SPECIFIC)
 export const quickFixInvoiceNumbering = async () => {
   try {
     console.log('🚀 Quick fixing user-specific invoice numbering...');

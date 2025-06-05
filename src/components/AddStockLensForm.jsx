@@ -242,7 +242,12 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
             inventoryType: 'individual',
             powerInventory: row.powerInventoryData.powerInventory,
             powerLimits: row.powerInventoryData.powerLimits,
-            totalQuantity: row.powerInventoryData.totalQuantity
+            totalQuantity: row.powerInventoryData.totalQuantity,
+            // Add new fields for bifocal/progressive lenses
+            lensType: row.powerInventoryData.lensType || 'single',
+            ...(row.powerInventoryData.lensType === 'bifocal' && {
+              axis: row.powerInventoryData.axis || 90
+            })
           };
           // Remove qty if using individual power inventory
           delete lensData.qty;
@@ -292,7 +297,12 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
               inventoryType: 'individual',
               powerInventory: row.powerInventoryData.powerInventory,
               powerLimits: row.powerInventoryData.powerLimits,
-              totalQuantity: row.powerInventoryData.totalQuantity
+              totalQuantity: row.powerInventoryData.totalQuantity,
+              // Add new fields for bifocal/progressive lenses
+              lensType: row.powerInventoryData.lensType || 'single',
+              ...(row.powerInventoryData.lensType === 'bifocal' && {
+                axis: row.powerInventoryData.axis || 90
+              })
             };
           } else {
             // Default to simple quantity

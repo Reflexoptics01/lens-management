@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebaseConfig';
-import { collection, getDoc, doc } from 'firebase/firestore';
+import { getDoc } from 'firebase/firestore';
 import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import { safelyParseDate, formatDate, formatDateTime } from '../utils/dateUtils';
+import { formatDate } from '../utils/dateUtils';
 import { getUserDoc } from '../utils/multiTenancy';
 
 const TAX_OPTIONS = [
@@ -36,30 +35,22 @@ const PurchaseDetail = () => {
       setLoading(true);
       setError(''); // Clear any previous errors
       
-      console.log('Fetching purchase details for ID:', purchaseId);
-      
       // Use user-specific collection instead of global collection
       const purchaseDoc = await getDoc(getUserDoc('purchases', purchaseId));
       
       if (!purchaseDoc.exists()) {
-        console.error('Purchase not found:', purchaseId);
         setError('Purchase not found');
         return;
       }
       
       const purchaseData = { id: purchaseId, ...purchaseDoc.data() };
-      console.log('Purchase data fetched:', purchaseData);
       
       // Fetch vendor details if vendorId exists
       if (purchaseData.vendorId) {
-        console.log('Fetching vendor details for ID:', purchaseData.vendorId);
         // Use user-specific collection for vendor details
         const vendorDoc = await getDoc(getUserDoc('customers', purchaseData.vendorId));
         if (vendorDoc.exists()) {
           purchaseData.vendor = vendorDoc.data();
-          console.log('Vendor data fetched:', purchaseData.vendor);
-        } else {
-          console.warn('Vendor not found for ID:', purchaseData.vendorId);
         }
       }
       
@@ -295,21 +286,21 @@ const PurchaseDetail = () => {
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-900">
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Item
+                    S.No.
                   </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Item Details
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Qty
                   </th>
-                  <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Unit
                   </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Price
                   </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Discount
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Total
                   </th>
                 </tr>
@@ -318,28 +309,84 @@ const PurchaseDetail = () => {
                 {purchase.items && purchase.items.length > 0 ? (
                   purchase.items.map((item, index) => (
                     <tr key={index} className={index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-indigo-50 dark:bg-gray-700'}>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                        <div className="font-medium">{item.itemName}</div>
+                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white text-left">
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200">
+                          {index + 1}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white text-left">
+                        <div className="font-medium">{item.itemName || 'Unnamed Item'}</div>
                         {item.description && (
                           <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{item.description}</div>
                         )}
+                        
+                        {/* Show power inventory details if available */}
+                        {item.powerInventorySetup && item.powerInventoryData ? (
+                          <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
+                            <div className="flex items-center mb-1">
+                              <svg className="w-4 h-4 mr-1 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" clipRule="evenodd" />
+                              </svg>
+                              <span className="text-xs font-medium text-green-700 dark:text-green-300">Power Inventory Setup</span>
+                            </div>
+                            <div className="text-xs text-green-600 dark:text-green-400">
+                              <div>Lens Type: {item.powerInventoryData.lensType || 'Single Vision'}</div>
+                              <div>Power Range: SPH {item.powerInventoryData.powerLimits?.minSph || -6} to {item.powerInventoryData.powerLimits?.maxSph || 6}, CYL {item.powerInventoryData.powerLimits?.minCyl || -2} to {item.powerInventoryData.powerLimits?.maxCyl || 0}</div>
+                              <div>Total Combinations: {Object.keys(item.powerInventoryData.powerInventory || {}).length}</div>
+                              <div className="font-medium">Total Quantity: {item.powerInventoryData.totalQuantity}</div>
+                            </div>
+                          </div>
+                        ) : (
+                          /* Show basic lens info if no power inventory */
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {item.lensType && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                                {item.lensType}
+                              </span>
+                            )}
+                            {item.maxSph && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+                                SPH: {parseFloat(item.maxSph) >= 0 ? '+' : ''}{item.maxSph}
+                              </span>
+                            )}
+                            {item.maxCyl && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+                                CYL: {parseFloat(item.maxCyl) >= 0 ? '+' : ''}{item.maxCyl}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white text-right font-medium">
-                        {item.qty}
+                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white text-left">
+                        <div className="flex items-center">
+                          {item.powerInventorySetup && item.powerInventoryData?.totalQuantity ? (
+                            <div className="flex flex-col">
+                              <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400">
+                                {item.powerInventoryData.totalQuantity}
+                              </span>
+                              <span className="text-xs text-green-600 dark:text-green-400 font-medium">
+                                (from {Object.keys(item.powerInventoryData.powerInventory || {}).length} power combinations)
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400">
+                              {item.qty || 0}
+                            </span>
+                          )}
+                        </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white text-center">
-                        {item.unit}
+                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white text-left">
+                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+                          {item.unit || 'Pairs'}
+                        </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white text-right">
-                        {formatCurrency(item.price)}
+                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white text-left">
+                        <span className="font-medium">{formatCurrency(item.price)}</span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white text-right">
-                        {item.itemDiscountType === 'percentage' 
-                          ? <span className="text-amber-600 dark:text-amber-400">{item.itemDiscount}%</span> 
-                          : <span className="text-amber-600 dark:text-amber-400">{formatCurrency(item.itemDiscount)}</span>}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white text-right">
-                        {formatCurrency(item.total)}
+                      <td className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-white text-left">
+                        <span className="text-lg text-green-600 dark:text-green-400">
+                          {formatCurrency(item.total)}
+                        </span>
                       </td>
                     </tr>
                   ))

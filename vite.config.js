@@ -33,7 +33,7 @@ export default defineConfig({
         // Keep console.log but remove console.debug in production for debugging
         drop_console: false,
         drop_debugger: true,
-        // Only drop specific console methods
+        // Only drop specific methods
         pure_funcs: ['console.debug']
       }
     }

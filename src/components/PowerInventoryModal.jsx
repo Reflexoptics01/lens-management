@@ -9,6 +9,8 @@ const PowerInventoryModal = ({
   existingInventory = null 
 }) => {
   const [inventoryType, setInventoryType] = useState('range');
+  const [lensType, setLensType] = useState('single'); // 'single' or 'bifocal'
+  const [axis, setAxis] = useState(90);
   const [powerLimits, setPowerLimits] = useState({
     minSph: -10,
     maxSph: 10,
@@ -19,8 +21,10 @@ const PowerInventoryModal = ({
   });
   const [loading, setLoading] = useState(false);
   
-  // Simple spreadsheet data structure
+  // Simple spreadsheet data structure for single vision
   const [cellData, setCellData] = useState({});
+  // Bifocal/Progressive data structure: combination_addition -> quantity
+  const [bifocalData, setBifocalData] = useState({});
   const [selectedCells, setSelectedCells] = useState(new Set());
   const [editingCell, setEditingCell] = useState(null);
   const [editValue, setEditValue] = useState('');
@@ -44,31 +48,135 @@ const PowerInventoryModal = ({
     }
   }, [lensData]);
 
-  // Generate power arrays
+  // Generate power arrays starting from 0 and going outward
   const generatePowerArray = (min, max, step = 0.25) => {
-    const powers = [];
-    for (let i = min; i <= max; i += step) {
-      powers.push(parseFloat(i.toFixed(2)));
+    const powers = [0]; // Always start with 0
+    
+    // Add positive powers if max > 0
+    if (max > 0) {
+      for (let i = step; i <= max; i += step) {
+        powers.push(parseFloat(i.toFixed(2)));
+      }
     }
+    
+    // Add negative powers if min < 0 (in reverse order to maintain proper sequence)
+    if (min < 0) {
+      for (let i = -step; i >= min; i -= step) {
+        powers.unshift(parseFloat(i.toFixed(2))); // unshift to add at beginning
+      }
+    }
+    
+    // Sort by absolute value first, then by actual value (negative first)
+    powers.sort((a, b) => {
+      const absA = Math.abs(a);
+      const absB = Math.abs(b);
+      
+      if (absA !== absB) {
+        return absA - absB; // Sort by absolute value (lowest magnitude to highest)
+      }
+      
+      // If absolute values are same, sort by actual value (negative first)
+      return a - b;
+    });
+    
     return powers;
+  };
+
+  // Generate addition powers from +1.00 to +3.00
+  const generateAdditionArray = () => {
+    const additions = [];
+    for (let i = 1; i <= 3; i += 0.25) {
+      additions.push(parseFloat(i.toFixed(2)));
+    }
+    return additions;
   };
 
   const sphPowers = generatePowerArray(powerLimits.minSph, powerLimits.maxSph);
   const cylPowers = generatePowerArray(powerLimits.minCyl, powerLimits.maxCyl);
+  const additionPowers = generateAdditionArray();
+
+  // Generate SPH/CYL combinations for bifocal/progressive
+  const generateSphCylCombinations = () => {
+    const combinations = [];
+    
+    // Check if both SPH and CYL values were specifically entered (non-default)
+    const hasBothSphAndCyl = lensData?.maxSph && lensData?.maxCyl && 
+                            lensData.maxSph !== '0' && lensData.maxCyl !== '0';
+    
+    sphPowers.forEach(sph => {
+      cylPowers.forEach(cyl => {
+        // If both SPH and CYL are specified, exclude combinations where either is 0
+        if (hasBothSphAndCyl && (sph === 0 || cyl === 0)) {
+          return; // Skip this combination
+        }
+        
+        combinations.push({
+          sph,
+          cyl,
+          label: `SPH: ${sph >= 0 ? '+' : ''}${sph}, CYL: ${cyl >= 0 ? '+' : ''}${cyl}`,
+          key: `${sph}_${cyl}`
+        });
+      });
+    });
+    
+    // Sort combinations: lowest absolute value first, then lowest CYL for same SPH
+    combinations.sort((a, b) => {
+      // First sort by absolute value of SPH
+      const absSphaA = Math.abs(a.sph);
+      const absSphB = Math.abs(b.sph);
+      
+      if (absSphaA !== absSphB) {
+        return absSphaA - absSphB; // Sort by absolute SPH (lowest magnitude to highest)
+      }
+      
+      // If absolute SPH is same, sort by actual SPH value (negative first)
+      if (a.sph !== b.sph) {
+        return a.sph - b.sph;
+      }
+      
+      // If SPH is exactly same, sort by absolute value of CYL
+      const absCylA = Math.abs(a.cyl);
+      const absCylB = Math.abs(b.cyl);
+      
+      if (absCylA !== absCylB) {
+        return absCylA - absCylB; // Sort by absolute CYL (lowest magnitude to highest)
+      }
+      
+      // If absolute CYL is same, sort by actual CYL value (negative first)
+      return a.cyl - b.cyl;
+    });
+    
+    return combinations;
+  };
+
+  const sphCylCombinations = generateSphCylCombinations();
 
   // Initialize cell data when power limits change
   useEffect(() => {
     if (inventoryType === 'individual') {
-      const newCellData = {};
-      sphPowers.forEach(sph => {
-        cylPowers.forEach(cyl => {
-          const key = `${sph}_${cyl}`;
-          newCellData[key] = cellData[key] || 0;
+      if (lensType === 'single') {
+        // Single vision lens data structure
+        const newCellData = {};
+        sphPowers.forEach(sph => {
+          cylPowers.forEach(cyl => {
+            const key = `${sph}_${cyl}`;
+            newCellData[key] = cellData[key] || 0;
+          });
         });
-      });
-      setCellData(newCellData);
+        setCellData(newCellData);
+      } else {
+        // Bifocal/Progressive lens data structure
+        const newBifocalData = {};
+        sphCylCombinations.forEach(combo => {
+          additionPowers.forEach(add => {
+            const key = `${combo.key}_${add}`;
+            newBifocalData[key] = bifocalData[key] || 0;
+          });
+        });
+        setBifocalData(newBifocalData);
+      }
     }
-  }, [inventoryType, powerLimits]);
+  }, [inventoryType, lensType, powerLimits]);
 
   // Simple cell value management
   const getCellValue = (sph, cyl) => {
@@ -187,7 +295,7 @@ const PowerInventoryModal = ({
     setEditValue('');
   };
 
-  // Enhanced keyboard navigation
+  // Enhanced keyboard navigation for single vision
   const moveSelection = (direction) => {
     if (editingCell || selectedCells.size !== 1) return;
     
@@ -220,7 +328,7 @@ const PowerInventoryModal = ({
     }
   };
 
-  // Bulk operations
+  // Bulk operations for single vision
   const fillSelectedCells = (value) => {
     const numValue = parseInt(value) || 0;
     selectedCells.forEach(cellKey => {
@@ -250,11 +358,18 @@ const PowerInventoryModal = ({
   const handleKeyDown = (e) => {
     if (!selectedCells.size && !editingCell) return;
 
+    // Determine if we're in bifocal mode
+    const isBifocalMode = lensType === 'bifocal' && inventoryType === 'individual';
+
     // Handle editing mode keys
     if (editingCell) {
       if (e.key === 'Enter') {
         e.preventDefault();
-        finishEdit();
+        if (isBifocalMode) {
+          finishBifocalEdit();
+        } else {
+          finishEdit();
+        }
         return;
       }
       if (e.key === 'Escape') {
@@ -264,10 +379,18 @@ const PowerInventoryModal = ({
       }
       if (e.key === 'Tab') {
         e.preventDefault();
-        finishEdit();
+        if (isBifocalMode) {
+          finishBifocalEdit();
+        } else {
+          finishEdit();
+        }
         // Move to next cell
         if (selectedCells.size === 1) {
-          moveSelection(e.shiftKey ? 'left' : 'right');
+          if (isBifocalMode) {
+            moveBifocalSelection(e.shiftKey ? 'left' : 'right');
+          } else {
+            moveSelection(e.shiftKey ? 'left' : 'right');
+          }
         }
         return;
       }
@@ -284,7 +407,11 @@ const PowerInventoryModal = ({
 
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
-      deleteSelectedCells();
+      if (isBifocalMode) {
+        deleteSelectedBifocalCells();
+      } else {
+        deleteSelectedCells();
+      }
       return;
     }
 
@@ -292,8 +419,15 @@ const PowerInventoryModal = ({
       e.preventDefault();
       if (selectedCells.size === 1) {
         const cellKey = Array.from(selectedCells)[0];
-        const [sph, cyl] = cellKey.split('_').map(Number);
-        startEdit(sph, cyl);
+        if (isBifocalMode) {
+          const parts = cellKey.split('_');
+          const addition = parseFloat(parts.pop());
+          const comboKey = parts.join('_');
+          startBifocalEdit(comboKey, addition);
+        } else {
+          const [sph, cyl] = cellKey.split('_').map(Number);
+          startEdit(sph, cyl);
+        }
       }
       return;
     }
@@ -302,21 +436,33 @@ const PowerInventoryModal = ({
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
       e.preventDefault();
       const direction = e.key.replace('Arrow', '').toLowerCase();
-      moveSelection(direction);
+      if (isBifocalMode) {
+        moveBifocalSelection(direction);
+      } else {
+        moveSelection(direction);
+      }
       return;
     }
 
     // Tab navigation
     if (e.key === 'Tab') {
       e.preventDefault();
-      moveSelection(e.shiftKey ? 'left' : 'right');
+      if (isBifocalMode) {
+        moveBifocalSelection(e.shiftKey ? 'left' : 'right');
+      } else {
+        moveSelection(e.shiftKey ? 'left' : 'right');
+      }
       return;
     }
 
     // Ctrl+A to select all
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
       e.preventDefault();
-      selectAllCells();
+      if (isBifocalMode) {
+        selectAllBifocalCells();
+      } else {
+        selectAllCells();
+      }
       return;
     }
 
@@ -324,9 +470,17 @@ const PowerInventoryModal = ({
     if (/^[0-9]$/.test(e.key) && selectedCells.size === 1) {
       e.preventDefault();
       const cellKey = Array.from(selectedCells)[0];
-      const [sph, cyl] = cellKey.split('_').map(Number);
-      setEditingCell(cellKey);
-      setEditValue(e.key); // Start with the pressed number
+      if (isBifocalMode) {
+        const parts = cellKey.split('_');
+        const addition = parseFloat(parts.pop());
+        const comboKey = parts.join('_');
+        setEditingCell(cellKey);
+        setEditValue(e.key); // Start with the pressed number
+      } else {
+        const [sph, cyl] = cellKey.split('_').map(Number);
+        setEditingCell(cellKey);
+        setEditValue(e.key); // Start with the pressed number
+      }
       return;
     }
   };
@@ -343,7 +497,26 @@ const PowerInventoryModal = ({
   }, [isOpen, selectedCells, editingCell, editValue, sphPowers, cylPowers]);
 
   const getTotalQuantity = () => {
-    return Object.values(cellData).reduce((sum, value) => sum + (value || 0), 0);
+    if (lensType === 'single') {
+      return Object.values(cellData).reduce((sum, value) => sum + (value || 0), 0);
+    } else {
+      return Object.values(bifocalData).reduce((sum, value) => sum + (value || 0), 0);
+    }
+  };
+
+  // Bifocal data management functions
+  const getBifocalCellValue = (comboKey, addition) => {
+    const key = `${comboKey}_${addition}`;
+    return bifocalData[key] || 0;
+  };
+
+  const setBifocalCellValue = (comboKey, addition, value) => {
+    const key = `${comboKey}_${addition}`;
+    const numValue = parseInt(value) || 0;
+    setBifocalData(prev => ({
+      ...prev,
+      [key]: numValue
+    }));
   };
 
   const handleSave = async () => {
@@ -355,37 +528,74 @@ const PowerInventoryModal = ({
           data: lensData
         });
       } else {
-        const nonZeroData = Object.entries(cellData)
-          .filter(([key, value]) => value > 0)
-          .reduce((acc, [key, value]) => {
-            const [sph, cyl] = key.split('_').map(Number);
-            acc[key] = {
-              sph,
-              cyl,
-              quantity: value,
-              ...(lensData?.type === 'bifocal' && {
-                axis: powerLimits.axis,
-                addition: powerLimits.addition
-              })
-            };
-            return acc;
-          }, {});
+        if (lensType === 'single') {
+          // Single vision lens save logic
+          const nonZeroData = Object.entries(cellData)
+            .filter(([key, value]) => value > 0)
+            .reduce((acc, [key, value]) => {
+              const [sph, cyl] = key.split('_').map(Number);
+              acc[key] = {
+                sph,
+                cyl,
+                quantity: value
+              };
+              return acc;
+            }, {});
 
-        if (Object.keys(nonZeroData).length === 0) {
-          alert('Please enter at least one quantity greater than 0');
-          setLoading(false);
-          return;
-        }
-
-        onSave({
-          type: 'individual',
-          data: {
-            ...lensData,
-            powerInventory: nonZeroData,
-            powerLimits: powerLimits,
-            totalQuantity: getTotalQuantity()
+          if (Object.keys(nonZeroData).length === 0) {
+            alert('Please enter at least one quantity greater than 0');
+            setLoading(false);
+            return;
           }
-        });
+
+          onSave({
+            type: 'individual',
+            data: {
+              ...lensData,
+              lensType: 'single',
+              powerInventory: nonZeroData,
+              powerLimits: powerLimits,
+              totalQuantity: getTotalQuantity()
+            }
+          });
+        } else {
+          // Bifocal/Progressive lens save logic
+          const nonZeroData = Object.entries(bifocalData)
+            .filter(([key, value]) => value > 0)
+            .reduce((acc, [key, value]) => {
+              const parts = key.split('_');
+              const addition = parseFloat(parts.pop());
+              const comboKey = parts.join('_');
+              const [sph, cyl] = comboKey.split('_').map(Number);
+              
+              acc[key] = {
+                sph,
+                cyl,
+                addition,
+                axis,
+                quantity: value
+              };
+              return acc;
+            }, {});
+
+          if (Object.keys(nonZeroData).length === 0) {
+            alert('Please enter at least one quantity greater than 0');
+            setLoading(false);
+            return;
+          }
+
+          onSave({
+            type: 'individual',
+            data: {
+              ...lensData,
+              lensType: 'bifocal',
+              powerInventory: nonZeroData,
+              powerLimits: powerLimits,
+              axis: axis,
+              totalQuantity: getTotalQuantity()
+            }
+          });
+        }
       }
     } catch (error) {
       console.error('Error saving power inventory:', error);
@@ -393,6 +603,152 @@ const PowerInventoryModal = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  // Bifocal cell interaction functions
+  const getBifocalCellKey = (comboKey, addition) => `${comboKey}_${addition}`;
+
+  const handleBifocalCellMouseDown = (comboKey, addition, e) => {
+    if (editingCell) return;
+    if (e.detail === 2) return;
+
+    const cellKey = getBifocalCellKey(comboKey, addition);
+    
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const newSelected = new Set(selectedCells);
+      if (newSelected.has(cellKey)) {
+        newSelected.delete(cellKey);
+      } else {
+        newSelected.add(cellKey);
+      }
+      setSelectedCells(newSelected);
+    } else {
+      e.preventDefault();
+      setSelectedCells(new Set([cellKey]));
+      setSelectionStart({ comboKey, addition });
+      setIsSelecting(true);
+    }
+  };
+
+  const handleBifocalCellMouseEnter = (comboKey, addition) => {
+    if (isSelecting && selectionStart && !editingCell) {
+      selectBifocalRange(selectionStart.comboKey, selectionStart.addition, comboKey, addition);
+    }
+  };
+
+  const selectBifocalRange = (startComboKey, startAddition, endComboKey, endAddition) => {
+    const startComboIdx = sphCylCombinations.findIndex(c => c.key === startComboKey);
+    const endComboIdx = sphCylCombinations.findIndex(c => c.key === endComboKey);
+    const startAddIdx = additionPowers.indexOf(startAddition);
+    const endAddIdx = additionPowers.indexOf(endAddition);
+
+    const minComboIdx = Math.min(startComboIdx, endComboIdx);
+    const maxComboIdx = Math.max(startComboIdx, endComboIdx);
+    const minAddIdx = Math.min(startAddIdx, endAddIdx);
+    const maxAddIdx = Math.max(startAddIdx, endAddIdx);
+
+    const newSelected = new Set();
+    for (let i = minComboIdx; i <= maxComboIdx; i++) {
+      for (let j = minAddIdx; j <= maxAddIdx; j++) {
+        newSelected.add(getBifocalCellKey(sphCylCombinations[i].key, additionPowers[j]));
+      }
+    }
+    setSelectedCells(newSelected);
+  };
+
+  const startBifocalEdit = (comboKey, addition) => {
+    if (blurTimeout) {
+      clearTimeout(blurTimeout);
+      setBlurTimeout(null);
+    }
+    
+    const key = getBifocalCellKey(comboKey, addition);
+    setEditingCell(key);
+    setSelectedCells(new Set([key]));
+    setEditValue(getBifocalCellValue(comboKey, addition).toString());
+    setIsSelecting(false);
+    setSelectionStart(null);
+  };
+
+  const finishBifocalEdit = () => {
+    if (blurTimeout) {
+      clearTimeout(blurTimeout);
+      setBlurTimeout(null);
+    }
+    
+    if (editingCell) {
+      const parts = editingCell.split('_');
+      const addition = parseFloat(parts.pop());
+      const comboKey = parts.join('_');
+      setBifocalCellValue(comboKey, addition, editValue);
+    }
+    setEditingCell(null);
+    setEditValue('');
+  };
+
+  const moveBifocalSelection = (direction) => {
+    if (editingCell || selectedCells.size !== 1) return;
+    
+    const currentCell = Array.from(selectedCells)[0];
+    const parts = currentCell.split('_');
+    const currentAddition = parseFloat(parts.pop());
+    const currentComboKey = parts.join('_');
+    
+    const comboIdx = sphCylCombinations.findIndex(c => c.key === currentComboKey);
+    const addIdx = additionPowers.indexOf(currentAddition);
+    
+    let newComboIdx = comboIdx;
+    let newAddIdx = addIdx;
+    
+    switch (direction) {
+      case 'up':
+        newComboIdx = Math.max(0, comboIdx - 1);
+        break;
+      case 'down':
+        newComboIdx = Math.min(sphCylCombinations.length - 1, comboIdx + 1);
+        break;
+      case 'left':
+        newAddIdx = Math.max(0, addIdx - 1);
+        break;
+      case 'right':
+        newAddIdx = Math.min(additionPowers.length - 1, addIdx + 1);
+        break;
+    }
+    
+    if (newComboIdx !== comboIdx || newAddIdx !== addIdx) {
+      const newCell = getBifocalCellKey(sphCylCombinations[newComboIdx].key, additionPowers[newAddIdx]);
+      setSelectedCells(new Set([newCell]));
+    }
+  };
+
+  const fillSelectedBifocalCells = (value) => {
+    const numValue = parseInt(value) || 0;
+    selectedCells.forEach(cellKey => {
+      const parts = cellKey.split('_');
+      const addition = parseFloat(parts.pop());
+      const comboKey = parts.join('_');
+      setBifocalCellValue(comboKey, addition, numValue);
+    });
+  };
+
+  const deleteSelectedBifocalCells = () => {
+    selectedCells.forEach(cellKey => {
+      const parts = cellKey.split('_');
+      const addition = parseFloat(parts.pop());
+      const comboKey = parts.join('_');
+      setBifocalCellValue(comboKey, addition, 0);
+    });
+  };
+
+  const selectAllBifocalCells = () => {
+    const allCells = new Set();
+    sphCylCombinations.forEach(combo => {
+      additionPowers.forEach(add => {
+        allCells.add(getBifocalCellKey(combo.key, add));
+      });
+    });
+    setSelectedCells(allCells);
   };
 
   if (!isOpen) return null;
@@ -469,6 +825,75 @@ const PowerInventoryModal = ({
                   </div>
                 </div>
 
+                {/* Lens Type Selection - Only show when individual inventory is selected */}
+                {inventoryType === 'individual' && (
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                      What type of lens is this?
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <label className="relative flex cursor-pointer rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 p-4 shadow-sm focus:outline-none">
+                        <input
+                          type="radio"
+                          name="lensType"
+                          value="single"
+                          checked={lensType === 'single'}
+                          onChange={(e) => setLensType(e.target.value)}
+                          className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500 dark:border-gray-600 dark:focus:ring-blue-400"
+                        />
+                        <div className="ml-3">
+                          <span className="block text-sm font-medium text-gray-900 dark:text-white">
+                            👁️ Single Vision
+                          </span>
+                          <span className="block text-sm text-gray-500 dark:text-gray-400">
+                            Standard single vision lenses (SPH + CYL only)
+                          </span>
+                        </div>
+                      </label>
+
+                      <label className="relative flex cursor-pointer rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 p-4 shadow-sm focus:outline-none">
+                        <input
+                          type="radio"
+                          name="lensType"
+                          value="bifocal"
+                          checked={lensType === 'bifocal'}
+                          onChange={(e) => setLensType(e.target.value)}
+                          className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500 dark:border-gray-600 dark:focus:ring-blue-400"
+                        />
+                        <div className="ml-3">
+                          <span className="block text-sm font-medium text-gray-900 dark:text-white">
+                            👓 Bifocal/Progressive
+                          </span>
+                          <span className="block text-sm text-gray-500 dark:text-gray-400">
+                            Bifocal or progressive lenses (SPH + CYL + Addition)
+                          </span>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* AXIS Input - Only show for bifocal/progressive lenses */}
+                {inventoryType === 'individual' && lensType === 'bifocal' && (
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      AXIS (degrees)
+                    </label>
+                    <input
+                      type="number"
+                      value={axis}
+                      onChange={(e) => setAxis(parseInt(e.target.value) || 90)}
+                      min="1"
+                      max="180"
+                      className="w-32 px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                      placeholder="90"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Typically 90° for most bifocal/progressive lenses
+                    </p>
+                  </div>
+                )}
+
                 {/* Individual Power Configuration */}
                 {inventoryType === 'individual' && (
                   <div className="space-y-6">
@@ -486,21 +911,40 @@ const PowerInventoryModal = ({
                           className="w-24 text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                         />
                         <button
-                          onClick={() => fillSelectedCells(bulkValue)}
+                          onClick={() => {
+                            if (lensType === 'single') {
+                              fillSelectedCells(bulkValue);
+                            } else {
+                              // Handle bifocal bulk fill
+                              fillSelectedBifocalCells(bulkValue);
+                            }
+                          }}
                           disabled={selectedCells.size === 0 || !bulkValue}
                           className="px-3 py-1 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Fill Selected ({selectedCells.size})
                         </button>
                         <button
-                          onClick={deleteSelectedCells}
+                          onClick={() => {
+                            if (lensType === 'single') {
+                              deleteSelectedCells();
+                            } else {
+                              deleteSelectedBifocalCells();
+                            }
+                          }}
                           disabled={selectedCells.size === 0}
                           className="px-3 py-1 text-sm bg-red-500 hover:bg-red-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Clear Selected
                         </button>
                         <button
-                          onClick={selectAllCells}
+                          onClick={() => {
+                            if (lensType === 'single') {
+                              selectAllCells();
+                            } else {
+                              selectAllBifocalCells();
+                            }
+                          }}
                           className="px-3 py-1 text-sm bg-purple-500 hover:bg-purple-600 text-white rounded"
                         >
                           Select All
@@ -515,115 +959,224 @@ const PowerInventoryModal = ({
                       </div>
                     </div>
 
-                    {/* Enhanced Spreadsheet Table */}
-                    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                      <div className="px-4 py-2 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-                        <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                          📊 Power Inventory Spreadsheet (Quantity in Pieces)
-                        </h4>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Total: <span className="font-medium text-green-600">{getTotalQuantity()} pieces</span> | 
-                          Selected: <span className="font-medium text-blue-600">{selectedCells.size} cells</span>
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          💡 Click & drag to select • Ctrl+click for multi-select • Enter to edit • Delete to clear • Use bulk operations above
-                        </p>
-                      </div>
-                      
-                      <div className="overflow-auto max-h-96" style={{ userSelect: 'none' }}>
-                        <table className="min-w-full border-collapse table-fixed">
-                          <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
-                            <tr>
-                              <th className="w-20 px-2 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase border border-gray-300 dark:border-gray-600">
-                                SPH \ CYL
-                              </th>
-                              {cylPowers.map(cyl => (
-                                <th key={cyl} className="w-16 px-1 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase border border-gray-300 dark:border-gray-600">
-                                  {cyl >= 0 ? `+${cyl}` : cyl}
+                    {lensType === 'single' ? (
+                      /* Single Vision Spreadsheet Table */
+                      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                        <div className="px-4 py-2 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                          <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                            📊 Single Vision Power Inventory (Quantity in Pieces)
+                          </h4>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Total: <span className="font-medium text-green-600">{getTotalQuantity()} pieces</span> | 
+                            Selected: <span className="font-medium text-blue-600">{selectedCells.size} cells</span>
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            💡 Click & drag to select • Ctrl+click for multi-select • Enter to edit • Delete to clear • Use bulk operations above
+                          </p>
+                        </div>
+                        
+                        <div className="overflow-auto max-h-96" style={{ userSelect: 'none' }}>
+                          <table className="min-w-full border-collapse table-fixed">
+                            <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                              <tr>
+                                <th className="w-20 px-2 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase border border-gray-300 dark:border-gray-600">
+                                  SPH \ CYL
                                 </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white dark:bg-gray-800">
-                            {sphPowers.map(sph => (
-                              <tr key={sph}>
-                                <td className="w-20 px-2 py-1 text-center text-xs font-medium text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
-                                  {sph >= 0 ? `+${sph}` : sph}
-                                </td>
-                                {cylPowers.map(cyl => {
-                                  const cellKey = getCellKey(sph, cyl);
-                                  const isEditing = editingCell === cellKey;
-                                  const isSelected = selectedCells.has(cellKey);
-                                  const value = isEditing ? editValue : getCellValue(sph, cyl);
-                                  
-                                  return (
-                                    <td 
-                                      key={cyl} 
-                                      className={`w-16 border border-gray-300 dark:border-gray-600 p-0 relative ${
-                                        isSelected && !isEditing ? 'ring-2 ring-blue-500 dark:ring-blue-400 bg-blue-50 dark:bg-blue-900/20' : ''
-                                      } ${isEditing ? 'ring-2 ring-yellow-500 dark:ring-yellow-400 bg-yellow-50 dark:bg-yellow-900/20' : ''}`}
-                                      onMouseDown={(e) => !isEditing && handleCellMouseDown(sph, cyl, e)}
-                                      onMouseEnter={() => !isEditing && handleCellMouseEnter(sph, cyl)}
-                                    >
-                                      {isEditing ? (
-                                        <input
-                                          type="text"
-                                          value={editValue}
-                                          onChange={(e) => {
-                                            const newValue = e.target.value.replace(/[^0-9]/g, '');
-                                            setEditValue(newValue);
-                                          }}
-                                          onBlur={(e) => {
-                                            // Only finish edit if not clicking on another cell
-                                            const timeout = setTimeout(() => finishEdit(), 100);
-                                            setBlurTimeout(timeout);
-                                          }}
-                                          onKeyDown={(e) => {
-                                            e.stopPropagation(); // Prevent global key handlers
-                                            if (e.key === 'Enter') {
-                                              finishEdit();
-                                              // Move down to next row
-                                              setTimeout(() => moveSelection('down'), 50);
-                                            } else if (e.key === 'Escape') {
-                                              cancelEdit();
-                                            } else if (e.key === 'Tab') {
-                                              e.preventDefault();
-                                              finishEdit();
-                                              setTimeout(() => moveSelection(e.shiftKey ? 'left' : 'right'), 50);
-                                            }
-                                          }}
-                                          onFocus={(e) => e.target.select()}
-                                          autoFocus
-                                          className="w-full h-8 text-xs text-center border-0 bg-transparent focus:outline-none focus:ring-0 text-gray-900 dark:text-white"
-                                        />
-                                      ) : (
-                                        <div
-                                          className="w-full h-8 flex items-center justify-center text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white transition-colors"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            // Single click selects, double click edits
-                                            if (e.detail === 1) {
-                                              // Just update selection on single click
-                                              setSelectedCells(new Set([getCellKey(sph, cyl)]));
-                                            }
-                                          }}
-                                          onDoubleClick={(e) => {
-                                            e.stopPropagation();
-                                            startEdit(sph, cyl);
-                                          }}
-                                        >
-                                          {value || ''}
-                                        </div>
-                                      )}
-                                    </td>
-                                  );
-                                })}
+                                {cylPowers.map(cyl => (
+                                  <th key={cyl} className="w-16 px-1 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase border border-gray-300 dark:border-gray-600">
+                                    {cyl >= 0 ? `+${cyl}` : cyl}
+                                  </th>
+                                ))}
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody className="bg-white dark:bg-gray-800">
+                              {sphPowers.map(sph => (
+                                <tr key={sph}>
+                                  <td className="w-20 px-2 py-1 text-center text-xs font-medium text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
+                                    {sph >= 0 ? `+${sph}` : sph}
+                                  </td>
+                                  {cylPowers.map(cyl => {
+                                    const cellKey = getCellKey(sph, cyl);
+                                    const isEditing = editingCell === cellKey;
+                                    const isSelected = selectedCells.has(cellKey);
+                                    const value = isEditing ? editValue : getCellValue(sph, cyl);
+                                    
+                                    return (
+                                      <td 
+                                        key={cyl} 
+                                        className={`w-16 border border-gray-300 dark:border-gray-600 p-0 relative ${
+                                          isSelected && !isEditing ? 'ring-2 ring-blue-500 dark:ring-blue-400 bg-blue-50 dark:bg-blue-900/20' : ''
+                                        } ${isEditing ? 'ring-2 ring-yellow-500 dark:ring-yellow-400 bg-yellow-50 dark:bg-yellow-900/20' : ''}`}
+                                        onMouseDown={(e) => !isEditing && handleCellMouseDown(sph, cyl, e)}
+                                        onMouseEnter={() => !isEditing && handleCellMouseEnter(sph, cyl)}
+                                      >
+                                        {isEditing ? (
+                                          <input
+                                            type="text"
+                                            value={editValue}
+                                            onChange={(e) => {
+                                              const newValue = e.target.value.replace(/[^0-9]/g, '');
+                                              setEditValue(newValue);
+                                            }}
+                                            onBlur={(e) => {
+                                              // Only finish edit if not clicking on another cell
+                                              const timeout = setTimeout(() => finishEdit(), 100);
+                                              setBlurTimeout(timeout);
+                                            }}
+                                            onKeyDown={(e) => {
+                                              e.stopPropagation(); // Prevent global key handlers
+                                              if (e.key === 'Enter') {
+                                                finishEdit();
+                                                // Move down to next row
+                                                setTimeout(() => moveSelection('down'), 50);
+                                              } else if (e.key === 'Escape') {
+                                                cancelEdit();
+                                              } else if (e.key === 'Tab') {
+                                                e.preventDefault();
+                                                finishEdit();
+                                                setTimeout(() => moveSelection(e.shiftKey ? 'left' : 'right'), 50);
+                                              }
+                                            }}
+                                            onFocus={(e) => e.target.select()}
+                                            autoFocus
+                                            className="w-full h-8 text-xs text-center border-0 bg-transparent focus:outline-none focus:ring-0 text-gray-900 dark:text-white"
+                                          />
+                                        ) : (
+                                          <div
+                                            className="w-full h-8 flex items-center justify-center text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white transition-colors"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              // Single click selects, double click edits
+                                              if (e.detail === 1) {
+                                                // Just update selection on single click
+                                                setSelectedCells(new Set([getCellKey(sph, cyl)]));
+                                              }
+                                            }}
+                                            onDoubleClick={(e) => {
+                                              e.stopPropagation();
+                                              startEdit(sph, cyl);
+                                            }}
+                                          >
+                                            {value || ''}
+                                          </div>
+                                        )}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      /* Bifocal/Progressive Spreadsheet Table */
+                      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                        <div className="px-4 py-2 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                          <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                            📊 Bifocal/Progressive Power Inventory (Quantity in Pieces)
+                          </h4>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Total: <span className="font-medium text-green-600">{getTotalQuantity()} pieces</span> | 
+                            Selected: <span className="font-medium text-blue-600">{selectedCells.size} cells</span> | 
+                            AXIS: <span className="font-medium text-purple-600">{axis}°</span>
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            💡 SPH/CYL combinations on Y-axis • Addition powers on X-axis • Click & drag to select • Enter to edit
+                          </p>
+                        </div>
+                        
+                        <div className="overflow-auto max-h-96" style={{ userSelect: 'none' }}>
+                          <table className="min-w-full border-collapse">
+                            <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                              <tr>
+                                <th className="w-40 px-2 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase border border-gray-300 dark:border-gray-600">
+                                  SPH/CYL \ Addition
+                                </th>
+                                {additionPowers.map(add => (
+                                  <th key={add} className="w-16 px-1 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase border border-gray-300 dark:border-gray-600">
+                                    +{add}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white dark:bg-gray-800">
+                              {sphCylCombinations.map(combo => (
+                                <tr key={combo.key}>
+                                  <td className="w-40 px-2 py-1 text-left text-xs font-medium text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
+                                    {combo.label}
+                                  </td>
+                                  {additionPowers.map(add => {
+                                    const cellKey = getBifocalCellKey(combo.key, add);
+                                    const isEditing = editingCell === cellKey;
+                                    const isSelected = selectedCells.has(cellKey);
+                                    const value = isEditing ? editValue : getBifocalCellValue(combo.key, add);
+                                    
+                                    return (
+                                      <td 
+                                        key={add} 
+                                        className={`w-16 border border-gray-300 dark:border-gray-600 p-0 relative ${
+                                          isSelected && !isEditing ? 'ring-2 ring-blue-500 dark:ring-blue-400 bg-blue-50 dark:bg-blue-900/20' : ''
+                                        } ${isEditing ? 'ring-2 ring-yellow-500 dark:ring-yellow-400 bg-yellow-50 dark:bg-yellow-900/20' : ''}`}
+                                        onMouseDown={(e) => !isEditing && handleBifocalCellMouseDown(combo.key, add, e)}
+                                        onMouseEnter={() => !isEditing && handleBifocalCellMouseEnter(combo.key, add)}
+                                      >
+                                        {isEditing ? (
+                                          <input
+                                            type="text"
+                                            value={editValue}
+                                            onChange={(e) => {
+                                              const newValue = e.target.value.replace(/[^0-9]/g, '');
+                                              setEditValue(newValue);
+                                            }}
+                                            onBlur={(e) => {
+                                              const timeout = setTimeout(() => finishBifocalEdit(), 100);
+                                              setBlurTimeout(timeout);
+                                            }}
+                                            onKeyDown={(e) => {
+                                              e.stopPropagation();
+                                              if (e.key === 'Enter') {
+                                                finishBifocalEdit();
+                                                setTimeout(() => moveBifocalSelection('down'), 50);
+                                              } else if (e.key === 'Escape') {
+                                                cancelEdit();
+                                              } else if (e.key === 'Tab') {
+                                                e.preventDefault();
+                                                finishBifocalEdit();
+                                                setTimeout(() => moveBifocalSelection(e.shiftKey ? 'left' : 'right'), 50);
+                                              }
+                                            }}
+                                            onFocus={(e) => e.target.select()}
+                                            autoFocus
+                                            className="w-full h-8 text-xs text-center border-0 bg-transparent focus:outline-none focus:ring-0 text-gray-900 dark:text-white"
+                                          />
+                                        ) : (
+                                          <div
+                                            className="w-full h-8 flex items-center justify-center text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white transition-colors"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              if (e.detail === 1) {
+                                                setSelectedCells(new Set([cellKey]));
+                                              }
+                                            }}
+                                            onDoubleClick={(e) => {
+                                              e.stopPropagation();
+                                              startBifocalEdit(combo.key, add);
+                                            }}
+                                          >
+                                            {value || ''}
+                                          </div>
+                                        )}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

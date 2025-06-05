@@ -37,7 +37,6 @@ const ItemSuggestions = ({
   useEffect(() => {
     if (value !== undefined && value !== searchTerm && !isSelectingRef.current) {
       setSearchTerm(value || '');
-      console.log("ItemSuggestions - Syncing value:", value);
     }
     // Reset the selecting flag after sync
     if (isSelectingRef.current) {
@@ -192,15 +191,9 @@ const ItemSuggestions = ({
     setShowSuggestions(false);
     setSelectedIndex(-1);
     
-    console.log("ItemSuggestions - Selected item:", item);
-    console.log("ItemSuggestions - Setting text to:", item.name);
-    console.log("ItemSuggestions - Item price:", item.price);
-    console.log("ItemSuggestions - Service data:", item.serviceData);
-    console.log("ItemSuggestions - Stock data:", item.stockData);
-    
     if (onSelect) {
       if (typeof index === 'number') {
-        // For DailyDispatchLog format
+        // For DailyDispatchLog and CreatePurchase format - include all necessary fields
         const dataToSend = {
           name: item.name,
           itemName: item.name,
@@ -209,23 +202,26 @@ const ItemSuggestions = ({
           isStockLens: item.isStockLens,
           stockData: item.stockData,
           isService: item.isService,
-          serviceData: item.serviceData
+          serviceData: item.serviceData,
+          // Include the missing fields that CreatePurchase needs
+          type: item.type,
+          maxSph: item.maxSph,
+          maxCyl: item.maxCyl,
+          description: item.serviceDescription || item.description || '',
+          // Include additional fields that might be useful
+          brandName: item.brandName,
+          powerSeries: item.powerSeries,
+          isContactLens: item.isContactLens
         };
         
-        console.log("ItemSuggestions - Sending data to parent:", dataToSend);
-        onSelect(index, dataToSend);
+        try {
+          onSelect(index, dataToSend);
+        } catch (error) {
+          console.error("Error calling onSelect:", error);
+        }
       } else {
         // For simple format
         onSelect(item);
-      }
-    }
-    
-    // Also update via onChange for consistency
-    if (onChange) {
-      if (typeof index === 'number') {
-        onChange(index, 'itemName', item.name);
-      } else {
-        onChange(item.name);
       }
     }
   };
@@ -388,8 +384,6 @@ const ItemSuggestions = ({
 
       // Save to lens_inventory collection
       await addDoc(getUserCollection('lensInventory'), productData);
-
-      console.log(`Created new ${productType} product:`, productData);
 
       // Close modal and trigger selection
       setShowCreateModal(false);

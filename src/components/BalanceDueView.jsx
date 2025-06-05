@@ -275,7 +275,7 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
       
     } catch (error) {
       console.error('[BalanceDueView] Error calculating balance summary:', error);
-      setError('Failed to calculate balance summary. Please check console for details.');
+      setError('Failed to calculate balance summary. Please check for details.');
       setCustomerBalances([]); // Clear summary on error
       setVendorBalances([]);
     } finally {
