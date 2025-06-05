@@ -818,7 +818,13 @@ const Settings = () => {
         'categories', // Product categories
         'brands', // Brand information
         'prescriptions', // Prescription data
-        'appointments' // Appointment data
+        'appointments', // Appointment data
+        'salesReturns', // Sales return data
+        'purchaseReturns', // Purchase return data
+        'dispatchLogs', // Daily dispatch logs
+        'inventoryDeductions', // Lens inventory deductions
+        'items', // Generic items collection
+        'errorLogs' // System error logs (if any)
       ];
       const backupData = {};
       
@@ -1574,6 +1580,12 @@ The page will refresh in 3 seconds to load your restored data...`;
         'brands', // Brand information
         'prescriptions', // Prescription data
         'appointments', // Appointment data
+        'salesReturns', // Sales return data
+        'purchaseReturns', // Purchase return data
+        'dispatchLogs', // Daily dispatch logs
+        'inventoryDeductions', // Lens inventory deductions
+        'items', // Generic items collection
+        'errorLogs', // System error logs (if any)
         // Legacy collections that might exist
         'users', // Old user collection name
         'reports' // Reports if any
@@ -1689,7 +1701,8 @@ The page will refresh in 3 seconds to load your restored data...`;
                   <div className="bg-red-50 border border-red-200 rounded-md p-3">
                     <p className="text-xs text-red-700">
                       <strong>Data to be deleted:</strong> Customers, vendors, orders, sales, purchases, 
-                      invoices, lens inventory, counters, transactions, users, and all other collections.
+                      invoices, lens inventory, counters, transactions, users, returns data, dispatch logs, 
+                      inventory deductions, and all other collections.
                     </p>
                   </div>
                 </div>
@@ -2502,6 +2515,10 @@ The page will refresh in 3 seconds to load your restored data...`;
                         <li>User management</li>
                         <li>Prescription data</li>
                         <li>Appointment data</li>
+                        <li>Sales & Purchase returns</li>
+                        <li>Daily dispatch logs</li>
+                        <li>Inventory deductions</li>
+                        <li>System error logs</li>
                         <li>All other business data</li>
                       </ul>
                     </div>
