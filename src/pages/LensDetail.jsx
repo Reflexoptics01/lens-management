@@ -4,6 +4,7 @@ import { db } from '../firebaseConfig';
 import { doc, getDoc, collection, query, where, getDocs, orderBy, updateDoc, addDoc, Timestamp } from 'firebase/firestore';
 import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 import Navbar from '../components/Navbar';
+import PowerSelectionModal from '../components/PowerSelectionModal';
 import { 
   LineChart, 
   Line, 
@@ -51,12 +52,70 @@ const LensDetail = () => {
   });
   const [deductionLoading, setDeductionLoading] = useState(false);
 
-  // Add state for power search
+  // Add states for power selection in deduction
+  const [showPowerSelectionForDeduction, setShowPowerSelectionForDeduction] = useState(false);
+  const [selectedPowersForDeduction, setSelectedPowersForDeduction] = useState([]);
+  const [deductionType, setDeductionType] = useState('general'); // 'general' or 'specific'
+
+  // Add states for power search and display
   const [powerSearch, setPowerSearch] = useState('');
+  const [searchType, setSearchType] = useState('all'); // 'all', 'in-stock', 'out-of-stock'
+  const [sortBy, setSortBy] = useState('power'); // 'power', 'quantity'
+  const [viewMode, setViewMode] = useState('grid'); // 'grid', 'table'
+  const [showOutOfStock, setShowOutOfStock] = useState(true);
 
   useEffect(() => {
     fetchLensDetails();
   }, [id]);
+
+  // Add keyboard shortcuts for better UX
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Only handle shortcuts when not in an input field
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      // Ctrl/Cmd + F to focus search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        const searchInput = document.querySelector('input[placeholder*="Search powers"]');
+        if (searchInput) {
+          searchInput.focus();
+        }
+      }
+
+      // Escape to clear search
+      if (e.key === 'Escape') {
+        setPowerSearch('');
+        setSearchType('all');
+      }
+
+      // Number keys for quick filters
+      if (e.key === '1') {
+        setSearchType('all');
+      } else if (e.key === '2') {
+        setSearchType('in-stock');
+      } else if (e.key === '3') {
+        setSearchType('out-of-stock');
+      }
+
+      // G for grid, T for table
+      if (e.key.toLowerCase() === 'g') {
+        setViewMode('grid');
+      } else if (e.key.toLowerCase() === 't') {
+        setViewMode('table');
+      }
+
+      // S to toggle sort
+      if (e.key.toLowerCase() === 's') {
+        setSortBy(sortBy === 'quantity' ? 'power' : 'quantity');
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [sortBy]);
 
   const fetchLensDetails = async () => {
     try {
@@ -78,8 +137,7 @@ const LensDetail = () => {
       calculateFinancialMetrics(lensData);
       
     } catch (error) {
-      console.error('Error fetching lens details:', error);
-      setError('Could not load lens details. ' + error.message);
+      setError('Could not load lens details. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -207,7 +265,7 @@ const LensDetail = () => {
       }));
       
     } catch (error) {
-      console.error('Error fetching sales metrics:', error);
+      // Error fetching sales metrics - continue without metrics
     }
   };
 
@@ -293,7 +351,95 @@ const LensDetail = () => {
       setDeductionLoading(true);
       setError('');
 
-      // Validate input
+      if (!deductionData.reason && !deductionData.customReason) {
+        setError('Please select or enter a reason for the deduction');
+        return;
+      }
+
+      const finalReason = deductionData.reason === 'other' ? deductionData.customReason : deductionData.reason;
+
+      if (deductionType === 'specific' && lens.type === 'stock' && lens.inventoryType === 'individual') {
+        // Handle power-specific deduction
+        if (selectedPowersForDeduction.length === 0) {
+          setError('Please select powers to deduct from');
+          return;
+        }
+
+        // Validate that all selected powers have sufficient quantity
+        for (const powerSelection of selectedPowersForDeduction) {
+          const currentPowerQuantity = parseInt(lens.powerInventory[powerSelection.powerKey]?.quantity || 0);
+          if (powerSelection.pieceQuantity > currentPowerQuantity) {
+            setError(`Cannot deduct ${powerSelection.pieceQuantity} pieces from power ${powerSelection.powerDisplay}. Only ${currentPowerQuantity} pieces available.`);
+            return;
+          }
+        }
+
+        // Calculate total pieces being deducted
+        const totalPiecesDeducted = selectedPowersForDeduction.reduce((sum, power) => sum + power.pieceQuantity, 0);
+
+        // Update power inventory
+        const updatedPowerInventory = { ...lens.powerInventory };
+        const deductionDetails = [];
+
+        for (const powerSelection of selectedPowersForDeduction) {
+          const currentQuantity = parseInt(updatedPowerInventory[powerSelection.powerKey]?.quantity || 0);
+          const newQuantity = currentQuantity - powerSelection.pieceQuantity;
+          
+          updatedPowerInventory[powerSelection.powerKey] = {
+            ...updatedPowerInventory[powerSelection.powerKey],
+            quantity: newQuantity
+          };
+
+          deductionDetails.push({
+            powerKey: powerSelection.powerKey,
+            powerDisplay: powerSelection.powerDisplay,
+            deductedQuantity: powerSelection.pieceQuantity,
+            previousQuantity: currentQuantity,
+            newQuantity: newQuantity,
+            eyeSelection: powerSelection.eyeSelection
+          });
+        }
+
+        // Calculate new total quantity
+        const newTotalQuantity = Object.values(updatedPowerInventory).reduce((sum, powerData) => {
+          return sum + (parseInt(powerData?.quantity) || 0);
+        }, 0);
+
+        // Update the lens in Firestore
+        const lensRef = getUserDoc('lensInventory', id);
+        await updateDoc(lensRef, {
+          powerInventory: updatedPowerInventory,
+          totalQuantity: newTotalQuantity,
+          updatedAt: Timestamp.now()
+        });
+
+        // Log the power-specific deduction
+        await addDoc(getUserCollection('inventoryDeductions'), {
+          lensId: id,
+          lensName: lens.brandName,
+          lensType: lens.type,
+          deductionType: 'power_specific',
+          deductedQuantity: totalPiecesDeducted,
+          powerDeductions: deductionDetails,
+          reason: finalReason,
+          notes: deductionData.notes,
+          deductedAt: Timestamp.now(),
+          deductedBy: 'current_user'
+        });
+
+        // Update local state
+        setLens(prev => ({
+          ...prev,
+          powerInventory: updatedPowerInventory,
+          totalQuantity: newTotalQuantity
+        }));
+
+        // Show success message
+        const successMessage = `Successfully deducted ${totalPiecesDeducted} pieces from ${selectedPowersForDeduction.length} power(s). New total: ${newTotalQuantity}`;
+        alert(successMessage);
+
+      } else {
+        // Handle general deduction (existing logic)
       const deductQty = parseInt(deductionData.quantity);
       const currentQty = parseInt(lens.qty || 0);
 
@@ -307,13 +453,7 @@ const LensDetail = () => {
         return;
       }
 
-      if (!deductionData.reason && !deductionData.customReason) {
-        setError('Please select or enter a reason for the deduction');
-        return;
-      }
-
       const newQty = currentQty - deductQty;
-      const finalReason = deductionData.reason === 'other' ? deductionData.customReason : deductionData.reason;
 
       // Update the lens quantity in Firestore
       const lensRef = getUserDoc('lensInventory', id);
@@ -322,18 +462,19 @@ const LensDetail = () => {
         updatedAt: Timestamp.now()
       });
 
-      // Log the deduction in a separate collection for audit trail
+        // Log the general deduction
       await addDoc(getUserCollection('inventoryDeductions'), {
         lensId: id,
         lensName: lens.brandName,
         lensType: lens.type,
+          deductionType: 'general',
         deductedQuantity: deductQty,
         previousQuantity: currentQty,
         newQuantity: newQty,
         reason: finalReason,
         notes: deductionData.notes,
         deductedAt: Timestamp.now(),
-        deductedBy: 'current_user' // You can replace this with actual user info
+          deductedBy: 'current_user'
       });
 
       // Update local state
@@ -342,24 +483,16 @@ const LensDetail = () => {
         qty: newQty
       }));
 
-      // Reset modal and show success
-      setShowDeductionModal(false);
-      setDeductionData({
-        quantity: 1,
-        reason: '',
-        notes: '',
-        customReason: ''
-      });
-
-      // Show success message temporarily
+        // Show success message
       const successMessage = `Successfully deducted ${deductQty} units. New quantity: ${newQty}`;
-      setError(''); // Clear any previous errors
+        alert(successMessage);
+      }
       
-      // You could add a success state here if you want to show success messages differently
-      alert(successMessage); // Simple alert for now
+      // Reset modal and clear states
+      resetDeductionModal();
 
     } catch (error) {
-      console.error('Error deducting inventory:', error);
+      // Error deducting inventory
       setError(`Failed to deduct inventory: ${error.message}`);
     } finally {
       setDeductionLoading(false);
@@ -374,6 +507,21 @@ const LensDetail = () => {
       notes: '',
       customReason: ''
     });
+    setSelectedPowersForDeduction([]);
+    setDeductionType('general');
+    setShowPowerSelectionForDeduction(false);
+  };
+
+  // Handle power selection for deduction
+  const handlePowerSelectionForDeduction = (rowIndex, powerSelections) => {
+    setSelectedPowersForDeduction(powerSelections);
+    setShowPowerSelectionForDeduction(false);
+  };
+
+  // Open power selection modal for deduction
+  const openPowerSelectionForDeduction = () => {
+    setDeductionType('specific');
+    setShowPowerSelectionForDeduction(true);
   };
 
   if (loading) {
@@ -466,489 +614,337 @@ const LensDetail = () => {
             >
               Back to Inventory
             </button>
+            <div className="relative group">
+              <button className="px-3 py-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </button>
+              <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-2">Keyboard Shortcuts</h4>
+                <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
+                  <div className="flex justify-between">
+                    <span>Focus search:</span>
+                    <kbd className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">Ctrl+F</kbd>
           </div>
+                  <div className="flex justify-between">
+                    <span>Clear filters:</span>
+                    <kbd className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">Esc</kbd>
         </div>
+                  <div className="flex justify-between">
+                    <span>Show all:</span>
+                    <kbd className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">1</kbd>
+                </div>
+                  <div className="flex justify-between">
+                    <span>Show in stock:</span>
+                    <kbd className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">2</kbd>
+                </div>
+                  <div className="flex justify-between">
+                    <span>Show out of stock:</span>
+                    <kbd className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">3</kbd>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Grid view:</span>
+                    <kbd className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">G</kbd>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Table view:</span>
+                    <kbd className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">T</kbd>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Toggle sort:</span>
+                    <kbd className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">S</kbd>
+                  </div>
+                    </div>
+                    </div>
+                    </div>
+                    </div>
+              </div>
 
-        {/* Lens Details Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 border border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Lens Details</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">Basic Information</h3>
-              <div className="space-y-2">
-                <div>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Brand Name:</span>
-                  <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.brandName || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Type:</span>
-                  <span className="ml-2 font-medium capitalize text-gray-900 dark:text-white">{lens.type || 'N/A'}</span>
-                </div>
-                {lens.type === 'stock' && (
-                  <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Power Series:</span>
-                    <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.powerSeries || 'N/A'}</span>
-                  </div>
-                )}
-                {lens.type === 'stock' && lens.maxSph && (
-                  <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Max SPH:</span>
-                    <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.maxSph}</span>
-                  </div>
-                )}
-                {lens.type === 'stock' && lens.maxCyl && (
-                  <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Max CYL:</span>
-                    <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.maxCyl}</span>
-                  </div>
-                )}
-                {lens.type === 'stock' && lens.inventoryType && (
-                  <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Inventory Type:</span>
-                    <span className="ml-2 font-medium text-gray-900 dark:text-white capitalize">{lens.inventoryType}</span>
-                  </div>
-                )}
-                {lens.type === 'prescription' && (
-                  <>
-                    <div>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">SPH:</span>
-                      <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.sph || 'N/A'}</span>
+        {/* Enhanced Lens Details Card */}
+        <div className="bg-gradient-to-r from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-xl shadow-lg p-6 mb-6 border border-gray-200 dark:border-gray-700 overflow-hidden relative">
+          {/* Background Pattern */}
+          <div className="absolute top-0 right-0 w-32 h-32 opacity-5 dark:opacity-10">
+            <svg viewBox="0 0 100 100" className="w-full h-full">
+              <circle cx="50" cy="20" r="20" fill="currentColor" />
+              <circle cx="80" cy="50" r="15" fill="currentColor" />
+              <circle cx="20" cy="80" r="10" fill="currentColor" />
+            </svg>
+            </div>
+            
+          <div className="relative">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center mr-3">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
                     </div>
-                    <div>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">CYL:</span>
-                      <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.cyl || 'N/A'}</span>
+                Lens Details
+              </h2>
+              <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                lens.type === 'stock' 
+                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200' 
+                  : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
+              }`}>
+                {lens.type === 'stock' ? '📦 Stock Lens' : '🔧 Prescription Lens'}
                     </div>
-                    <div>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">AXIS:</span>
-                      <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.axis || 'N/A'}</span>
                     </div>
-                    <div>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">ADD:</span>
-                      <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.add || 'N/A'}</span>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Basic Information */}
+              <div className="space-y-4">
+                <div className="flex items-center mb-4">
+                  <div className="w-6 h-6 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center mr-2">
+                    <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM21 5a2 2 0 00-2-2h-4a2 2 0 00-2 2v12a4 4 0 004 4h4a2 2 0 002-2V5z" />
+                    </svg>
                     </div>
-                  </>
-                )}
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">Basic Information</h3>
+                    </div>
+                
+                <div className="space-y-3">
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Brand Name</span>
+                      <span className="text-base font-bold text-gray-900 dark:text-white">{lens.brandName || 'N/A'}</span>
               </div>
             </div>
             
-            <div>
-              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">Specifications</h3>
-              <div className="space-y-2">
-                {lens.type === 'prescription' && (
-                  <>
-                    <div>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">Material:</span>
-                      <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.material || 'N/A'}</span>
-                    </div>
-                    <div>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">Index:</span>
-                      <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.index || 'N/A'}</span>
-                    </div>
-                    <div>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">Coating:</span>
-                      <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.coatingType || 'N/A'} {lens.coatingColor ? `(${lens.coatingColor})` : ''}</span>
-                    </div>
-                    <div>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">Base Tint:</span>
-                      <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.baseTint || 'N/A'}</span>
-                    </div>
-                    <div>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">Diameter:</span>
-                      <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.diameter ? `${lens.diameter}mm` : 'N/A'}</span>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">Inventory & Pricing</h3>
-              <div className="space-y-2">
-                <div>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Quantity in Stock:</span>
-                  <span className="ml-2 font-medium text-gray-900 dark:text-white">
-                    {lens.type === 'stock' && lens.inventoryType === 'individual' && lens.totalQuantity 
-                      ? `${lens.totalQuantity} pieces (Individual tracking)` 
-                      : `${lens.qty || '0'} ${lens.type === 'stock' ? 'pairs' : 'units'}`}
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Type</span>
+                      <span className={`px-2 py-1 rounded-md text-sm font-medium capitalize ${
+                        lens.type === 'stock' 
+                          ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' 
+                          : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
+                      }`}>
+                        {lens.type || 'N/A'}
                   </span>
                 </div>
-                <div>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Purchase Price:</span>
-                  <span className="ml-2 font-medium text-gray-900 dark:text-white">{formatCurrency(lens.purchasePrice || 0)}</span>
                 </div>
-                <div>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Sale Price:</span>
-                  <span className="ml-2 font-medium text-gray-900 dark:text-white">{formatCurrency(lens.salePrice || 0)}</span>
+
+                  {lens.type === 'stock' && (
+                    <>
+                      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
+                        <div className="mb-2">
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Power Series</span>
                 </div>
-                {lens.type === 'prescription' && (
-                  <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Storage Location:</span>
-                    <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.location || 'N/A'}</span>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-700 px-3 py-2 rounded-md">
+                          {lens.powerSeries || 'N/A'}
                   </div>
-                )}
-                {lens.notes && (
-                  <div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Notes:</span>
-                    <span className="ml-2 font-medium text-gray-900 dark:text-white">{lens.notes}</span>
                   </div>
-                )}
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-100 dark:border-gray-700">
+                          <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Max SPH</div>
+                          <div className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                            {lens.maxSph || 'N/A'}
               </div>
+                        </div>
+                        <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-100 dark:border-gray-700">
+                          <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Max CYL</div>
+                          <div className="text-lg font-bold text-orange-600 dark:text-orange-400">
+                            {lens.maxCyl || 'N/A'}
             </div>
           </div>
         </div>
         
-        {/* Power Inventory Card - Only for stock lenses with individual inventory */}
-        {lens.type === 'stock' && lens.inventoryType === 'individual' && lens.powerInventory && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 border border-gray-200 dark:border-gray-700">
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-              Individual Power Inventory
-              {lens.lensType === 'bifocal' && (
-                <span className="ml-2 text-sm font-normal text-blue-600 dark:text-blue-400">
-                  (Bifocal/Progressive - Axis: {lens.axis || 90}°)
+                      {lens.inventoryType && (
+                        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Inventory Type</span>
+                            <span className={`px-2 py-1 rounded-md text-sm font-medium capitalize ${
+                              lens.inventoryType === 'individual' 
+                                ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' 
+                                : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                            }`}>
+                              {lens.inventoryType}
                 </span>
-              )}
-            </h2>
-            
-            {/* Power Summary */}
-            {(() => {
-              // Calculate ranges from powerLimits if available, otherwise from actual power data
-              const powers = Object.keys(lens.powerInventory);
-              
-              // Use powerLimits if available (it looks like it is!)
-              const finalSphMin = lens.powerLimits?.minSph ?? null;
-              const finalSphMax = lens.powerLimits?.maxSph ?? null;
-              const finalCylMin = lens.powerLimits?.minCyl ?? null;
-              const finalCylMax = lens.powerLimits?.maxCyl ?? null;
-              
-              // Calculate total quantity from the power inventory objects
-              const totalQuantity = Object.values(lens.powerInventory).reduce((sum, powerData) => {
-                return sum + (parseInt(powerData?.quantity) || 0);
-              }, 0);
-              
-              return (
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                  <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg border border-blue-200 dark:border-blue-700">
-                    <h3 className="text-sm font-semibold text-blue-700 dark:text-blue-300 uppercase mb-2">Total Powers Available</h3>
-                    <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                      {Object.keys(lens.powerInventory).length}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {lens.type === 'prescription' && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-100 dark:border-gray-700">
+                          <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">SPH</div>
+                          <div className="text-lg font-bold text-blue-600 dark:text-blue-400">{lens.sph || 'N/A'}</div>
                     </div>
-                    <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">Different power combinations</p>
+                        <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-100 dark:border-gray-700">
+                          <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">CYL</div>
+                          <div className="text-lg font-bold text-green-600 dark:text-green-400">{lens.cyl || 'N/A'}</div>
                   </div>
-                  
-                  <div className="bg-green-50 dark:bg-green-900/30 p-4 rounded-lg border border-green-200 dark:border-green-700">
-                    <h3 className="text-sm font-semibold text-green-700 dark:text-green-300 uppercase mb-2">Total Pieces</h3>
-                    <div className="text-2xl font-bold text-green-700 dark:text-green-300">
-                      {lens.totalQuantity || totalQuantity}
                     </div>
-                    <p className="text-sm text-green-600 dark:text-green-400 mt-1">Individual pieces in stock</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-100 dark:border-gray-700">
+                          <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">AXIS</div>
+                          <div className="text-lg font-bold text-purple-600 dark:text-purple-400">{lens.axis || 'N/A'}</div>
                   </div>
-                  
-                  <div className="bg-purple-50 dark:bg-purple-900/30 p-4 rounded-lg border border-purple-200 dark:border-purple-700">
-                    <h3 className="text-sm font-semibold text-purple-700 dark:text-purple-300 uppercase mb-2">SPH Range</h3>
-                    <div className="text-xl font-bold text-purple-700 dark:text-purple-300">
-                      {finalSphMin !== null && finalSphMax !== null 
-                        ? `${finalSphMin > 0 ? '+' : ''}${finalSphMin} to ${finalSphMax > 0 ? '+' : ''}${finalSphMax}`
-                        : 'N/A'}
+                        <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-100 dark:border-gray-700">
+                          <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">ADD</div>
+                          <div className="text-lg font-bold text-orange-600 dark:text-orange-400">{lens.add || 'N/A'}</div>
                     </div>
-                    <p className="text-sm text-purple-600 dark:text-purple-400 mt-1">Spherical power range</p>
                   </div>
-                  
-                  <div className="bg-orange-50 dark:bg-orange-900/30 p-4 rounded-lg border border-orange-200 dark:border-orange-700">
-                    <h3 className="text-sm font-semibold text-orange-700 dark:text-orange-300 uppercase mb-2">CYL Range</h3>
-                    <div className="text-xl font-bold text-orange-700 dark:text-orange-300">
-                      {finalCylMin !== null && finalCylMax !== null 
-                        ? `${finalCylMin > 0 ? '+' : ''}${finalCylMin} to ${finalCylMax > 0 ? '+' : ''}${finalCylMax}`
-                        : 'N/A'}
                     </div>
-                    <p className="text-sm text-orange-600 dark:text-orange-400 mt-1">Cylindrical power range</p>
+                  )}
                   </div>
                 </div>
-              );
-            })()}
-            
-            {/* Additional summary for bifocal lenses */}
-            {lens.lensType === 'bifocal' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div className="bg-cyan-50 dark:bg-cyan-900/30 p-4 rounded-lg border border-cyan-200 dark:border-cyan-700">
-                  <h3 className="text-sm font-semibold text-cyan-700 dark:text-cyan-300 uppercase mb-2">Addition Range</h3>
-                  <div className="text-xl font-bold text-cyan-700 dark:text-cyan-300">
-                    {(() => {
-                      // Calculate addition range from power inventory keys
-                      const additionPowers = Object.keys(lens.powerInventory)
-                        .map(key => {
-                          const parts = key.split('_');
-                          return parts.length >= 3 ? parseFloat(parts[2]) : null;
-                        })
-                        .filter(add => add !== null);
-                      
-                      if (additionPowers.length > 0) {
-                        const minAdd = Math.min(...additionPowers);
-                        const maxAdd = Math.max(...additionPowers);
-                        return `+${minAdd} to +${maxAdd}`;
-                      }
-                      return 'N/A';
-                    })()}
+
+              {/* Specifications */}
+              <div className="space-y-4">
+                <div className="flex items-center mb-4">
+                  <div className="w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center mr-2">
+                    <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                    </svg>
                   </div>
-                  <p className="text-sm text-cyan-600 dark:text-cyan-400 mt-1">Addition power range</p>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">Specifications</h3>
                 </div>
                 
-                <div className="bg-indigo-50 dark:bg-indigo-900/30 p-4 rounded-lg border border-indigo-200 dark:border-indigo-700">
-                  <h3 className="text-sm font-semibold text-indigo-700 dark:text-indigo-300 uppercase mb-2">Axis</h3>
-                  <div className="text-xl font-bold text-indigo-700 dark:text-indigo-300">
-                    {lens.axis || 90}°
+                {lens.type === 'prescription' ? (
+                  <div className="space-y-3">
+                    {[
+                      { label: 'Material', value: lens.material, icon: '🔬' },
+                      { label: 'Index', value: lens.index, icon: '📊' },
+                      { label: 'Coating', value: `${lens.coatingType || 'N/A'} ${lens.coatingColor ? `(${lens.coatingColor})` : ''}`, icon: '✨' },
+                      { label: 'Base Tint', value: lens.baseTint, icon: '🎨' },
+                      { label: 'Diameter', value: lens.diameter ? `${lens.diameter}mm` : 'N/A', icon: '📏' }
+                    ].map((spec, index) => (
+                      <div key={index} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center">
+                            <span className="mr-2">{spec.icon}</span>
+                            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{spec.label}</span>
                   </div>
-                  <p className="text-sm text-indigo-600 dark:text-indigo-400 mt-1">Standard axis orientation</p>
+                          <span className="text-sm font-semibold text-gray-900 dark:text-white">{spec.value || 'N/A'}</span>
                 </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 text-center">
+                    <svg className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Stock lens specifications are managed through power inventory
+                    </p>
               </div>
             )}
-            
-            {/* Available Powers List with Search */}
-            {(() => {
-              // Filter powers based on search
-              const availablePowers = Object.entries(lens.powerInventory)
-                .filter(([powerKey, powerData]) => parseInt(powerData?.quantity) > 0)
-                .filter(([powerKey, powerData]) => {
-                  if (!powerSearch) return true;
-                  
-                  // Handle different key formats for single vs bifocal lenses
-                  let searchText;
-                  const parts = powerKey.split('_');
-                  
-                  if (parts.length >= 3) {
-                    // Bifocal format detected: "sph_cyl_addition"
-                    const [sph, cyl, addition] = parts.map(p => parseFloat(p));
-                    searchText = `SPH: ${sph > 0 ? `+${sph}` : sph}, CYL: ${cyl > 0 ? `+${cyl}` : cyl}, ADD: +${addition}, AXIS: ${lens.axis || 90}°`;
-                  } else {
-                    // Single vision format: "sph_cyl"
-                    const [sph, cyl] = parts.map(p => parseFloat(p));
-                    searchText = `SPH: ${sph > 0 ? `+${sph}` : sph}, CYL: ${cyl > 0 ? `+${cyl}` : cyl}${lens.axis ? `, AXIS: ${lens.axis}°` : ''}`;
-                  }
-                  
-                  const searchLower = powerSearch.toLowerCase();
-                  return searchText.toLowerCase().includes(searchLower);
-                });
-              
-              return (
+              </div>
+
+              {/* Inventory & Pricing */}
+              <div className="space-y-4">
+                <div className="flex items-center mb-4">
+                  <div className="w-6 h-6 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center mr-2">
+                    <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                    </svg>
+                  </div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">Inventory & Pricing</h3>
+                </div>
+
+                <div className="space-y-3">
+                  {/* Quantity Display */}
+                  <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/10 rounded-lg p-4 border border-blue-200 dark:border-blue-700">
+                    <div className="flex items-center justify-between">
                 <div>
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-md font-semibold text-gray-700 dark:text-gray-300">Available Powers (In Stock)</h3>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Search powers..."
-                        value={powerSearch}
-                        onChange={(e) => setPowerSearch(e.target.value)}
-                        className="w-64 px-3 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                      />
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <svg className="h-4 w-4 text-gray-400 dark:text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        <div className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">Quantity in Stock</div>
+                        <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                          {lens.type === 'stock' && lens.inventoryType === 'individual' && lens.totalQuantity 
+                            ? lens.totalQuantity 
+                            : (lens.qty || '0')}
+                        </div>
+                        <div className="text-xs text-blue-600 dark:text-blue-400">
+                          {lens.type === 'stock' && lens.inventoryType === 'individual' 
+                            ? 'pieces (Individual tracking)' 
+                            : `${lens.type === 'stock' ? 'pairs' : 'units'}`}
+                        </div>
+                      </div>
+                      <div className="w-12 h-12 bg-blue-200 dark:bg-blue-800 rounded-lg flex items-center justify-center">
+                        <svg className="w-6 h-6 text-blue-600 dark:text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                         </svg>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {availablePowers
-                      .sort(([a], [b]) => {
-                        // Handle different sorting for single vs bifocal lenses
-                        const partsA = a.split('_');
-                        const partsB = b.split('_');
-                        
-                        if (partsA.length >= 3 && partsB.length >= 3) {
-                          // Bifocal format detected: "sph_cyl_addition"
-                          const [sphA, cylA, addA] = partsA.map(p => parseFloat(p));
-                          const [sphB, cylB, addB] = partsB.map(p => parseFloat(p));
-                          if (sphA !== sphB) return sphA - sphB;
-                          if (cylA !== cylB) return cylA - cylB;
-                          return addA - addB;
-                        } else {
-                          // Single vision format: "sph_cyl"
-                          const [sphA, cylA] = partsA.map(p => parseFloat(p));
-                          const [sphB, cylB] = partsB.map(p => parseFloat(p));
-                          if (sphA !== sphB) return sphA - sphB;
-                          return cylA - cylB;
-                        }
-                      })
-                      .map(([powerKey, powerData]) => {
-                        // Handle different display for single vs bifocal lenses
-                        let powerDisplay;
-                        
-                        const parts = powerKey.split('_');
-                        if (parts.length >= 3) {
-                          // Bifocal format detected: "sph_cyl_addition"
-                          const [sph, cyl, addition] = parts.map(p => parseFloat(p));
-                          
-                          // Try to get axis from power inventory data or use lens.axis or default to 90
-                          let axisValue = lens.axis || 90;
-                          if (!lens.axis && lens.powerInventory && lens.powerInventory[powerKey] && lens.powerInventory[powerKey].axis) {
-                            axisValue = lens.powerInventory[powerKey].axis;
-                          }
-                          
-                          powerDisplay = (
-                            <div>
-                              <div>SPH: {sph > 0 ? `+${sph}` : sph}, CYL: {cyl > 0 ? `+${cyl}` : cyl}</div>
-                              <div className="text-xs text-blue-600 dark:text-blue-400">
-                                ADD: +{addition} | AXIS: {axisValue}°
+                  {/* Pricing Information */}
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center">
+                          <span className="text-red-500 mr-2">💰</span>
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Purchase Price</span>
                               </div>
+                        <span className="text-lg font-bold text-red-600 dark:text-red-400">{formatCurrency(lens.purchasePrice || 0)}</span>
                             </div>
-                          );
-                        } else {
-                          // Single vision format: "sph_cyl" - Always show axis
-                          const [sph, cyl] = parts.map(p => parseFloat(p));
-                          
-                          // Try to get axis from power inventory data or use lens.axis or default to 90
-                          let axisValue = lens.axis || 90;
-                          if (!lens.axis && lens.powerInventory && lens.powerInventory[powerKey] && lens.powerInventory[powerKey].axis) {
-                            axisValue = lens.powerInventory[powerKey].axis;
-                          }
-                          
-                          powerDisplay = (
-                            <div>
-                              <div>SPH: {sph > 0 ? `+${sph}` : sph}, CYL: {cyl > 0 ? `+${cyl}` : cyl}</div>
-                              <div className="text-xs text-gray-600 dark:text-gray-400">
-                                AXIS: {axisValue}°
+                    </div>
+                    
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center">
+                          <span className="text-green-500 mr-2">💵</span>
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Sale Price</span>
                               </div>
+                        <span className="text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(lens.salePrice || 0)}</span>
                             </div>
-                          );
-                        }
-                        
-                        const quantity = parseInt(powerData?.quantity) || 0;
-                        
-                        return (
-                          <div key={powerKey} className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+                    </div>
+
+                    {/* Profit Margin */}
+                    {lens.purchasePrice && lens.salePrice && (
+                      <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/10 rounded-lg p-4 border border-green-200 dark:border-green-700">
                             <div className="flex justify-between items-center">
-                              <div>
-                                <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                  {powerDisplay}
-                                </span>
+                          <div className="flex items-center">
+                            <span className="text-emerald-500 mr-2">📈</span>
+                            <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Profit Margin</span>
                               </div>
                               <div className="text-right">
-                                <span className="text-sm font-bold text-green-600 dark:text-green-400">
-                                  {quantity} {quantity === 1 ? 'piece' : 'pieces'}
-                                </span>
+                            <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                              {formatCurrency((lens.salePrice || 0) - (lens.purchasePrice || 0))}
                               </div>
+                            <div className="text-xs text-emerald-600 dark:text-emerald-400">
+                              {lens.salePrice > 0 ? `${(((lens.salePrice - lens.purchasePrice) / lens.salePrice) * 100).toFixed(1)}%` : '0%'}
                             </div>
                           </div>
-                        );
-                      })}
                   </div>
-                  
-                  {availablePowers.length === 0 && powerSearch && (
-                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                      No powers found matching "{powerSearch}"
                     </div>
                   )}
-                  
-                  {availablePowers.length === 0 && !powerSearch && (
-                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                      No powers currently in stock
                     </div>
+
+                  {/* Additional Information */}
+                  {lens.type === 'prescription' && lens.location && (
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center">
+                          <span className="text-blue-500 mr-2">📍</span>
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Storage Location</span>
+                                </div>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">{lens.location}</span>
+                              </div>
+                                </div>
                   )}
-                </div>
-              );
-            })()}
-            
-            {/* Out of Stock Powers */}
-            {(() => {
-              const outOfStockPowers = Object.entries(lens.powerInventory)
-                .filter(([powerKey, powerData]) => parseInt(powerData?.quantity) === 0);
-              
-              if (outOfStockPowers.length > 0) {
-                return (
-                  <div className="mt-6">
-                    <h3 className="text-md font-semibold text-gray-700 dark:text-gray-300 mb-4">Out of Stock Powers</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {outOfStockPowers
-                        .sort(([a], [b]) => {
-                          // Handle different sorting for single vs bifocal lenses
-                          const partsA = a.split('_');
-                          const partsB = b.split('_');
-                          
-                          if (partsA.length >= 3 && partsB.length >= 3) {
-                            // Bifocal format detected: "sph_cyl_addition"
-                            const [sphA, cylA, addA] = partsA.map(p => parseFloat(p));
-                            const [sphB, cylB, addB] = partsB.map(p => parseFloat(p));
-                            if (sphA !== sphB) return sphA - sphB;
-                            if (cylA !== cylB) return cylA - cylB;
-                            return addA - addB;
-                          } else {
-                            // Single vision format: "sph_cyl"
-                            const [sphA, cylA] = partsA.map(p => parseFloat(p));
-                            const [sphB, cylB] = partsB.map(p => parseFloat(p));
-                            if (sphA !== sphB) return sphA - sphB;
-                            return cylA - cylB;
-                          }
-                        })
-                        .map(([powerKey, powerData]) => {
-                          // Handle different display for single vs bifocal lenses
-                          let powerDisplay;
-                          
-                          const parts = powerKey.split('_');
-                          if (parts.length >= 3) {
-                            // Bifocal format detected: "sph_cyl_addition"
-                            const [sph, cyl, addition] = parts.map(p => parseFloat(p));
-                            
-                            // Try to get axis from power inventory data or use lens.axis or default to 90
-                            let axisValue = lens.axis || 90;
-                            if (!lens.axis && lens.powerInventory && lens.powerInventory[powerKey] && lens.powerInventory[powerKey].axis) {
-                              axisValue = lens.powerInventory[powerKey].axis;
-                            }
-                            
-                            powerDisplay = (
-                              <div>
-                                <div>SPH: {sph > 0 ? `+${sph}` : sph}, CYL: {cyl > 0 ? `+${cyl}` : cyl}</div>
-                                <div className="text-xs text-blue-600 dark:text-blue-400">
-                                  ADD: +{addition} | AXIS: {axisValue}°
-                                </div>
-                              </div>
-                            );
-                          } else {
-                            // Single vision format: "sph_cyl" - Always show axis
-                            const [sph, cyl] = parts.map(p => parseFloat(p));
-                            
-                            // Try to get axis from power inventory data or use lens.axis or default to 90
-                            let axisValue = lens.axis || 90;
-                            if (!lens.axis && lens.powerInventory && lens.powerInventory[powerKey] && lens.powerInventory[powerKey].axis) {
-                              axisValue = lens.powerInventory[powerKey].axis;
-                            }
-                            
-                            powerDisplay = (
-                              <div>
-                                <div>SPH: {sph > 0 ? `+${sph}` : sph}, CYL: {cyl > 0 ? `+${cyl}` : cyl}</div>
-                                <div className="text-xs text-gray-600 dark:text-gray-400">
-                                  AXIS: {axisValue}°
-                                </div>
-                              </div>
-                            );
-                          }
-                          
-                          return (
-                            <div key={powerKey} className="bg-red-50 dark:bg-red-900/30 p-3 rounded-lg border border-red-200 dark:border-red-700">
-                              <div className="flex justify-between items-center">
+
+                  {lens.notes && (
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
+                      <div className="flex items-start">
+                        <span className="text-yellow-500 mr-2 mt-0.5">📝</span>
                                 <div>
-                                  <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                    {powerDisplay}
-                                  </span>
+                          <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Notes</div>
+                          <div className="text-sm text-gray-900 dark:text-white">{lens.notes}</div>
                                 </div>
-                                <div className="text-right">
-                                  <span className="text-sm font-bold text-red-600 dark:text-red-400">
-                                    Out of Stock
-                                  </span>
                                 </div>
                               </div>
+                  )}
                             </div>
-                          );
-                        })}
                     </div>
                   </div>
-                );
-              }
-              return null;
-            })()}
           </div>
-        )}
+        </div>
         
         {/* Financial Analysis Card */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 border border-gray-200 dark:border-gray-700">
@@ -1094,6 +1090,720 @@ const LensDetail = () => {
             </div>
           </div>
         </div>
+        
+        {/* Power Inventory Card - Only for stock lenses with individual inventory */}
+        {lens.type === 'stock' && lens.inventoryType === 'individual' && lens.powerInventory && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 border border-gray-200 dark:border-gray-700">
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+              Individual Power Inventory
+              {lens.lensType === 'bifocal' && (
+                <span className="ml-2 text-sm font-normal text-blue-600 dark:text-blue-400">
+                  (Bifocal/Progressive - Axis: {lens.axis || 90}°)
+                </span>
+              )}
+            </h2>
+            
+            {/* Enhanced Power Summary */}
+            {(() => {
+              // Calculate comprehensive statistics from power inventory
+              const powers = Object.entries(lens.powerInventory || {});
+              const inStockPowers = powers.filter(([_, data]) => parseInt(data?.quantity) > 0);
+              const outOfStockPowers = powers.filter(([_, data]) => parseInt(data?.quantity) === 0);
+              
+              // Use powerLimits if available
+              const finalSphMin = lens.powerLimits?.minSph ?? null;
+              const finalSphMax = lens.powerLimits?.maxSph ?? null;
+              const finalCylMin = lens.powerLimits?.minCyl ?? null;
+              const finalCylMax = lens.powerLimits?.maxCyl ?? null;
+              
+              // Calculate total quantity and statistics
+              const totalQuantity = powers.reduce((sum, [_, powerData]) => {
+                return sum + (parseInt(powerData?.quantity) || 0);
+              }, 0);
+              
+              const averageQuantity = powers.length > 0 ? (totalQuantity / powers.length).toFixed(1) : 0;
+              const maxQuantity = Math.max(...powers.map(([_, data]) => parseInt(data?.quantity) || 0));
+              
+              // Calculate stock health percentage
+              const stockHealthPercentage = powers.length > 0 ? ((inStockPowers.length / powers.length) * 100).toFixed(1) : 0;
+              
+              return (
+                <div className="space-y-4 mb-6">
+                  {/* Primary Statistics */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 p-4 rounded-xl border border-blue-200 dark:border-blue-700">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-sm font-semibold text-blue-700 dark:text-blue-300 uppercase mb-1">Total Powers</h3>
+                          <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                            {powers.length}
+                          </div>
+                          <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Different combinations</p>
+                        </div>
+                        <div className="w-12 h-12 bg-blue-200 dark:bg-blue-800 rounded-lg flex items-center justify-center">
+                          <svg className="w-6 h-6 text-blue-600 dark:text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/20 p-4 rounded-xl border border-green-200 dark:border-green-700">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-sm font-semibold text-green-700 dark:text-green-300 uppercase mb-1">Total Inventory</h3>
+                          <div className="text-2xl font-bold text-green-700 dark:text-green-300">
+                            {totalQuantity}
+                          </div>
+                          <p className="text-xs text-green-600 dark:text-green-400 mt-1">Individual pieces</p>
+                        </div>
+                        <div className="w-12 h-12 bg-green-200 dark:bg-green-800 rounded-lg flex items-center justify-center">
+                          <svg className="w-6 h-6 text-green-600 dark:text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 p-4 rounded-xl border border-purple-200 dark:border-purple-700">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-sm font-semibold text-purple-700 dark:text-purple-300 uppercase mb-1">In Stock</h3>
+                          <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">
+                            {inStockPowers.length}
+                          </div>
+                          <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">Available powers</p>
+                        </div>
+                        <div className="w-12 h-12 bg-purple-200 dark:bg-purple-800 rounded-lg flex items-center justify-center">
+                          <svg className="w-6 h-6 text-purple-600 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/20 p-4 rounded-xl border border-orange-200 dark:border-orange-700">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-sm font-semibold text-orange-700 dark:text-orange-300 uppercase mb-1">Stock Health</h3>
+                          <div className="text-2xl font-bold text-orange-700 dark:text-orange-300">
+                            {stockHealthPercentage}%
+                          </div>
+                          <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">Powers available</p>
+                        </div>
+                        <div className="w-12 h-12 bg-orange-200 dark:bg-orange-800 rounded-lg flex items-center justify-center">
+                          <svg className="w-6 h-6 text-orange-600 dark:text-orange-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Power Range Information */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">SPH Range</h4>
+                      <div className="text-lg font-semibold text-gray-700 dark:text-gray-300">
+                        {finalSphMin !== null && finalSphMax !== null 
+                          ? `${finalSphMin >= 0 ? '+' : ''}${finalSphMin} to ${finalSphMax >= 0 ? '+' : ''}${finalSphMax}`
+                          : 'N/A'}
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Spherical power range</p>
+                    </div>
+                    
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">CYL Range</h4>
+                      <div className="text-lg font-semibold text-gray-700 dark:text-gray-300">
+                        {finalCylMin !== null && finalCylMax !== null 
+                          ? `${finalCylMin >= 0 ? '+' : ''}${finalCylMin} to ${finalCylMax >= 0 ? '+' : ''}${finalCylMax}`
+                          : 'N/A'}
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Cylindrical power range</p>
+                    </div>
+                    
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Inventory Stats</h4>
+                      <div className="space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Avg per power:</span>
+                          <span className="font-medium text-gray-900 dark:text-white">{averageQuantity}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Max quantity:</span>
+                          <span className="font-medium text-gray-900 dark:text-white">{maxQuantity}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Out of stock:</span>
+                          <span className="font-medium text-red-600 dark:text-red-400">{outOfStockPowers.length}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Stock Health Indicator */}
+                  <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-white">Stock Health Overview</h4>
+                      <span className={`text-sm font-medium ${
+                        stockHealthPercentage >= 90 ? 'text-green-600 dark:text-green-400' :
+                        stockHealthPercentage >= 70 ? 'text-yellow-600 dark:text-yellow-400' :
+                        'text-red-600 dark:text-red-400'
+                      }`}>
+                        {stockHealthPercentage >= 90 ? 'Excellent' :
+                         stockHealthPercentage >= 70 ? 'Good' :
+                         stockHealthPercentage >= 50 ? 'Fair' : 'Needs Attention'}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                      <div 
+                        className={`h-2 rounded-full transition-all duration-500 ${
+                          stockHealthPercentage >= 90 ? 'bg-green-500' :
+                          stockHealthPercentage >= 70 ? 'bg-yellow-500' :
+                          'bg-red-500'
+                        }`}
+                        style={{ width: `${stockHealthPercentage}%` }}
+                      ></div>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      <span>{inStockPowers.length} powers available</span>
+                      <span>{outOfStockPowers.length} powers out of stock</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+            
+            {/* Additional summary for bifocal lenses */}
+            {lens.lensType === 'bifocal' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="bg-cyan-50 dark:bg-cyan-900/30 p-4 rounded-lg border border-cyan-200 dark:border-cyan-700">
+                  <h3 className="text-sm font-semibold text-cyan-700 dark:text-cyan-300 uppercase mb-2">Addition Range</h3>
+                  <div className="text-xl font-bold text-cyan-700 dark:text-cyan-300">
+                    {(() => {
+                      // Calculate addition range from power inventory keys
+                      const additionPowers = Object.keys(lens.powerInventory)
+                        .map(key => {
+                          const parts = key.split('_');
+                          return parts.length >= 3 ? parseFloat(parts[2]) : null;
+                        })
+                        .filter(add => add !== null);
+                      
+                      if (additionPowers.length > 0) {
+                        const minAdd = Math.min(...additionPowers);
+                        const maxAdd = Math.max(...additionPowers);
+                        return `+${minAdd} to +${maxAdd}`;
+                      }
+                      return 'N/A';
+                    })()}
+                  </div>
+                  <p className="text-sm text-cyan-600 dark:text-cyan-400 mt-1">Addition power range</p>
+                </div>
+                
+                <div className="bg-indigo-50 dark:bg-indigo-900/30 p-4 rounded-lg border border-indigo-200 dark:border-indigo-700">
+                  <h3 className="text-sm font-semibold text-indigo-700 dark:text-indigo-300 uppercase mb-2">Axis</h3>
+                  <div className="text-xl font-bold text-indigo-700 dark:text-indigo-300">
+                    {lens.axis || 90}°
+                  </div>
+                  <p className="text-sm text-indigo-600 dark:text-indigo-400 mt-1">Standard axis orientation</p>
+                </div>
+              </div>
+            )}
+            
+            {/* Enhanced Power Search and Filter Controls */}
+            {(() => {
+              // Process and filter powers based on search and filters
+              const allPowers = Object.entries(lens.powerInventory || {});
+              
+              const processedPowers = allPowers.map(([powerKey, powerData]) => {
+                const parts = powerKey.split('_');
+                const quantity = parseInt(powerData?.quantity) || 0;
+                
+                let powerInfo;
+                if (parts.length >= 3) {
+                  // Bifocal format: "sph_cyl_addition"
+                  const [sph, cyl, addition] = parts.map(p => parseFloat(p));
+                  const axisValue = powerData?.axis || lens.axis || 90;
+                  powerInfo = {
+                    sph,
+                    cyl,
+                    addition,
+                    axis: axisValue,
+                    type: 'bifocal',
+                    displayText: `SPH: ${sph >= 0 ? '+' : ''}${sph}, CYL: ${cyl >= 0 ? '+' : ''}${cyl}, ADD: +${addition}`,
+                    searchText: `sph ${sph} cyl ${cyl} add ${addition} axis ${axisValue}`,
+                    sortKey: sph * 1000 + cyl * 100 + addition * 10
+                  };
+                } else {
+                  // Single vision format: "sph_cyl"
+                  const [sph, cyl] = parts.map(p => parseFloat(p));
+                  const axisValue = powerData?.axis || lens.axis || 90;
+                  powerInfo = {
+                    sph,
+                    cyl,
+                    axis: axisValue,
+                    type: 'single',
+                    displayText: `SPH: ${sph >= 0 ? '+' : ''}${sph}, CYL: ${cyl >= 0 ? '+' : ''}${cyl}`,
+                    searchText: `sph ${sph} cyl ${cyl} axis ${axisValue}`,
+                    sortKey: sph * 1000 + cyl * 100
+                  };
+                }
+                
+                return {
+                  key: powerKey,
+                  quantity,
+                  inStock: quantity > 0,
+                  ...powerInfo
+                };
+              });
+
+              // Apply filters
+              let filteredPowers = processedPowers;
+              
+              // Filter by stock status
+              if (searchType === 'in-stock') {
+                filteredPowers = filteredPowers.filter(p => p.inStock);
+              } else if (searchType === 'out-of-stock') {
+                filteredPowers = filteredPowers.filter(p => !p.inStock);
+              }
+              
+              // Apply search filter
+              if (powerSearch) {
+                const searchLower = powerSearch.toLowerCase();
+                filteredPowers = filteredPowers.filter(power => 
+                  power.displayText.toLowerCase().includes(searchLower) ||
+                  power.searchText.toLowerCase().includes(searchLower) ||
+                  power.sph.toString().includes(searchLower) ||
+                  power.cyl.toString().includes(searchLower) ||
+                  (power.addition && power.addition.toString().includes(searchLower))
+                );
+              }
+              
+              // Apply sorting
+              filteredPowers.sort((a, b) => {
+                if (sortBy === 'quantity') {
+                  if (a.quantity !== b.quantity) return b.quantity - a.quantity;
+                }
+                return a.sortKey - b.sortKey;
+              });
+
+              const inStockCount = processedPowers.filter(p => p.inStock).length;
+              const outOfStockCount = processedPowers.filter(p => !p.inStock).length;
+              const totalQuantity = processedPowers.reduce((sum, p) => sum + p.quantity, 0);
+              
+              return (
+                <div>
+                  {/* Enhanced Search and Filter Controls */}
+                  <div className="mb-6 space-y-4">
+                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                        Power Inventory Management
+                      </h3>
+                      
+                      {/* Stats Summary */}
+                      <div className="flex flex-wrap gap-2 text-sm">
+                        <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded-full">
+                          {inStockCount} In Stock
+                        </span>
+                        <span className="px-3 py-1 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 rounded-full">
+                          {outOfStockCount} Out of Stock
+                        </span>
+                        <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-full">
+                          {totalQuantity} Total Pieces
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* Search and Filter Controls */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* Search Input */}
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Search powers, SPH, CYL, ADD..."
+                          value={powerSearch}
+                          onChange={(e) => setPowerSearch(e.target.value)}
+                          className="w-full px-3 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                        />
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <svg className="h-4 w-4 text-gray-400 dark:text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                        </div>
+                        {powerSearch && (
+                          <button
+                            onClick={() => setPowerSearch('')}
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                          >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                      
+                      {/* Filter by Stock Status */}
+                      <select
+                        value={searchType}
+                        onChange={(e) => setSearchType(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                      >
+                        <option value="all">All Powers</option>
+                        <option value="in-stock">In Stock Only</option>
+                        <option value="out-of-stock">Out of Stock Only</option>
+                      </select>
+                      
+                      {/* Sort Options */}
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                      >
+                        <option value="power">Sort by Power</option>
+                        <option value="quantity">Sort by Quantity</option>
+                      </select>
+                      
+                      {/* View Mode */}
+                      <div className="flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
+                        <button
+                          onClick={() => setViewMode('grid')}
+                          className={`px-3 py-2 text-sm font-medium transition-colors ${
+                            viewMode === 'grid' 
+                              ? 'bg-sky-500 text-white' 
+                              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          Grid
+                        </button>
+                        <button
+                          onClick={() => setViewMode('table')}
+                          className={`px-3 py-2 text-sm font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
+                            viewMode === 'table' 
+                              ? 'bg-sky-500 text-white' 
+                              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          Table
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {/* Quick Filter Buttons */}
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => {
+                          setPowerSearch('');
+                          setSearchType('all');
+                          setSortBy('power');
+                        }}
+                        className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                      >
+                        Clear All Filters
+                      </button>
+                      <button
+                        onClick={() => setSearchType('in-stock')}
+                        className="px-3 py-1 text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
+                      >
+                        Show In Stock
+                      </button>
+                      <button
+                        onClick={() => setSearchType('out-of-stock')}
+                        className="px-3 py-1 text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                      >
+                        Show Out of Stock
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Quick Actions Toolbar */}
+                  {filteredPowers.length > 0 && (
+                    <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Quick Actions:</span>
+                        <button
+                          onClick={() => {
+                            setPowerSearch('');
+                            setSearchType('in-stock');
+                          }}
+                          className="px-3 py-1 text-xs bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"
+                        >
+                          Show Available Stock
+                        </button>
+                        <button
+                          onClick={() => {
+                            setPowerSearch('');
+                            setSearchType('out-of-stock');
+                          }}
+                          className="px-3 py-1 text-xs bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+                        >
+                          Show Empty Stock
+                        </button>
+                        <button
+                          onClick={() => setSortBy(sortBy === 'quantity' ? 'power' : 'quantity')}
+                          className="px-3 py-1 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+                        >
+                          Sort by {sortBy === 'quantity' ? 'Power' : 'Quantity'}
+                        </button>
+                        <button
+                          onClick={() => setViewMode(viewMode === 'grid' ? 'table' : 'grid')}
+                          className="px-3 py-1 text-xs bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors"
+                        >
+                          Switch to {viewMode === 'grid' ? 'Table' : 'Grid'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Results Summary */}
+                  <div className="mb-4 flex items-center justify-between">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Showing {filteredPowers.length} of {processedPowers.length} powers
+                      {powerSearch && (
+                        <span className="ml-2 px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded-full text-xs">
+                          Filtered by: "{powerSearch}"
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  
+                  {/* Power Display */}
+                  {filteredPowers.length > 0 ? (
+                    viewMode === 'grid' ? (
+                      /* Grid View */
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {filteredPowers.map((power) => (
+                          <div 
+                            key={power.key} 
+                            className={`relative p-4 rounded-lg border transition-all duration-200 hover:shadow-md ${
+                              power.inStock 
+                                ? 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-green-300 dark:hover:border-green-600' 
+                                : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700/50'
+                            }`}
+                          >
+                            {/* Stock Status Indicator */}
+                            <div className={`absolute top-2 right-2 w-3 h-3 rounded-full ${
+                              power.inStock ? 'bg-green-500' : 'bg-red-500'
+                            }`}></div>
+                            
+                            <div className="space-y-2">
+                              {/* Power Values */}
+                              <div className="space-y-1">
+                                <div className="font-medium text-gray-900 dark:text-white text-sm">
+                                  {power.displayText}
+                                </div>
+                                <div className="text-xs text-gray-600 dark:text-gray-400">
+                                  AXIS: {power.axis}°
+                                  {power.type === 'bifocal' && (
+                                    <span className="ml-2 px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full">
+                                      Bifocal
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              {/* Quantity */}
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-gray-500 dark:text-gray-400">Quantity:</span>
+                                <span className={`font-bold text-sm ${
+                                  power.inStock 
+                                    ? power.quantity >= 10 
+                                      ? 'text-green-600 dark:text-green-400' 
+                                      : power.quantity >= 5 
+                                        ? 'text-yellow-600 dark:text-yellow-400' 
+                                        : 'text-orange-600 dark:text-orange-400'
+                                    : 'text-red-600 dark:text-red-400'
+                                }`}>
+                                  {power.quantity} {power.quantity === 1 ? 'piece' : 'pieces'}
+                                </span>
+                              </div>
+                              
+                              {/* Stock Level Indicator */}
+                              {power.inStock && (
+                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                                  <div 
+                                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                                      power.quantity >= 10 
+                                        ? 'bg-green-500' 
+                                        : power.quantity >= 5 
+                                          ? 'bg-yellow-500' 
+                                          : 'bg-orange-500'
+                                    }`}
+                                    style={{ width: `${Math.min(power.quantity * 10, 100)}%` }}
+                                  ></div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      /* Table View */
+                      <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                          <thead className="bg-gray-50 dark:bg-gray-700">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Status
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                SPH
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                CYL
+                              </th>
+                              {filteredPowers.some(p => p.type === 'bifocal') && (
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                  ADD
+                                </th>
+                              )}
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                AXIS
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Type
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Quantity
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Stock Level
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                            {filteredPowers.map((power) => (
+                              <tr 
+                                key={power.key} 
+                                className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
+                                  !power.inStock ? 'bg-red-50 dark:bg-red-900/10' : ''
+                                }`}
+                              >
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <div className="flex items-center">
+                                    <div className={`w-2 h-2 rounded-full mr-2 ${
+                                      power.inStock ? 'bg-green-500' : 'bg-red-500'
+                                    }`}></div>
+                                    <span className={`text-xs font-medium ${
+                                      power.inStock ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
+                                    }`}>
+                                      {power.inStock ? 'In Stock' : 'Out of Stock'}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                                  {power.sph >= 0 ? `+${power.sph}` : power.sph}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                  {power.cyl >= 0 ? `+${power.cyl}` : power.cyl}
+                                </td>
+                                {filteredPowers.some(p => p.type === 'bifocal') && (
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                    {power.type === 'bifocal' ? `+${power.addition}` : '-'}
+                                  </td>
+                                )}
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                  {power.axis}°
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                    power.type === 'bifocal' 
+                                      ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                      : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                                  }`}>
+                                    {power.type === 'bifocal' ? 'Bifocal' : 'Single'}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <div className="flex items-center">
+                                    <span className={`text-sm font-bold mr-2 ${
+                                      power.inStock 
+                                        ? power.quantity >= 10 
+                                          ? 'text-green-600 dark:text-green-400' 
+                                          : power.quantity >= 5 
+                                            ? 'text-yellow-600 dark:text-yellow-400' 
+                                            : 'text-orange-600 dark:text-orange-400'
+                                        : 'text-red-600 dark:text-red-400'
+                                    }`}>
+                                      {power.quantity}
+                                    </span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                      {power.quantity === 1 ? 'piece' : 'pieces'}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  {power.inStock ? (
+                                    <div className="flex items-center">
+                                      <div className="w-16 bg-gray-200 dark:bg-gray-600 rounded-full h-2 mr-2">
+                                        <div 
+                                          className={`h-2 rounded-full transition-all duration-300 ${
+                                            power.quantity >= 10 
+                                              ? 'bg-green-500' 
+                                              : power.quantity >= 5 
+                                                ? 'bg-yellow-500' 
+                                                : 'bg-orange-500'
+                                          }`}
+                                          style={{ width: `${Math.min(power.quantity * 10, 100)}%` }}
+                                        ></div>
+                                      </div>
+                                      <span className={`text-xs ${
+                                        power.quantity >= 10 
+                                          ? 'text-green-600 dark:text-green-400' 
+                                          : power.quantity >= 5 
+                                            ? 'text-yellow-600 dark:text-yellow-400' 
+                                            : 'text-orange-600 dark:text-orange-400'
+                                      }`}>
+                                        {power.quantity >= 10 ? 'High' : power.quantity >= 5 ? 'Medium' : 'Low'}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-xs text-red-600 dark:text-red-400">Empty</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )
+                  ) : (
+                    /* No Results */
+                    <div className="text-center py-12">
+                      <div className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500 mb-4">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6 4h6m6-8a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                        No powers found
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                        {powerSearch 
+                          ? `No powers match your search "${powerSearch}"` 
+                          : searchType === 'in-stock' 
+                            ? 'No powers are currently in stock'
+                            : searchType === 'out-of-stock'
+                              ? 'No powers are out of stock'
+                              : 'No power inventory data available'
+                        }
+                      </p>
+                      {powerSearch && (
+                        <button
+                          onClick={() => setPowerSearch('')}
+                          className="text-sm text-sky-600 dark:text-sky-400 hover:text-sky-500 dark:hover:text-sky-300"
+                        >
+                          Clear search
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+            
+
+          </div>
+                )}
         
         {/* Sales Trends Card */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 border border-gray-200 dark:border-gray-700">
@@ -1313,11 +2023,118 @@ const LensDetail = () => {
                 {/* Current Quantity Display */}
                 <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-md border border-blue-200 dark:border-blue-700">
                   <p className="text-sm text-blue-700 dark:text-blue-300">
-                    <span className="font-medium">Current Quantity in Stock:</span> {lens.qty || 0} units
+                    <span className="font-medium">Current Quantity in Stock:</span>{' '}
+                    {lens.type === 'stock' && lens.inventoryType === 'individual' && lens.powerInventory 
+                      ? `${Object.values(lens.powerInventory).reduce((sum, powerData) => sum + (parseInt(powerData?.quantity) || 0), 0)} pieces (${Object.keys(lens.powerInventory).length} powers)`
+                      : `${lens.qty || 0} units`
+                    }
                   </p>
                 </div>
 
-                {/* Quantity to Deduct */}
+                {/* Deduction Type Selection for Stock Lenses with Individual Inventory */}
+                {lens.type === 'stock' && lens.inventoryType === 'individual' && lens.powerInventory && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Deduction Type <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setDeductionType('general')}
+                        className={`p-3 rounded-lg border text-left transition-all ${
+                          deductionType === 'general'
+                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                            : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500'
+                        }`}
+                      >
+                        <div className="flex items-center mb-1">
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                          </svg>
+                          <span className="font-medium">General Deduction</span>
+                        </div>
+                        <p className="text-xs opacity-75">Deduct from overall inventory quantity</p>
+                      </button>
+                      
+                      <button
+                        type="button"
+                        onClick={() => setDeductionType('specific')}
+                        className={`p-3 rounded-lg border text-left transition-all ${
+                          deductionType === 'specific'
+                            ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                            : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500'
+                        }`}
+                      >
+                        <div className="flex items-center mb-1">
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span className="font-medium">Select Powers</span>
+                        </div>
+                        <p className="text-xs opacity-75">Choose specific powers to deduct</p>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Power Selection for Specific Deduction */}
+                {deductionType === 'specific' && lens.type === 'stock' && lens.inventoryType === 'individual' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Selected Powers ({selectedPowersForDeduction.length})
+                    </label>
+                    
+                    {selectedPowersForDeduction.length === 0 ? (
+                      <button
+                        type="button"
+                        onClick={openPowerSelectionForDeduction}
+                        className="w-full p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-center text-gray-500 dark:text-gray-400 hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+                      >
+                        <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        <span className="text-sm font-medium">Select Powers to Deduct</span>
+                        <p className="text-xs mt-1">Choose specific lens powers for deduction</p>
+                      </button>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="bg-purple-50 dark:bg-purple-900/30 rounded-lg border border-purple-200 dark:border-purple-700">
+                          <div className="p-3 border-b border-purple-200 dark:border-purple-700 flex justify-between items-center">
+                            <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                              {selectedPowersForDeduction.length} Power{selectedPowersForDeduction.length !== 1 ? 's' : ''} Selected
+                            </span>
+                            <button
+                              type="button"
+                              onClick={openPowerSelectionForDeduction}
+                              className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-200 font-medium"
+                            >
+                              Change Selection
+                            </button>
+                          </div>
+                          <div className="p-3 max-h-32 overflow-y-auto">
+                            {selectedPowersForDeduction.map((power, index) => (
+                              <div key={power.powerKey} className="flex justify-between items-center text-sm py-1">
+                                <span className="font-mono text-gray-700 dark:text-gray-300">{power.powerDisplay}</span>
+                                <span className="text-purple-600 dark:text-purple-400 font-medium">
+                                  {power.pieceQuantity} pcs
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="p-3 border-t border-purple-200 dark:border-purple-700 bg-purple-100 dark:bg-purple-900/50">
+                            <div className="flex justify-between items-center text-sm font-medium text-purple-700 dark:text-purple-300">
+                              <span>Total to Deduct:</span>
+                              <span>{selectedPowersForDeduction.reduce((sum, p) => sum + p.pieceQuantity, 0)} pieces</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Quantity to Deduct - Only for General Deduction */}
+                {deductionType === 'general' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Quantity to Deduct <span className="text-red-500">*</span>
@@ -1335,6 +2152,7 @@ const LensDetail = () => {
                     placeholder="Enter quantity to deduct"
                   />
                 </div>
+                )}
 
                 {/* Reason for Deduction */}
                 <div>
@@ -1398,11 +2216,38 @@ const LensDetail = () => {
                 </div>
 
                 {/* Calculation Display */}
-                {deductionData.quantity && parseInt(deductionData.quantity) > 0 && (
+                {(
+                  (deductionType === 'general' && deductionData.quantity && parseInt(deductionData.quantity) > 0) ||
+                  (deductionType === 'specific' && selectedPowersForDeduction.length > 0)
+                ) && (
                   <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md border border-gray-200 dark:border-gray-600">
+                    {deductionType === 'general' ? (
                     <p className="text-sm text-gray-700 dark:text-gray-300">
                       <span className="font-medium">After deduction:</span> {(lens.qty || 0) - parseInt(deductionData.quantity)} units will remain
                     </p>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">After power-specific deduction:</p>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          <div className="flex justify-between">
+                            <span>Total pieces to deduct:</span>
+                            <span className="font-medium">{selectedPowersForDeduction.reduce((sum, p) => sum + p.pieceQuantity, 0)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Current total inventory:</span>
+                            <span className="font-medium">
+                              {Object.values(lens.powerInventory || {}).reduce((sum, powerData) => sum + (parseInt(powerData?.quantity) || 0), 0)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between border-t border-gray-300 dark:border-gray-600 pt-1 mt-1">
+                            <span>Remaining total pieces:</span>
+                            <span className="font-medium text-green-600 dark:text-green-400">
+                              {Object.values(lens.powerInventory || {}).reduce((sum, powerData) => sum + (parseInt(powerData?.quantity) || 0), 0) - selectedPowersForDeduction.reduce((sum, p) => sum + p.pieceQuantity, 0)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1438,6 +2283,15 @@ const LensDetail = () => {
           </div>
         </div>
       )}
+
+      {/* Power Selection Modal for Deduction */}
+      <PowerSelectionModal 
+        isOpen={showPowerSelectionForDeduction}
+        onClose={() => setShowPowerSelectionForDeduction(false)}
+        onSelectPower={handlePowerSelectionForDeduction}
+        selectedLens={lens}
+        rowIndex={0} // Not used in deduction context, but required by component
+      />
     </div>
   );
 };

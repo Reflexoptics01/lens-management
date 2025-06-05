@@ -26,25 +26,12 @@ const SaleDetail = () => {
     fetchShopInfo();
   }, [saleId]);
 
-  // Add debugging effect to log sale data when it changes
-  useEffect(() => {
-    if (sale) {
-      console.log('Current sale state:', sale);
-      console.log('Items in state:', sale.items);
-      
-      if (sale.items && sale.items.length > 0) {
-        console.log('First item properties:', Object.keys(sale.items[0]));
-        console.log('First item sample:', sale.items[0]);
-      }
-    }
-  }, [sale]);
+  // Remove debugging logs for production
 
   const fetchSaleDetails = async () => {
     try {
       setLoading(true);
       setError(''); // Clear any previous errors
-      
-      console.log('Fetching sale details for ID:', saleId);
       
       // Use user-specific collection instead of global collection
       const saleDoc = await getDoc(getUserDoc('sales', saleId));
@@ -55,43 +42,24 @@ const SaleDetail = () => {
       }
       
       const saleData = saleDoc.data();
-      console.log('Raw sale data:', saleData);
-      
-      // Log specific phone information to help debug
-      console.log('Sale phone number:', saleData.phone);
-      console.log('Sale customerPhone:', saleData.customerPhone);
       
       // If phone is not in the sale data, try to fetch it from customer record
       let customerPhone = saleData.phone || saleData.customerPhone || '';
       
       if (!customerPhone && saleData.customerId) {
         try {
-          console.log('Fetching customer details for ID:', saleData.customerId);
           // Use user-specific customer collection
           const customerDoc = await getDoc(getUserDoc('customers', saleData.customerId));
           if (customerDoc.exists()) {
             const customerData = customerDoc.data();
             customerPhone = customerData.phone || '';
-            console.log('Retrieved customer phone from customer record:', customerPhone);
           }
         } catch (error) {
           console.error('Error fetching customer details:', error);
         }
       }
       
-      // Debug items array to help diagnose issues
-      if (saleData.items && Array.isArray(saleData.items)) {
-        console.log(`Found ${saleData.items.length} items in the sale`);
-        saleData.items.forEach((item, index) => {
-          console.log(`Item ${index + 1}:`, item);
-          // Check what properties are available
-          if (item) {
-            console.log(`Item ${index + 1} properties:`, Object.keys(item));
-          }
-        });
-      } else {
-        console.warn('No items array found in sale data or items is not an array');
-          }
+            // Validate items array structure
       
       // Use our utility function to safely parse dates
       const createdAt = safelyParseDate(saleData.createdAt) || new Date();
@@ -103,6 +71,28 @@ const SaleDetail = () => {
       
       if (saleData.items && Array.isArray(saleData.items)) {
         processedItems = saleData.items.map(item => {
+          // Ensure item is an object to prevent runtime errors
+          if (!item || typeof item !== 'object') {
+            return {
+              itemName: '',
+              qty: 0,
+              quantity: 0,
+              price: 0,
+              rate: 0,
+              discount: 0,
+              tax: 0,
+              taxRate: 0,
+              total: 0,
+              totalAmount: 0,
+              power: '',
+              sph: '',
+              cyl: '',
+              axis: '',
+              add: '',
+              unit: 'Pairs'
+            };
+          }
+          
           // Create a new object with standardized properties
           return {
             // Common item properties
@@ -149,8 +139,6 @@ const SaleDetail = () => {
         items: processedItems
       };
       
-      console.log('Processed sale data:', processedSale);
-      
       setSale(processedSale);
     } catch (error) {
       console.error('Error fetching sale details:', error);
@@ -188,6 +176,10 @@ const SaleDetail = () => {
     if (!content) return;
 
     const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Popup blocked. Please allow popups for this site.');
+      return;
+    }
     printWindow.document.write(`
       <html>
         <head>
@@ -241,7 +233,7 @@ const SaleDetail = () => {
           </style>
         </head>
         <body>
-          ${content.innerHTML}
+          ${content ? content.innerHTML : ''}
           <div class="no-print" style="margin-top: 20px; text-align: center;">
             <button onclick="window.print();" style="padding: 10px 20px; background: #4a90e2; color: white; border: none; border-radius: 4px; cursor: pointer;">
               Print
@@ -266,8 +258,7 @@ const SaleDetail = () => {
   const AddressModal = () => {
     if (!sale || !shopInfo) return null;
     
-    // Log the phone number for debugging
-    console.log('Phone number in address modal:', sale.phone);
+    // Validate phone number availability
     
     return (
       <div className="fixed inset-0 overflow-y-auto z-50">
@@ -498,16 +489,17 @@ const SaleDetail = () => {
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                   <thead className="bg-gray-50 dark:bg-gray-700">
                         <tr>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Item</th>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">SPH</th>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">CYL</th>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">AXIS</th>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">ADD</th>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Qty</th>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Rate</th>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Discount</th>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tax</th>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">SL No</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Order ID</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Item Name</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">SPH</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">CYL</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">AXIS</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">ADD</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Qty</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Unit</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Rate</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total</th>
                         </tr>
                       </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -554,24 +546,28 @@ const SaleDetail = () => {
                         const axisDisplay = axis !== '-' && !isNaN(parseFloat(axis)) ? 
                           `${axis}°` : axis;
                         
+                        // Get order ID from the item
+                        const orderId = item.orderId || '-';
+                        
                         return (
                           <tr key={index}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white text-center">{item.itemName || 'N/A'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-center">{sph}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-center">{cyl}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-center">{axisDisplay}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-center">{add}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-center">{quantity} {unit}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-center">₹{typeof rate === 'number' ? rate.toFixed(2) : parseFloat(rate || 0).toFixed(2)}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-center">{discount}%</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-center">{tax}%</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-center">₹{typeof totalAmount === 'number' ? totalAmount.toFixed(2) : parseFloat(totalAmount || 0).toFixed(2)}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white text-left">{index + 1}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-left">{orderId}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white text-left">{item.itemName || 'N/A'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-left">{sph}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-left">{cyl}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-left">{axisDisplay}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-left">{add}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-left">{quantity}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-left">{unit}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-left">₹{typeof rate === 'number' ? rate.toFixed(2) : parseFloat(rate || 0).toFixed(2)}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-left">₹{typeof totalAmount === 'number' ? totalAmount.toFixed(2) : parseFloat(totalAmount || 0).toFixed(2)}</td>
                           </tr>
                         );
                       })
                     ) : (
                       <tr>
-                        <td colSpan="10" className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-center">No items found</td>
+                        <td colSpan="11" className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300 text-left">No items found</td>
                       </tr>
                     )}
                       </tbody>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { db } from '../firebaseConfig';
-import { collection, getDocs, getDoc, doc, updateDoc, serverTimestamp, query, where, orderBy, setDoc, addDoc } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, updateDoc, serverTimestamp, query, where, orderBy, setDoc, addDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import CustomerSearch from '../components/CustomerSearch';
@@ -8,13 +8,12 @@ import CustomerForm from '../components/CustomerForm';
 import ItemSuggestions from '../components/ItemSuggestions';
 import PrintInvoiceModal from '../components/PrintInvoiceModal';
 import BottomActionBar from '../components/BottomActionBar';
+import PowerSelectionModal from '../components/PowerSelectionModal';
 import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
+import { calculateCustomerBalance, calculateVendorBalance, formatCurrency as formatCurrencyUtil, getBalanceColorClass, getBalanceStatusText } from '../utils/ledgerUtils';
 
 const TAX_OPTIONS = [
   { id: 'TAX_FREE', label: 'Tax Free', rate: 0 },
-  { id: 'GST_6', label: 'GST 6%', rate: 6 },
-  { id: 'GST_12', label: 'GST 12%', rate: 12 },
-  { id: 'GST_18', label: 'GST 18%', rate: 18 },
   { id: 'CGST_SGST_6', label: 'CGST/SGST 6%', rate: 6, split: true },
   { id: 'CGST_SGST_12', label: 'CGST/SGST 12%', rate: 12, split: true },
   { id: 'CGST_SGST_18', label: 'CGST/SGST 18%', rate: 18, split: true },
@@ -29,6 +28,7 @@ const EditSale = () => {
   const [customers, setCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerBalance, setCustomerBalance] = useState(0);
+  const [loadingBalance, setLoadingBalance] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -85,12 +85,57 @@ const EditSale = () => {
   // Add PrintInvoiceModal state
   const [showPrintModal, setShowPrintModal] = useState(false);
 
+  // Add state for address modal
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [shopInfo, setShopInfo] = useState(null);
+
+  // Add state for dispatch logs
+  const [dispatchLogs, setDispatchLogs] = useState([]);
+  const [showDispatchLogs, setShowDispatchLogs] = useState(false);
+  const [searchLogQuery, setSearchLogQuery] = useState('');
+  const [isSearchingLogs, setIsSearchingLogs] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [selectedLogDate, setSelectedLogDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // PowerSelectionModal state - ONLY for stock lenses
+  const [showPowerSelectionModal, setShowPowerSelectionModal] = useState(false);
+  const [powerSelectionRowIndex, setPowerSelectionRowIndex] = useState(null);
+  const [selectedStockPowers, setSelectedStockPowers] = useState({}); // Track selected powers by row index
+  const [selectedLensForPowerModal, setSelectedLensForPowerModal] = useState(null); // Store the lens object for the modal
+
+  // Format optical values (SPH, CYL, ADD) to "0.00" format with signs
+  const formatOpticalValue = (value) => {
+    if (!value || value === '') return '';
+    
+    // Convert to number
+    let numValue = parseFloat(value);
+    if (isNaN(numValue)) return value; // Return original if not a valid number
+    
+    // Format to 2 decimal places and add + sign for positive values
+    let formattedValue = numValue.toFixed(2);
+    
+    // Add plus sign for positive values (including zero with a plus sign if it has no sign)
+    if (numValue > 0 || (numValue === 0 && !value.includes('-'))) {
+      formattedValue = '+' + formattedValue;
+    }
+    
+    return formattedValue;
+  };
+
   // Fetch sale data and customers when component mounts
   useEffect(() => {
     fetchCustomers();
     fetchSaleData();
     fetchItems();
+    fetchShopInfo();
   }, [saleId]);
+
+  // Add useEffect to fetch dispatch logs when invoice date changes
+  useEffect(() => {
+    if (selectedLogDate) {
+      fetchDispatchLogs(selectedLogDate);
+    }
+  }, [selectedLogDate]);
 
   // Handlers for tax calculations
   const getTaxOption = (taxId) => {
@@ -122,11 +167,29 @@ const EditSale = () => {
   
   // Calculate grand total
   const calculateTotal = () => {
-    const subtotal = calculateSubtotal();
-    const discountAmount = calculateDiscountAmount();
-    const taxAmount = calculateTaxAmount();
-    const freight = parseFloat(frieghtCharge || 0);
-    return subtotal - discountAmount + taxAmount + freight;
+    try {
+      const subtotal = calculateSubtotal();
+      const discountAmount = calculateDiscountAmount();
+      const taxAmount = calculateTaxAmount();
+      const freight = parseFloat(frieghtCharge || 0);
+      const total = subtotal - discountAmount + taxAmount + freight;
+      return isNaN(total) ? 0 : total;
+    } catch (error) {
+      return 0; // Return 0 if calculation fails
+    }
+  };
+
+  // Fetch shop information for the address
+  const fetchShopInfo = async () => {
+    try {
+      // Use user-specific settings collection
+      const shopSettingsDoc = await getDoc(getUserDoc('settings', 'shopSettings'));
+      if (shopSettingsDoc.exists()) {
+        setShopInfo(shopSettingsDoc.data());
+      }
+    } catch (error) {
+      console.error('Error fetching shop info:', error);
+    }
   };
 
   const fetchSaleData = async () => {
@@ -175,7 +238,7 @@ const EditSale = () => {
               customer.openingBalance = customerData.openingBalance;
             }
           } catch (error) {
-            console.log('Could not fetch customer details:', error);
+            // Could not fetch customer details
           }
         }
         
@@ -222,26 +285,87 @@ const EditSale = () => {
 
   const fetchCustomers = async () => {
     try {
+      setLoading(true);
+      
+      // Fetch customers
       const customersRef = getUserCollection('customers');
-      const q = query(customersRef, orderBy('opticalName'));
-      const snapshot = await getDocs(q);
-      const customersList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
+      const customersQuery = query(customersRef, orderBy('opticalName'));
+      const customersSnapshot = await getDocs(customersQuery);
+      const customersList = customersSnapshot.docs
+        .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      
+      // Include customers marked as vendors (no need to fetch from global vendors collection)
+      const customersAsVendors = customersList.filter(customer => 
+        customer.isVendor || customer.type === 'vendor'
+      ).map(customer => ({
+        ...customer,
+        type: 'vendor',
+        isVendor: true
       }));
-      setCustomers(customersList);
+      
+      // Merge all entities and remove duplicates by ID
+      const allEntities = [...customersList, ...customersAsVendors];
+      const uniqueEntities = allEntities.reduce((acc, entity) => {
+        const existingIndex = acc.findIndex(e => e.id === entity.id);
+        if (existingIndex >= 0) {
+          // If entity exists, prefer vendor type if either is marked as vendor
+          if (entity.isVendor || entity.type === 'vendor') {
+            acc[existingIndex] = { ...acc[existingIndex], ...entity, type: 'vendor', isVendor: true };
+          }
+        } else {
+          acc.push(entity);
+        }
+        return acc;
+      }, []);
+      
+      // Sort by name
+      uniqueEntities.sort((a, b) => {
+        const nameA = a.opticalName || a.name || '';
+        const nameB = b.opticalName || b.name || '';
+        return nameA.toLowerCase().localeCompare(nameB.toLowerCase());
+      });
+      
+      setCustomers(uniqueEntities);
     } catch (error) {
-      console.error('Error fetching customers:', error);
-      setError('Failed to fetch customers');
+      console.error('Error fetching customers and vendors:', error);
+      setError('Failed to fetch customers and vendors');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleCustomerSelect = (customer) => {
-    // Selected customer from search suggestions
+  const handleCustomerSelect = async (customer) => {
+    // Selected customer/vendor from search suggestions
     setSelectedCustomer(customer);
     if (customer) {
-      const balance = customer.openingBalance || 0;
-      setCustomerBalance(balance);
+      setLoadingBalance(true);
+      try {
+        // Detect if this is a vendor and use appropriate balance calculation
+        const entityIsVendor = customer.isVendor || customer.type === 'vendor';
+        
+        let currentBalance;
+        if (entityIsVendor) {
+          // Use vendor balance calculation
+          currentBalance = await calculateVendorBalance(customer.id, customer.openingBalance || 0);
+        } else {
+          // Use customer balance calculation
+          currentBalance = await calculateCustomerBalance(customer.id, customer.openingBalance || 0);
+        }
+        
+        setCustomerBalance(currentBalance);
+      } catch (error) {
+        console.error('Error calculating balance:', error);
+        // Fallback to opening balance
+        setCustomerBalance(customer.openingBalance || 0);
+      } finally {
+        setLoadingBalance(false);
+      }
+    } else {
+      setCustomerBalance(0);
     }
   };
 
@@ -306,13 +430,31 @@ const EditSale = () => {
           orderDoc = await getDoc(getUserDoc('orders', orderId));
         } catch (e) {
           // If direct ID fails, no order was found
-          console.log('Order not found by ID:', e);
+          // Order not found by ID
         }
       }
 
       if (orderDoc && orderDoc.exists()) {
         const orderData = { id: orderDoc.id, ...orderDoc.data() };
         
+        // Calculate proper quantity in pairs
+        let quantity = 1; // default
+        const rightQty = parseInt(orderData.rightQty || 0);
+        const leftQty = parseInt(orderData.leftQty || 0);
+        
+        // If both right and left are present, this is a pair
+        if (rightQty > 0 && leftQty > 0) {
+          // In optical terms, 1 right + 1 left = 1 pair
+          // We take the maximum since you can't have a partial pair
+          quantity = Math.max(rightQty, leftQty);
+        } else {
+          // If only one side is ordered, then count just that side
+          quantity = Math.max(rightQty, leftQty);
+        }
+        
+        // Ensure we have at least 1 quantity
+        quantity = quantity || 1;
+
         // Update the row with order details
         const updatedRows = [...tableRows];
         updatedRows[rowIndex] = {
@@ -321,14 +463,14 @@ const EditSale = () => {
           orderId: orderData.displayId, 
           orderDetails: orderData,
           itemName: orderData.brandName || '',
-          // Extract prescription from either the right or left eye
-          sph: orderData.rightSph || orderData.leftSph || '',
-          cyl: orderData.rightCyl || orderData.leftCyl || '',
-          axis: orderData.rightAxis || orderData.leftAxis || '',
-          add: orderData.rightAdd || orderData.leftAdd || '',
-          qty: (parseInt(orderData.rightQty || 0) + parseInt(orderData.leftQty || 0)) || 1,
+          // Extract prescription from either the right or left eye and format it
+          sph: formatOpticalValue(orderData.rightSph || orderData.leftSph || ''),
+          cyl: formatOpticalValue(orderData.rightCyl || orderData.leftCyl || ''),
+          axis: orderData.rightAxis || orderData.leftAxis || '', // No formatting for AXIS
+          add: formatOpticalValue(orderData.rightAdd || orderData.leftAdd || ''),
+          qty: quantity,
           price: orderData.price || 0,
-          total: (orderData.price || 0) * ((parseInt(orderData.rightQty || 0) + parseInt(orderData.leftQty || 0)) || 1)
+          total: (orderData.price || 0) * quantity
         };
         setTableRows(updatedRows);
       } else {
@@ -339,7 +481,7 @@ const EditSale = () => {
           orderId
         };
         setTableRows(updatedRows);
-        console.log('Order not found');
+        // Order not found
       }
     } catch (error) {
       console.error('Error fetching order details:', error);
@@ -348,23 +490,47 @@ const EditSale = () => {
 
   const handleTableRowChange = (index, field, value) => {
     const updatedRows = [...tableRows];
-    updatedRows[index] = {
-      ...updatedRows[index],
-      [field]: value
-    };
+    
+    // Format SPH, CYL, and ADD values when they're changed
+    if (field === 'sph' || field === 'cyl' || field === 'add') {
+      // Only format when the field loses focus or user presses Enter
+      updatedRows[index] = {
+        ...updatedRows[index],
+        [field]: value
+      };
+    } else {
+      updatedRows[index] = {
+        ...updatedRows[index],
+        [field]: value
+      };
+    }
 
     // Recalculate total for the row if price or qty changes
     if (field === 'price' || field === 'qty') {
-      updatedRows[index].total = 
-        parseFloat(updatedRows[index].price || 0) * 
-        parseInt(updatedRows[index].qty || 0);
+      const price = parseFloat(updatedRows[index].price || 0);
+      const qty = parseInt(updatedRows[index].qty || 1); // Default to 1, not 0
+      updatedRows[index].total = price * qty;
       
       // Save item to database when price is updated and we have an item name
       if (field === 'price' && updatedRows[index].itemName.trim() !== '') {
-        saveItemToDatabase(updatedRows[index].itemName, value);
+        try {
+          saveItemToDatabase(updatedRows[index].itemName, value);
+        } catch (error) {
+          // Silent fail - don't disrupt user flow
+        }
       }
     }
 
+    setTableRows(updatedRows);
+  };
+  
+  // Format SPH, CYL, and ADD when the field loses focus
+  const handleOpticalValueBlur = (index, field, value) => {
+    const updatedRows = [...tableRows];
+    updatedRows[index] = {
+      ...updatedRows[index],
+      [field]: formatOpticalValue(value)
+    };
     setTableRows(updatedRows);
   };
 
@@ -450,7 +616,7 @@ const EditSale = () => {
     }
     
     if (!selectedCustomer.phone) {
-      alert(`No phone number found for ${selectedCustomer.opticalName}. Please add a phone number to the customer record.`);
+      alert(`No phone number found for ${selectedCustomer.opticalName || 'this customer'}. Please add a phone number to the customer record.`);
       return;
     }
     
@@ -466,10 +632,13 @@ const EditSale = () => {
       currency: 'INR'
     });
     
+    const customerName = (selectedCustomer.opticalName || 'Customer').replace(/[^\w\s]/g, '');
+    const safeInvoiceNumber = (invoiceNumber || 'N/A').replace(/[^\w\s-]/g, '');
+    
     const message = 
       `*Updated Invoice from PRISM OPTICAL*\n\n` +
-      `Dear ${selectedCustomer.opticalName},\n\n` +
-      `Your invoice ${invoiceNumber} has been updated with amount ${total}.\n\n` +
+      `Dear ${customerName},\n\n` +
+      `Your invoice ${safeInvoiceNumber} has been updated with amount ${total}.\n\n` +
       `Thank you for your business!\n` +
       `For any questions, please contact us.`;
     
@@ -483,13 +652,9 @@ const EditSale = () => {
     }
   };
 
-  // Format currency for display
+  // Format currency for display - use the utility function
   const formatCurrency = (amount) => {
-    if (amount === undefined || amount === null) return '-';
-    return `₹${parseFloat(amount).toLocaleString('en-IN', { 
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2 
-    })}`;
+    return formatCurrencyUtil(amount);
   };
 
   // Get visible rows based on current state
@@ -503,21 +668,58 @@ const EditSale = () => {
   // Add function to fetch saved items
   const fetchItems = async () => {
     try {
-      const itemsRef = getUserCollection('items');
-      const snapshot = await getDocs(itemsRef);
+      // Only fetch items from 'lensInventory' collection to restrict suggestions using multi-tenant collection
+      const lensRef = getUserCollection('lensInventory');
+      const allSnapshot = await getDocs(lensRef);
       
       // Create a map to deduplicate items by name
       const uniqueItems = {};
       
-      snapshot.docs.forEach(doc => {
-        const item = { id: doc.id, ...doc.data() };
-        const normalizedName = item.name.trim().toLowerCase();
+      // Process all items from lens_inventory
+      allSnapshot.docs.forEach(doc => {
+        const lens = { id: doc.id, ...doc.data() };
         
-        // Only keep the latest version of each item (by name)
-        if (!uniqueItems[normalizedName] || 
-            (item.updatedAt && uniqueItems[normalizedName].updatedAt && 
-             item.updatedAt.toDate() > uniqueItems[normalizedName].updatedAt.toDate())) {
-          uniqueItems[normalizedName] = item;
+        let itemName = '';
+        let itemPrice = 0;
+        
+        // Determine item name and price based on lens type
+        if (lens.type === 'stock') {
+          itemName = `${lens.brandName || ''} ${lens.powerSeries || ''}`.trim();
+          itemPrice = lens.salePrice || 0;
+        } else if (lens.type === 'service') {
+          itemName = lens.serviceName || lens.brandName || '';
+          itemPrice = lens.salePrice || lens.servicePrice || 0;
+        } else if (lens.type === 'prescription') {
+          itemName = lens.brandName || '';
+          itemPrice = lens.salePrice || 0;
+        } else if (lens.type === 'contact') {
+          itemName = `${lens.brandName || ''} ${lens.powerSeries || ''}`.trim();
+          itemPrice = lens.salePrice || 0;
+        }
+        
+        if (itemName.trim()) {
+          const normalizedName = itemName.toLowerCase();
+          
+          // Add to uniqueItems if it doesn't exist or if this is a newer entry
+          if (!uniqueItems[normalizedName] || 
+              (lens.createdAt && uniqueItems[normalizedName].createdAt && 
+               lens.createdAt.toDate() > uniqueItems[normalizedName].createdAt.toDate())) {
+            
+            uniqueItems[normalizedName] = {
+              id: lens.id,
+              name: itemName,
+              price: itemPrice,
+              createdAt: lens.createdAt,
+              isStockLens: lens.type === 'stock',
+              isService: lens.type === 'service',
+              isContactLens: lens.type === 'contact',
+              isPrescription: lens.type === 'prescription',
+              stockData: lens.type === 'stock' ? lens : null,
+              serviceData: lens.type === 'service' ? lens : null,
+              contactData: lens.type === 'contact' ? lens : null,
+              prescriptionData: lens.type === 'prescription' ? lens : null
+            };
+          }
         }
       });
       
@@ -526,7 +728,6 @@ const EditSale = () => {
         a.name.toLowerCase().localeCompare(b.name.toLowerCase())
       );
       
-      console.log("Fetched unique items:", itemsList.length);
       setItemSuggestions(itemsList);
     } catch (error) {
       console.error('Error fetching items:', error);
@@ -552,7 +753,7 @@ const EditSale = () => {
           price: parseFloat(price) || 0,
           createdAt: serverTimestamp()
         });
-        console.log(`Created new item: ${normalizedName} - ₹${price}`);
+        // Item created successfully
       } else {
         // Update existing item
         const existingItem = snapshot.docs[0];
@@ -560,7 +761,7 @@ const EditSale = () => {
           price: parseFloat(price) || 0,
           updatedAt: serverTimestamp()
         });
-        console.log(`Updated existing item: ${normalizedName} - ₹${price}`);
+        // Item updated successfully
       }
       
       // Refresh items list
@@ -572,12 +773,384 @@ const EditSale = () => {
 
   // Handle item selection from the ItemSuggestions component
   const handleItemSelect = (index, itemData) => {
+    // Get the price - prioritize the main price field that ItemSuggestions passes
+    let itemPrice = parseFloat(itemData.price || 0);
+    
+    // If no price in main field, try service-specific fields
+    if (itemPrice === 0 && itemData.isService && itemData.serviceData) {
+      itemPrice = parseFloat(
+        itemData.serviceData.salePrice || 
+        itemData.serviceData.servicePrice || 
+        0
+      );
+    }
+    
+    // If still no price, try stock lens fields
+    if (itemPrice === 0 && itemData.isStockLens && itemData.stockData) {
+      itemPrice = parseFloat(itemData.stockData.salePrice || 0);
+    }
+    
+    // First update the item name
+    handleTableRowChange(index, 'itemName', itemData.name || itemData.itemName);
+    
+    // Then update the price, which will trigger total calculation
+    if (itemPrice > 0) {
+      setTimeout(() => {
+        handleTableRowChange(index, 'price', itemPrice.toString());
+      }, 10);
+    }
+    
+    // Store lens data for stock lenses to be used by PowerSelectionModal
+    if (itemData.isStockLens && itemData.stockData) {
+      const updatedRows = [...tableRows];
+      updatedRows[index].powerSeries = itemData.stockData.powerSeries || '';
+      updatedRows[index].stockLensData = itemData; // Store complete lens data for modal use
+      
+      // For stock lenses, clear optical values and guide user to use PowerSelectionModal
+      updatedRows[index].sph = '';
+      updatedRows[index].cyl = '';
+      updatedRows[index].axis = '';
+      updatedRows[index].add = '';
+      
+      setTableRows(updatedRows);
+      
+      // Auto-focus the power selection button after a short delay
+      setTimeout(() => {
+        const powerButton = document.querySelector(`[data-power-button="${index}"]`);
+        if (powerButton && powerButton.focus) {
+          powerButton.focus();
+          if (powerButton.classList) {
+            powerButton.classList.add('animate-pulse');
+            setTimeout(() => {
+              if (powerButton.classList) {
+                powerButton.classList.remove('animate-pulse');
+              }
+            }, 2000);
+          }
+        }
+      }, 100);
+    }
+  };
+
+  // Add function to fetch dispatch logs
+  const fetchDispatchLogs = async (date) => {
+    try {
+      const dispatchRef = getUserCollection('dispatchLogs');
+      
+      // Try without orderBy first to see if we get any results
+      const simpleQuery = query(dispatchRef, where('date', '==', date));
+      const snapshot = await getDocs(simpleQuery);
+      
+      if (snapshot.empty) {
+        // Try getting all logs and filter in memory
+        const allSnapshot = await getDocs(dispatchRef);
+        
+        // Filter manually
+        const logsList = allSnapshot.docs
+          .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+          .map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+        
+        setDispatchLogs(logsList);
+      } else {
+        const logsList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        setDispatchLogs(logsList);
+      }
+    } catch (error) {
+      console.error('Error fetching dispatch logs:', error);
+      setDispatchLogs([]);
+    }
+  };
+  
+  // Add function to import dispatch log entries to invoice
+  const importDispatchLog = (log) => {
+    // First check if we have a customer selected, if not try to find matching customer
+    if (!selectedCustomer) {
+      const matchingCustomer = customers.find(
+        customer => customer.opticalName && log.opticalShop && 
+        customer.opticalName.toLowerCase() === log.opticalShop.toLowerCase()
+      );
+      
+      if (matchingCustomer) {
+        handleCustomerSelect(matchingCustomer);
+      } else {
+        setError(`Please select a customer first. Could not find customer matching "${log.opticalShop}"`);
+        return;
+      }
+    }
+    
+    try {
+      if (!log.items || !Array.isArray(log.items) || log.items.length === 0) {
+        setError("No items found in this dispatch log");
+        return;
+      }
+      
+      // Find the first empty row index in the current table
+      let insertIndex = tableRows.findIndex(row => row.itemName.trim() === '');
+      if (insertIndex === -1) {
+        // If no empty rows, add new ones
+        insertIndex = tableRows.length;
+        addMoreRows(log.items.length);
+      }
+      
+      // Create updated rows array
+      const updatedRows = [...tableRows];
+      
+      // Import each item from the dispatch log
+      log.items.forEach((item, index) => {
+        const targetIndex = insertIndex + index;
+        
+        // Ensure we have enough rows
+        if (targetIndex >= updatedRows.length) {
+          // Add more empty rows if needed
+          const newRowsNeeded = targetIndex - updatedRows.length + 1;
+          for (let i = 0; i < newRowsNeeded; i++) {
+            updatedRows.push({
+              orderId: '',
+              orderDetails: null,
+              itemName: '',
+              sph: '',
+              cyl: '',
+              axis: '',
+              add: '',
+              qty: 1,
+              price: 0,
+              total: 0
+            });
+          }
+        }
+        
+        // Import the item data
+        updatedRows[targetIndex] = {
+          ...updatedRows[targetIndex],
+          orderId: log.logId || '', // Put log ID in order ID column
+          itemName: item.itemName || '',
+          sph: item.sph || '',
+          cyl: item.cyl || '',
+          axis: item.axis || '',
+          add: item.add || '',
+          qty: parseFloat(item.qty) || 1, // Use parseFloat to handle decimal quantities like 0.5
+          price: 0, // Price will need to be filled manually
+          total: 0
+        };
+      });
+      
+      // Update the table with imported data
+      setTableRows(updatedRows);
+      
+      // Set success message instead of error
+      setTimeout(() => {
+        if (log.items && log.items.length > 0) {
+          const importedItemDetails = log.items.map(item => 
+            `${item.itemName || 'Unknown'} (Qty: ${item.qty || 0})`
+          ).join(', ');
+          alert(`Successfully imported ${log.items.length} items from dispatch log ${log.logId || 'Unknown'}:\n${importedItemDetails}`);
+        }
+      }, 100);
+      
+    } catch (error) {
+      console.error("Error importing dispatch log:", error);
+      setError(`Failed to import dispatch log: ${error.message}`);
+    }
+    
+    // Close the dispatch logs modal
+    setShowDispatchLogs(false);
+  };
+
+  // PowerSelectionModal handlers - ONLY for stock lenses
+  const handleOpenPowerSelection = (rowIndex, itemData) => {
+    // Check if it's a stock lens and has stockData
+    if (!itemData || !itemData.isStockLens || !itemData.stockData) {
+      setError('Please select a stock lens first from the suggestions');
+      return;
+    }
+    
+    setPowerSelectionRowIndex(rowIndex);
+    setSelectedLensForPowerModal(itemData.stockData);
+    setShowPowerSelectionModal(true);
+  };
+
+  const handlePowerSelection = (rowIndex, powerSelections) => {
+    // powerSelections is now an array of multiple power selections
     const updatedRows = [...tableRows];
-    updatedRows[index] = {
-      ...updatedRows[index],
-      ...itemData // This contains itemName, price, and total
-    };
+    const updatedStockPowers = {...selectedStockPowers};
+    
+    // Find the starting row index for insertion
+    let insertIndex = rowIndex;
+    
+    // If we have multiple selections, we need to ensure we have enough rows
+    if (powerSelections.length > 1) {
+      // Check if we need to add more rows
+      const rowsNeeded = insertIndex + powerSelections.length;
+      if (rowsNeeded > updatedRows.length) {
+        const additionalRowsNeeded = rowsNeeded - updatedRows.length;
+        const newRows = Array(additionalRowsNeeded).fill().map(() => ({
+          orderId: '',
+          orderDetails: null,
+          itemName: '',
+          sph: '',
+          cyl: '',
+          axis: '',
+          add: '',
+          qty: 1,
+          price: '',
+          total: 0
+        }));
+        updatedRows.push(...newRows);
+      }
+    }
+    
+    // Insert each power selection into consecutive rows
+    powerSelections.forEach((powerSelection, index) => {
+      const targetRowIndex = insertIndex + index;
+      
+      updatedRows[targetRowIndex] = {
+        ...updatedRows[targetRowIndex],
+        itemName: `${powerSelection.lensName} (${powerSelection.powerDisplay})`,
+        sph: powerSelection.sph.toString(),
+        cyl: powerSelection.cyl.toString(),
+        axis: powerSelection.axis.toString(),
+        add: powerSelection.addition ? powerSelection.addition.toString() : '',
+        qty: powerSelection.quantity,
+        price: powerSelection.price,
+        total: powerSelection.price * powerSelection.quantity,
+        // Store lens inventory info for deduction
+        lensId: powerSelection.lensId,
+        powerKey: powerSelection.powerKey,
+        pieceQuantity: powerSelection.pieceQuantity,
+        eyeSelection: powerSelection.eyeSelection,
+        lensType: 'stockLens' // Mark as stock lens for inventory deduction
+      };
+
+      // Track selected power for this row
+      updatedStockPowers[targetRowIndex] = powerSelection;
+    });
+
     setTableRows(updatedRows);
+    setSelectedStockPowers(updatedStockPowers);
+    setShowPowerSelectionModal(false);
+    setPowerSelectionRowIndex(null);
+    setSelectedLensForPowerModal(null);
+  };
+
+  const handleClosePowerSelection = () => {
+    setShowPowerSelectionModal(false);
+    setPowerSelectionRowIndex(null);
+    setSelectedLensForPowerModal(null);
+  };
+
+  // Function to handle ledger button click
+  const handleViewLedger = async (customer) => {
+    // Navigate to Ledger page with customer data
+    navigate('/ledger', { 
+      state: { 
+        selectedCustomer: {
+          id: customer.id,
+          opticalName: customer.opticalName
+        },
+        viewMode: 'invoiceOnly'
+      } 
+    });
+  };
+
+  // Function to handle printing the address
+  const handlePrintAddress = () => {
+    if (!selectedCustomer || !shopInfo) {
+              // Customer or shop info not available
+      return;
+    }
+    
+    setShowAddressModal(true);
+  };
+
+  // Function to actually print the address content
+  const printAddressContent = () => {
+    const content = document.getElementById('address-content');
+    if (!content) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Popup blocked. Please allow popups for this site.');
+      return;
+    }
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Print Address</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 0;
+              padding: 20px;
+            }
+            .address-wrapper {
+              display: flex;
+              flex-direction: column;
+              gap: 30px;
+              max-width: 400px;
+              margin: 0 auto;
+            }
+            .address-block {
+              border: 1px solid #000;
+              padding: 15px;
+              margin-bottom: 20px;
+            }
+            .address-label {
+              font-weight: bold;
+              font-size: 14px;
+              margin-bottom: 5px;
+              text-transform: uppercase;
+            }
+            .address-text {
+              font-size: 16px;
+              line-height: 1.4;
+            }
+            h2 {
+              margin-top: 0;
+              margin-bottom: 10px;
+              font-size: 18px;
+              text-align: center;
+            }
+            .divider {
+              border-bottom: 1px dashed #000;
+              margin: 15px 0;
+            }
+            @media print {
+              body {
+                padding: 0;
+              }
+              .no-print {
+                display: none;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          ${content ? content.innerHTML : ''}
+          <div class="no-print" style="margin-top: 20px; text-align: center;">
+            <button onclick="window.print();" style="padding: 10px 20px; background: #4a90e2; color: white; border: none; border-radius: 4px; cursor: pointer;">
+              Print
+            </button>
+            <button onclick="window.close();" style="padding: 10px 20px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">
+              Close
+            </button>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    
+    // Auto-print after a delay to ensure content is loaded
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+    }, 500);
   };
 
   const getStatusColor = (status) => {
@@ -591,6 +1164,21 @@ const EditSale = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-gray-900">
+      <style>
+        {`
+          /* Hide webkit number input spinners */
+          input[type="number"]::-webkit-outer-spin-button,
+          input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+          }
+          
+          /* Hide Firefox number input spinners */
+          input[type="number"] {
+            -moz-appearance: textfield;
+          }
+        `}
+      </style>
       <Navbar />
       
       <main className="flex-grow p-4 max-w-7xl mx-auto w-full">
@@ -621,46 +1209,81 @@ const EditSale = () => {
           <>
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Customer Information</h2>
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Customer</label>
-                    <CustomerSearch 
-                      customers={customers}
-                      value={selectedCustomer?.opticalName || ''}
-                      onChange={(e) => setSearchCustomer(e.target.value)}
-                      onSelect={handleCustomerSelect}
-                      onAddNew={handleAddNewCustomer}
-                    />
-                  </div>
+                            <div>
+              <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Customer/Vendor Information</h2>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Customer/Vendor</label>
+                <CustomerSearch 
+                  customers={customers}
+                  value={selectedCustomer?.opticalName || ''}
+                  onChange={(e) => setSearchCustomer(e.target.value)}
+                  onSelect={handleCustomerSelect}
+                  onAddNew={handleAddNewCustomer}
+                  onViewLedger={handleViewLedger}
+                />
+              </div>
 
-                  {selectedCustomer && (
-                    <div className="border border-gray-200 dark:border-gray-600 rounded-md p-4 bg-gray-50 dark:bg-gray-700">
-                      <h3 className="font-medium text-gray-900 dark:text-white">{selectedCustomer.opticalName}</h3>
-                      {selectedCustomer.address && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{selectedCustomer.address}</p>
-                      )}
-                      {(selectedCustomer.city || selectedCustomer.state) && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {selectedCustomer.city}{selectedCustomer.state ? `, ${selectedCustomer.state}` : ''}
-                        </p>
-                      )}
-                      {selectedCustomer.gstNumber && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                          <span className="font-medium">GST:</span> {selectedCustomer.gstNumber}
-                        </p>
-                      )}
-                      <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
-                        <p className="text-sm">
-                          <span className="font-medium text-gray-700 dark:text-gray-300">Previous Balance:</span> 
-                          <span className={`ml-2 ${customerBalance < 0 ? 'text-red-600 dark:text-red-400' : customerBalance > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
-                            {formatCurrency(customerBalance)}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
+              {selectedCustomer && (
+                <div className="border border-gray-200 dark:border-gray-700 rounded-md p-4 bg-gray-50 dark:bg-gray-700">
+                  <div className="flex items-center">
+                    <h3 className="font-medium text-gray-900 dark:text-white">{selectedCustomer.opticalName}</h3>
+                    {(selectedCustomer.isVendor || selectedCustomer.type === 'vendor') && (
+                      <span className="ml-2 px-2 py-0.5 text-xs bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 rounded-full">
+                        Vendor
+                      </span>
+                    )}
+                  </div>
+                  {selectedCustomer.address && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{selectedCustomer.address}</p>
                   )}
+                  {(selectedCustomer.city || selectedCustomer.state) && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {selectedCustomer.city}{selectedCustomer.state ? `, ${selectedCustomer.state}` : ''}
+                    </p>
+                  )}
+                  {selectedCustomer.gstNumber && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      <span className="font-medium">GST:</span> {selectedCustomer.gstNumber}
+                    </p>
+                  )}
+                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                    {loadingBalance ? (
+                      <div className="flex items-center">
+                        <svg className="animate-spin h-4 w-4 text-blue-500 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">Calculating balance...</span>
+                      </div>
+                    ) : (
+                      <div 
+                        onClick={() => handleViewLedger(selectedCustomer)}
+                        className="flex justify-between items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 p-2 rounded-md transition-colors"
+                        title="Click to view complete ledger"
+                      >
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {(selectedCustomer.isVendor || selectedCustomer.type === 'vendor') ? 'Amount Payable:' : 'Current Balance:'}
+                        </span>
+                        <div className="text-right">
+                          <span className={`text-sm font-semibold ${getBalanceColorClass(customerBalance)}`}>
+                            {formatCurrency(Math.abs(customerBalance))}
+                          </span>
+                          <span className={`text-xs ml-1 px-2 py-0.5 rounded-full ${customerBalance > 0 ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' : customerBalance < 0 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300'}`}>
+                            {(selectedCustomer.isVendor || selectedCustomer.type === 'vendor') 
+                              ? (customerBalance > 0 ? 'Payable' : customerBalance < 0 ? 'Credit' : 'Settled')
+                              : getBalanceStatusText(customerBalance)
+                            }
+                          </span>
+                          <svg className="w-4 h-4 inline-block ml-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                          </svg>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
+              )}
+            </div>
 
                 <div>
                   <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Invoice Information</h2>
@@ -714,8 +1337,20 @@ const EditSale = () => {
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 overflow-x-auto">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium text-gray-900 dark:text-white">Invoice Items</h2>
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  Showing {getVisibleRows().length} of {tableRows.length} rows
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowDispatchLogs(true)}
+                    className="ml-2 px-3 py-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-md hover:bg-indigo-200 dark:hover:bg-indigo-900/70 text-sm flex items-center"
+                  >
+                    <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    Import from Dispatch Log
+                  </button>
+                  <div className="text-sm text-gray-500 dark:text-gray-400 ml-4">
+                    Showing {getVisibleRows().length} of {tableRows.length} rows
+                  </div>
                 </div>
               </div>
               
@@ -766,16 +1401,39 @@ const EditSale = () => {
                       </td>
                       
                       <td className="px-3 py-2 whitespace-nowrap relative w-[260px]">
-                        <ItemSuggestions
-                          items={itemSuggestions}
-                          value={row.itemName}
-                          onChange={handleTableRowChange}
-                          onSelect={handleItemSelect}
-                          index={index}
-                          rowQty={row.qty}
-                          saveItemToDatabase={saveItemToDatabase}
-                          onRefreshItems={fetchItems}
-                        />
+                        <div className="flex items-center space-x-2">
+                          <div className="flex-1">
+                            <ItemSuggestions
+                              items={itemSuggestions}
+                              value={row.itemName}
+                              onChange={handleTableRowChange}
+                              onSelect={handleItemSelect}
+                              index={index}
+                              rowQty={row.qty}
+                              saveItemToDatabase={saveItemToDatabase}
+                              onRefreshItems={fetchItems}
+                              currentPrice={parseFloat(row.price) || 0}
+                            />
+                            {row.powerSeries && (
+                              <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                                {row.powerSeries}
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Stock Lens Power Selection Button - ONLY for stock lenses */}
+                          {row.stockLensData && row.stockLensData.isStockLens && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenPowerSelection(index, row.stockLensData)}
+                              data-power-button={index}
+                              className="flex-shrink-0 px-2 py-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1 transition-colors"
+                              title="Click to select specific power from stock lens inventory"
+                            >
+                              👓
+                            </button>
+                          )}
+                        </div>
                       </td>
                       
                       <td className="px-3 py-2 whitespace-nowrap">
@@ -783,6 +1441,7 @@ const EditSale = () => {
                           type="text"
                           value={row.sph}
                           onChange={(e) => handleTableRowChange(index, 'sph', e.target.value)}
+                          onBlur={(e) => handleOpticalValueBlur(index, 'sph', e.target.value)}
                           className="block w-full border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm text-center"
                           placeholder="SPH"
                         />
@@ -792,6 +1451,7 @@ const EditSale = () => {
                           type="text"
                           value={row.cyl}
                           onChange={(e) => handleTableRowChange(index, 'cyl', e.target.value)}
+                          onBlur={(e) => handleOpticalValueBlur(index, 'cyl', e.target.value)}
                           className="block w-full border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm text-center"
                           placeholder="CYL"
                         />
@@ -810,6 +1470,7 @@ const EditSale = () => {
                           type="text"
                           value={row.add}
                           onChange={(e) => handleTableRowChange(index, 'add', e.target.value)}
+                          onBlur={(e) => handleOpticalValueBlur(index, 'add', e.target.value)}
                           className="block w-full border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm text-center"
                           placeholder="ADD"
                         />
@@ -1134,6 +1795,18 @@ const EditSale = () => {
                   </svg>
                   Print Bill
                 </button>
+                
+                <button
+                  type="button"
+                  onClick={handlePrintAddress}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-purple-500 sm:w-auto sm:text-sm"
+                >
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  Print Address
+                </button>
+
                 <button
                   type="button"
                   onClick={handleSendWhatsApp}
@@ -1167,6 +1840,189 @@ const EditSale = () => {
           title={`Invoice #${invoiceNumber}`}
         />
       )}
+
+      {/* Address Modal */}
+      {showAddressModal && (
+        <div className="fixed inset-0 overflow-y-auto z-50">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div id="address-content" className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="address-wrapper">
+                  <div className="address-block">
+                    <h2>FROM</h2>
+                    <div className="divider"></div>
+                    <div className="address-label">Sender:</div>
+                    <div className="address-text">
+                      <strong>{shopInfo?.shopName || 'Your Shop Name'}</strong><br />
+                      {shopInfo?.address || ''}<br />
+                      {shopInfo?.city && shopInfo?.state ? `${shopInfo.city}, ${shopInfo.state}` : shopInfo?.city || shopInfo?.state || ''} 
+                      {shopInfo?.pincode ? ` - ${shopInfo.pincode}` : ''}<br />
+                      {shopInfo?.phone && `Phone: ${shopInfo.phone}`}<br />
+                      {shopInfo?.email && `Email: ${shopInfo.email}`}<br />
+                      {shopInfo?.gstNumber && `GSTIN: ${shopInfo.gstNumber}`}
+                    </div>
+                  </div>
+
+                  <div className="address-block">
+                    <h2>TO</h2>
+                    <div className="divider"></div>
+                    <div className="address-label">Recipient:</div>
+                    <div className="address-text">
+                      <strong>{selectedCustomer?.opticalName || 'Customer Name'}</strong><br />
+                      {selectedCustomer?.address || ''}<br />
+                      {selectedCustomer?.city && selectedCustomer?.state ? `${selectedCustomer.city}, ${selectedCustomer.state}` : selectedCustomer?.city || selectedCustomer?.state || ''}<br />
+                      {selectedCustomer?.phone && `Phone: ${selectedCustomer.phone}`}<br />
+                      {selectedCustomer?.gstNumber && `GSTIN: ${selectedCustomer.gstNumber}`}<br />
+                      {`Invoice: ${invoiceNumber || ''}`}<br />
+                      {`Date: ${new Date(invoiceDate).toLocaleDateString()}`}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={printAddressContent}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Print
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddressModal(false)}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dispatch Logs Modal */}
+      {showDispatchLogs && (
+        <div className="fixed inset-0 overflow-y-auto z-50">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full">
+              <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                        Dispatch Logs
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setShowDispatchLogs(false)}
+                        className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                      >
+                        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    
+                    <div className="mt-4 border-b border-gray-200 dark:border-gray-700 pb-4">
+                      <div className="flex flex-col md:flex-row md:items-center gap-3">
+                        <div className="md:w-48">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Select Date
+                          </label>
+                          <input
+                            type="date"
+                            value={selectedLogDate}
+                            onChange={(e) => {
+                              setSelectedLogDate(e.target.value);
+                              setSearchLogQuery('');
+                              setSearchResults([]);
+                              fetchDispatchLogs(e.target.value);
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-4 max-h-[60vh] overflow-y-auto">
+                      {dispatchLogs.length === 0 ? (
+                        <p className="text-gray-500 dark:text-gray-400 text-center py-4">No dispatch logs found for {new Date(selectedLogDate).toLocaleDateString()}</p>
+                      ) : (
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Logs for {new Date(selectedLogDate).toLocaleDateString()}:</h4>
+                          <ul className="space-y-3">
+                            {dispatchLogs.map(log => (
+                              <li key={log.logId} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <h4 className="font-medium text-gray-900 dark:text-white">{log.opticalShop}</h4>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                      Log ID: {log.logId} ({log.items ? log.items.length : 0} items)
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => importDispatchLog(log)}
+                                    className="px-3 py-1 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 rounded-md hover:bg-green-200 dark:hover:bg-green-900/70 text-sm"
+                                  >
+                                    Import
+                                  </button>
+                                </div>
+                                <div className="mt-2">
+                                  <ul className="text-sm text-gray-600 dark:text-gray-400">
+                                    {log.items && log.items.slice(0, 3).map((item, idx) => (
+                                      <li key={idx} className="truncate">
+                                        • {item.itemName} {item.sph && `(SPH: ${item.sph})`} {item.qty && `- Qty: ${item.qty}`}
+                                      </li>
+                                    ))}
+                                    {log.items && log.items.length > 3 && (
+                                      <li className="text-gray-400">+ {log.items.length - 3} more items</li>
+                                    )}
+                                  </ul>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    onClick={() => setShowDispatchLogs(false)}
+                    className="w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Power Selection Modal - ONLY for stock lenses */}
+      <PowerSelectionModal
+        isOpen={showPowerSelectionModal}
+        onClose={handleClosePowerSelection}
+        onSelectPower={handlePowerSelection}
+        selectedLens={selectedLensForPowerModal}
+        rowIndex={powerSelectionRowIndex}
+      />
     </div>
   );
 };
