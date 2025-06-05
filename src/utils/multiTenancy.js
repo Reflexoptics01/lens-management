@@ -2,41 +2,41 @@ import { collection, doc } from 'firebase/firestore';
 import { db, auth } from '../firebaseConfig';
 
 /**
- * Get the current user's UID from localStorage or AuthContext
+ * Get the current user's UID - optimized for production
  * @returns {string|null} The user's UID or null if not found
  */
 export const getUserUid = () => {
-  // First try localStorage (existing approach)
-  let uid = localStorage.getItem('userUid');
-  console.log('getUserUid: localStorage userUid:', uid);
+  // Check for team member organization UID first
+  const organizationId = localStorage.getItem('organizationId');
+  if (organizationId) {
+    return organizationId; // Team members use their organization's UID
+  }
   
-  // If not found in localStorage, try the global auth user (new approach)
+  // First try localStorage (existing approach for organization owners)
+  let uid = localStorage.getItem('userUid');
+  
+  // If not found in localStorage, try the global auth user
   if (!uid && typeof window !== 'undefined' && window.__authUser) {
     uid = window.__authUser.uid;
-    console.log('getUserUid: Using AuthContext user UID:', uid);
   }
   
   // Try Firebase auth directly as last resort
   if (!uid) {
     try {
-      // Use static import instead of dynamic import
       if (auth.currentUser) {
         uid = auth.currentUser.uid;
-        console.log('getUserUid: Using Firebase currentUser UID:', uid);
         // Update localStorage if we found a user
         localStorage.setItem('userUid', uid);
         localStorage.setItem('userEmail', auth.currentUser.email);
       }
     } catch (error) {
-      console.warn('getUserUid: Could not access Firebase auth:', error);
+      // Silent auth check in production
     }
   }
   
-  console.log('getUserUid: Final retrieved UID:', uid);
+  // Only log errors in production
   if (!uid) {
     console.error('No user UID found in localStorage, AuthContext, or Firebase auth');
-    console.log('localStorage contents:', Object.keys(localStorage));
-    console.log('window.__authUser:', typeof window !== 'undefined' ? window.__authUser : 'Window not available');
   }
   return uid;
 };
@@ -48,7 +48,6 @@ export const getUserUid = () => {
  */
 export const getUserCollection = (collectionName) => {
   const userUid = getUserUid();
-  console.log('getUserCollection: Starting with collectionName:', collectionName, 'userUid:', userUid);
   
   if (!userUid) {
     console.error('getUserCollection: User not authenticated - no UID found');
@@ -56,12 +55,7 @@ export const getUserCollection = (collectionName) => {
   }
   
   const path = `users/${userUid}/${collectionName}`;
-  console.log(`getUserCollection: Creating collection reference for path: ${path}`);
-  
-  const collectionRef = collection(db, path);
-  console.log('getUserCollection: Collection reference created successfully');
-  
-  return collectionRef;
+  return collection(db, path);
 };
 
 /**
@@ -72,7 +66,6 @@ export const getUserCollection = (collectionName) => {
  */
 export const getUserDoc = (collectionName, docId) => {
   const userUid = getUserUid();
-  console.log('getUserDoc: Starting with collectionName:', collectionName, 'docId:', docId, 'userUid:', userUid);
   
   if (!userUid) {
     console.error('getUserDoc: User not authenticated - no UID found');
@@ -80,12 +73,7 @@ export const getUserDoc = (collectionName, docId) => {
   }
   
   const path = `users/${userUid}/${collectionName}`;
-  console.log(`getUserDoc: Creating document reference for path: ${path}/${docId}`);
-  
-  const docRef = doc(db, path, docId);
-  console.log('getUserDoc: Document reference created successfully');
-  
-  return docRef;
+  return doc(db, path, docId);
 };
 
 /**

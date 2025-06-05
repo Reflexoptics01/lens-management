@@ -1243,13 +1243,11 @@ The page will refresh in 3 seconds to load your restored data...`;
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      console.log('Fetching users from user-specific collection');
+      // Fetching team members
       
       // Fetch users from user-specific collection
       const usersCollection = getUserCollection('teamMembers'); // Changed from 'users' to 'teamMembers' for clarity
       const usersSnapshot = await getDocs(usersCollection);
-      
-      console.log(`Retrieved ${usersSnapshot.docs.length} user documents from user-specific collection`);
       
       const activeUsersList = [];
       const inactiveUsersList = [];
@@ -1257,11 +1255,12 @@ The page will refresh in 3 seconds to load your restored data...`;
       // Process users
       usersSnapshot.forEach(doc => {
         const userData = doc.data();
-        console.log(`Processing user: ${userData.email}`);
         
         // Include all users from this tenant's team
+        // Note: doc.id should now be the user's UID
         const userWithId = {
-          id: doc.id,
+          id: doc.id, // This is now the user's UID
+          uid: userData.uid, // This should match doc.id
           ...userData,
           // Convert Firestore Timestamp to JS Date for display using dateUtils
           createdAt: safelyParseDate(userData.createdAt),
@@ -1290,12 +1289,13 @@ The page will refresh in 3 seconds to load your restored data...`;
   };
   
   // Restore inactive user
-  const handleRestoreUser = async (userId, userEmail) => {
+  const handleRestoreUser = async (userUid, userEmail) => {
     try {
       setLoading(true);
       
       // Update the user document to mark as active in user-specific collection
-      await updateDoc(getUserDoc('teamMembers', userId), {
+      // userUid is now the document ID in teamMembers collection
+      await updateDoc(getUserDoc('teamMembers', userUid), {
         isActive: true,
         inactiveAt: null,
         inactiveBy: null,
@@ -1360,31 +1360,79 @@ The page will refresh in 3 seconds to load your restored data...`;
     try {
       setLoading(true);
       
-      // Create user directly with Firebase Auth
+      // Create user using Cloud Function to avoid signing out current admin
       console.log('Creating new user with email:', newUserEmail);
       
-      // Get a separate auth instance to avoid logging out the current admin
-      const auth2 = getAuth();
-      
-      // Create the user in Firebase Authentication
-      const userCredential = await createUserWithEmailAndPassword(
-        auth2, 
-        newUserEmail, 
-        newUserPassword
-      );
-      
-      console.log('User created successfully with uid:', userCredential.user.uid);
-      
-      // Add user to user-specific Firestore collection
-      await addDoc(getUserCollection('teamMembers'), {
-        uid: userCredential.user.uid,
-        email: newUserEmail,
-        role: newUserRole,
-        permissions: newUserPermissions,
-        createdAt: new Date(),
-        createdBy: user.uid,
-        isActive: true
-      });
+      try {
+        // Use Cloud Function to create user without affecting current session
+        const createUserFunction = httpsCallable(functions, 'createUser');
+        const result = await createUserFunction({
+          email: newUserEmail,
+          password: newUserPassword,
+          role: newUserRole,
+          permissions: newUserPermissions
+        });
+        
+        const newUserUid = result.data.uid;
+        console.log('User created successfully with uid:', newUserUid);
+        
+        // Add user to user-specific Firestore collection using UID as document ID
+        await setDoc(getUserDoc('teamMembers', newUserUid), {
+          uid: newUserUid,
+          email: newUserEmail,
+          role: newUserRole,
+          permissions: newUserPermissions,
+          createdAt: new Date(),
+          createdBy: user.uid,
+          isActive: true
+        });
+        
+        console.log('Team member document created successfully');
+        
+      } catch (cloudFunctionError) {
+        console.warn('Cloud function not available, falling back to direct creation:', cloudFunctionError);
+        
+        // Fallback: Direct user creation (with warning about sign-out risk)
+        console.warn('⚠️ WARNING: Direct user creation may sign you out!');
+        
+        // Import the Firebase Auth functions
+        const { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword } = await import('firebase/auth');
+        
+        // Store current user info before creating new user
+        const currentUserEmail = user.email;
+        const currentUserPassword = prompt(`⚠️ ADMIN VERIFICATION REQUIRED\n\nCreating users directly may sign you out. Please enter your admin password to re-authenticate if needed:\n\nAdmin Email: ${currentUserEmail}`);
+        
+        if (!currentUserPassword) {
+          throw new Error('Admin password required for direct user creation');
+        }
+        
+        // Create the new user (this will sign out current admin)
+        const auth2 = getAuth();
+        const userCredential = await createUserWithEmailAndPassword(auth2, newUserEmail, newUserPassword);
+        const newUserUid = userCredential.user.uid;
+        
+        console.log('User created with fallback method, uid:', newUserUid);
+        
+        // Re-authenticate the admin immediately
+        try {
+          await signInWithEmailAndPassword(auth2, currentUserEmail, currentUserPassword);
+          console.log('Admin re-authenticated successfully');
+        } catch (reAuthError) {
+          console.error('Failed to re-authenticate admin:', reAuthError);
+          throw new Error('User created but admin re-authentication failed. Please log in again.');
+        }
+        
+        // Add user to teamMembers collection using UID as document ID
+        await setDoc(getUserDoc('teamMembers', newUserUid), {
+          uid: newUserUid,
+          email: newUserEmail,
+          role: newUserRole,
+          permissions: newUserPermissions,
+          createdAt: new Date(),
+          createdBy: user.uid,
+          isActive: true
+        });
+      }
       
       // Reset form and refresh users
       setNewUserEmail('');
@@ -1393,7 +1441,7 @@ The page will refresh in 3 seconds to load your restored data...`;
       setNewUserPermissions({});
       await fetchUsers();
       
-      setUserSuccess(`User ${newUserEmail} created successfully!`);
+      setUserSuccess(`User ${newUserEmail} created successfully! They can now log in with their credentials.`);
     } catch (error) {
       console.error('Error creating user:', error);
       let errorMessage = 'Failed to create user';
@@ -1433,27 +1481,27 @@ The page will refresh in 3 seconds to load your restored data...`;
   
   // Delete user
   const handleDeleteUser = async (userId, userEmail, userUid) => {
-    if (!window.confirm(`Are you sure you want to delete ${userEmail}? This action cannot be undone.`)) {
+    if (!window.confirm(`Are you sure you want to deactivate ${userEmail}? They will no longer be able to log in.`)) {
       return;
     }
     
     try {
       setLoading(true);
       
-      // Instead of deleting from Firebase Auth (which requires admin privileges),
-      // we'll mark the user as inactive in user-specific Firestore
-      console.log(`Marking user ${userEmail} as inactive`);
+      // Mark user as inactive in user-specific Firestore
+      // userId should now be the user's UID (used as document ID)
+      console.log(`Marking user ${userEmail} (UID: ${userUid}) as inactive`);
       
       // Update the user document to mark as inactive in user-specific collection
-      await updateDoc(getUserDoc('teamMembers', userId), {
+      await updateDoc(getUserDoc('teamMembers', userUid), {
         isActive: false,
         inactiveAt: new Date(),
         inactiveBy: user.uid
       });
       
-      setUserSuccess(`User ${userEmail} has been marked as inactive and will no longer be able to log in.`);
+      setUserSuccess(`User ${userEmail} has been deactivated and will no longer be able to log in.`);
       
-      // Refresh the users list to remove the inactive user
+      // Refresh the users list
       await fetchUsers();
       
     } catch (error) {
@@ -2688,7 +2736,7 @@ The page will refresh in 3 seconds to load your restored data...`;
                                   onClick={() => handleDeleteUser(user.id, user.email, user.uid)}
                                   className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm"
                                 >
-                                  Delete
+                                  Deactivate
                                 </button>
                               </div>
                             </div>
@@ -2714,7 +2762,7 @@ The page will refresh in 3 seconds to load your restored data...`;
                                 </p>
                               </div>
                               <button
-                                onClick={() => handleRestoreUser(user.id, user.email)}
+                                onClick={() => handleRestoreUser(user.uid, user.email)}
                                 className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 text-sm"
                               >
                                 Restore

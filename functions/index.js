@@ -213,4 +213,106 @@ exports.listUsers = functions.https.onCall(async (data, context) => {
       `Error listing users: ${error.message}`
     );
   }
+});
+
+// Find team member status for authentication (no admin check needed - this is for auth flow)
+exports.findTeamMember = functions.https.onCall(async (data, context) => {
+  console.log('findTeamMember function called for UID:', data.uid);
+  
+  // Check if request is made by an authenticated user
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      'unauthenticated',
+      'The function must be called while authenticated.'
+    );
+  }
+
+  // Security check - user can only look up their own team member status
+  if (context.auth.uid !== data.uid) {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'You can only look up your own team member status.'
+    );
+  }
+
+  if (!data.uid || !data.email) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'UID and email are required.'
+    );
+  }
+
+  try {
+    console.log(`Searching for team member: ${data.email} (${data.uid})`);
+    
+    // Get all users (organization owners) with admin privileges
+    const usersSnapshot = await admin.firestore().collection('users').get();
+    console.log(`Found ${usersSnapshot.docs.length} organizations to check`);
+    
+    // Check each organization's teamMembers collection
+    for (const userDoc of usersSnapshot.docs) {
+      const orgOwnerId = userDoc.id;
+      
+      try {
+        // Check if this user exists as a team member in this organization
+        const teamMemberDoc = await admin.firestore()
+          .collection('users')
+          .doc(orgOwnerId)
+          .collection('teamMembers')
+          .doc(data.uid)
+          .get();
+        
+        if (teamMemberDoc.exists) {
+          const teamMemberData = teamMemberDoc.data();
+          
+          console.log(`Found team member in organization ${orgOwnerId}:`, {
+            email: teamMemberData.email,
+            role: teamMemberData.role,
+            isActive: teamMemberData.isActive
+          });
+          
+          // Security check - ensure email matches
+          if (teamMemberData.email !== data.email) {
+            console.warn(`Email mismatch for team member in org ${orgOwnerId}`);
+            continue;
+          }
+          
+          // Check if team member is active
+          if (teamMemberData.isActive === false) {
+            console.log(`Team member is inactive in org ${orgOwnerId}`);
+            continue;
+          }
+          
+          // Get organization owner data
+          const orgOwnerData = userDoc.data();
+          
+          // Return team member data with organization context
+          return {
+            found: true,
+            teamMemberData: {
+              ...teamMemberData,
+              organizationId: orgOwnerId,
+              organizationOwner: {
+                email: orgOwnerData.email,
+                companyName: orgOwnerData.companyName
+              }
+            }
+          };
+        }
+      } catch (orgError) {
+        console.warn(`Error checking team member in org ${orgOwnerId}:`, orgError.message);
+        // Continue checking other organizations
+      }
+    }
+    
+    console.log('User not found as team member in any organization');
+    return { found: false };
+    
+  } catch (error) {
+    console.error('Error finding team member:', error);
+    throw new functions.https.HttpsError(
+      'internal',
+      `Error finding team member: ${error.message}`
+    );
+  }
 }); 

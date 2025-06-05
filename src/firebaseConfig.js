@@ -21,12 +21,7 @@ if (missingVars.length > 0) {
   throw new Error(`Missing Firebase environment variables: ${missingVars.join(', ')}`);
 }
 
-// Log environment variables status (without exposing sensitive data)
-console.log('🔧 Firebase Environment Variables Status:');
-requiredEnvVars.forEach(varName => {
-  const value = import.meta.env[varName];
-  console.log(`  ${varName}: ${value ? '✅ Present' : '❌ Missing'}`);
-});
+// Validate environment variables are present (production optimized)
 
 // Your Firebase configuration
 const firebaseConfig = {
@@ -49,59 +44,29 @@ if (firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith('AIza')) {
 let app;
 try {
   app = initializeApp(firebaseConfig);
-  console.log('✅ Firebase initialized successfully');
 } catch (error) {
-  console.error('❌ Error initializing Firebase:', error);
-  console.error('🔧 Firebase config used:', {
-    ...firebaseConfig,
-    apiKey: firebaseConfig.apiKey ? `${firebaseConfig.apiKey.substring(0, 10)}...` : 'MISSING'
-  });
+  console.error('Firebase initialization failed:', error.code);
   throw error;
 }
 
-// Initialize Firebase Authentication
-let auth;
+// Initialize Firebase services
+let auth, db, storage, functions;
+
 try {
   auth = getAuth(app);
-  auth.useDeviceLanguage(); // Set language to device's language
-  console.log('✅ Firebase Auth initialized successfully');
-} catch (error) {
-  console.error('❌ Error initializing Firebase Auth:', error);
-  throw error;
-}
-
-// Initialize Firestore
-let db;
-try {
+  auth.useDeviceLanguage();
+  
   db = getFirestore(app);
-  console.log('✅ Firestore initialized successfully');
-} catch (error) {
-  console.error('❌ Error initializing Firestore:', error);
-  throw error;
-}
-
-// Initialize Storage
-let storage;
-try {
   storage = getStorage(app);
-  console.log('✅ Firebase Storage initialized successfully');
-} catch (error) {
-  console.error('❌ Error initializing Firebase Storage:', error);
-  throw error;
-}
-
-// Initialize Functions - specify us-central1 region explicitly
-let functions;
-try {
   functions = getFunctions(app, 'us-central1');
-  console.log('✅ Firebase Functions initialized successfully');
 } catch (error) {
-  console.error('❌ Error initializing Firebase Functions:', error);
+  console.error('Firebase services initialization failed:', error.code);
   throw error;
 }
 
-// Connect to Functions emulator if in development
-if (import.meta.env.MODE === 'development') {
+// Connect to Functions emulator if in development (disabled for team member authentication)
+// Note: Disabled emulator connection to use production Cloud Functions for team member auth
+if (import.meta.env.MODE === 'development' && false) {
   try {
     connectFunctionsEmulator(functions, "localhost", 5001);
     console.log('✅ Connected to Functions emulator');
@@ -109,6 +74,8 @@ if (import.meta.env.MODE === 'development') {
     console.warn('⚠️ Failed to connect to Functions emulator:', error);
   }
 }
+
+// Production Cloud Functions enabled for team member authentication
 
 // Export Firebase modules for use in other parts of the app
 export { auth, db, storage, functions };

@@ -116,6 +116,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('userEmail');
     localStorage.removeItem('userRole');
     localStorage.removeItem('userPermissions');
+    localStorage.removeItem('organizationId'); // Clear organization ID for team members
   };
 
   // Validate and setup authenticated user
@@ -137,6 +138,15 @@ export const AuthProvider = ({ children }) => {
       if (userData) {
         console.log('🔐 Approved user found:', userData);
         await setupApprovedUser(firebaseUser, userData);
+        return;
+      }
+
+      // Check if user is a team member in any organization
+      const teamMemberData = await checkTeamMemberStatus(firebaseUser);
+      
+      if (teamMemberData) {
+        console.log('🔐 Team member found:', teamMemberData);
+        await setupTeamMember(firebaseUser, teamMemberData);
         return;
       }
 
@@ -261,6 +271,80 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('userEmail', firebaseUser.email);
     localStorage.setItem('userRole', userData.role || USER_ROLES.USER);
     localStorage.setItem('userPermissions', JSON.stringify(userData.permissions || {}));
+  };
+
+  // Check if user is a team member in any organization using Cloud Function
+  const checkTeamMemberStatus = async (firebaseUser) => {
+    try {
+      // Import functions dynamically to avoid issues with SSR
+      const { httpsCallable } = await import('firebase/functions');
+      const { functions } = await import('../firebaseConfig');
+      
+      const findTeamMemberFunction = httpsCallable(functions, 'findTeamMember');
+      const result = await findTeamMemberFunction({
+        uid: firebaseUser.uid,
+        email: firebaseUser.email
+      });
+      
+      if (result.data && result.data.found) {
+        return result.data.teamMemberData;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Team member authentication error:', error.code);
+      
+      // Handle different error types
+      if (error.code === 'functions/not-found') {
+        throw new Error('Team member authentication service unavailable. Please contact your administrator.');
+      }
+      
+      if (error.code === 'functions/unavailable' || error.code === 'functions/deadline-exceeded') {
+        throw new Error('Authentication service is temporarily unavailable. Please try again in a moment.');
+      }
+      
+      if (error.code === 'functions/permission-denied') {
+        return null; // User is not a team member
+      }
+      
+      throw error;
+    }
+  };
+
+  // Setup team member user
+  const setupTeamMember = async (firebaseUser, teamMemberData) => {
+    console.log('🔐 Setting up team member:', teamMemberData);
+    
+    // Check if team member is active
+    if (teamMemberData.isActive === false) {
+      setAuthState(AUTH_STATES.INACTIVE);
+      setAuthError('Your team member account has been deactivated. Please contact your administrator.');
+      await signOut(auth);
+      return;
+    }
+    
+    setUser(firebaseUser);
+    setUserRole(teamMemberData.role || USER_ROLES.USER);
+    setUserPermissions(teamMemberData.permissions || {});
+    setUserProfile({
+      email: firebaseUser.email,
+      displayName: firebaseUser.displayName || teamMemberData.email,
+      role: teamMemberData.role || USER_ROLES.USER,
+      isTeamMember: true,
+      organizationId: teamMemberData.organizationId,
+      organizationOwner: teamMemberData.organizationOwner,
+      ...teamMemberData
+    });
+    setAuthState(AUTH_STATES.AUTHENTICATED);
+    
+    // Store in localStorage with organization context
+    localStorage.setItem('userUid', firebaseUser.uid);
+    localStorage.setItem('userEmail', firebaseUser.email);
+    localStorage.setItem('userRole', teamMemberData.role || USER_ROLES.USER);
+    localStorage.setItem('userPermissions', JSON.stringify(teamMemberData.permissions || {}));
+    localStorage.setItem('organizationId', teamMemberData.organizationId);
+    
+    console.log('🔐 Team member setup complete for organization:', teamMemberData.organizationId);
   };
 
   // Check user registration status
