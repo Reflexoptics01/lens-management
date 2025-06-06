@@ -107,6 +107,17 @@ export const processRestoredData = (data) => {
         console.warn(`Failed to convert timestamp for key ${key}:`, error);
         processed[key] = value.value; // Store as string if conversion fails
       }
+    }
+    // Handle Firebase Timestamp-like objects (from restored backup)
+    else if (value && typeof value === 'object' && 
+             value.seconds !== undefined && value.nanoseconds !== undefined) {
+      try {
+        // Convert Firestore Timestamp-like object to Date
+        processed[key] = new Date(value.seconds * 1000 + value.nanoseconds / 1000000);
+      } catch (error) {
+        console.warn(`Failed to convert Firebase timestamp for key ${key}:`, error);
+        processed[key] = null;
+      }
     } 
     // Special handling for powerInventory data structure
     else if (key === 'powerInventory' && value && typeof value === 'object') {
@@ -148,9 +159,31 @@ export const processRestoredData = (data) => {
       const intValue = typeof value === 'number' ? value : parseInt(value);
       processed[key] = isNaN(intValue) ? value : intValue;
     }
-    // Handle nested objects
+    // Handle date-related fields that might be timestamp objects
+    else if ((key === 'createdAt' || key === 'updatedAt' || key.includes('Date') || key.includes('At')) &&
+             value && typeof value === 'object' && 
+             value.seconds !== undefined && value.nanoseconds !== undefined) {
+      try {
+        // Convert Firestore Timestamp-like object to Date for date fields
+        processed[key] = new Date(value.seconds * 1000 + value.nanoseconds / 1000000);
+      } catch (error) {
+        console.warn(`Failed to convert date timestamp for key ${key}:`, error);
+        processed[key] = null;
+      }
+    }
+    // Handle nested objects (but check for timestamp patterns first)
     else if (value && typeof value === 'object') {
-      processed[key] = processRestoredData(value);
+      // Additional check for any object that might be a timestamp
+      if (value.seconds !== undefined && value.nanoseconds !== undefined) {
+        try {
+          processed[key] = new Date(value.seconds * 1000 + value.nanoseconds / 1000000);
+        } catch (error) {
+          console.warn(`Failed to convert nested timestamp for key ${key}:`, error);
+          processed[key] = processRestoredData(value);
+        }
+      } else {
+        processed[key] = processRestoredData(value);
+      }
     } 
     // Handle ISO date strings (for older backups that don't use the __type format)
     else if (

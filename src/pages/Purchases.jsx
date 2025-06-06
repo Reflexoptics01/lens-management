@@ -98,12 +98,26 @@ const Purchases = () => {
       
       const purchasesList = snapshot.docs
         .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
-        .map((doc) => ({
-          id: doc.id,
-          // Use the actual stored purchaseNumber instead of calculating displayId
-          displayId: doc.data().purchaseNumber || `P-${doc.id.slice(-3)}`,
-          ...doc.data()
-        }));
+        .map((doc) => {
+          const data = doc.data();
+          // Create a safe copy with all timestamp fields properly converted
+          const processedData = {};
+          Object.keys(data).forEach(key => {
+            if (key.includes('At') || key.includes('Date') || key === 'createdAt' || key === 'updatedAt') {
+              // Convert any timestamp-like fields to proper Date objects
+              processedData[key] = safelyParseDate(data[key]) || new Date();
+            } else {
+              processedData[key] = data[key];
+            }
+          });
+          
+          return {
+            id: doc.id,
+            // Use the actual stored purchaseNumber instead of calculating displayId
+            displayId: data.purchaseNumber || `P-${doc.id.slice(-3)}`,
+            ...processedData
+          };
+        });
       setPurchases(purchasesList);
     } catch (error) {
       console.error('Error fetching purchases:', error);

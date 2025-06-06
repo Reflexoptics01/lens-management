@@ -169,12 +169,21 @@ const Orders = () => {
           .filter(doc => doc.data() && !doc.data()._placeholder) // Filter out placeholder documents and ensure data exists
           .map((doc) => {
             const data = doc.data();
+            // Create a safe copy with all timestamp fields properly converted
+            const processedData = {};
+            Object.keys(data).forEach(key => {
+              if (key.includes('At') || key.includes('Date') || key === 'createdAt' || key === 'updatedAt') {
+                // Convert any timestamp-like fields to proper Date objects
+                processedData[key] = safelyParseDate(data[key]) || new Date();
+              } else {
+                processedData[key] = data[key];
+              }
+            });
+            
             return {
               id: doc.id,
               displayId: data.displayId || `ORD-${doc.id.slice(-6)}`, // Fallback displayId
-              ...data,
-              // Keep original createdAt for processing
-              createdAt: data.createdAt 
+              ...processedData
             };
           });
         console.log('orderBy query successful, got', ordersList.length, 'orders');
@@ -191,11 +200,21 @@ const Orders = () => {
             .filter(doc => doc.data() && !doc.data()._placeholder) // Filter out placeholder documents and ensure data exists
             .map((doc) => {
               const data = doc.data();
+              // Create a safe copy with all timestamp fields properly converted
+              const processedData = {};
+              Object.keys(data).forEach(key => {
+                if (key.includes('At') || key.includes('Date') || key === 'createdAt' || key === 'updatedAt') {
+                  // Convert any timestamp-like fields to proper Date objects
+                  processedData[key] = safelyParseDate(data[key]) || new Date();
+                } else {
+                  processedData[key] = data[key];
+                }
+              });
+              
               return {
                 id: doc.id,
                 displayId: data.displayId || `ORD-${doc.id.slice(-6)}`, // Fallback displayId
-                ...data,
-                createdAt: data.createdAt
+                ...processedData
               };
             });
           
