@@ -104,7 +104,6 @@ export const processRestoredData = (data) => {
         // Convert to JavaScript Date
         processed[key] = new Date(value.value);
       } catch (error) {
-        console.warn(`Failed to convert timestamp for key ${key}:`, error);
         processed[key] = value.value; // Store as string if conversion fails
       }
     }
@@ -115,7 +114,6 @@ export const processRestoredData = (data) => {
         // Convert Firestore Timestamp-like object to Date
         processed[key] = new Date(value.seconds * 1000 + value.nanoseconds / 1000000);
       } catch (error) {
-        console.warn(`Failed to convert Firebase timestamp for key ${key}:`, error);
         processed[key] = null;
       }
     } 
@@ -167,7 +165,6 @@ export const processRestoredData = (data) => {
         // Convert Firestore Timestamp-like object to Date for date fields
         processed[key] = new Date(value.seconds * 1000 + value.nanoseconds / 1000000);
       } catch (error) {
-        console.warn(`Failed to convert date timestamp for key ${key}:`, error);
         processed[key] = null;
       }
     }
@@ -178,7 +175,6 @@ export const processRestoredData = (data) => {
         try {
           processed[key] = new Date(value.seconds * 1000 + value.nanoseconds / 1000000);
         } catch (error) {
-          console.warn(`Failed to convert nested timestamp for key ${key}:`, error);
           processed[key] = processRestoredData(value);
         }
       } else {
@@ -265,10 +261,8 @@ export const safelyParseDate = (date) => {
     }
     
     // For other cases, return null
-    console.warn('Unable to parse date format:', date);
     return null;
   } catch (error) {
-    console.warn('Error parsing date:', error, 'Original value:', date);
     return null;
   }
 };

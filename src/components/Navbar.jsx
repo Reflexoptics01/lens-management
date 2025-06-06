@@ -361,17 +361,8 @@ const Navbar = () => {
 
   // Don't render navbar if user is not authenticated
   if (!isAuthenticated()) {
-    console.log('🔐 Navbar: Not rendering - user not authenticated');
-    console.log('🔐 Auth state:', { 
-      isAuthenticated: isAuthenticated(), 
-      user: user?.email, 
-      userRole, 
-      authState: isAuthenticated() ? 'authenticated' : 'not authenticated' 
-    });
     return null;
   }
-
-  console.log('🔐 Navbar: Rendering for authenticated user:', user?.email);
 
   return (
     <>
