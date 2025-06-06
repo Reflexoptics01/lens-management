@@ -5,6 +5,9 @@ import { doc, getDoc, collection, query, where, getDocs, orderBy, updateDoc, add
 import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 import Navbar from '../components/Navbar';
 import PowerSelectionModal from '../components/PowerSelectionModal';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { 
   LineChart, 
   Line, 
@@ -63,6 +66,225 @@ const LensDetail = () => {
   const [sortBy, setSortBy] = useState('power'); // 'power', 'quantity'
   const [viewMode, setViewMode] = useState('grid'); // 'grid', 'table'
   const [showOutOfStock, setShowOutOfStock] = useState(true);
+
+  // Export functions
+  const exportToExcel = (filteredPowers, lens) => {
+    try {
+      // Prepare data for Excel export
+      const excelData = filteredPowers.map((power, index) => ({
+        'S.No': index + 1,
+        'Brand': lens.brandName || 'N/A',
+        'Lens Type': lens.lensType === 'bifocal' ? 'Bifocal/Progressive' : 'Single Vision',
+        'SPH': power.sph >= 0 ? `+${power.sph}` : power.sph,
+        'CYL': power.cyl >= 0 ? `+${power.cyl}` : power.cyl,
+        'ADD': power.type === 'bifocal' ? `+${power.addition}` : '-',
+        'AXIS': `${power.axis}°`,
+        'Quantity': power.quantity,
+        'Status': power.inStock ? 'In Stock' : 'Out of Stock',
+        'Stock Level': power.inStock ? 
+          (power.quantity >= 10 ? 'High' : power.quantity >= 5 ? 'Medium' : 'Low') : 
+          'Empty',
+        'Purchase Price': lens.purchasePrice ? `₹${lens.purchasePrice}` : 'N/A',
+        'Sale Price': lens.salePrice ? `₹${lens.salePrice}` : 'N/A',
+        'Total Value': lens.purchasePrice ? `₹${(power.quantity * lens.purchasePrice).toFixed(2)}` : 'N/A'
+      }));
+
+      // Create workbook and worksheet
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(excelData);
+
+      // Set column widths
+      const colWidths = [
+        { wch: 6 },   // S.No
+        { wch: 20 },  // Brand
+        { wch: 18 },  // Lens Type
+        { wch: 8 },   // SPH
+        { wch: 8 },   // CYL
+        { wch: 8 },   // ADD
+        { wch: 8 },   // AXIS
+        { wch: 10 },  // Quantity
+        { wch: 12 },  // Status
+        { wch: 12 },  // Stock Level
+        { wch: 15 },  // Purchase Price
+        { wch: 15 },  // Sale Price
+        { wch: 15 }   // Total Value
+      ];
+      ws['!cols'] = colWidths;
+
+      // Add worksheet to workbook
+      XLSX.utils.book_append_sheet(wb, ws, 'Stock Inventory');
+
+      // Generate filename with current date and filter info
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0];
+      const filterInfo = searchType === 'all' ? 'All' : 
+                        searchType === 'in-stock' ? 'InStock' : 'OutOfStock';
+      const searchInfo = powerSearch ? `_Search-${powerSearch.replace(/[^a-zA-Z0-9]/g, '')}` : '';
+      const filename = `${lens.brandName || 'LensInventory'}_${filterInfo}${searchInfo}_${dateStr}.xlsx`;
+
+      // Save file
+      XLSX.writeFile(wb, filename);
+
+      // Show success message
+      alert(`Excel file exported successfully!\nFile: ${filename}\nRecords: ${filteredPowers.length}`);
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      alert('Failed to export Excel file. Please try again.');
+    }
+  };
+
+  const exportToPDF = (filteredPowers, lens) => {
+    try {
+      // Create new PDF document in landscape orientation for better table fit
+      const doc = new jsPDF('landscape', 'pt', 'a4');
+      
+      // Add title
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${lens.brandName || 'Lens'} - Stock Inventory Report`, 40, 40);
+      
+      // Add metadata
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      const now = new Date();
+      const dateStr = now.toLocaleDateString();
+      const timeStr = now.toLocaleTimeString();
+      doc.text(`Generated on: ${dateStr} at ${timeStr}`, 40, 60);
+      
+      // Add filter information
+      let filterText = `Filter: ${searchType === 'all' ? 'All Powers' : 
+                                 searchType === 'in-stock' ? 'In Stock Only' : 'Out of Stock Only'}`;
+      if (powerSearch) {
+        filterText += ` | Search: "${powerSearch}"`;
+      }
+      filterText += ` | Sort: ${sortBy === 'power' ? 'By Power' : 'By Quantity'}`;
+      filterText += ` | Records: ${filteredPowers.length}`;
+      doc.text(filterText, 40, 75);
+
+      // Add summary statistics
+      const inStockCount = filteredPowers.filter(p => p.inStock).length;
+      const outOfStockCount = filteredPowers.filter(p => !p.inStock).length;
+      const totalQuantity = filteredPowers.reduce((sum, p) => sum + p.quantity, 0);
+      const summaryText = `Summary: ${inStockCount} In Stock, ${outOfStockCount} Out of Stock, Total Pieces: ${totalQuantity}`;
+      doc.text(summaryText, 40, 90);
+
+      // Prepare table data - simplified to fit in page width
+      const tableData = filteredPowers.map((power, index) => [
+        index + 1,
+        power.sph >= 0 ? `+${power.sph}` : power.sph,
+        power.cyl >= 0 ? `+${power.cyl}` : power.cyl,
+        power.type === 'bifocal' ? `+${power.addition}` : '-',
+        `${power.axis}°`,
+        power.quantity,
+        power.inStock ? 'In Stock' : 'Out of Stock',
+        power.inStock ? 
+          (power.quantity >= 10 ? 'High' : power.quantity >= 5 ? 'Medium' : 'Low') : 
+          'Empty'
+      ]);
+
+      // Simplified table headers that fit better on page
+      const headers = [
+        'S.No', 'SPH', 'CYL', 'ADD', 'AXIS', 'Qty', 'Status', 'Stock Level'
+      ];
+
+      // Create table with autoTable - using proper syntax
+      autoTable(doc, {
+        head: [headers],
+        body: tableData,
+        startY: 110,
+        margin: { left: 20, right: 20 },
+        styles: {
+          fontSize: 9,
+          cellPadding: 4,
+          overflow: 'linebreak',
+          halign: 'center'
+        },
+        headStyles: {
+          fillColor: [66, 139, 202],
+          textColor: 255,
+          fontStyle: 'bold',
+          halign: 'center'
+        },
+        columnStyles: {
+          0: { cellWidth: 'auto', halign: 'center' },   // S.No
+          1: { cellWidth: 'auto', halign: 'center' },   // SPH
+          2: { cellWidth: 'auto', halign: 'center' },   // CYL
+          3: { cellWidth: 'auto', halign: 'center' },   // ADD
+          4: { cellWidth: 'auto', halign: 'center' },   // AXIS
+          5: { cellWidth: 'auto', halign: 'center' },   // Qty
+          6: { cellWidth: 'auto', halign: 'center' },   // Status
+          7: { cellWidth: 'auto', halign: 'center' }    // Stock Level
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245]
+        },
+        didParseCell: function(data) {
+          // Color code the status column
+          if (data.column.index === 6) { // Status column
+            if (data.cell.text[0] === 'Out of Stock') {
+              data.cell.styles.textColor = [220, 53, 69]; // Red for out of stock
+              data.cell.styles.fontStyle = 'bold';
+            } else {
+              data.cell.styles.textColor = [40, 167, 69]; // Green for in stock
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
+          // Color code the stock level column
+          if (data.column.index === 7) { // Stock Level column
+            const level = data.cell.text[0];
+            if (level === 'High') {
+              data.cell.styles.textColor = [40, 167, 69]; // Green
+            } else if (level === 'Medium') {
+              data.cell.styles.textColor = [255, 193, 7]; // Yellow
+            } else if (level === 'Low') {
+              data.cell.styles.textColor = [255, 87, 34]; // Orange
+            } else if (level === 'Empty') {
+              data.cell.styles.textColor = [220, 53, 69]; // Red
+            }
+          }
+        }
+      });
+
+      // Get final Y position - use the correct property
+      let finalY = 400; // fallback position
+      try {
+        if (doc.autoTable && doc.autoTable.previous) {
+          finalY = doc.autoTable.previous.finalY + 20;
+        }
+      } catch (err) {
+        console.log('Could not get table final Y position, using fallback');
+      }
+      
+      // Add footer with totals  
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      const totalValue = filteredPowers.reduce((sum, power) => {
+        return sum + (power.quantity * (lens.purchasePrice || 0));
+      }, 0);
+      
+      // Footer information
+      doc.text(`Total Pieces: ${totalQuantity}`, 40, finalY);
+      doc.text(`Lens Type: ${lens.lensType === 'bifocal' ? 'Bifocal/Progressive' : 'Single Vision'}`, 250, finalY);
+      if (lens.purchasePrice) {
+        doc.text(`Total Inventory Value: ₹${totalValue.toFixed(2)}`, 500, finalY);
+      }
+
+      // Generate filename
+      const filterInfo = searchType === 'all' ? 'All' : 
+                        searchType === 'in-stock' ? 'InStock' : 'OutOfStock';
+      const searchInfo = powerSearch ? `_Search-${powerSearch.replace(/[^a-zA-Z0-9]/g, '')}` : '';
+      const filename = `${lens.brandName || 'LensInventory'}_${filterInfo}${searchInfo}_${now.toISOString().split('T')[0]}.pdf`;
+
+      // Save PDF
+      doc.save(filename);
+
+      // Show success message
+      alert(`PDF file exported successfully!\nFile: ${filename}\nRecords: ${filteredPowers.length}`);
+    } catch (error) {
+      console.error('Error exporting to PDF:', error);
+      alert('Failed to export PDF file. Please try again.');
+    }
+  };
 
   useEffect(() => {
     fetchLensDetails();
@@ -1091,17 +1313,22 @@ const LensDetail = () => {
           </div>
         </div>
         
-        {/* Power Inventory Card - Only for stock lenses with individual inventory */}
-        {lens.type === 'stock' && lens.inventoryType === 'individual' && lens.powerInventory && (
+        {/* Power Inventory Card - For stock lenses and contact lenses with individual inventory */}
+        {(lens.type === 'stock' || lens.type === 'contact') && lens.inventoryType === 'individual' && lens.powerInventory && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 border border-gray-200 dark:border-gray-700">
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-              Individual Power Inventory
-              {lens.lensType === 'bifocal' && (
-                <span className="ml-2 text-sm font-normal text-blue-600 dark:text-blue-400">
-                  (Bifocal/Progressive - Axis: {lens.axis || 90}°)
-                </span>
-              )}
-            </h2>
+                          <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                Individual Power Inventory
+                {lens.type === 'stock' && lens.lensType === 'bifocal' && (
+                  <span className="ml-2 text-sm font-normal text-blue-600 dark:text-blue-400">
+                    (Bifocal/Progressive - Axis: {lens.axis || 90}°)
+                  </span>
+                )}
+                {lens.type === 'contact' && (
+                  <span className="ml-2 text-sm font-normal text-purple-600 dark:text-purple-400">
+                    ({lens.category || 'Contact Lens'} - {lens.contactType || 'Type'}{lens.color ? ` - ${lens.color}` : ''})
+                  </span>
+                )}
+              </h2>
             
             {/* Enhanced Power Summary */}
             {(() => {
@@ -1274,8 +1501,8 @@ const LensDetail = () => {
               );
             })()}
             
-            {/* Additional summary for bifocal lenses */}
-            {lens.lensType === 'bifocal' && (
+                            {/* Additional summary for bifocal lenses and contact lens details */}
+            {lens.type === 'stock' && lens.lensType === 'bifocal' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div className="bg-cyan-50 dark:bg-cyan-900/30 p-4 rounded-lg border border-cyan-200 dark:border-cyan-700">
                   <h3 className="text-sm font-semibold text-cyan-700 dark:text-cyan-300 uppercase mb-2">Addition Range</h3>
@@ -1306,6 +1533,37 @@ const LensDetail = () => {
                     {lens.axis || 90}°
                   </div>
                   <p className="text-sm text-indigo-600 dark:text-indigo-400 mt-1">Standard axis orientation</p>
+                </div>
+              </div>
+            )}
+            
+            {/* Additional summary for contact lenses */}
+            {lens.type === 'contact' && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="bg-purple-50 dark:bg-purple-900/30 p-4 rounded-lg border border-purple-200 dark:border-purple-700">
+                  <h3 className="text-sm font-semibold text-purple-700 dark:text-purple-300 uppercase mb-2">Category</h3>
+                  <div className="text-xl font-bold text-purple-700 dark:text-purple-300">
+                    {lens.category || 'N/A'}
+                  </div>
+                  <p className="text-sm text-purple-600 dark:text-purple-400 mt-1">Contact lens category</p>
+                </div>
+                
+                <div className="bg-pink-50 dark:bg-pink-900/30 p-4 rounded-lg border border-pink-200 dark:border-pink-700">
+                  <h3 className="text-sm font-semibold text-pink-700 dark:text-pink-300 uppercase mb-2">Type</h3>
+                  <div className="text-xl font-bold text-pink-700 dark:text-pink-300">
+                    {lens.contactType || 'N/A'}
+                  </div>
+                  <p className="text-sm text-pink-600 dark:text-pink-400 mt-1">Contact lens type</p>
+                </div>
+                
+                <div className="bg-rose-50 dark:bg-rose-900/30 p-4 rounded-lg border border-rose-200 dark:border-rose-700">
+                  <h3 className="text-sm font-semibold text-rose-700 dark:text-rose-300 uppercase mb-2">{lens.contactType === 'Color' ? 'Color' : 'Disposal'}</h3>
+                  <div className="text-xl font-bold text-rose-700 dark:text-rose-300">
+                    {lens.contactType === 'Color' ? (lens.color || 'N/A') : (lens.disposalFrequency || 'N/A')}
+                  </div>
+                  <p className="text-sm text-rose-600 dark:text-rose-400 mt-1">
+                    {lens.contactType === 'Color' ? 'Color option' : 'Disposal frequency'}
+                  </p>
                 </div>
               </div>
             )}
@@ -1396,21 +1654,31 @@ const LensDetail = () => {
                   {/* Enhanced Search and Filter Controls */}
                   <div className="mb-6 space-y-4">
                     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                        Power Inventory Management
-                      </h3>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                          Power Inventory Management
+                        </h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          Filter and export your lens inventory data for orders and reports
+                        </p>
+                      </div>
                       
-                      {/* Stats Summary */}
-                      <div className="flex flex-wrap gap-2 text-sm">
-                        <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded-full">
-                          {inStockCount} In Stock
-                        </span>
-                        <span className="px-3 py-1 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 rounded-full">
-                          {outOfStockCount} Out of Stock
-                        </span>
-                        <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-full">
-                          {totalQuantity} Total Pieces
-                        </span>
+                      {/* Stats Summary and Export Actions */}
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                        {/* Stats Summary */}
+                        <div className="flex flex-wrap gap-2 text-sm">
+                          <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded-full">
+                            {inStockCount} In Stock
+                          </span>
+                          <span className="px-3 py-1 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 rounded-full">
+                            {outOfStockCount} Out of Stock
+                          </span>
+                          <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-full">
+                            {totalQuantity} Total Pieces
+                          </span>
+                        </div>
+                        
+
                       </div>
                     </div>
                     
@@ -1550,6 +1818,31 @@ const LensDetail = () => {
                         >
                           Switch to {viewMode === 'grid' ? 'Table' : 'Grid'}
                         </button>
+                        
+                        {/* Export Actions */}
+                        <div className="flex items-center gap-2 ml-2 pl-2 border-l border-gray-300 dark:border-gray-600">
+                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Export:</span>
+                          <button
+                            onClick={() => exportToExcel(filteredPowers, lens)}
+                            className="flex items-center px-3 py-1 text-xs bg-emerald-500 text-white rounded-md hover:bg-emerald-600 transition-colors"
+                            title="Export filtered data to Excel"
+                          >
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Excel
+                          </button>
+                          <button
+                            onClick={() => exportToPDF(filteredPowers, lens)}
+                            className="flex items-center px-3 py-1 text-xs bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+                            title="Export filtered data to PDF"
+                          >
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                            PDF
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}

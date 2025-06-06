@@ -70,11 +70,23 @@ const convertToDate = (value) => {
 };
 
 const StickerPrint = ({ order, eye = 'right' }) => {
-  // Determine which eye's data to use
-  const sph = eye === 'right' ? order.rightSph : order.leftSph;
-  const cyl = eye === 'right' ? order.rightCyl : order.leftCyl;
-  const axis = eye === 'right' ? order.rightAxis : order.leftAxis;
-  const add = eye === 'right' ? order.rightAdd : order.leftAdd;
+  // Helper function to safely extract string values and handle timestamp objects
+  const safeExtractValue = (value, defaultValue = '') => {
+    // If it's a timestamp object, convert to appropriate default
+    if (value && typeof value === 'object' && value.seconds !== undefined && value.nanoseconds !== undefined) {
+      console.warn('Found timestamp object in StickerPrint, converting to default:', value);
+      return defaultValue;
+    }
+    
+    // Return the value as string, or default if null/undefined
+    return value !== null && value !== undefined ? String(value) : defaultValue;
+  };
+
+  // Determine which eye's data to use with safe extraction
+  const sph = safeExtractValue(eye === 'right' ? order.rightSph : order.leftSph, '0.00');
+  const cyl = safeExtractValue(eye === 'right' ? order.rightCyl : order.leftCyl, '0.00');
+  const axis = safeExtractValue(eye === 'right' ? order.rightAxis : order.leftAxis, '0');
+  const add = safeExtractValue(eye === 'right' ? order.rightAdd : order.leftAdd, '0.00');
   
   // Debug log the date value when component mounts
   useEffect(() => {
@@ -108,13 +120,20 @@ const StickerPrint = ({ order, eye = 'right' }) => {
   // Get lens details as a string
   const getLensDetails = () => {
     const details = [];
-    if (order.material) details.push(order.material);
-    if (order.lensType) details.push(order.lensType);
-    if (order.coatingType) {
-      details.push(order.coatingType + (order.coatingColour ? ` ${order.coatingColour}` : ''));
+    const material = safeExtractValue(order.material);
+    const lensType = safeExtractValue(order.lensType);
+    const coatingType = safeExtractValue(order.coatingType);
+    const coatingColour = safeExtractValue(order.coatingColour);
+    const index = safeExtractValue(order.index);
+    const baseTint = safeExtractValue(order.baseTint);
+    
+    if (material) details.push(material);
+    if (lensType) details.push(lensType);
+    if (coatingType) {
+      details.push(coatingType + (coatingColour ? ` ${coatingColour}` : ''));
     }
-    if (order.index) details.push(`IDX: ${order.index}`);
-    if (order.baseTint && order.baseTint !== 'WHITE') details.push(`TINT: ${order.baseTint}`);
+    if (index) details.push(`IDX: ${index}`);
+    if (baseTint && baseTint !== 'WHITE') details.push(`TINT: ${baseTint}`);
     
     return details.join(' | ');
   };
@@ -142,7 +161,7 @@ const StickerPrint = ({ order, eye = 'right' }) => {
         fontSize: '7pt'
       }}>
         <div style={{ fontWeight: 'bold' }}>
-          #{order.displayId || 'N/A'}
+          #{safeExtractValue(order.displayId, 'N/A')}
         </div>
         <div>
           {formatDate(order.createdAt)}
@@ -156,7 +175,7 @@ const StickerPrint = ({ order, eye = 'right' }) => {
         marginBottom: '0.05in',
         fontSize: '9pt'
       }}>
-        {order.brandName || 'N/A'}
+        {safeExtractValue(order.brandName, 'N/A')}
       </div>
       
       {/* Lens details */}
@@ -195,10 +214,10 @@ const StickerPrint = ({ order, eye = 'right' }) => {
         </thead>
         <tbody>
           <tr>
-            <td style={{ border: '1px solid black', padding: '0.05in', textAlign: 'center' }}>{sph || '0.00'}</td>
-            <td style={{ border: '1px solid black', padding: '0.05in', textAlign: 'center' }}>{cyl || '0.00'}</td>
-            <td style={{ border: '1px solid black', padding: '0.05in', textAlign: 'center' }}>{axis || '0'}</td>
-            <td style={{ border: '1px solid black', padding: '0.05in', textAlign: 'center' }}>{add || '0.00'}</td>
+            <td style={{ border: '1px solid black', padding: '0.05in', textAlign: 'center' }}>{sph}</td>
+            <td style={{ border: '1px solid black', padding: '0.05in', textAlign: 'center' }}>{cyl}</td>
+            <td style={{ border: '1px solid black', padding: '0.05in', textAlign: 'center' }}>{axis}</td>
+            <td style={{ border: '1px solid black', padding: '0.05in', textAlign: 'center' }}>{add}</td>
           </tr>
         </tbody>
       </table>

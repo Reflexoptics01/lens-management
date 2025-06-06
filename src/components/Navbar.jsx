@@ -149,13 +149,19 @@ const Navbar = () => {
       const savedScrollLeft = localStorage.getItem('bottomNavScrollPosition');
       if (savedScrollLeft) {
         // Use a timeout to make sure the DOM is fully rendered
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           try {
-            bottomNavRef.current.scrollLeft = parseInt(savedScrollLeft, 10);
+            // Check if ref is still valid before accessing it
+            if (bottomNavRef.current) {
+              bottomNavRef.current.scrollLeft = parseInt(savedScrollLeft, 10);
+            }
           } catch (e) {
             console.error("Error setting scroll position:", e);
           }
         }, 100);
+        
+        // Cleanup function to clear timeout if component unmounts
+        return () => clearTimeout(timeoutId);
       }
     }
   }, []); // Only run on mount
@@ -588,7 +594,7 @@ const Navbar = () => {
       >
         <div 
           ref={bottomNavRef}
-          className="flex overflow-x-auto py-1 px-4 space-x-2 scrollbar-hide"
+          className="flex justify-center items-center overflow-x-auto py-1 px-4 space-x-2 scrollbar-hide"
           onScroll={handleNavScroll}
           style={{ 
             scrollbarWidth: 'none',
