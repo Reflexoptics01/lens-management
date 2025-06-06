@@ -54,75 +54,145 @@ const OrderDetail = () => {
       setLoading(true);
       setError(''); // Clear any previous errors
       
-      console.log('Fetching order details for ID:', orderId);
-      
       // Use user-specific collection instead of global collection
       const orderRef = getUserDoc('orders', orderId);
       const orderDoc = await getDoc(orderRef);
       
       if (!orderDoc.exists()) {
-        console.log('Order document does not exist');
         setError('Order not found');
         return;
       }
       
       const rawOrderData = orderDoc.data();
-      console.log('Raw order data:', rawOrderData);
-      console.log('Raw createdAt:', rawOrderData.createdAt);
-      console.log('createdAt type:', rawOrderData.createdAt ? typeof rawOrderData.createdAt : 'undefined');
       
       // Process the createdAt timestamp using the convertToDate helper
-      const processedCreatedAt = safelyParseDate(rawOrderData.createdAt) || new Date();
-      console.log('Processed createdAt:', processedCreatedAt);
+      const processedCreatedAtDate = safelyParseDate(rawOrderData.createdAt) || new Date();
       
+      // Convert the processed date to a string for safe rendering
+      const processedCreatedAt = processedCreatedAtDate.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short', 
+        year: 'numeric'
+      });
+      
+      // Helper function to recursively clean timestamp objects from any value
+      const cleanTimestampObjects = (obj, fieldName = '') => {
+        if (obj === null || obj === undefined) {
+          return obj;
+        }
+        
+        // If it's a timestamp object, convert it appropriately
+        if (obj && typeof obj === 'object' && obj.seconds !== undefined && obj.nanoseconds !== undefined) {
+          // Skip fields that should never be dates - convert to appropriate defaults
+          const skipFields = ['displayId', 'orderId', 'id', 'price', 'rightSph', 'rightCyl', 'rightAxis', 'rightAdd', 'rightQty',
+                             'leftSph', 'leftCyl', 'leftAxis', 'leftAdd', 'leftQty', 'diameter', 'index', 'material', 'lensType',
+                             'baseTint', 'coatingType', 'coatingColour', 'brandName', 'customerName', 'consumerName'];
+          
+          if (skipFields.includes(fieldName)) {
+            if (fieldName === 'displayId' || fieldName === 'orderId') {
+              return `ORD-${Math.random().toString(36).substr(2, 9)}`;
+            } else if (['rightSph', 'rightCyl', 'rightAdd', 'leftSph', 'leftCyl', 'leftAdd'].includes(fieldName)) {
+              return '0.00';
+            } else if (['rightAxis', 'leftAxis'].includes(fieldName)) {
+              return '0';
+            } else if (['rightQty', 'leftQty'].includes(fieldName)) {
+              return '1';
+            } else if (fieldName === 'price') {
+              return '0';
+            } else if (fieldName === 'diameter') {
+              return '';
+            } else {
+              return fieldName.includes('Name') ? 'Unknown' : '';
+            }
+          }
+          
+          // For date fields, convert to proper formatted string
+          if (fieldName.includes('At') || fieldName.includes('Date') || fieldName.includes('Time') || 
+              fieldName === 'createdAt' || fieldName === 'updatedAt' || fieldName === 'deletedAt' ||
+              fieldName === 'expectedDeliveryDate' || fieldName === 'deliveryDate') {
+            const date = safelyParseDate(obj);
+            if (date && !isNaN(date.getTime())) {
+              return date.toLocaleDateString('en-IN', {
+                day: '2-digit',
+                month: 'short', 
+                year: 'numeric'
+              });
+            }
+            return 'Invalid Date';
+          }
+          
+          // For any other timestamp objects, convert to empty string
+          return '';
+        }
+        
+        // If it's an array, clean each element
+        if (Array.isArray(obj)) {
+          return obj.map((item, index) => cleanTimestampObjects(item, `${fieldName}[${index}]`));
+        }
+        
+        // If it's an object, clean each property
+        if (obj && typeof obj === 'object') {
+          const cleaned = {};
+          Object.keys(obj).forEach(key => {
+            cleaned[key] = cleanTimestampObjects(obj[key], key);
+          });
+          return cleaned;
+        }
+        
+        // For primitive values, return as-is
+        return obj;
+      };
+
+      // Clean the entire raw order data first
+      const cleanedOrderData = cleanTimestampObjects(rawOrderData);
+
       // Safely process the order data with fallbacks
       const processedOrderData = {
         id: orderDoc.id,
         // Required fields with fallbacks
-        displayId: rawOrderData.displayId || 'Unknown',
-        customerName: rawOrderData.customerName || 'Unknown Customer',
-        consumerName: rawOrderData.consumerName || '',
-        brandName: rawOrderData.brandName || 'Unknown Brand',
-        status: rawOrderData.status || 'PENDING',
+        displayId: cleanedOrderData.displayId || 'Unknown',
+        customerName: cleanedOrderData.customerName || 'Unknown Customer',
+        consumerName: cleanedOrderData.consumerName || '',
+        brandName: cleanedOrderData.brandName || 'Unknown Brand',
+        status: cleanedOrderData.status || 'PENDING',
         
         // Handle timestamps safely
         createdAt: processedCreatedAt,
         
         // Prescription data with fallbacks
-        rightSph: rawOrderData.rightSph || '0.00',
-        rightCyl: rawOrderData.rightCyl || '0.00',
-        rightAxis: rawOrderData.rightAxis || '0',
-        rightAdd: rawOrderData.rightAdd || '0.00',
-        rightQty: rawOrderData.rightQty || '1',
+        rightSph: cleanedOrderData.rightSph || '0.00',
+        rightCyl: cleanedOrderData.rightCyl || '0.00',
+        rightAxis: cleanedOrderData.rightAxis || '0',
+        rightAdd: cleanedOrderData.rightAdd || '0.00',
+        rightQty: cleanedOrderData.rightQty || '1',
         
-        leftSph: rawOrderData.leftSph || '0.00',
-        leftCyl: rawOrderData.leftCyl || '0.00',
-        leftAxis: rawOrderData.leftAxis || '0',
-        leftAdd: rawOrderData.leftAdd || '0.00',
-        leftQty: rawOrderData.leftQty || '1',
+        leftSph: cleanedOrderData.leftSph || '0.00',
+        leftCyl: cleanedOrderData.leftCyl || '0.00',
+        leftAxis: cleanedOrderData.leftAxis || '0',
+        leftAdd: cleanedOrderData.leftAdd || '0.00',
+        leftQty: cleanedOrderData.leftQty || '1',
         
         // Lens details with fallbacks
-        material: rawOrderData.material || '',
-        index: rawOrderData.index || '',
-        lensType: rawOrderData.lensType || '',
-        baseTint: rawOrderData.baseTint || '',
-        diameter: rawOrderData.diameter || '',
+        material: cleanedOrderData.material || '',
+        index: cleanedOrderData.index || '',
+        lensType: cleanedOrderData.lensType || '',
+        baseTint: cleanedOrderData.baseTint || '',
+        diameter: cleanedOrderData.diameter || '',
         
         // Coating details with fallbacks
-        coatingType: rawOrderData.coatingType || '',
-        coatingColour: rawOrderData.coatingColour || '',
-        fogMark: rawOrderData.fogMark || false,
+        coatingType: cleanedOrderData.coatingType || '',
+        coatingColour: cleanedOrderData.coatingColour || '',
+        fogMark: cleanedOrderData.fogMark || false,
         
         // Other details with fallbacks
-        price: rawOrderData.price || '0',
-        expectedDeliveryDate: rawOrderData.expectedDeliveryDate || '',
-        specialNotes: rawOrderData.specialNotes || '',
+        price: cleanedOrderData.price || '0',
+        expectedDeliveryDate: cleanedOrderData.expectedDeliveryDate || '',
+        specialNotes: cleanedOrderData.specialNotes || '',
         
-        // Keep all other original fields
-        ...rawOrderData
+        // Keep all other cleaned fields
+        ...cleanedOrderData
       };
       
-      console.log('Processed order data:', processedOrderData);
       setOrder(processedOrderData);
       setSelectedStatus(processedOrderData.status);
       
@@ -132,7 +202,6 @@ const OrderDetail = () => {
       
     } catch (error) {
       console.error('Error fetching order details:', error);
-      console.error('Error stack:', error.stack);
       setError(`Failed to fetch order details: ${error.message}. Please try refreshing the page.`);
     } finally {
       setLoading(false);
@@ -218,12 +287,49 @@ const OrderDetail = () => {
     window.open(whatsappUrl, '_blank');
   };
 
-  const DataItem = ({ label, value, className = "" }) => (
-    <div className={`${className} group transition-all duration-300 hover:bg-sky-50 dark:hover:bg-sky-900/30 hover:rounded-md p-1`}>
-      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 group-hover:text-sky-700 dark:group-hover:text-sky-300">{label}</dt>
-      <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100 font-medium group-hover:text-sky-900 dark:group-hover:text-sky-200">{value || '-'}</dd>
-    </div>
-  );
+  const DataItem = ({ label, value, className = "" }) => {
+    // Safely convert value to string, handling Date objects and other non-string types
+    const formatValue = (val) => {
+      if (val === null || val === undefined) return '-';
+      
+      // Handle Date objects
+      if (val instanceof Date) {
+        return val.toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: 'short', 
+          year: 'numeric'
+        });
+      }
+      
+      // Handle timestamp objects that somehow made it through
+      if (val && typeof val === 'object' && val.seconds !== undefined && val.nanoseconds !== undefined) {
+        const date = safelyParseDate(val);
+        if (date && !isNaN(date.getTime())) {
+          return date.toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'short', 
+            year: 'numeric'
+          });
+        }
+        return 'Invalid Date';
+      }
+      
+      // Handle any other objects
+      if (val && typeof val === 'object') {
+        return JSON.stringify(val);
+      }
+      
+      // Convert to string for all other types
+      return String(val);
+    };
+
+    return (
+      <div className={`${className} group transition-all duration-300 hover:bg-sky-50 dark:hover:bg-sky-900/30 hover:rounded-md p-1`}>
+        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 group-hover:text-sky-700 dark:group-hover:text-sky-300">{label}</dt>
+        <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100 font-medium group-hover:text-sky-900 dark:group-hover:text-sky-200">{formatValue(value)}</dd>
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -333,10 +439,10 @@ const OrderDetail = () => {
                       {STATUS_COLORS[order?.status || 'PENDING']?.icon} {order?.status || 'PENDING'}
                     </span>
                     <span className="ml-3 text-sm text-gray-500 dark:text-gray-400 font-medium">
-                      Order #{order?.displayId}
+                      Order #{String(order?.displayId || 'Unknown')}
                     </span>
                     <span className="ml-4 font-semibold px-3 py-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full">
-                      ₹{order?.price}
+                      ₹{String(order?.price || '0')}
                     </span>
                   </div>
                 </div>
@@ -466,22 +572,7 @@ const OrderDetail = () => {
                           </h3>
                           <div className="mt-2 text-gray-600 dark:text-gray-300">
                             <DataItem label="Price" value={`₹${order.price}`} />
-                            <DataItem label="Created" 
-                              value={order.createdAt ? (() => {
-                                try {
-                                  const date = safelyParseDate(order.createdAt);
-                                  return date ? date.toLocaleString('en-IN', {
-                                    day: '2-digit',
-                                    month: 'short', 
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  }) : 'Invalid Date';
-                                } catch (error) {
-                                  console.error('Error formatting created date:', error);
-                                  return 'Invalid Date';
-                                }
-                              })() : 'Not available'} />
+                            <DataItem label="Created" value={String(order.createdAt || 'Not available')} />
                           </div>
                         </div>
                       </div>
@@ -515,7 +606,7 @@ const OrderDetail = () => {
                               </svg>
                               <h3 className="font-bold text-green-800 dark:text-green-200 text-sm sm:text-base">Optical Prescription</h3>
                             </div>
-                            <span className="text-xs sm:text-sm text-green-700 dark:text-green-300">Order #{order.displayId}</span>
+                            <span className="text-xs sm:text-sm text-green-700 dark:text-green-300">Order #{String(order.displayId || 'Unknown')}</span>
                           </div>
                         </div>
                         
@@ -540,11 +631,11 @@ const OrderDetail = () => {
                                     <span className="truncate">OD (Right)</span>
                                   </div>
                                 </td>
-                                <td className="py-2 px-1 text-center border border-green-200 dark:border-green-600 font-medium text-gray-900 dark:text-gray-100 truncate">{order.rightSph || '0.00'}</td>
-                                <td className="py-2 px-1 text-center border border-green-200 dark:border-green-600 font-medium text-gray-900 dark:text-gray-100 truncate">{order.rightCyl || '0.00'}</td>
-                                <td className="py-2 px-1 text-center border border-green-200 dark:border-green-600 font-medium text-gray-900 dark:text-gray-100 truncate">{order.rightAxis || '0'}</td>
-                                <td className="py-2 px-1 text-center border border-green-200 dark:border-green-600 font-medium text-gray-900 dark:text-gray-100 truncate">{order.rightAdd || '0.00'}</td>
-                                <td className="py-2 px-1 text-center border border-green-200 dark:border-green-600 font-medium text-gray-900 dark:text-gray-100 truncate">{order.rightQty || '1'}</td>
+                                <td className="py-2 px-1 text-center border border-green-200 dark:border-green-600 font-medium text-gray-900 dark:text-gray-100 truncate">{String(order.rightSph || '0.00')}</td>
+                                <td className="py-2 px-1 text-center border border-green-200 dark:border-green-600 font-medium text-gray-900 dark:text-gray-100 truncate">{String(order.rightCyl || '0.00')}</td>
+                                <td className="py-2 px-1 text-center border border-green-200 dark:border-green-600 font-medium text-gray-900 dark:text-gray-100 truncate">{String(order.rightAxis || '0')}</td>
+                                <td className="py-2 px-1 text-center border border-green-200 dark:border-green-600 font-medium text-gray-900 dark:text-gray-100 truncate">{String(order.rightAdd || '0.00')}</td>
+                                <td className="py-2 px-1 text-center border border-green-200 dark:border-green-600 font-medium text-gray-900 dark:text-gray-100 truncate">{String(order.rightQty || '1')}</td>
                               </tr>
                               <tr className="bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors">
                                 <td className="py-2 px-1 border border-green-200 dark:border-green-600 font-medium text-green-800 dark:text-green-200">
@@ -553,11 +644,11 @@ const OrderDetail = () => {
                                     <span className="truncate">OS (Left)</span>
                                   </div>
                                 </td>
-                                <td className="py-2 px-1 text-center border border-green-200 dark:border-green-600 font-medium text-gray-900 dark:text-gray-100 truncate">{order.leftSph || '0.00'}</td>
-                                <td className="py-2 px-1 text-center border border-green-200 dark:border-green-600 font-medium text-gray-900 dark:text-gray-100 truncate">{order.leftCyl || '0.00'}</td>
-                                <td className="py-2 px-1 text-center border border-green-200 dark:border-green-600 font-medium text-gray-900 dark:text-gray-100 truncate">{order.leftAxis || '0'}</td>
-                                <td className="py-2 px-1 text-center border border-green-200 dark:border-green-600 font-medium text-gray-900 dark:text-gray-100 truncate">{order.leftAdd || '0.00'}</td>
-                                <td className="py-2 px-1 text-center border border-green-200 dark:border-green-600 font-medium text-gray-900 dark:text-gray-100 truncate">{order.leftQty || '1'}</td>
+                                <td className="py-2 px-1 text-center border border-green-200 dark:border-green-600 font-medium text-gray-900 dark:text-gray-100 truncate">{String(order.leftSph || '0.00')}</td>
+                                <td className="py-2 px-1 text-center border border-green-200 dark:border-green-600 font-medium text-gray-900 dark:text-gray-100 truncate">{String(order.leftCyl || '0.00')}</td>
+                                <td className="py-2 px-1 text-center border border-green-200 dark:border-green-600 font-medium text-gray-900 dark:text-gray-100 truncate">{String(order.leftAxis || '0')}</td>
+                                <td className="py-2 px-1 text-center border border-green-200 dark:border-green-600 font-medium text-gray-900 dark:text-gray-100 truncate">{String(order.leftAdd || '0.00')}</td>
+                                <td className="py-2 px-1 text-center border border-green-200 dark:border-green-600 font-medium text-gray-900 dark:text-gray-100 truncate">{String(order.leftQty || '1')}</td>
                               </tr>
                             </tbody>
                           </table>
@@ -731,7 +822,6 @@ const OrderDetail = () => {
         </div>
       );
     } catch (error) {
-      console.error('Error rendering order content:', error);
       return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-red-50 dark:from-gray-900 dark:to-red-900/30 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg max-w-md w-full text-center border-t-4 border-red-500">

@@ -49,9 +49,6 @@ const Orders = () => {
       const diagnosis = diagnoseAuthIssues();
       
       if (diagnosis.issues.length > 0) {
-        console.log('Authentication issues detected:', diagnosis.issues);
-        console.log('Attempting to fix authentication...');
-        
         // Try to fix authentication
         attemptAuthFix();
         
@@ -74,7 +71,6 @@ const Orders = () => {
   
   // Force data reload on component mount (helps after backup restoration)
   useEffect(() => {
-    console.log('Orders component mounted, ensuring fresh data...');
     fetchOrders();
   }, []);
   
@@ -129,7 +125,6 @@ const Orders = () => {
       
       // Add debugging for user authentication
       const userUid = localStorage.getItem('userUid');
-      console.log('fetchOrders: Current user UID:', userUid);
       
       if (!userUid) {
         console.error('fetchOrders: No user UID found in localStorage');
@@ -138,12 +133,9 @@ const Orders = () => {
         return;
       }
       
-      console.log('Fetching orders from database...');
-      
       let ordersRef;
       try {
         ordersRef = getUserCollection('orders');
-        console.log('fetchOrders: Got orders collection reference');
       } catch (authError) {
         console.error('fetchOrders: Authentication error getting collection:', authError);
         setError('Authentication error. Please logout and login again.');
@@ -155,28 +147,53 @@ const Orders = () => {
       
       try {
         // Try the standard query first
-        console.log('Attempting orderBy query...');
         const q = query(ordersRef, orderBy('createdAt', 'desc'));
         const snapshot = await getDocs(q);
         
-        console.log('fetchOrders: Query executed, got', snapshot.docs.length, 'documents');
-        
         if (snapshot.docs.length > 0) {
-          console.log('fetchOrders: First document data sample:', snapshot.docs[0].data());
+          // Sample first document for debugging if needed
         }
         
         ordersList = snapshot.docs
           .filter(doc => doc.data() && !doc.data()._placeholder) // Filter out placeholder documents and ensure data exists
           .map((doc) => {
             const data = doc.data();
-            // Create a safe copy with all timestamp fields properly converted
+            // Create a safe copy with all timestamp objects properly converted
             const processedData = {};
             Object.keys(data).forEach(key => {
-              if (key.includes('At') || key.includes('Date') || key === 'createdAt' || key === 'updatedAt') {
-                // Convert any timestamp-like fields to proper Date objects
-                processedData[key] = safelyParseDate(data[key]) || new Date();
+              const value = data[key];
+              
+              // Skip converting certain fields that should never be dates
+              const skipFields = ['displayId', 'orderId', 'orderNumber', 'invoiceNumber', 'id', 'price', 'quantity', 'total', 'amount', 
+                                 'leftQty', 'rightQty', 'diameter', 'leftSph', 'rightSph', 'leftCyl', 'rightCyl', 'leftAxis', 'rightAxis',
+                                 'leftAdd', 'rightAdd', 'index', 'material', 'lensType', 'brandName', 'customerName', 'consumerName'];
+              if (skipFields.includes(key)) {
+                // Even in skip fields, if it's a timestamp object, convert to string or appropriate default
+                if (value && typeof value === 'object' && value.seconds !== undefined && value.nanoseconds !== undefined) {
+                  processedData[key] = key === 'displayId' ? `ORD-${Math.random().toString(36).substr(2, 9)}` : '';
+                } else {
+                  processedData[key] = value;
+                }
+                return;
+              }
+              
+              // Check if value is a timestamp object by structure (has seconds and nanoseconds)
+              if (value && typeof value === 'object' && 
+                  value.seconds !== undefined && value.nanoseconds !== undefined) {
+                // Convert timestamp objects to proper Date objects only for date-related fields
+                if (key.includes('At') || key.includes('Date') || key.includes('Time') || 
+                    key === 'createdAt' || key === 'updatedAt' || key === 'deletedAt' ||
+                    key === 'expectedDeliveryDate' || key === 'deliveryDate') {
+                  processedData[key] = safelyParseDate(value) || new Date();
+                } else {
+                  // For non-date fields that somehow have timestamp objects, convert to null or default
+                  processedData[key] = null;
+                }
+              } else if (key.includes('At') || key.includes('Date') || key === 'createdAt' || key === 'updatedAt') {
+                // Also convert common date field names
+                processedData[key] = safelyParseDate(value) || new Date();
               } else {
-                processedData[key] = data[key];
+                processedData[key] = value;
               }
             });
             
@@ -186,7 +203,6 @@ const Orders = () => {
               ...processedData
             };
           });
-        console.log('orderBy query successful, got', ordersList.length, 'orders');
       } catch (queryError) {
         console.error('Error with standard query, trying fallback:', queryError);
         
@@ -194,20 +210,46 @@ const Orders = () => {
           // Fallback: Get all orders without sorting
           const snapshot = await getDocs(ordersRef);
           
-          console.log('fetchOrders: Fallback query executed, got', snapshot.docs.length, 'documents');
-          
           ordersList = snapshot.docs
             .filter(doc => doc.data() && !doc.data()._placeholder) // Filter out placeholder documents and ensure data exists
             .map((doc) => {
               const data = doc.data();
-              // Create a safe copy with all timestamp fields properly converted
+              // Create a safe copy with all timestamp objects properly converted
               const processedData = {};
               Object.keys(data).forEach(key => {
-                if (key.includes('At') || key.includes('Date') || key === 'createdAt' || key === 'updatedAt') {
-                  // Convert any timestamp-like fields to proper Date objects
-                  processedData[key] = safelyParseDate(data[key]) || new Date();
+                const value = data[key];
+                
+                // Skip converting certain fields that should never be dates
+                const skipFields = ['displayId', 'orderId', 'orderNumber', 'invoiceNumber', 'id', 'price', 'quantity', 'total', 'amount', 
+                                   'leftQty', 'rightQty', 'diameter', 'leftSph', 'rightSph', 'leftCyl', 'rightCyl', 'leftAxis', 'rightAxis',
+                                   'leftAdd', 'rightAdd', 'index', 'material', 'lensType', 'brandName', 'customerName', 'consumerName'];
+                if (skipFields.includes(key)) {
+                  // Even in skip fields, if it's a timestamp object, convert to string or appropriate default
+                  if (value && typeof value === 'object' && value.seconds !== undefined && value.nanoseconds !== undefined) {
+                    processedData[key] = key === 'displayId' ? `ORD-${Math.random().toString(36).substr(2, 9)}` : '';
+                  } else {
+                    processedData[key] = value;
+                  }
+                  return;
+                }
+                
+                // Check if value is a timestamp object by structure (has seconds and nanoseconds)
+                if (value && typeof value === 'object' && 
+                    value.seconds !== undefined && value.nanoseconds !== undefined) {
+                  // Convert timestamp objects to proper Date objects only for date-related fields
+                  if (key.includes('At') || key.includes('Date') || key.includes('Time') || 
+                      key === 'createdAt' || key === 'updatedAt' || key === 'deletedAt' ||
+                      key === 'expectedDeliveryDate' || key === 'deliveryDate') {
+                    processedData[key] = safelyParseDate(value) || new Date();
+                  } else {
+                    // For non-date fields that somehow have timestamp objects, convert to null or default
+                    processedData[key] = null;
+                  }
+                } else if (key.includes('At') || key.includes('Date') || key === 'createdAt' || key === 'updatedAt') {
+                  // Also convert common date field names
+                  processedData[key] = safelyParseDate(value) || new Date();
                 } else {
-                  processedData[key] = data[key];
+                  processedData[key] = value;
                 }
               });
               
@@ -217,8 +259,6 @@ const Orders = () => {
                 ...processedData
               };
             });
-          
-          console.log('Fallback query successful, got', ordersList.length, 'orders');
           
           // Sort manually by createdAt (newest first)
           ordersList.sort((a, b) => {
@@ -234,7 +274,6 @@ const Orders = () => {
             // If both dates are invalid, maintain original order
             return 0;
           });
-          console.log('Manual sorting completed');
         } catch (fallbackError) {
           console.error('Both standard and fallback queries failed:', fallbackError);
           setError('Failed to fetch orders. Please check your internet connection and try again.');
@@ -243,31 +282,15 @@ const Orders = () => {
         }
       }
       
-      // Log final results
-      console.log('fetchOrders: Final ordersList length:', ordersList.length);
-      console.log('fetchOrders: Current user path should be: users/' + userUid + '/orders');
-      
-      if (ordersList.length > 0) {
-        console.log('fetchOrders: Sample order data:', ordersList[0]);
-      }
-      
       // Process and validate data
       let processedCount = 0;
       let invalidCount = 0;
-      
-      console.log('Raw ordersList sample (first 3):', ordersList.slice(0, 3).map(o => ({
-        id: o.displayId,
-        createdAt: o.createdAt,
-        createdAtType: typeof o.createdAt,
-        createdAtKeys: typeof o.createdAt === 'object' ? Object.keys(o.createdAt || {}) : 'N/A'
-      })));
       
       const processedOrders = ordersList.map((order, index) => {
         try {
           // Validate createdAt timestamp
           const date = safelyParseDate(order.createdAt);
           if (!date) {
-            console.warn(`Order ${order.displayId || order.id} has invalid createdAt:`, order.createdAt);
             invalidCount++;
             // Set a default date if createdAt is invalid
             order.createdAt = new Date(); // Use current date as fallback
@@ -277,7 +300,6 @@ const Orders = () => {
           
           // Ensure displayId exists
           if (!order.displayId) {
-            console.warn(`Order ${order.id} missing displayId, assigning temporary one`);
             order.displayId = `ORD-${index + 1}`;
           }
           
@@ -330,14 +352,6 @@ const Orders = () => {
         // Fallback to original order
         return 0;
       });
-      
-      console.log(`Orders processed: ${processedCount} valid dates, ${invalidCount} invalid dates`);
-      console.log('First 3 processed orders (should be newest):', processedOrders.slice(0, 3).map(o => ({
-        id: o.displayId,
-        createdAt: o.createdAt,
-        convertedDate: safelyParseDate(o.createdAt),
-        formattedDate: safelyParseDate(o.createdAt) ? safelyParseDate(o.createdAt).toLocaleDateString() : 'Invalid'
-      })));
       
       // Always set the orders array, even if empty
       setOrders(processedOrders || []);
@@ -430,7 +444,6 @@ const Orders = () => {
           
           // Commit the batch
           await batch.commit();
-          console.log(`Removed ${snapshot.docs.length} lenses from inventory due to ${newStatus} status`);
         }
         return;
       }
@@ -439,8 +452,6 @@ const Orders = () => {
       if (wasInvalid && isNowValid) {
         // Check if lenses already exist (they shouldn't, but check anyway)
         if (!snapshot.empty) {
-          console.log('Lenses exist despite invalid previous status - updating them');
-          
           const batch = writeBatch(db);
           snapshot.docs.forEach(lensDoc => {
             const lensRef = getUserDoc('lensInventory', lensDoc.id);
@@ -472,7 +483,6 @@ const Orders = () => {
         
         // Commit the batch
         await batch.commit();
-        console.log(`Updated status for ${snapshot.docs.length} lenses to ${newStatus}`);
       } else if (isNowValid) {
         // No lenses found but status is valid - create them
         await createLensesFromOrder(orderData, newStatus);
@@ -490,7 +500,6 @@ const Orders = () => {
       const hasLeftEye = orderData.leftSph || orderData.leftCyl;
       
       if (!hasRightEye && !hasLeftEye) {
-        console.log('No prescription data to add to inventory');
         return;
       }
       
@@ -564,7 +573,6 @@ const Orders = () => {
       if (lensCount > 0) {
         // Commit the batch
         await batch.commit();
-        console.log(`Created ${lensCount} lenses for order ${orderData.displayId}`);
       }
     } catch (error) {
       console.error('Error creating lenses from order:', error);
@@ -599,7 +607,6 @@ const Orders = () => {
       const snapshot = await getDocs(q);
       
       if (snapshot.empty) {
-        console.log('No lenses found in inventory for this order');
         return;
       }
       
@@ -613,7 +620,6 @@ const Orders = () => {
       
       // Commit the batch
       await batch.commit();
-      console.log(`Deleted ${snapshot.docs.length} lenses from inventory for order ${orderId}`);
     } catch (error) {
       console.error('Error deleting lenses from inventory:', error);
     }
@@ -621,23 +627,18 @@ const Orders = () => {
 
   const formatDisplayDate = (timestamp) => {
     if (!timestamp) {
-      console.debug('formatDisplayDate: No timestamp provided');
       return { date: 'No Date', time: '' };
     }
     
     try {
-      console.debug('formatDisplayDate: Processing timestamp:', typeof timestamp, timestamp);
-      
       // Use the safelyParseDate helper function for robust timestamp conversion
       const date = safelyParseDate(timestamp);
       
       if (!date) {
-        console.warn('formatDisplayDate: safelyParseDate returned null for:', timestamp);
         return { date: 'Invalid Date', time: '' };
       }
       
       if (isNaN(date.getTime())) {
-        console.warn('formatDisplayDate: Date object is invalid (NaN) for:', timestamp);
         return { date: 'Invalid Date', time: '' };
       }
       
@@ -648,8 +649,6 @@ const Orders = () => {
         hour: '2-digit', 
         minute: '2-digit' 
       });
-      
-      console.debug('formatDisplayDate: Successfully formatted:', { formattedDate, formattedTime });
       
       return {
         date: formattedDate,
@@ -792,7 +791,6 @@ const Orders = () => {
               <div className="mt-3 space-x-2">
                 <button
                   onClick={() => {
-                    console.log('Debug: Attempting to refetch orders...');
                     fetchOrders();
                   }}
                   className="px-3 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-md hover:bg-blue-200 dark:hover:bg-blue-800"
@@ -802,7 +800,6 @@ const Orders = () => {
                 
                 <button
                   onClick={() => {
-                    console.log('Debug: Running auth diagnosis...');
                     const diagnosis = diagnoseAuthIssues();
                     alert(`Auth Status:\n\nUID: ${diagnosis.hasUid ? '✓' : '✗'}\nEmail: ${diagnosis.hasEmail ? '✓' : '✗'}\n\nIssues: ${diagnosis.issues.length}\nRecommendations: ${diagnosis.recommendations.length}`);
                   }}

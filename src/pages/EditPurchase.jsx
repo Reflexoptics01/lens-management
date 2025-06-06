@@ -4,7 +4,7 @@ import { collection, getDocs, query, where, getDoc, updateDoc, serverTimestamp }
 import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
-import { dateToISOString } from '../utils/dateUtils';
+import { dateToISOString, safelyParseDate } from '../utils/dateUtils';
 import CustomerForm from '../components/CustomerForm';
 import PowerInventoryModal from '../components/PowerInventoryModal';
 
@@ -127,59 +127,142 @@ const EditPurchase = () => {
         return;
       }
       
-      const purchaseData = purchaseDoc.data();
-      setOriginalPurchase(purchaseData);
+      const rawPurchaseData = purchaseDoc.data();
+      
+      // Helper function to recursively clean timestamp objects from any value
+      const cleanTimestampObjects = (obj, fieldName = '') => {
+        if (obj === null || obj === undefined) {
+          return obj;
+        }
+        
+        // If it's a timestamp object, convert it appropriately
+        if (obj && typeof obj === 'object' && obj.seconds !== undefined && obj.nanoseconds !== undefined) {
+          // Skip fields that should never be dates - convert to appropriate defaults
+          const skipFields = ['displayId', 'purchaseId', 'purchaseNumber', 'invoiceNumber', 'id', 'price', 'quantity', 'total', 'amount',
+                             'vendorId', 'vendorName', 'itemName', 'itemCode', 'category', 'brand', 'unit', 'rate', 'discount', 'tax',
+                             'vendorInvoiceNumber', 'frieghtCharge', 'subtotal', 'discountAmount', 'taxAmount', 'totalAmount', 'amountPaid', 'balance',
+                             'maxSph', 'maxCyl', 'lensType', 'qty'];
+          
+          if (skipFields.includes(fieldName)) {
+            if (fieldName === 'displayId' || fieldName === 'purchaseId' || fieldName === 'purchaseNumber') {
+              return `P-${Math.random().toString(36).substr(2, 9)}`;
+            } else if (['price', 'quantity', 'total', 'amount', 'rate', 'discount', 'frieghtCharge', 'subtotal', 
+                       'discountAmount', 'taxAmount', 'totalAmount', 'amountPaid', 'balance'].includes(fieldName)) {
+              return 0;
+            } else if (['maxSph', 'maxCyl'].includes(fieldName)) {
+              return '';
+            } else if (fieldName === 'qty') {
+              return 1;
+            } else if (fieldName === 'lensType') {
+              return 'Stock Lens';
+            } else {
+              return '';
+            }
+          }
+          
+          // For date fields, convert to proper formatted string or keep as date for processing
+          if (fieldName.includes('At') || fieldName.includes('Date') || fieldName.includes('Time') || 
+              fieldName === 'createdAt' || fieldName === 'updatedAt' || fieldName === 'deletedAt' ||
+              fieldName === 'purchaseDate' || fieldName === 'deliveryDate') {
+            // For purchaseDate specifically, we want to keep it as a date for form processing
+            if (fieldName === 'purchaseDate') {
+              const date = safelyParseDate(obj);
+              return date && !isNaN(date.getTime()) ? date : new Date();
+            } else {
+              const date = safelyParseDate(obj);
+              if (date && !isNaN(date.getTime())) {
+                return date.toLocaleDateString('en-IN', {
+                  day: '2-digit',
+                  month: 'short', 
+                  year: 'numeric'
+                });
+              }
+              return 'Invalid Date';
+            }
+          }
+          
+          // For any other timestamp objects, convert to empty string
+          return '';
+        }
+        
+        // If it's an array, clean each element
+        if (Array.isArray(obj)) {
+          return obj.map((item, index) => cleanTimestampObjects(item, `${fieldName}[${index}]`));
+        }
+        
+        // If it's an object, clean each property
+        if (obj && typeof obj === 'object') {
+          const cleaned = {};
+          Object.keys(obj).forEach(key => {
+            cleaned[key] = cleanTimestampObjects(obj[key], key);
+          });
+          return cleaned;
+        }
+        
+        // For primitive values, return as-is
+        return obj;
+      };
+      
+      // Clean the entire purchase data object
+      const cleanedPurchaseData = cleanTimestampObjects(rawPurchaseData);
+      setOriginalPurchase(cleanedPurchaseData);
       
       // Set purchase details
-      setPurchaseNumber(purchaseData.purchaseNumber || '');
-      setVendorInvoiceNumber(purchaseData.vendorInvoiceNumber || '');
+      setPurchaseNumber(String(cleanedPurchaseData.purchaseNumber || ''));
+      setVendorInvoiceNumber(String(cleanedPurchaseData.vendorInvoiceNumber || ''));
       
       // Format the date if it's a timestamp
-      if (purchaseData.purchaseDate) {
-        if (purchaseData.purchaseDate.toDate) {
+      if (cleanedPurchaseData.purchaseDate) {
+        if (cleanedPurchaseData.purchaseDate instanceof Date) {
+          // Already converted to Date by our cleaning function
+          setPurchaseDate(dateToISOString(cleanedPurchaseData.purchaseDate).split('T')[0]);
+        } else if (cleanedPurchaseData.purchaseDate.toDate) {
           // Firebase timestamp
-          setPurchaseDate(dateToISOString(purchaseData.purchaseDate.toDate()).split('T')[0]);
-        } else if (typeof purchaseData.purchaseDate === 'string') {
+          setPurchaseDate(dateToISOString(cleanedPurchaseData.purchaseDate.toDate()).split('T')[0]);
+        } else if (typeof cleanedPurchaseData.purchaseDate === 'string') {
           // Already a string date
-          setPurchaseDate(purchaseData.purchaseDate);
+          setPurchaseDate(cleanedPurchaseData.purchaseDate);
         } else {
           // Default to today
           setPurchaseDate(dateToISOString(new Date()).split('T')[0]);
         }
       }
       
-      setSelectedTaxOption(purchaseData.taxOption || TAX_OPTIONS[0].id);
-      setDiscountType(purchaseData.discountType || 'amount');
-      setDiscountValue(purchaseData.discountValue || 0);
-      setFrieghtCharge(purchaseData.frieghtCharge || 0);
-      setNotes(purchaseData.notes || '');
-      setPaymentStatus(purchaseData.paymentStatus || 'UNPAID');
-      setAmountPaid(purchaseData.amountPaid || 0);
+      setSelectedTaxOption(String(cleanedPurchaseData.taxOption || TAX_OPTIONS[0].id));
+      setDiscountType(String(cleanedPurchaseData.discountType || 'amount'));
+      setDiscountValue(parseFloat(cleanedPurchaseData.discountValue) || 0);
+      setFrieghtCharge(parseFloat(cleanedPurchaseData.frieghtCharge) || 0);
+      setNotes(String(cleanedPurchaseData.notes || ''));
+      setPaymentStatus(String(cleanedPurchaseData.paymentStatus || 'UNPAID'));
+      setAmountPaid(parseFloat(cleanedPurchaseData.amountPaid) || 0);
       
       // Set vendor
-      if (purchaseData.vendorId) {
-        const vendorDoc = await getDoc(getUserDoc('customers', purchaseData.vendorId));
+      if (cleanedPurchaseData.vendorId) {
+        const vendorDoc = await getDoc(getUserDoc('customers', cleanedPurchaseData.vendorId));
         if (vendorDoc.exists()) {
+          const rawVendorData = vendorDoc.data();
+          // Clean vendor data as well
+          const cleanedVendorData = cleanTimestampObjects(rawVendorData);
           setSelectedVendor({
             id: vendorDoc.id,
-            ...vendorDoc.data()
+            ...cleanedVendorData
           });
         }
       }
       
       // Set table rows - simplified structure to match CreatePurchase
-      if (purchaseData.items && purchaseData.items.length > 0) {
-        setTableRows(purchaseData.items.map(item => ({
-          itemName: item.itemName || '',
-          lensType: item.lensType || 'Stock Lens',
-          maxSph: item.maxSph || '',
-          maxCyl: item.maxCyl || '',
+      if (cleanedPurchaseData.items && cleanedPurchaseData.items.length > 0) {
+        setTableRows(cleanedPurchaseData.items.map(item => ({
+          itemName: String(item.itemName || ''),
+          lensType: String(item.lensType || 'Stock Lens'),
+          maxSph: String(item.maxSph || ''),
+          maxCyl: String(item.maxCyl || ''),
           powerInventorySetup: item.powerInventorySetup || false,
           powerInventoryData: item.powerInventoryData || null,
-          qty: item.qty || 1,
-          unit: item.unit || 'Pairs',
-          price: item.price || 0,
-          total: item.total || 0,
+          qty: parseInt(item.qty) || 1,
+          unit: String(item.unit || 'Pairs'),
+          price: parseFloat(item.price) || 0,
+          total: parseFloat(item.total) || 0,
           rowKey: Math.random().toString(36).substr(2, 9)
         })));
       } else {
@@ -479,7 +562,7 @@ const EditPurchase = () => {
               <div className="flex items-center space-x-3">
                 <div className="text-right">
                   <div className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Purchase Number</div>
-                  <div className="text-lg font-bold text-orange-600 dark:text-orange-400">{purchaseNumber}</div>
+                  <div className="text-lg font-bold text-orange-600 dark:text-orange-400">{String(purchaseNumber)}</div>
                 </div>
                 <button
                   onClick={() => navigate('/purchases')}
@@ -533,22 +616,22 @@ const EditPurchase = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100">
-                        {selectedVendor.opticalName}
+                        {String(selectedVendor.opticalName)}
                       </h3>
                       <div className="mt-2 space-y-1">
                         {selectedVendor.contactPerson && (
                           <div className="text-sm text-blue-700 dark:text-blue-300">
-                            <span className="font-medium">Contact:</span> {selectedVendor.contactPerson}
+                            <span className="font-medium">Contact:</span> {String(selectedVendor.contactPerson)}
                           </div>
                         )}
                         {selectedVendor.phone && (
                           <div className="text-sm text-blue-700 dark:text-blue-300">
-                            <span className="font-medium">Phone:</span> {selectedVendor.phone}
+                            <span className="font-medium">Phone:</span> {String(selectedVendor.phone)}
                           </div>
                         )}
                         {selectedVendor.email && (
                           <div className="text-sm text-blue-700 dark:text-blue-300">
-                            <span className="font-medium">Email:</span> {selectedVendor.email}
+                            <span className="font-medium">Email:</span> {String(selectedVendor.email)}
                           </div>
                         )}
                       </div>
@@ -599,12 +682,12 @@ const EditPurchase = () => {
                                     className="cursor-pointer py-3 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-600 last:border-b-0"
                                     onClick={() => handleVendorSelect(vendor)}
                                   >
-                                    <div className="font-medium text-gray-900 dark:text-white">{vendor.opticalName}</div>
+                                    <div className="font-medium text-gray-900 dark:text-white">{String(vendor.opticalName)}</div>
                                     {vendor.contactPerson && (
-                                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Contact: {vendor.contactPerson}</div>
+                                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Contact: {String(vendor.contactPerson)}</div>
                                     )}
                                     {vendor.phone && (
-                                      <div className="text-xs text-gray-500 dark:text-gray-400">Phone: {vendor.phone}</div>
+                                      <div className="text-xs text-gray-500 dark:text-gray-400">Phone: {String(vendor.phone)}</div>
                                     )}
                                   </div>
                                 ))
@@ -624,7 +707,7 @@ const EditPurchase = () => {
                       </div>
                     ) : (
                       <div className="text-base font-medium text-gray-900 dark:text-white">
-                        {selectedVendor.opticalName}
+                        {String(selectedVendor.opticalName)}
                       </div>
                     )}
                   </div>

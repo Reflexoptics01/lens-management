@@ -8,7 +8,7 @@ import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import CustomerForm from '../components/CustomerForm';
 import { DocumentPlusIcon } from '@heroicons/react/24/outline';
 import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, safelyParseDate } from '../utils/dateUtils';
 
 // Define section colors for the OrderForm
 const SECTION_COLORS = {
@@ -74,33 +74,105 @@ const EditOrder = () => {
       const orderDoc = await getDoc(orderRef);
       
       if (orderDoc.exists()) {
-        const orderData = orderDoc.data();
+        const rawOrderData = orderDoc.data();
+        
+        // Helper function to recursively clean timestamp objects from any value
+        const cleanTimestampObjects = (obj, fieldName = '') => {
+          if (obj === null || obj === undefined) {
+            return obj;
+          }
+          
+          // If it's a timestamp object, convert it appropriately
+          if (obj && typeof obj === 'object' && obj.seconds !== undefined && obj.nanoseconds !== undefined) {
+            // Skip fields that should never be dates - convert to appropriate defaults
+            const skipFields = ['displayId', 'orderId', 'id', 'price', 'rightSph', 'rightCyl', 'rightAxis', 'rightAdd', 'rightQty',
+                               'leftSph', 'leftCyl', 'leftAxis', 'leftAdd', 'leftQty', 'diameter', 'index', 'material', 'lensType',
+                               'baseTint', 'coatingType', 'coatingColour', 'brandName', 'customerName', 'consumerName'];
+            
+            if (skipFields.includes(fieldName)) {
+              if (fieldName === 'displayId' || fieldName === 'orderId') {
+                return `ORD-${Math.random().toString(36).substr(2, 9)}`;
+              } else if (['rightSph', 'rightCyl', 'rightAdd', 'leftSph', 'leftCyl', 'leftAdd'].includes(fieldName)) {
+                return '0.00';
+              } else if (['rightAxis', 'leftAxis'].includes(fieldName)) {
+                return '0';
+              } else if (['rightQty', 'leftQty'].includes(fieldName)) {
+                return '1';
+              } else if (fieldName === 'price') {
+                return '0';
+              } else if (fieldName === 'diameter' || fieldName === 'index') {
+                return '';
+              } else {
+                return fieldName.includes('Name') ? 'Unknown' : '';
+              }
+            }
+            
+            // For date fields, convert to proper formatted string
+            if (fieldName.includes('At') || fieldName.includes('Date') || fieldName.includes('Time') || 
+                fieldName === 'createdAt' || fieldName === 'updatedAt' || fieldName === 'deletedAt' ||
+                fieldName === 'expectedDeliveryDate' || fieldName === 'deliveryDate') {
+              const date = safelyParseDate(obj);
+              if (date && !isNaN(date.getTime())) {
+                return date.toLocaleDateString('en-IN', {
+                  day: '2-digit',
+                  month: 'short', 
+                  year: 'numeric'
+                });
+              }
+              return 'Invalid Date';
+            }
+            
+            // For any other timestamp objects, convert to empty string
+            return '';
+          }
+          
+          // If it's an array, clean each element
+          if (Array.isArray(obj)) {
+            return obj.map((item, index) => cleanTimestampObjects(item, `${fieldName}[${index}]`));
+          }
+          
+          // If it's an object, clean each property
+          if (obj && typeof obj === 'object') {
+            const cleaned = {};
+            Object.keys(obj).forEach(key => {
+              cleaned[key] = cleanTimestampObjects(obj[key], key);
+            });
+            return cleaned;
+          }
+          
+          // For primitive values, return as-is
+          return obj;
+        };
+        
+        // Clean the entire order data object
+        const cleanedOrderData = cleanTimestampObjects(rawOrderData);
+        
         setFormData({
-          customerName: orderData.customerName || '',
-          consumerName: orderData.consumerName || '',
-          brandName: orderData.brandName || '',
-          material: orderData.material || '',
-          index: orderData.index || '',
-          lensType: orderData.lensType || '',
-          baseTint: orderData.baseTint || '',
-          coatingType: orderData.coatingType || '',
-          coatingColour: orderData.coatingColour || '',
-          diameter: orderData.diameter || '',
-          fogMark: orderData.fogMark || false,
-          rightSph: orderData.rightSph || '',
-          rightCyl: orderData.rightCyl || '',
-          rightAxis: orderData.rightAxis || '',
-          rightAdd: orderData.rightAdd || '',
-          rightQty: orderData.rightQty || '1',
-          leftSph: orderData.leftSph || '',
-          leftCyl: orderData.leftCyl || '',
-          leftAxis: orderData.leftAxis || '',
-          leftAdd: orderData.leftAdd || '',
-          leftQty: orderData.leftQty || '1',
-          expectedDeliveryDate: orderData.expectedDeliveryDate || '',
-          price: orderData.price || '',
-          specialNotes: orderData.specialNotes || '',
-          displayId: orderData.displayId || ''
+          customerName: String(cleanedOrderData.customerName || ''),
+          consumerName: String(cleanedOrderData.consumerName || ''),
+          brandName: String(cleanedOrderData.brandName || ''),
+          material: String(cleanedOrderData.material || ''),
+          index: String(cleanedOrderData.index || ''),
+          lensType: String(cleanedOrderData.lensType || ''),
+          baseTint: String(cleanedOrderData.baseTint || ''),
+          coatingType: String(cleanedOrderData.coatingType || ''),
+          coatingColour: String(cleanedOrderData.coatingColour || ''),
+          diameter: String(cleanedOrderData.diameter || ''),
+          fogMark: cleanedOrderData.fogMark || false,
+          rightSph: String(cleanedOrderData.rightSph || ''),
+          rightCyl: String(cleanedOrderData.rightCyl || ''),
+          rightAxis: String(cleanedOrderData.rightAxis || ''),
+          rightAdd: String(cleanedOrderData.rightAdd || ''),
+          rightQty: String(cleanedOrderData.rightQty || '1'),
+          leftSph: String(cleanedOrderData.leftSph || ''),
+          leftCyl: String(cleanedOrderData.leftCyl || ''),
+          leftAxis: String(cleanedOrderData.leftAxis || ''),
+          leftAdd: String(cleanedOrderData.leftAdd || ''),
+          leftQty: String(cleanedOrderData.leftQty || '1'),
+          expectedDeliveryDate: String(cleanedOrderData.expectedDeliveryDate || ''),
+          price: String(cleanedOrderData.price || ''),
+          specialNotes: String(cleanedOrderData.specialNotes || ''),
+          displayId: String(cleanedOrderData.displayId || '')
         });
       } else {
         setError('Order not found');
@@ -237,7 +309,7 @@ const EditOrder = () => {
                 </div>
                 {formData.displayId && (
                   <span className="ml-4 px-4 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-full text-sm font-medium shadow-sm">
-                    Order #{formData.displayId}
+                    Order #{String(formData.displayId)}
                   </span>
                 )}
               </div>

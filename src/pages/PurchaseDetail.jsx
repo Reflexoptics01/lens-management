@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getDoc } from 'firebase/firestore';
 import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, safelyParseDate } from '../utils/dateUtils';
 import { getUserDoc } from '../utils/multiTenancy';
 
 const TAX_OPTIONS = [
@@ -43,14 +43,82 @@ const PurchaseDetail = () => {
         return;
       }
       
-      const purchaseData = { id: purchaseId, ...purchaseDoc.data() };
+      const rawPurchaseData = purchaseDoc.data();
+      
+      // Helper function to recursively clean timestamp objects from any value
+      const cleanTimestampObjects = (obj, fieldName = '') => {
+        if (obj === null || obj === undefined) {
+          return obj;
+        }
+        
+        // If it's a timestamp object, convert it appropriately
+        if (obj && typeof obj === 'object' && obj.seconds !== undefined && obj.nanoseconds !== undefined) {
+          // Skip fields that should never be dates - convert to appropriate defaults
+          const skipFields = ['displayId', 'purchaseId', 'purchaseNumber', 'invoiceNumber', 'id', 'price', 'quantity', 'total', 'amount',
+                             'vendorId', 'vendorName', 'itemName', 'itemCode', 'category', 'brand', 'unit', 'rate', 'discount', 'tax',
+                             'vendorInvoiceNumber', 'frieghtCharge', 'subtotal', 'discountAmount', 'taxAmount', 'totalAmount', 'amountPaid', 'balance'];
+          
+          if (skipFields.includes(fieldName)) {
+            if (fieldName === 'displayId' || fieldName === 'purchaseId' || fieldName === 'purchaseNumber') {
+              return `P-${Math.random().toString(36).substr(2, 9)}`;
+            } else if (['price', 'quantity', 'total', 'amount', 'rate', 'discount', 'frieghtCharge', 'subtotal', 
+                       'discountAmount', 'taxAmount', 'totalAmount', 'amountPaid', 'balance'].includes(fieldName)) {
+              return '0';
+            } else {
+              return '';
+            }
+          }
+          
+          // For date fields, convert to proper formatted string
+          if (fieldName.includes('At') || fieldName.includes('Date') || fieldName.includes('Time') || 
+              fieldName === 'createdAt' || fieldName === 'updatedAt' || fieldName === 'deletedAt' ||
+              fieldName === 'purchaseDate' || fieldName === 'deliveryDate') {
+            const date = safelyParseDate(obj);
+            if (date && !isNaN(date.getTime())) {
+              return date.toLocaleDateString('en-IN', {
+                day: '2-digit',
+                month: 'short', 
+                year: 'numeric'
+              });
+            }
+            return 'Invalid Date';
+          }
+          
+          // For any other timestamp objects, convert to empty string
+          return '';
+        }
+        
+        // If it's an array, clean each element
+        if (Array.isArray(obj)) {
+          return obj.map((item, index) => cleanTimestampObjects(item, `${fieldName}[${index}]`));
+        }
+        
+        // If it's an object, clean each property
+        if (obj && typeof obj === 'object') {
+          const cleaned = {};
+          Object.keys(obj).forEach(key => {
+            cleaned[key] = cleanTimestampObjects(obj[key], key);
+          });
+          return cleaned;
+        }
+        
+        // For primitive values, return as-is
+        return obj;
+      };
+      
+      // Clean the entire purchase data object
+      const cleanedPurchaseData = cleanTimestampObjects(rawPurchaseData);
+      
+      const purchaseData = { id: purchaseId, ...cleanedPurchaseData };
       
       // Fetch vendor details if vendorId exists
       if (purchaseData.vendorId) {
         // Use user-specific collection for vendor details
         const vendorDoc = await getDoc(getUserDoc('customers', purchaseData.vendorId));
         if (vendorDoc.exists()) {
-          purchaseData.vendor = vendorDoc.data();
+          const rawVendorData = vendorDoc.data();
+          // Clean vendor data as well
+          purchaseData.vendor = cleanTimestampObjects(rawVendorData);
         }
       }
       
@@ -187,7 +255,7 @@ const PurchaseDetail = () => {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
-                {purchase.purchaseNumber ? `#${purchase.purchaseNumber}` : `ID: ${purchaseId.substring(0, 8)}`}
+                {purchase.purchaseNumber ? `#${String(purchase.purchaseNumber)}` : `ID: ${purchaseId.substring(0, 8)}`}
               </p>
             </div>
             <div className="flex space-x-2">
@@ -219,7 +287,7 @@ const PurchaseDetail = () => {
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              {formatDate(purchase.purchaseDate)}
+              {String(purchase.purchaseDate || 'N/A')}
             </span>
           </div>
         </div>
@@ -238,13 +306,13 @@ const PurchaseDetail = () => {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between">
               <div>
                 <h4 className="text-xl font-bold text-gray-900 dark:text-white">
-                  {purchase.vendorName || (vendor && vendor.opticalName) || '-'}
+                  {String(purchase.vendorName || (vendor && vendor.opticalName) || '-')}
                 </h4>
                 {vendor && vendor.contactPerson && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Contact Person: {vendor.contactPerson}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Contact Person: {String(vendor.contactPerson)}</p>
                 )}
                 {vendor && vendor.city && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{vendor.city}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{String(vendor.city)}</p>
                 )}
               </div>
               
@@ -253,13 +321,13 @@ const PurchaseDetail = () => {
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  Purchase #: <span className="font-medium ml-1 text-gray-900 dark:text-white">{purchase.purchaseNumber || '-'}</span>
+                  Purchase #: <span className="font-medium ml-1 text-gray-900 dark:text-white">{String(purchase.purchaseNumber || '-')}</span>
                 </div>
                 <div className="flex items-center justify-end text-sm text-gray-600 dark:text-gray-400">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                   </svg>
-                  Invoice #: <span className="font-medium ml-1 text-gray-900 dark:text-white">{purchase.vendorInvoiceNumber || '-'}</span>
+                  Invoice #: <span className="font-medium ml-1 text-gray-900 dark:text-white">{String(purchase.vendorInvoiceNumber || '-')}</span>
                 </div>
               </div>
             </div>
@@ -315,9 +383,9 @@ const PurchaseDetail = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 dark:text-white text-left">
-                        <div className="font-medium">{item.itemName || 'Unnamed Item'}</div>
+                        <div className="font-medium">{String(item.itemName || 'Unnamed Item')}</div>
                         {item.description && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{item.description}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{String(item.description)}</div>
                         )}
                         
                         {/* Show power inventory details if available */}
@@ -330,10 +398,10 @@ const PurchaseDetail = () => {
                               <span className="text-xs font-medium text-green-700 dark:text-green-300">Power Inventory Setup</span>
                             </div>
                             <div className="text-xs text-green-600 dark:text-green-400">
-                              <div>Lens Type: {item.powerInventoryData.lensType || 'Single Vision'}</div>
-                              <div>Power Range: SPH {item.powerInventoryData.powerLimits?.minSph || -6} to {item.powerInventoryData.powerLimits?.maxSph || 6}, CYL {item.powerInventoryData.powerLimits?.minCyl || -2} to {item.powerInventoryData.powerLimits?.maxCyl || 0}</div>
+                              <div>Lens Type: {String(item.powerInventoryData.lensType || 'Single Vision')}</div>
+                              <div>Power Range: SPH {String(item.powerInventoryData.powerLimits?.minSph || -6)} to {String(item.powerInventoryData.powerLimits?.maxSph || 6)}, CYL {String(item.powerInventoryData.powerLimits?.minCyl || -2)} to {String(item.powerInventoryData.powerLimits?.maxCyl || 0)}</div>
                               <div>Total Combinations: {Object.keys(item.powerInventoryData.powerInventory || {}).length}</div>
-                              <div className="font-medium">Total Quantity: {item.powerInventoryData.totalQuantity}</div>
+                              <div className="font-medium">Total Quantity: {String(item.powerInventoryData.totalQuantity)}</div>
                             </div>
                           </div>
                         ) : (
@@ -341,17 +409,17 @@ const PurchaseDetail = () => {
                           <div className="flex flex-wrap gap-1 mt-2">
                             {item.lensType && (
                               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
-                                {item.lensType}
+                                {String(item.lensType)}
                               </span>
                             )}
                             {item.maxSph && (
                               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
-                                SPH: {parseFloat(item.maxSph) >= 0 ? '+' : ''}{item.maxSph}
+                                SPH: {parseFloat(String(item.maxSph)) >= 0 ? '+' : ''}{String(item.maxSph)}
                               </span>
                             )}
                             {item.maxCyl && (
                               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
-                                CYL: {parseFloat(item.maxCyl) >= 0 ? '+' : ''}{item.maxCyl}
+                                CYL: {parseFloat(String(item.maxCyl)) >= 0 ? '+' : ''}{String(item.maxCyl)}
                               </span>
                             )}
                           </div>
@@ -361,23 +429,23 @@ const PurchaseDetail = () => {
                         <div className="flex items-center">
                           {item.powerInventorySetup && item.powerInventoryData?.totalQuantity ? (
                             <div className="flex flex-col">
-                              <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400">
-                                {item.powerInventoryData.totalQuantity}
-                              </span>
-                              <span className="text-xs text-green-600 dark:text-green-400 font-medium">
-                                (from {Object.keys(item.powerInventoryData.powerInventory || {}).length} power combinations)
-                              </span>
+                                                          <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400">
+                              {String(item.powerInventoryData.totalQuantity)}
+                            </span>
+                            <span className="text-xs text-green-600 dark:text-green-400 font-medium">
+                              (from {Object.keys(item.powerInventoryData.powerInventory || {}).length} power combinations)
+                            </span>
                             </div>
                           ) : (
                             <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400">
-                              {item.qty || 0}
+                              {String(item.qty || 0)}
                             </span>
                           )}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 dark:text-white text-left">
                         <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
-                          {item.unit || 'Pairs'}
+                          {String(item.unit || 'Pairs')}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 dark:text-white text-left">
@@ -531,7 +599,7 @@ const PurchaseDetail = () => {
                   </svg>
                   Notes:
                 </h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400 italic">{purchase.notes}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 italic">{String(purchase.notes)}</p>
               </div>
             )}
           </div>

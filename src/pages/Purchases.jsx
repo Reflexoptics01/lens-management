@@ -75,7 +75,6 @@ const Purchases = () => {
       
       // Add debugging for user authentication
       const userUid = localStorage.getItem('userUid');
-      console.log('fetchPurchases: Current user UID:', userUid);
       
       if (!userUid) {
         console.error('fetchPurchases: No user UID found in localStorage');
@@ -84,37 +83,73 @@ const Purchases = () => {
       }
       
       const purchasesRef = getUserCollection('purchases');
-      console.log('fetchPurchases: Got purchases collection reference');
       
       const q = query(purchasesRef, orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
-      
-      console.log('fetchPurchases: Query executed, got', snapshot.docs.length, 'documents');
-      console.log('fetchPurchases: Current user path should be: users/' + userUid + '/purchases');
-      
-      if (snapshot.docs.length > 0) {
-        console.log('fetchPurchases: First document data sample:', snapshot.docs[0].data());
-      }
       
       const purchasesList = snapshot.docs
         .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
         .map((doc) => {
           const data = doc.data();
-          // Create a safe copy with all timestamp fields properly converted
-          const processedData = {};
-          Object.keys(data).forEach(key => {
-            if (key.includes('At') || key.includes('Date') || key === 'createdAt' || key === 'updatedAt') {
-              // Convert any timestamp-like fields to proper Date objects
-              processedData[key] = safelyParseDate(data[key]) || new Date();
-            } else {
-              processedData[key] = data[key];
+          
+          // Helper function to recursively clean timestamp objects from any value
+          const cleanTimestampObjects = (obj, fieldName = '') => {
+            if (obj === null || obj === undefined) {
+              return obj;
             }
-          });
+            
+            // If it's a timestamp object, convert it appropriately
+            if (obj && typeof obj === 'object' && obj.seconds !== undefined && obj.nanoseconds !== undefined) {
+              // Skip fields that should never be dates - convert to appropriate defaults
+              const skipFields = ['displayId', 'purchaseId', 'purchaseNumber', 'invoiceNumber', 'id', 'price', 'quantity', 'total', 'amount',
+                                 'vendorId', 'vendorName', 'itemName', 'itemCode', 'category', 'brand', 'unit', 'rate', 'discount', 'tax'];
+              
+              if (skipFields.includes(fieldName)) {
+                if (fieldName === 'displayId' || fieldName === 'purchaseId' || fieldName === 'purchaseNumber') {
+                  return `P-${Math.random().toString(36).substr(2, 9)}`;
+                } else if (fieldName === 'price' || fieldName === 'quantity' || fieldName === 'total' || fieldName === 'amount' || fieldName === 'rate' || fieldName === 'discount') {
+                  return '0';
+                } else {
+                  return '';
+                }
+              }
+              
+              // For date fields, convert to proper date
+              if (fieldName.includes('At') || fieldName.includes('Date') || fieldName.includes('Time') || 
+                  fieldName === 'createdAt' || fieldName === 'updatedAt' || fieldName === 'deletedAt' ||
+                  fieldName === 'expectedDeliveryDate' || fieldName === 'deliveryDate') {
+                return safelyParseDate(obj) || new Date();
+              }
+              
+              // For any other timestamp objects, convert to empty string
+              return '';
+            }
+            
+            // If it's an array, clean each element
+            if (Array.isArray(obj)) {
+              return obj.map((item, index) => cleanTimestampObjects(item, `${fieldName}[${index}]`));
+            }
+            
+            // If it's an object, clean each property
+            if (obj && typeof obj === 'object') {
+              const cleaned = {};
+              Object.keys(obj).forEach(key => {
+                cleaned[key] = cleanTimestampObjects(obj[key], key);
+              });
+              return cleaned;
+            }
+            
+            // For primitive values, return as-is
+            return obj;
+          };
+          
+          // Clean the entire data object
+          const processedData = cleanTimestampObjects(data);
           
           return {
             id: doc.id,
-            // Use the actual stored purchaseNumber instead of calculating displayId
-            displayId: data.purchaseNumber || `P-${doc.id.slice(-3)}`,
+            // Ensure displayId is always a string
+            displayId: processedData.purchaseNumber || processedData.displayId || `P-${doc.id.slice(-3)}`,
             ...processedData
           };
         });
@@ -192,7 +227,6 @@ const Purchases = () => {
       // Fetch the full purchase data
       const purchaseDoc = await getDoc(getUserDoc('purchases', purchaseId));
       if (!purchaseDoc.exists()) {
-        console.error('Purchase not found');
         return;
       }
       
