@@ -55,6 +55,14 @@ const LensDetail = () => {
   });
   const [deductionLoading, setDeductionLoading] = useState(false);
 
+  // Add states for reorder threshold management
+  const [showThresholdModal, setShowThresholdModal] = useState(false);
+  const [thresholdData, setThresholdData] = useState({
+    generalThreshold: 5,
+    powerThresholds: {}
+  });
+  const [thresholdLoading, setThresholdLoading] = useState(false);
+
   // Add states for power selection in deduction
   const [showPowerSelectionForDeduction, setShowPowerSelectionForDeduction] = useState(false);
   const [selectedPowersForDeduction, setSelectedPowersForDeduction] = useState([]);
@@ -128,7 +136,7 @@ const LensDetail = () => {
       // Show success message
       alert(`Excel file exported successfully!\nFile: ${filename}\nRecords: ${filteredPowers.length}`);
     } catch (error) {
-      console.error('Error exporting to Excel:', error);
+
       alert('Failed to export Excel file. Please try again.');
     }
   };
@@ -252,7 +260,7 @@ const LensDetail = () => {
           finalY = doc.autoTable.previous.finalY + 20;
         }
       } catch (err) {
-        console.log('Could not get table final Y position, using fallback');
+        // Could not get table final Y position, using fallback
       }
       
       // Add footer with totals  
@@ -281,7 +289,7 @@ const LensDetail = () => {
       // Show success message
       alert(`PDF file exported successfully!\nFile: ${filename}\nRecords: ${filteredPowers.length}`);
     } catch (error) {
-      console.error('Error exporting to PDF:', error);
+
       alert('Failed to export PDF file. Please try again.');
     }
   };
@@ -746,6 +754,59 @@ const LensDetail = () => {
     setShowPowerSelectionForDeduction(true);
   };
 
+  // Initialize threshold data when lens loads
+  useEffect(() => {
+    if (lens) {
+      setThresholdData({
+        generalThreshold: lens.reorderThreshold || 5,
+        powerThresholds: lens.powerReorderThresholds || {}
+      });
+    }
+  }, [lens]);
+
+  // Handle threshold updates
+  const handleUpdateThresholds = async () => {
+    try {
+      setThresholdLoading(true);
+      setError('');
+
+      const updateData = {
+        reorderThreshold: parseInt(thresholdData.generalThreshold),
+        powerReorderThresholds: thresholdData.powerThresholds,
+        updatedAt: Timestamp.now()
+      };
+
+      const lensRef = getUserDoc('lensInventory', id);
+      await updateDoc(lensRef, updateData);
+
+      // Update local state
+      setLens(prev => ({
+        ...prev,
+        reorderThreshold: updateData.reorderThreshold,
+        powerReorderThresholds: updateData.powerReorderThresholds
+      }));
+
+      setShowThresholdModal(false);
+      alert('Reorder thresholds updated successfully!');
+
+    } catch (error) {
+      setError(`Failed to update thresholds: ${error.message}`);
+    } finally {
+      setThresholdLoading(false);
+    }
+  };
+
+  // Handle individual power threshold change
+  const handlePowerThresholdChange = (powerKey, threshold) => {
+    setThresholdData(prev => ({
+      ...prev,
+      powerThresholds: {
+        ...prev.powerThresholds,
+        [powerKey]: parseInt(threshold) || 0
+      }
+    }));
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-gray-900">
@@ -825,6 +886,12 @@ const LensDetail = () => {
           </div>
           <div className="flex space-x-3">
             <button
+              onClick={() => setShowThresholdModal(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none shadow-sm transition-colors"
+            >
+              Set Reorder Threshold
+            </button>
+            <button
               onClick={() => setShowDeductionModal(true)}
               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none shadow-sm transition-colors"
             >
@@ -877,11 +944,11 @@ const LensDetail = () => {
                     <span>Toggle sort:</span>
                     <kbd className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">S</kbd>
                   </div>
-                    </div>
-                    </div>
-                    </div>
-                    </div>
+                </div>
               </div>
+            </div>
+          </div>
+        </div>
 
         {/* Enhanced Lens Details Card */}
         <div className="bg-gradient-to-r from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-xl shadow-lg p-6 mb-6 border border-gray-200 dark:border-gray-700 overflow-hidden relative">
@@ -2294,6 +2361,200 @@ const LensDetail = () => {
           </div>
         </div>
       </main>
+
+      {/* Reorder Threshold Modal */}
+      {showThresholdModal && (
+        <div className="fixed inset-0 bg-gray-600 dark:bg-gray-900 bg-opacity-50 dark:bg-opacity-70 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border border-gray-200 dark:border-gray-700 w-full max-w-4xl shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Set Reorder Thresholds</h3>
+                <button
+                  onClick={() => setShowThresholdModal(false)}
+                  className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg border border-blue-200 dark:border-blue-700">
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    <span className="font-medium">Set minimum quantity thresholds:</span> When inventory falls below these levels, 
+                    the lens will appear in the reorder dashboard for restocking.
+                  </p>
+                </div>
+
+                {/* General Threshold for Single/Prescription Lenses */}
+                {(lens.type !== 'stock' || lens.inventoryType !== 'individual') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      General Reorder Threshold
+                    </label>
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="number"
+                        min="0"
+                        value={thresholdData.generalThreshold}
+                        onChange={(e) => setThresholdData(prev => ({
+                          ...prev,
+                          generalThreshold: e.target.value
+                        }))}
+                        className="w-32 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        units (Notify when inventory drops to or below this level)
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Current quantity: {lens.qty || 0} units
+                    </p>
+                  </div>
+                )}
+
+                {/* Individual Power Thresholds for Stock Lenses */}
+                {lens.type === 'stock' && lens.inventoryType === 'individual' && lens.powerInventory && (
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Individual Power Thresholds
+                      </label>
+                      <button
+                        onClick={() => {
+                          const allPowers = Object.keys(lens.powerInventory);
+                          const defaultThreshold = 3;
+                          const newThresholds = {};
+                          allPowers.forEach(powerKey => {
+                            newThresholds[powerKey] = thresholdData.powerThresholds[powerKey] || defaultThreshold;
+                          });
+                          setThresholdData(prev => ({
+                            ...prev,
+                            powerThresholds: newThresholds
+                          }));
+                        }}
+                        className="px-3 py-1 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+                      >
+                        Set All to 3
+                      </button>
+                    </div>
+                    
+                    <div className="max-h-96 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg">
+                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Power Combination
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Current Qty
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Reorder Threshold
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Status
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                          {Object.entries(lens.powerInventory).map(([powerKey, powerData]) => {
+                            const currentQty = parseInt(powerData?.quantity) || 0;
+                            const threshold = thresholdData.powerThresholds[powerKey] || 0;
+                            const needsReorder = currentQty <= threshold;
+
+                            // Parse power key
+                            const parts = powerKey.split('_');
+                            let displayText;
+                            if (parts.length >= 3) {
+                              const [sph, cyl, addition] = parts.map(p => parseFloat(p));
+                              displayText = `SPH: ${sph >= 0 ? '+' : ''}${sph}, CYL: ${cyl >= 0 ? '+' : ''}${cyl}, ADD: +${addition}`;
+                            } else {
+                              const [sph, cyl] = parts.map(p => parseFloat(p));
+                              displayText = `SPH: ${sph >= 0 ? '+' : ''}${sph}, CYL: ${cyl >= 0 ? '+' : ''}${cyl}`;
+                            }
+
+                            return (
+                              <tr key={powerKey} className={needsReorder ? 'bg-red-50 dark:bg-red-900/20' : ''}>
+                                <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                                  {displayText}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                                  <span className={`font-medium ${
+                                    currentQty === 0 ? 'text-red-600 dark:text-red-400' :
+                                    needsReorder ? 'text-yellow-600 dark:text-yellow-400' :
+                                    'text-green-600 dark:text-green-400'
+                                  }`}>
+                                    {currentQty}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={thresholdData.powerThresholds[powerKey] || ''}
+                                    onChange={(e) => handlePowerThresholdChange(powerKey, e.target.value)}
+                                    className="w-20 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-center"
+                                    placeholder="0"
+                                  />
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  {currentQty === 0 ? (
+                                    <span className="px-2 py-1 text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 rounded-full">
+                                      Out of Stock
+                                    </span>
+                                  ) : needsReorder ? (
+                                    <span className="px-2 py-1 text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded-full">
+                                      Needs Reorder
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded-full">
+                                      Good Stock
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex space-x-3 mt-6">
+                <button
+                  onClick={handleUpdateThresholds}
+                  disabled={thresholdLoading}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {thresholdLoading ? (
+                    <div className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Updating...
+                    </div>
+                  ) : (
+                    'Save Thresholds'
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowThresholdModal(false)}
+                  disabled={thresholdLoading}
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed bg-white dark:bg-gray-800"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Inventory Deduction Modal */}
       {showDeductionModal && (

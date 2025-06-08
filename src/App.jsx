@@ -30,6 +30,7 @@ import PurchaseDetail from './pages/PurchaseDetail';
 import LensInventory from './pages/LensInventory';
 import LensDetail from './pages/LensDetail';
 import LensInventoryReport from './pages/LensInventoryReport';
+import ReorderDashboard from './pages/ReorderDashboard';
 import SalesReturn from "./pages/SalesReturn";
 import PurchaseReturn from "./pages/PurchaseReturn";
 import Shop from './pages/Shop';
@@ -41,8 +42,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
-// Import debug utility for development
-import './utils/debugFirestore';
+
 
 // Import production monitoring
 import { initializeMonitoring } from './utils/productionMonitoring';
@@ -266,6 +266,11 @@ function App() {
               <Route path="/lens-inventory-report" element={
                 <ProtectedRoute requiredPermission="/lens-inventory">
                   <LensInventoryReport />
+                </ProtectedRoute>
+              } />
+              <Route path="/reorder-dashboard" element={
+                <ProtectedRoute requiredPermission="/lens-inventory">
+                  <ReorderDashboard />
                 </ProtectedRoute>
               } />
               

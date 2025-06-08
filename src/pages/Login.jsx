@@ -159,7 +159,7 @@ const Login = () => {
                   <img 
                     src={slide.image} 
                     alt={slide.title}
-                    className="w-48 h-48 mx-auto mb-8 object-contain"
+                    className="w-80 h-80 mx-auto mb-8 object-contain"
                   />
                   <h2 className="text-3xl font-bold mb-4">{slide.title}</h2>
                   <p className="text-lg text-blue-100">{slide.description}</p>
@@ -274,7 +274,26 @@ const Login = () => {
             </p>
           </div>
 
-          <div className="mt-8 text-center text-xs text-gray-500 dark:text-gray-400">
+          {/* Contact Details */}
+          <div className="mt-8 text-center space-y-2">
+            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Contact Us</h3>
+            <div className="flex flex-col space-y-1 text-xs text-gray-600 dark:text-gray-400">
+              <div className="flex items-center justify-center space-x-2">
+                <span>📧</span>
+                <a href="mailto:info@reflexoptics.in" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  info@reflexoptics.in
+                </a>
+              </div>
+              <div className="flex items-center justify-center space-x-2">
+                <span>📞</span>
+                <a href="tel:+916361773719" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  +91-6361773719
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 text-center text-xs text-gray-500 dark:text-gray-400">
             <p>© 2024 Reflex Optic Solutions. All rights reserved.</p>
           </div>
         </div>

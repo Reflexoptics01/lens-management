@@ -7,6 +7,7 @@ import Navbar from '../components/Navbar';
 import { safelyParseDate, formatDate, formatDateTime } from '../utils/dateUtils';
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
     return today.toISOString().split('T')[0];
@@ -31,16 +32,18 @@ const Dashboard = () => {
   // GST Notification states
   const [gstNotifications, setGstNotifications] = useState([]);
   const [backupNotifications, setBackupNotifications] = useState([]);
+  const [reorderNotifications, setReorderNotifications] = useState([]);
   
   useEffect(() => {
     loadDashboardData();
     checkGSTNotifications();
     checkBackupNotifications();
+    checkReorderNotifications();
   }, [selectedDate]);
 
   // Force data reload on component mount (helps after backup restoration)
   useEffect(() => {
-    console.log('Dashboard component mounted, forcing data reload...');
+    cleanupOldDismissals(); // Clean up old dismissal records
     loadDashboardData();
   }, []);
 
@@ -54,7 +57,7 @@ const Dashboard = () => {
         fetchTopProfitProducts()
       ]);
     } catch (error) {
-      console.error('Error loading dashboard:', error);
+      setError('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
@@ -62,24 +65,16 @@ const Dashboard = () => {
   
   const fetchSalesData = async () => {
     try {
-      console.log('Fetching sales data for dashboard...');
-      console.log('Current userUid from localStorage:', localStorage.getItem('userUid'));
-      console.log('Current user role from localStorage:', localStorage.getItem('userRole'));
-      
       const salesRef = getUserCollection('sales');
-      console.log('Sales collection path will be:', `users/${localStorage.getItem('userUid')}/sales`);
       
       let salesSnapshot;
       try {
         // Try with orderBy first
         salesSnapshot = await getDocs(query(salesRef, orderBy('invoiceDate', 'desc')));
       } catch (error) {
-        console.log('orderBy failed, trying without ordering:', error);
         // Fallback: get all sales without ordering
         salesSnapshot = await getDocs(salesRef);
       }
-      
-      console.log('Found', salesSnapshot.docs.length, 'sales documents for this user');
       
       const selectedDateObj = new Date(selectedDate);
       
@@ -127,7 +122,6 @@ const Dashboard = () => {
         // Convert timestamp safely
         const saleDate = safelyParseDate(sale.invoiceDate);
         if (!saleDate) {
-          console.warn('Could not convert sale date:', sale.invoiceDate);
           skippedCount++;
           return;
         }
@@ -171,8 +165,6 @@ const Dashboard = () => {
         }
       });
       
-      console.log(`Dashboard: Processed ${processedCount} sales, skipped ${skippedCount}`);
-      
       // Calculate projections
       const daysInMonth = new Date(selectedDateObj.getFullYear(), selectedDateObj.getMonth() + 1, 0).getDate();
       const daysPassed = selectedDateObj.getDate();
@@ -195,11 +187,9 @@ const Dashboard = () => {
         yearlyProjection
       };
       
-      console.log('Dashboard sales data:', newSalesData);
       setSalesData(newSalesData);
       
     } catch (error) {
-      console.error('Error fetching sales data:', error);
       // Set default values if there's an error
       setSalesData({
         today: 0,
@@ -216,7 +206,6 @@ const Dashboard = () => {
 
   const fetchTopProducts = async () => {
     try {
-      console.log('Fetching top products for dashboard...');
       const salesRef = getUserCollection('sales');
       const salesSnapshot = await getDocs(salesRef);
       
@@ -251,18 +240,14 @@ const Dashboard = () => {
         .sort((a, b) => b.count - a.count)
         .slice(0, 20);
       
-      console.log(`Dashboard: Processed ${processedSales} sales with ${processedItems} items for top products`);
-      console.log('Top products:', sortedProducts.slice(0, 5));
       setTopProducts(sortedProducts);
     } catch (error) {
-      console.error('Error fetching top products:', error);
       setTopProducts([]);
     }
   };
 
   const fetchTopPowers = async () => {
     try {
-      console.log('Fetching top powers for dashboard...');
       const salesRef = getUserCollection('sales');
       const salesSnapshot = await getDocs(salesRef);
       
@@ -288,7 +273,7 @@ const Dashboard = () => {
                 powerCounts[power] += qty;
               }
             } catch (error) {
-              console.warn('Error processing power item:', item, error);
+              // Skip invalid items
             }
           });
         }
@@ -299,18 +284,14 @@ const Dashboard = () => {
         .sort((a, b) => b.count - a.count)
         .slice(0, 20);
       
-      console.log(`Dashboard: Processed ${processedSales} sales with ${processedItems} power items`);
-      console.log('Top powers:', sortedPowers.slice(0, 5));
       setTopPowers(sortedPowers);
     } catch (error) {
-      console.error('Error fetching top powers:', error);
       setTopPowers([]);
     }
   };
 
   const fetchTopProfitProducts = async () => {
     try {
-      console.log('Fetching top profit products for dashboard...');
       const salesRef = getUserCollection('sales');
       const salesSnapshot = await getDocs(salesRef);
       
@@ -338,7 +319,7 @@ const Dashboard = () => {
               productProfits[productName].profit += profit;
               productProfits[productName].revenue += price * qty;
             } catch (error) {
-              console.warn('Error processing profit item:', item, error);
+              // Skip invalid items
             }
           });
         }
@@ -354,11 +335,8 @@ const Dashboard = () => {
         .sort((a, b) => b.profit - a.profit)
         .slice(0, 20);
       
-      console.log(`Dashboard: Processed ${processedSales} sales with ${processedItems} profit items`);
-      console.log('Top profit products:', sortedProfitProducts.slice(0, 5));
       setTopProfitProducts(sortedProfitProducts);
     } catch (error) {
-      console.error('Error fetching top profit products:', error);
       setTopProfitProducts([]);
     }
   };
@@ -523,21 +501,141 @@ const Dashboard = () => {
     window.location.href = `#/gst-returns?tab=${targetTab}`;
   };
 
+  // Check for reorder notifications
+  const checkReorderNotifications = async () => {
+    try {
+      const lensInventoryRef = getUserCollection('lensInventory');
+      const snapshot = await getDocs(lensInventoryRef);
+      
+      const notifications = [];
+      let outOfStockCount = 0;
+      let needsReorderCount = 0;
+      let totalValueAtRisk = 0;
+
+      snapshot.docs.forEach(doc => {
+        const lens = { id: doc.id, ...doc.data() };
+        
+        // Check for general reorder needs (single/prescription lenses)
+        if (lens.type !== 'stock' || lens.inventoryType !== 'individual') {
+          const currentQty = parseInt(lens.qty || 0);
+          const threshold = parseInt(lens.reorderThreshold || 0);
+          
+          if (threshold > 0 && currentQty <= threshold) {
+            const shortage = Math.max(0, threshold - currentQty + 5);
+            const estimatedCost = shortage * (parseFloat(lens.purchasePrice) || 0);
+            totalValueAtRisk += estimatedCost;
+            
+            if (currentQty === 0) {
+              outOfStockCount++;
+            } else {
+              needsReorderCount++;
+            }
+          }
+        }
+
+        // Check for individual power reorder needs (stock lenses)
+        if (lens.type === 'stock' && lens.inventoryType === 'individual' && lens.powerInventory && lens.powerReorderThresholds) {
+          Object.entries(lens.powerInventory).forEach(([powerKey, powerData]) => {
+            const currentQty = parseInt(powerData?.quantity || 0);
+            const threshold = parseInt(lens.powerReorderThresholds[powerKey] || 0);
+            
+            if (threshold > 0 && currentQty <= threshold) {
+              const shortage = currentQty === 0 ? Math.max(threshold + 3, 5) : threshold - currentQty + 3;
+              const estimatedCost = shortage * (parseFloat(lens.purchasePrice) || 0);
+              totalValueAtRisk += estimatedCost;
+              
+              if (currentQty === 0) {
+                outOfStockCount++;
+              } else {
+                needsReorderCount++;
+              }
+            }
+          });
+        }
+      });
+
+      // Create notification if there are items needing reorder
+      if (outOfStockCount > 0 || needsReorderCount > 0) {
+        const reorderNotification = {
+          id: 'reorder-notification',
+          title: 'Inventory Reorder Required',
+          message: outOfStockCount > 0 
+            ? `${outOfStockCount} item(s) out of stock, ${needsReorderCount} item(s) need reorder`
+            : `${needsReorderCount} item(s) below reorder threshold`,
+          outOfStockCount,
+          needsReorderCount,
+          totalValueAtRisk,
+          urgentCount: outOfStockCount, // Keep for backward compatibility
+          lowStockCount: needsReorderCount, // Keep for backward compatibility  
+          type: 'reorder',
+          priority: outOfStockCount > 0 ? 'urgent' : 'medium'
+        };
+
+        // Only add notification if it wasn't dismissed today
+        if (!wasNotificationDismissedToday(reorderNotification.id)) {
+          notifications.push(reorderNotification);
+        }
+      }
+
+      setReorderNotifications(notifications);
+    } catch (error) {
+      setReorderNotifications([]);
+    }
+  };
+
+  const dismissReorderNotification = (notificationId) => {
+    // Store dismissal date in localStorage
+    const today = new Date().toDateString(); // e.g., "Mon Dec 25 2023"
+    localStorage.setItem(`reorderNotification_dismissed_${notificationId}`, today);
+    
+    // Remove from current state
+    setReorderNotifications(prev => prev.filter(notification => notification.id !== notificationId));
+  };
+
+  // Check if notification was dismissed today
+  const wasNotificationDismissedToday = (notificationId) => {
+    const dismissedDate = localStorage.getItem(`reorderNotification_dismissed_${notificationId}`);
+    if (!dismissedDate) return false;
+    
+    const today = new Date().toDateString();
+    return dismissedDate === today;
+  };
+
+  // Clean up old dismissal records (run on component mount)
+  const cleanupOldDismissals = () => {
+    const today = new Date().toDateString();
+    const keysToRemove = [];
+    
+    // Check all localStorage keys for old dismissal records
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('reorderNotification_dismissed_')) {
+        const dismissedDate = localStorage.getItem(key);
+        if (dismissedDate && dismissedDate !== today) {
+          keysToRemove.push(key);
+        }
+      }
+    }
+    
+    // Remove old dismissal records
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+  };
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
       <Navbar />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        {/* All Notifications Section - Combined GST and Backup */}
-        {(gstNotifications.length > 0 || backupNotifications.length > 0) && (
-          <div className="mb-8 space-y-3">
-            <div className="flex items-center justify-between">
+        {/* All Notifications Section - Combined GST, Backup, and Reorder */}
+        {(gstNotifications.length > 0 || backupNotifications.length > 0 || reorderNotifications.length > 0) && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold flex items-center" style={{ color: 'var(--text-primary)' }}>
                 <svg className="h-5 w-5 mr-2 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5-5-5h5v-5h5v5zM9 3v3H4l5 5 5-5H9V3z" />
                 </svg>
-                Reminders ({gstNotifications.length + backupNotifications.length})
+                Reminders ({gstNotifications.length + backupNotifications.length + reorderNotifications.length})
               </h2>
               
               <div className="flex space-x-2">
@@ -545,6 +643,7 @@ const Dashboard = () => {
                   onClick={() => {
                     checkGSTNotifications();
                     checkBackupNotifications();
+                    checkReorderNotifications();
                   }}
                   className="px-3 py-1 text-xs rounded-md border transition-colors"
                   style={{ 
@@ -561,8 +660,10 @@ const Dashboard = () => {
               </div>
             </div>
             
-            {/* GST Notifications */}
-            {gstNotifications.map((notification) => (
+            {/* Notifications Grid - Cards side by side */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* GST Notifications */}
+              {gstNotifications.map((notification) => (
               <div 
                 key={notification.id}
                 className="rounded-lg shadow-lg border-l-4 p-4"
@@ -648,84 +749,182 @@ const Dashboard = () => {
                   </button>
                 </div>
               </div>
-            ))}
+              ))}
 
-            {/* Backup Notifications */}
-            {backupNotifications.map((notification) => (
-              <div 
-                key={notification.id}
-                className="rounded-lg shadow-lg border-l-4 p-4"
-                style={{ 
-                  backgroundColor: 'var(--bg-secondary)',
-                  borderLeftColor: '#8B5CF6'
-                }}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-3">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
-                      <svg 
-                        className="h-5 w-5 text-purple-600" 
-                        fill="none" 
-                        viewBox="0 0 24 24" 
-                        stroke="currentColor"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-                      </svg>
+              {/* Backup Notifications */}
+              {backupNotifications.map((notification) => (
+                <div 
+                  key={notification.id}
+                  className="rounded-lg shadow-lg border-l-4 p-4"
+                  style={{ 
+                    backgroundColor: 'var(--bg-secondary)',
+                    borderLeftColor: '#8B5CF6'
+                  }}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                        <svg 
+                          className="h-5 w-5 text-purple-600" 
+                          fill="none" 
+                          viewBox="0 0 24 24" 
+                          stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                        </svg>
+                      </div>
+                      
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                            {notification.title}
+                          </h3>
+                          {notification.weekNumber && (
+                            <span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-800">
+                              Week {notification.weekNumber}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+                          {notification.message}
+                        </p>
+                        <p className="text-xs mt-2 font-medium" style={{ color: 'var(--text-secondary)' }}>
+                          📅 Due by: {notification.dueDate}
+                        </p>
+                      </div>
                     </div>
                     
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                          {notification.title}
-                        </h3>
-                        {notification.weekNumber && (
-                          <span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-800">
-                            Week {notification.weekNumber}
-                          </span>
-                        )}
+                    <button
+                      onClick={() => dismissBackupNotification(notification.id)}
+                      className="ml-4 p-1 rounded-full hover:bg-gray-200 transition-colors"
+                      title="Dismiss notification"
+                    >
+                      <svg className="h-5 w-5 text-gray-400 hover:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  
+                  <div className="mt-4 flex space-x-3">
+                    <button
+                      onClick={() => dismissBackupNotification(notification.id)}
+                      className="px-4 py-2 rounded-md text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 transition-colors"
+                    >
+                      Create Backup
+                    </button>
+                    
+                    <button
+                      onClick={() => dismissBackupNotification(notification.id)}
+                      className="px-4 py-2 rounded-md text-sm font-medium border transition-colors"
+                      style={{ 
+                        color: 'var(--text-secondary)', 
+                        borderColor: 'var(--border-primary)',
+                        backgroundColor: 'var(--bg-tertiary)'
+                      }}
+                    >
+                      Mark as Done
+                    </button>
+                  </div>
+                </div>
+              ))}
+              
+              {/* Reorder Notifications */}
+              {reorderNotifications.map((notification) => (
+                <div 
+                  key={notification.id}
+                  className="rounded-lg shadow-lg border-l-4 p-4"
+                  style={{ 
+                    backgroundColor: 'var(--bg-secondary)',
+                    borderLeftColor: notification.priority === 'urgent' ? '#EF4444' : '#F59E0B'
+                  }}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-3">
+                      <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                        notification.priority === 'urgent' ? 'bg-red-100' : 'bg-yellow-100'
+                      }`}>
+                        <svg 
+                          className={`h-5 w-5 ${notification.priority === 'urgent' ? 'text-red-600' : 'text-yellow-600'}`} 
+                          fill="none" 
+                          viewBox="0 0 24 24" 
+                          stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
                       </div>
-                      <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-                        {notification.message}
-                      </p>
-                      <p className="text-xs mt-2 font-medium" style={{ color: 'var(--text-secondary)' }}>
-                        📅 Due by: {notification.dueDate}
-                      </p>
+                      
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                            {notification.title}
+                          </h3>
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            notification.priority === 'urgent' 
+                              ? 'bg-red-100 text-red-800' 
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {notification.priority === 'urgent' ? 'URGENT' : 'Medium Priority'}
+                          </span>
+                        </div>
+                        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+                          {notification.message}
+                        </p>
+                        <div className="flex items-center space-x-4 mt-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                          {notification.outOfStockCount > 0 && (
+                            <span className="flex items-center text-red-600">
+                              <span className="w-2 h-2 bg-red-500 rounded-full mr-1"></span>
+                              Out of Stock: {notification.outOfStockCount}
+                            </span>
+                          )}
+                          {notification.needsReorderCount > 0 && (
+                            <span className="flex items-center text-yellow-600">
+                              <span className="w-2 h-2 bg-yellow-500 rounded-full mr-1"></span>
+                              Needs Reorder: {notification.needsReorderCount}
+                            </span>
+                          )}
+
+                        </div>
+                      </div>
+                      
+                      <button
+                        onClick={() => dismissReorderNotification(notification.id)}
+                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                        title="Dismiss notification"
+                      >
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
                   
-                  <button
-                    onClick={() => dismissBackupNotification(notification.id)}
-                    className="ml-4 p-1 rounded-full hover:bg-gray-200 transition-colors"
-                    title="Dismiss notification"
-                  >
-                    <svg className="h-5 w-5 text-gray-400 hover:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                  <div className="mt-4 flex space-x-3">
+                    <button
+                      onClick={() => navigate('/reorder-dashboard')}
+                      className={`px-4 py-2 rounded-md text-sm font-medium text-white transition-colors ${
+                        notification.priority === 'urgent'
+                          ? 'bg-red-600 hover:bg-red-700'
+                          : 'bg-yellow-600 hover:bg-yellow-700'
+                      }`}
+                    >
+                      View Reorder Dashboard
+                    </button>
+                    
+                    <button
+                      onClick={() => dismissReorderNotification(notification.id)}
+                      className="px-4 py-2 rounded-md text-sm font-medium border transition-colors"
+                      style={{ 
+                        color: 'var(--text-secondary)', 
+                        borderColor: 'var(--border-primary)',
+                        backgroundColor: 'var(--bg-tertiary)'
+                      }}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
                 </div>
-                
-                <div className="mt-4 flex space-x-3">
-                  <button
-                    onClick={() => dismissBackupNotification(notification.id)}
-                    className="px-4 py-2 rounded-md text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 transition-colors"
-                  >
-                    Create Backup
-                  </button>
-                  
-                  <button
-                    onClick={() => dismissBackupNotification(notification.id)}
-                    className="px-4 py-2 rounded-md text-sm font-medium border transition-colors"
-                    style={{ 
-                      color: 'var(--text-secondary)', 
-                      borderColor: 'var(--border-primary)',
-                      backgroundColor: 'var(--bg-tertiary)'
-                    }}
-                  >
-                    Mark as Done
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
 

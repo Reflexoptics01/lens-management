@@ -213,7 +213,6 @@ const AddLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCancel }
         };
         
         await updateDoc(getUserDoc('lensInventory', lensToEdit.id), lensData);
-        console.log("Updated lens:", lensData);
         
         // Call the onSubmit callback
         if (onSubmit) onSubmit();
@@ -238,7 +237,7 @@ const AddLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCancel }
             createdAt: Timestamp.now()
           };
           
-          console.log("Adding lens:", lensData); // Debug log
+
           
           // Add document to Firestore
           const docRef = await addDoc(getUserCollection('lensInventory'), lensData);

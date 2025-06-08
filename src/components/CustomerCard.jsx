@@ -60,7 +60,6 @@ const CustomerCard = ({ customer, onEdit, onDelete, formatCurrency, isVendor = f
             </button>
             <button
               onClick={() => {
-                console.log('CustomerCard print address clicked for:', customer);
                 onPrintAddress && onPrintAddress(customer);
               }}
               className="p-2 text-gray-400 hover:text-purple-600 dark:text-gray-500 dark:hover:text-purple-400 rounded-full hover:bg-purple-50 dark:hover:bg-purple-900/50 transition-colors"
