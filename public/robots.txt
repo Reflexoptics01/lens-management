@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /
+
+# Allow crawling of static assets
+Allow: /images/
+Allow: /fonts/
+Allow: /*.css
+Allow: /*.js
+
+# Block sensitive areas
+Disallow: /admin
+Disallow: /api/
+Disallow: /private/
+Disallow: /*?*
+
+# Sitemap location
+Sitemap: https://lens-management.netlify.app/sitemap.xml
+
+# Crawl delay (optional)
+Crawl-delay: 1 

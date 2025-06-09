@@ -2,9 +2,81 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Lens Management</title>
+    
+    <!-- Primary Meta Tags -->
+    <title>Lens Management System - Professional Inventory & Sales Management</title>
+    <meta name="title" content="Lens Management System - Professional Inventory & Sales Management" />
+    <meta name="description" content="Comprehensive lens inventory management system for optical businesses. Track sales, purchases, customer orders, and inventory with advanced analytics and GST compliance." />
+    <meta name="keywords" content="lens management, optical inventory, sales management, purchase tracking, GST returns, lens inventory, optical business software, inventory management system" />
+    <meta name="author" content="Lens Management System" />
+    <meta name="robots" content="index, follow" />
+    <meta name="language" content="English" />
+    <meta name="revisit-after" content="7 days" />
+    
+    <!-- Viewport and Mobile Optimization -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Lens Manager" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://lens-management.netlify.app/" />
+    <meta property="og:title" content="Lens Management System - Professional Inventory & Sales Management" />
+    <meta property="og:description" content="Comprehensive lens inventory management system for optical businesses. Track sales, purchases, customer orders, and inventory with advanced analytics and GST compliance." />
+    <meta property="og:image" content="/images/Copy of Phoenix_20240923_001818_0000.svg" />
+    <meta property="og:site_name" content="Lens Management System" />
+    <meta property="og:locale" content="en_US" />
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://lens-management.netlify.app/" />
+    <meta property="twitter:title" content="Lens Management System - Professional Inventory & Sales Management" />
+    <meta property="twitter:description" content="Comprehensive lens inventory management system for optical businesses. Track sales, purchases, customer orders, and inventory with advanced analytics and GST compliance." />
+    <meta property="twitter:image" content="/images/Copy of Phoenix_20240923_001818_0000.svg" />
+    
+    <!-- Favicons and App Icons -->
+    <link rel="icon" type="image/svg+xml" href="/images/Copy of Phoenix_20240923_001818_0000.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    
+    <!-- Additional SEO -->
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="msapplication-TileColor" content="#ffffff" />
+    <meta name="msapplication-config" content="/browserconfig.xml" />
+    
+    <!-- Preconnect to improve performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Lens Management System",
+      "description": "Comprehensive lens inventory management system for optical businesses",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web Browser",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "Inventory Management",
+        "Sales Tracking",
+        "Purchase Management",
+        "Customer Management",
+        "GST Compliance",
+        "Analytics Dashboard",
+        "Order Management"
+      ]
+    }
+    </script>
     <style>
       @media print {
         /* body * { */
@@ -35,7 +107,30 @@
     </style>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Skip to main content for accessibility -->
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-0 focus:left-0 bg-blue-600 text-white p-2 z-50">
+      Skip to main content
+    </a>
+    
+    <!-- Main application root -->
+    <div id="root" role="application" aria-label="Lens Management System"></div>
+    
+    <!-- Preload critical scripts -->
     <script type="module" src="/src/main.jsx"></script>
+    
+    <!-- Service Worker Registration for PWA -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('SW registered: ', registration);
+            })
+            .catch((registrationError) => {
+              console.log('SW registration failed: ', registrationError);
+            });
+        });
+      }
+    </script>
   </body>
 </html>
