@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { getUserCollection } from '../utils/multiTenancy';
+import toast from 'react-hot-toast';
 
 const ItemSuggestions = ({ 
   items, 
@@ -14,7 +15,8 @@ const ItemSuggestions = ({
   onRefreshItems,
   placeholder = "Brand/Item Name",
   className = "",
-  currentPrice = 0 // Add currentPrice prop to get the price from parent
+  currentPrice = 0, // Add currentPrice prop to get the price from parent
+  dataSection = "" // Add dataSection prop for navigation
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -31,6 +33,7 @@ const ItemSuggestions = ({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newProductName, setNewProductName] = useState('');
   const [newProductPrice, setNewProductPrice] = useState(0);
+  const [newProductQty, setNewProductQty] = useState(10); // Default quantity of 10
   const [selectedProductType, setSelectedProductType] = useState('');
   const [creatingProduct, setCreatingProduct] = useState(false);
 
@@ -328,6 +331,15 @@ const ItemSuggestions = ({
     isSelectingRef.current = true;
     lastSelectedItemRef.current = item.name;
     
+    // Show warning if quantity is low or negative (but not for services)
+    if (!item.isService && item.type !== 'service' && item.qty !== undefined) {
+      if (parseInt(item.qty) <= 0) {
+        toast.error(`⚠️ Warning: ${item.name} has ${item.qty} quantity (will go negative)`);
+      } else if (parseInt(item.qty) <= 3) {
+        toast.error(`⚠️ Low stock: ${item.name} has only ${item.qty} remaining`);
+      }
+    }
+    
     // Simply use the full item name - no complicated auto-completion logic
     setSearchTerm(item.name);
     setShowSuggestions(false);
@@ -438,6 +450,7 @@ const ItemSuggestions = ({
       setTimeout(() => {
         setNewProductName(trimmedSearchTerm);
         setNewProductPrice(currentPrice || 0);
+        setNewProductQty(10); // Set default quantity
         setShowCreateModal(true);
       }, 100);
       return;
@@ -491,7 +504,7 @@ const ItemSuggestions = ({
         name: newProductName, // For compatibility with suggestions
         createdAt: Timestamp.now(),
         createdBy: 'user', // You might want to add user tracking
-        qty: 1,
+        qty: newProductQty, // Use the quantity entered by user
         type: selectedProductType
       };
 
@@ -597,6 +610,7 @@ const ItemSuggestions = ({
       // Reset states
       setNewProductName('');
       setNewProductPrice(0);
+      setNewProductQty(10); // Reset to default quantity
       setSelectedProductType('');
       setPowerRangeFields({
         maxSph: '',
@@ -619,7 +633,7 @@ const ItemSuggestions = ({
       }));
       
       // Show success message
-      alert(`Successfully created new ${selectedProductType} product: "${newProductName}"`);
+      alert(`Successfully created new ${selectedProductType} product: "${newProductName}" with quantity ${newProductQty}`);
 
     } catch (error) {
       console.error('Error creating new product:', error);
@@ -634,6 +648,7 @@ const ItemSuggestions = ({
     setShowCreateModal(false);
     setNewProductName('');
     setNewProductPrice(0);
+    setNewProductQty(10); // Reset to default quantity
     setSelectedProductType('');
     setPowerRangeFields({
       maxSph: '',
@@ -658,6 +673,7 @@ const ItemSuggestions = ({
         placeholder={placeholder}
         className={`form-input ${className}`}
         autoComplete="off"
+        data-section={dataSection}
       />
       {showSuggestions && filteredItems.length > 0 && (
         <div className="absolute z-50 left-0 w-[150%] mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 shadow-md rounded-md py-1 max-h-64 overflow-y-auto overflow-x-hidden">
@@ -745,9 +761,19 @@ const ItemSuggestions = ({
                     
                     {/* Show additional details */}
                     <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                      {/* Show available quantity if it exists and is not 1 */}
-                      {item.qty && parseInt(item.qty) > 1 && (
-                        <span>Qty: {item.qty}</span>
+                      {/* Show quantity with warnings for low/negative stock */}
+                      {item.qty !== undefined && (
+                        <span className={`font-medium ${
+                          parseInt(item.qty) <= 0 
+                            ? 'text-red-600 dark:text-red-400' 
+                            : parseInt(item.qty) <= 3 
+                            ? 'text-orange-600 dark:text-orange-400' 
+                            : 'text-gray-500 dark:text-gray-400'
+                        }`}>
+                          Qty: {item.qty}
+                          {parseInt(item.qty) <= 0 && ' ⚠️'}
+                          {parseInt(item.qty) > 0 && parseInt(item.qty) <= 3 && ' ⚠️'}
+                        </span>
                       )}
                       
                       {/* Show material for stock lenses */}
@@ -777,6 +803,7 @@ const ItemSuggestions = ({
                   e.stopPropagation();
                   setNewProductName(searchTerm.trim());
                   setNewProductPrice(currentPrice || 0);
+                  setNewProductQty(10); // Set default quantity
                   setShowCreateModal(true);
                   setShowSuggestions(false);
                 }}
@@ -816,19 +843,35 @@ const ItemSuggestions = ({
               />
             </div>
 
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Price (₹)
-              </label>
-              <input
-                type="number"
-                value={newProductPrice}
-                onChange={(e) => setNewProductPrice(parseFloat(e.target.value) || 0)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                placeholder="0.00"
-                min="0"
-                step="0.01"
-              />
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Price (₹)
+                </label>
+                <input
+                  type="number"
+                  value={newProductPrice}
+                  onChange={(e) => setNewProductPrice(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                  placeholder="0.00"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Initial Quantity
+                </label>
+                <input
+                  type="number"
+                  value={newProductQty}
+                  onChange={(e) => setNewProductQty(parseInt(e.target.value) || 1)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                  placeholder="10"
+                  min="1"
+                  step="1"
+                />
+              </div>
             </div>
 
             <div className="mb-6">

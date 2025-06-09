@@ -190,7 +190,7 @@ const EditSale = () => {
     let totalOthers = 0;
     
     filledRows.forEach(row => {
-      const qty = parseInt(row.qty) || 0;
+      const qty = parseFloat(row.qty) || 0;
       const unit = (row.unit || '').toLowerCase();
       
       if (unit === 'service') {
@@ -565,11 +565,11 @@ const EditSale = () => {
       };
     }
 
-    // Recalculate total for the row if price or qty changes
-    if (field === 'price' || field === 'qty') {
-      const price = parseFloat(updatedRows[index].price || 0);
-      const qty = parseInt(updatedRows[index].qty || 1); // Default to 1, not 0
-      updatedRows[index].total = price * qty;
+      // Recalculate total for the row if price or qty changes
+  if (field === 'price' || field === 'qty') {
+    const price = parseFloat(updatedRows[index].price || 0);
+    const qty = parseFloat(updatedRows[index].qty || 1); // Default to 1, not 0
+    updatedRows[index].total = price * qty;
       
       // Save item to database when price is updated and we have an item name
       if (field === 'price' && updatedRows[index].itemName.trim() !== '') {
@@ -651,7 +651,7 @@ const EditSale = () => {
           cyl: row.cyl || '',
           axis: row.axis || '',
           add: row.add || '',
-          qty: parseInt(row.qty) || 1,
+          qty: parseFloat(row.qty) || 1,
           price: parseFloat(row.price) || 0,
           total: parseFloat(row.total) || 0
         })),
@@ -809,7 +809,6 @@ const EditSale = () => {
       });
       
       setItemSuggestions(itemsList);
-      console.log(`Fetched ${itemsList.length} lens items for edit (all variants included)`);
     } catch (error) {
       console.error('Error fetching items:', error);
     }
@@ -1580,9 +1579,11 @@ const EditSale = () => {
                           type="number"
                           value={row.qty}
                           onChange={(e) => handleTableRowChange(index, 'qty', e.target.value)}
+                          onFocus={(e) => e.target.select()}
                           className="block w-full border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm text-center"
                           placeholder="QTY"
-                          min="1"
+                          min="0.1"
+                          step="0.1"
                         />
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">
@@ -1590,6 +1591,7 @@ const EditSale = () => {
                           type="number"
                           value={row.price}
                           onChange={(e) => handleTableRowChange(index, 'price', e.target.value)}
+                          onFocus={(e) => e.target.select()}
                           className="block w-full border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm text-right"
                           placeholder="Price"
                           min="0"

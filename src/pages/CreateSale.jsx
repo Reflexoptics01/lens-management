@@ -84,6 +84,53 @@ const CreateSale = () => {
     setTableRows([...tableRows, ...newRows]);
   };
 
+  // Delete a specific row
+  const handleDeleteRow = (indexToDelete) => {
+    // Prevent deletion if it would leave us with no rows
+    if (tableRows.length <= 1) {
+      alert('Cannot delete the last row. At least one row is required.');
+      return;
+    }
+    
+    // Filter out the row at the specified index
+    const updatedRows = tableRows.filter((_, index) => index !== indexToDelete);
+    setTableRows(updatedRows);
+    
+    // Clear any power range warnings for deleted row and adjust indices for remaining rows
+    setPowerRangeWarnings(prev => {
+      const newWarnings = {};
+      Object.keys(prev).forEach(key => {
+        const rowIndex = parseInt(key);
+        if (rowIndex < indexToDelete) {
+          // Keep warnings for rows before the deleted row
+          newWarnings[rowIndex] = prev[key];
+        } else if (rowIndex > indexToDelete) {
+          // Shift warnings for rows after the deleted row
+          newWarnings[rowIndex - 1] = prev[key];
+        }
+        // Skip warnings for the deleted row (rowIndex === indexToDelete)
+      });
+      return newWarnings;
+    });
+    
+    // Clear any selected stock powers for deleted row and adjust indices
+    setSelectedStockPowers(prev => {
+      const newPowers = {};
+      Object.keys(prev).forEach(key => {
+        const rowIndex = parseInt(key);
+        if (rowIndex < indexToDelete) {
+          // Keep powers for rows before the deleted row
+          newPowers[rowIndex] = prev[key];
+        } else if (rowIndex > indexToDelete) {
+          // Shift powers for rows after the deleted row
+          newPowers[rowIndex - 1] = prev[key];
+        }
+        // Skip powers for the deleted row (rowIndex === indexToDelete)
+      });
+      return newPowers;
+    });
+  };
+
   // Success modal
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [savedSaleId, setSavedSaleId] = useState(null);
@@ -123,6 +170,9 @@ const CreateSale = () => {
 
   // Power range validation state
   const [powerRangeWarnings, setPowerRangeWarnings] = useState({}); // Track warnings for each row
+
+  // Section navigation state
+  const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
 
 
 
@@ -284,7 +334,7 @@ const CreateSale = () => {
     let totalOthers = 0;
     
     filledRows.forEach(row => {
-      const qty = parseInt(row.qty) || 0;
+      const qty = parseFloat(row.qty) || 0;
       const unit = (row.unit || '').toLowerCase();
       
       if (unit === 'service') {
@@ -298,6 +348,47 @@ const CreateSale = () => {
     
     return { totalPairs, totalServices, totalOthers };
   };
+
+  // Define navigation sections for keyboard shortcuts
+  const navigationSections = [
+    {
+      name: 'Customer Selection',
+      selector: '[data-section="customer-search"] input',
+      focusElement: () => document.querySelector('[data-section="customer-search"] input')
+    },
+    {
+      name: 'Invoice Date',
+      selector: '[data-section="invoice-date"]',
+      focusElement: () => document.querySelector('[data-section="invoice-date"]')
+    },
+    {
+      name: 'First Row Order ID',
+      selector: '[data-section="table-row-0"] input[placeholder="Order ID"]',
+      focusElement: () => document.querySelector('[data-section="table-row-0"] input[placeholder="Order ID"]')
+    },
+    {
+      name: 'First Row Item Name',
+      selector: '[data-section="table-row-0"] [data-section="item-input"]',
+      focusElement: () => document.querySelector('[data-section="table-row-0"] [data-section="item-input"]')
+    },
+    {
+      name: 'Tax Options',
+      selector: '[data-section="tax-option"]',
+      focusElement: () => document.querySelector('[data-section="tax-option"]')
+    },
+    {
+      name: 'Discount',
+      selector: '[data-section="discount-type"]',
+      focusElement: () => document.querySelector('[data-section="discount-type"]')
+    },
+    {
+      name: 'Save Button',
+      selector: '[data-section="save-button"]',
+      focusElement: () => document.querySelector('[data-section="save-button"]')
+    }
+  ];
+
+
 
   // Format quantity display
   const formatQuantityDisplay = () => {
@@ -325,6 +416,52 @@ const CreateSale = () => {
     fetchItems();
     fetchShopInfo();
   }, []);
+
+  // Add keyboard navigation listener
+  useEffect(() => {
+    const handleKeyPress = (event) => {
+      // Only handle 'S' key when not typing in input fields
+      if (event.key.toLowerCase() === 's' && 
+          !['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName) &&
+          !event.ctrlKey && !event.altKey && !event.metaKey) {
+        event.preventDefault();
+        
+        // Use functional update to get the most current value
+        setCurrentSectionIndex(prevIndex => {
+          const nextIndex = (prevIndex + 1) % navigationSections.length;
+          const nextSection = navigationSections[nextIndex];
+          
+          const element = nextSection.focusElement();
+          if (element) {
+            element.focus();
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Show a brief indicator of which section we're in
+            const toast = document.createElement('div');
+            toast.className = 'fixed top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity';
+            toast.textContent = `Navigation: ${nextSection.name}`;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+              toast.style.opacity = '0';
+              setTimeout(() => {
+                if (document.body.contains(toast)) {
+                  document.body.removeChild(toast);
+                }
+              }, 300);
+            }, 1500);
+          }
+          
+          return nextIndex;
+        });
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    return () => {
+      document.removeEventListener('keydown', handleKeyPress);
+    };
+  }, []); // Remove currentSectionIndex from dependency array
 
   // Add useEffect to fetch dispatch logs when invoice date changes
   useEffect(() => {
@@ -720,11 +857,31 @@ const CreateSale = () => {
       };
     }
 
+    // Handle unit change - if changed to Service, clear optical values and set service flags
+    if (field === 'unit' && value === 'Service') {
+      updatedRows[index] = {
+        ...updatedRows[index],
+        isService: true,
+        type: 'service',
+        sph: '',
+        cyl: '',
+        axis: '',
+        add: ''
+      };
+    } else if (field === 'unit' && value !== 'Service') {
+      // If unit changed from Service to something else, remove service flags
+      updatedRows[index] = {
+        ...updatedRows[index],
+        isService: false,
+        type: ''
+      };
+    }
+
     // Recalculate total for the row if price or qty changes
     if (field === 'price' || field === 'qty') {
       updatedRows[index].total = 
         parseFloat(updatedRows[index].price || 0) * 
-        parseInt(updatedRows[index].qty || 0);
+        parseFloat(updatedRows[index].qty || 0);
       
       // Save item to database when price is updated and we have an item name
       if (field === 'price' && updatedRows[index].itemName.trim() !== '') {
@@ -836,7 +993,7 @@ const CreateSale = () => {
             cyl: formattedRow.cyl,
             axis: formattedRow.axis, // Using original AXIS value
             add: formattedRow.add,
-            qty: parseInt(formattedRow.qty),
+            qty: parseFloat(formattedRow.qty),
             unit: formattedRow.unit,
             price: parseFloat(formattedRow.price),
             total: parseFloat(formattedRow.total)
@@ -1067,7 +1224,7 @@ const CreateSale = () => {
             continue;
           }
           
-          if (!item.qty || parseInt(item.qty) <= 0) {
+          if (!item.qty || parseFloat(item.qty) <= 0) {
             continue;
           }
           
@@ -1156,14 +1313,14 @@ const CreateSale = () => {
             }
             
             // Deduct the sold quantity from matching lenses
-            let remainingQtyToDeduct = parseInt(item.qty) || 1;
+            let remainingQtyToDeduct = parseFloat(item.qty) || 1;
           
                       for (const lens of matchingLenses) {
               if (remainingQtyToDeduct <= 0) {
                 break;
               }
               
-              const currentQty = parseInt(lens.qty) || 0;
+              const currentQty = parseFloat(lens.qty) || 0;
               
               if (currentQty <= 0) {
                 continue;
@@ -1173,16 +1330,11 @@ const CreateSale = () => {
               const newQty = currentQty - qtyToDeductFromThisLens;
               
               try {
-                if (newQty <= 0) {
-                  // Remove the lens from inventory if quantity becomes zero or negative
-                  await deleteDoc(getUserDoc('lensInventory', lens.id));
-                } else {
-                  // Update the quantity
-                  await updateDoc(getUserDoc('lensInventory', lens.id), {
-                    qty: newQty,
-                    updatedAt: Timestamp.fromDate(new Date())
-                  });
-                }
+                // Always update the quantity, even if it goes negative
+                await updateDoc(getUserDoc('lensInventory', lens.id), {
+                  qty: newQty,
+                  updatedAt: Timestamp.fromDate(new Date())
+                });
                 
                 remainingQtyToDeduct -= qtyToDeductFromThisLens;
               
@@ -1342,9 +1494,14 @@ const CreateSale = () => {
       // Process all items from lens_inventory - NO DEDUPLICATION to show all variants
       const itemsList = [];
       
-      // Process all items from lens_inventory
+      // Process all items from lens_inventory - Include ALL items regardless of quantity
       allSnapshot.docs.forEach(doc => {
         const lens = { id: doc.id, ...doc.data() };
+        
+        // Skip only placeholder documents
+        if (lens._placeholder) {
+          return;
+        }
         
         let itemName = '';
         let displayName = '';
@@ -1371,12 +1528,14 @@ const CreateSale = () => {
           itemPrice = lens.salePrice || 0;
         }
         
+        // Include ALL items with a name, regardless of quantity (even 0 or negative)
         if (itemName.trim()) {
           itemsList.push({
             id: lens.id,
             name: displayName, // Full display name with power series
             itemName: itemName, // Clean brand name for form fields
             price: itemPrice,
+            qty: lens.qty || lens.totalQuantity || 0, // Include quantity info for display
             createdAt: lens.createdAt,
             isStockLens: lens.type === 'stock',
             isService: lens.type === 'service',
@@ -1500,7 +1659,7 @@ const CreateSale = () => {
     if (itemPrice > 0) {
       updatedRows[index].price = itemPrice.toString();
       // Recalculate total
-      updatedRows[index].total = itemPrice * parseInt(updatedRows[index].qty || 1);
+      updatedRows[index].total = itemPrice * parseFloat(updatedRows[index].qty || 1);
     }
     
     // Set appropriate unit for services and store service flag
@@ -2196,7 +2355,7 @@ const CreateSale = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Customer/Vendor Information</h2>
-              <div className="mb-4">
+              <div className="mb-4" data-section="customer-search">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Customer/Vendor</label>
                 <CustomerSearch 
                   customers={customers}
@@ -2311,6 +2470,7 @@ const CreateSale = () => {
                     type="date"
                     value={invoiceDate}
                     onChange={(e) => setInvoiceDate(e.target.value)}
+                    data-section="invoice-date"
                     className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
                 </div>
@@ -2395,11 +2555,14 @@ const CreateSale = () => {
                 <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Total
                 </th>
+                <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[60px]">
+                  Action
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {getVisibleRows().map((row, index) => (
-                <tr key={index} className={index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700'}>
+                <tr key={index} className={index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700'} data-section={`table-row-${index}`}>
                   <td className="px-3 py-2 whitespace-nowrap">
                     <input
                       type="text"
@@ -2424,6 +2587,7 @@ const CreateSale = () => {
                           saveItemToDatabase={saveItemToDatabase}
                           onRefreshItems={fetchItems}
                           currentPrice={parseFloat(row.price) || 0}
+                          dataSection="item-input"
                         />
                         {row.powerSeries && (
                           <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
@@ -2453,14 +2617,19 @@ const CreateSale = () => {
                       value={row.sph}
                       onChange={(e) => handleTableRowChange(index, 'sph', e.target.value)}
                       onBlur={(e) => handleOpticalValueBlur(index, 'sph', e.target.value)}
-                      className={`block w-full rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                      disabled={row.isService || row.type === 'service' || row.unit === 'Service'}
+                      className={`block w-full rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center ${
+                        row.isService || row.type === 'service' || row.unit === 'Service'
+                          ? 'bg-gray-100 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                          : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white'
+                      } ${
                         powerRangeWarnings[index]?.sph 
                           ? 'border-red-300 dark:border-red-600' 
                           : 'border-gray-300 dark:border-gray-600'
                       }`}
-                      placeholder="SPH"
+                      placeholder={row.isService || row.type === 'service' || row.unit === 'Service' ? 'N/A' : 'SPH'}
                     />
-                    {powerRangeWarnings[index]?.sph && (
+                    {powerRangeWarnings[index]?.sph && !(row.isService || row.type === 'service' || row.unit === 'Service') && (
                       <div className="text-xs text-red-600 dark:text-red-400 mt-1 text-center truncate">
                         {powerRangeWarnings[index].sph}
                       </div>
@@ -2472,14 +2641,19 @@ const CreateSale = () => {
                       value={row.cyl}
                       onChange={(e) => handleTableRowChange(index, 'cyl', e.target.value)}
                       onBlur={(e) => handleOpticalValueBlur(index, 'cyl', e.target.value)}
-                      className={`block w-full rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                      disabled={row.isService || row.type === 'service' || row.unit === 'Service'}
+                      className={`block w-full rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center ${
+                        row.isService || row.type === 'service' || row.unit === 'Service'
+                          ? 'bg-gray-100 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                          : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white'
+                      } ${
                         powerRangeWarnings[index]?.cyl 
                           ? 'border-red-300 dark:border-red-600' 
                           : 'border-gray-300 dark:border-gray-600'
                       }`}
-                      placeholder="CYL"
+                      placeholder={row.isService || row.type === 'service' || row.unit === 'Service' ? 'N/A' : 'CYL'}
                     />
-                    {powerRangeWarnings[index]?.cyl && (
+                    {powerRangeWarnings[index]?.cyl && !(row.isService || row.type === 'service' || row.unit === 'Service') && (
                       <div className="text-xs text-red-600 dark:text-red-400 mt-1 text-center truncate">
                         {powerRangeWarnings[index].cyl}
                       </div>
@@ -2490,8 +2664,13 @@ const CreateSale = () => {
                       type="text"
                       value={row.axis}
                       onChange={(e) => handleTableRowChange(index, 'axis', e.target.value)}
-                      className="block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      placeholder="AXIS"
+                      disabled={row.isService || row.type === 'service' || row.unit === 'Service'}
+                      className={`block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center ${
+                        row.isService || row.type === 'service' || row.unit === 'Service'
+                          ? 'bg-gray-100 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                          : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white'
+                      }`}
+                      placeholder={row.isService || row.type === 'service' || row.unit === 'Service' ? 'N/A' : 'AXIS'}
                     />
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
@@ -2500,17 +2679,25 @@ const CreateSale = () => {
                       value={row.add}
                       onChange={(e) => handleTableRowChange(index, 'add', e.target.value)}
                       onBlur={(e) => handleOpticalValueBlur(index, 'add', e.target.value)}
-                      className="block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      placeholder="ADD"
+                      disabled={row.isService || row.type === 'service' || row.unit === 'Service'}
+                      className={`block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center ${
+                        row.isService || row.type === 'service' || row.unit === 'Service'
+                          ? 'bg-gray-100 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                          : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white'
+                      }`}
+                      placeholder={row.isService || row.type === 'service' || row.unit === 'Service' ? 'N/A' : 'ADD'}
                     />
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     <input
-                      type="text"
+                      type="number"
                       value={row.qty}
                       onChange={(e) => handleTableRowChange(index, 'qty', e.target.value)}
+                      onFocus={(e) => e.target.select()}
                       className="block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       placeholder="QTY"
+                      min="0.1"
+                      step="0.1"
                       style={{
                         appearance: 'textfield',
                         MozAppearance: 'textfield'
@@ -2536,6 +2723,7 @@ const CreateSale = () => {
                       type="text"
                       value={row.price}
                       onChange={(e) => handleTableRowChange(index, 'price', e.target.value)}
+                      onFocus={(e) => e.target.select()}
                       className="block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-right bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       placeholder="Price"
                       style={{
@@ -2547,6 +2735,18 @@ const CreateSale = () => {
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap text-right text-gray-900 dark:text-white">
                     {formatCurrency(row.total)}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap text-center">
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteRow(index)}
+                      className="inline-flex items-center justify-center w-8 h-8 text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+                      title="Delete this row"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -2619,6 +2819,7 @@ const CreateSale = () => {
                 <select
                   value={selectedTaxOption}
                   onChange={(e) => setSelectedTaxOption(e.target.value)}
+                  data-section="tax-option"
                   className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
                   {TAX_OPTIONS.map(option => (
@@ -2635,6 +2836,7 @@ const CreateSale = () => {
                   <select
                     value={discountType}
                     onChange={(e) => setDiscountType(e.target.value)}
+                    data-section="discount-type"
                     className="block w-1/3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
                     <option value="amount">Amount</option>
@@ -2754,6 +2956,7 @@ const CreateSale = () => {
                   type="button"
                   onClick={handleSaveSale}
                   disabled={loading}
+                  data-section="save-button"
                   className="w-full px-4 py-3 bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors disabled:opacity-50"
                 >
                   {loading ? (
@@ -2780,6 +2983,7 @@ const CreateSale = () => {
               type="button"
               onClick={handleSaveSale}
               disabled={loading}
+              data-section="save-button"
               className="w-full px-4 py-3 bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors disabled:opacity-50"
             >
               {loading ? (

@@ -7,9 +7,89 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
   const [saleData, setSaleData] = useState(null);
   const [shopSettings, setShopSettings] = useState(null);
   const [bankDetails, setBankDetails] = useState(null);
+  const [customerOutstanding, setCustomerOutstanding] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [printing, setPrinting] = useState(false);
+
+  // Function to calculate customer's total outstanding balance (excluding current invoice)
+  const calculateCustomerOutstanding = async (customerName, customerPhone, currentSaleId) => {
+    try {
+      // Fetch all data in parallel for better performance
+      const [customersSnapshot, salesSnapshot, transactionsSnapshot] = await Promise.all([
+        getDocs(getUserCollection('customers')),
+        getDocs(getUserCollection('sales')),
+        getDocs(getUserCollection('transactions'))
+      ]);
+      
+      // Find customer record
+      let customer = null;
+      let openingBalance = 0;
+      
+      customersSnapshot.forEach(doc => {
+        const customerData = doc.data();
+        const customerOpticalName = customerData.opticalName;
+        const customerPhoneNumber = customerData.phone || customerData.phoneNumber;
+        
+        // Match customer by name or phone (case insensitive for names)
+        const nameMatch = customerName && customerOpticalName && 
+          customerOpticalName.toLowerCase().trim() === customerName.toLowerCase().trim();
+        const phoneMatch = customerPhone && customerPhoneNumber && 
+          customerPhoneNumber.toString().trim() === customerPhone.toString().trim();
+        
+        if (nameMatch || phoneMatch) {
+          customer = { id: doc.id, ...customerData };
+          openingBalance = parseFloat(customerData.openingBalance) || 0;
+        }
+      });
+      
+      if (!customer) {
+        return 0;
+      }
+      
+      // Calculate total sales (including current invoice)
+      let totalSales = 0;
+      let matchedSales = 0;
+      
+      salesSnapshot.forEach(doc => {
+        const sale = doc.data();
+        
+        // Include all sales for this customer (including current invoice)
+        if (sale.customerId === customer.id) {
+          matchedSales++;
+          // Use 'total' field first, fallback to 'totalAmount'
+          totalSales += parseFloat(sale.total || sale.totalAmount) || 0;
+        }
+      });
+      
+      // Calculate total payments from transactions
+      let totalPayments = 0;
+      
+      transactionsSnapshot.forEach(doc => {
+        const transaction = doc.data();
+        if (transaction.entityId === customer.id) {
+          const amount = parseFloat(transaction.amount) || 0;
+          
+          // For customers: 'received' payments reduce balance, 'paid' increases balance
+          if (transaction.type === 'received') {
+            totalPayments += amount;
+          } else if (transaction.type === 'paid') {
+            totalPayments -= amount; // Negative because it's money paid TO customer (refund)
+          }
+        }
+      });
+      
+      // Calculate final outstanding balance
+      const currentBalance = openingBalance + totalSales - totalPayments;
+      
+      // Return positive balance only (outstanding amount)
+      return Math.max(0, currentBalance);
+      
+    } catch (error) {
+      console.error('Error calculating customer outstanding:', error);
+      return 0;
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -85,8 +165,6 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
                 if (doc.id !== 'shopSettings') {
                   const docData = doc.data();
                   if (docData.bankName || docData.accountNumber || docData.accountName) {
-                    console.log(`Found bank details in document: ${doc.id}`);
-                    
                     // Create or update bank details
                     if (!bankDetailsData) {
                       bankDetailsData = {};
@@ -120,14 +198,27 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
             bankDetailsData.accountName = settingsData.businessName;
           }
           
-          console.log('Using bank details:', bankDetailsData);
-          setBankDetails(bankDetailsData);
-        } else {
-          console.warn('No bank details found in settings');
-        }
-        
-        setLoading(false);
-        
+        setBankDetails(bankDetailsData);
+      }
+      
+      setLoading(false);
+      
+      // Calculate customer outstanding balance asynchronously (non-blocking)
+      const customerName = data.customerName || data.selectedCustomer?.opticalName;
+      const customerPhone = data.customerPhone || data.selectedCustomer?.phone;
+      
+      if (customerName || customerPhone) {
+        // Don't block the UI loading, calculate outstanding in background
+        calculateCustomerOutstanding(customerName, customerPhone, saleId)
+          .then(outstanding => {
+            setCustomerOutstanding(outstanding);
+          })
+          .catch(error => {
+            console.error('Error calculating outstanding:', error);
+            setCustomerOutstanding(0);
+          });
+      }
+              
         // If autoPrint is true, trigger the print dialog after data is loaded
         if (autoPrint) {
           // Allow more time for all images and resources to load
@@ -148,7 +239,6 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
   // Add print handler function
   const handlePrint = () => {
     if (printing) {
-      console.log('Print already in progress');
       return;
     }
 
@@ -249,7 +339,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
               
               // Handle print dialog close
               window.onafterprint = function() {
-                console.log('Print dialog closed');
+                // Print dialog closed
               };
             </script>
           </body>
@@ -466,14 +556,10 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
     return <div className="p-4" style={{ color: '#374151' }}>Invoice data is not available.</div>;
   }
 
-  console.log('Shop settings:', shopSettings);
-  console.log('Bank details when rendering:', bankDetails);
-
   // Create a fallback bank details object if nothing was found
   const displayBankDetails = bankDetails || {};
   // If we have shop settings but no bank details, extract relevant fields
   if (!bankDetails && shopSettings) {
-    console.log('Creating fallback bank details from shop settings');
     if (shopSettings.accountName) displayBankDetails.accountName = shopSettings.accountName;
     if (shopSettings.accountNumber) displayBankDetails.accountNumber = shopSettings.accountNumber;
     if (shopSettings.bankName) displayBankDetails.bankName = shopSettings.bankName;
@@ -482,7 +568,6 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
     
     // Also check for fields in different formats
     if (shopSettings.bankDetails) {
-      console.log('Using bank details from shop settings');
       Object.assign(displayBankDetails, shopSettings.bankDetails);
     }
   }
@@ -717,7 +802,22 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
           </table>
           
           {/* Summary */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '10px' }}>
+            {/* Left side - Customer Outstanding Balance */}
+            <div style={{ width: '300px', fontSize: '11px' }}>
+              {customerOutstanding > 0 && (
+                <div style={{ padding: '8px', backgroundColor: '#fff3cd', border: '1px solid #ffeaa7', borderRadius: '4px' }}>
+                  <p style={{ fontWeight: 'bold', fontSize: '11px', color: '#856404', marginBottom: '4px' }}>
+                    Outstanding Balance:
+                  </p>
+                  <p style={{ fontWeight: 'bold', fontSize: '13px', color: '#856404', margin: '0' }}>
+                    {formatCurrency(customerOutstanding)}
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            {/* Right side - Invoice Summary */}
             <div style={{ width: '250px', fontSize: '11px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #eee' }}>
                 <span>Subtotal:</span>

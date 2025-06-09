@@ -32,6 +32,41 @@ const Sales = () => {
     fetchCustomers();
   }, []);
 
+  // Add keyboard shortcut for 'S' key to focus/trigger Add Sale button
+  useEffect(() => {
+    const handleKeyPress = (event) => {
+      // Only handle 'S' key when not typing in input fields
+      if (event.key.toLowerCase() === 's' && 
+          !['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName) &&
+          !event.ctrlKey && !event.altKey && !event.metaKey) {
+        event.preventDefault();
+        
+        // Navigate to Add Sale page
+        navigate('/sales/new');
+        
+        // Show a brief indicator
+        const toast = document.createElement('div');
+        toast.className = 'fixed top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity';
+        toast.textContent = 'Opening Add Sale...';
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          setTimeout(() => {
+            if (document.body.contains(toast)) {
+              document.body.removeChild(toast);
+            }
+          }, 300);
+        }, 1000);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    return () => {
+      document.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [navigate]);
+
   useEffect(() => {
     if (sales.length > 0) {
       applyFilters();
