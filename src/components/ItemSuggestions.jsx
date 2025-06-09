@@ -31,7 +31,16 @@ const ItemSuggestions = ({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newProductName, setNewProductName] = useState('');
   const [newProductPrice, setNewProductPrice] = useState(0);
+  const [selectedProductType, setSelectedProductType] = useState('');
   const [creatingProduct, setCreatingProduct] = useState(false);
+
+  // Add states for stock lens power range fields
+  const [powerRangeFields, setPowerRangeFields] = useState({
+    maxSph: '',
+    maxCyl: '',
+    maxAxis: '',
+    maxAdd: ''
+  });
 
   // Initialize search term from value prop when component loads
   useEffect(() => {
@@ -451,8 +460,8 @@ const ItemSuggestions = ({
   };
 
   // Function to create new product in lens inventory
-  const createNewProduct = async (productType) => {
-    if (!newProductName.trim()) return;
+  const createNewProduct = async () => {
+    if (!newProductName.trim() || !selectedProductType) return;
 
     try {
       setCreatingProduct(true);
@@ -463,19 +472,42 @@ const ItemSuggestions = ({
         createdAt: Timestamp.now(),
         createdBy: 'user', // You might want to add user tracking
         qty: 1,
-        type: productType
+        type: selectedProductType
       };
 
       // Add type-specific data and pricing
-      if (productType === 'stock') {
+      if (selectedProductType === 'stock') {
+        // Create power series description from max range fields
+        let powerSeries = '';
+        if (powerRangeFields.maxSph) {
+          powerSeries += `SPH: up to ${powerRangeFields.maxSph}`;
+        }
+        if (powerRangeFields.maxCyl) {
+          if (powerSeries) powerSeries += ', ';
+          powerSeries += `CYL: up to ${powerRangeFields.maxCyl}`;
+        }
+        if (powerRangeFields.maxAxis) {
+          if (powerSeries) powerSeries += ', ';
+          powerSeries += `AXIS: up to ${powerRangeFields.maxAxis}`;
+        }
+        if (powerRangeFields.maxAdd) {
+          if (powerSeries) powerSeries += ', ';
+          powerSeries += `ADD: up to ${powerRangeFields.maxAdd}`;
+        }
+
         productData = {
           ...productData,
-          powerSeries: '', // Will be filled later
+          powerSeries: powerSeries,
+          // Store max power range values
+          maxSph: powerRangeFields.maxSph || '',
+          maxCyl: powerRangeFields.maxCyl || '',
+          maxAxis: powerRangeFields.maxAxis || '',
+          maxAdd: powerRangeFields.maxAdd || '',
           purchasePrice: newProductPrice,
           salePrice: newProductPrice,
           price: newProductPrice
         };
-      } else if (productType === 'prescription') {
+      } else if (selectedProductType === 'prescription') {
         productData = {
           ...productData,
           eye: 'both',
@@ -489,7 +521,7 @@ const ItemSuggestions = ({
           salePrice: newProductPrice,
           price: newProductPrice
         };
-      } else if (productType === 'contact') {
+      } else if (selectedProductType === 'contact') {
         productData = {
           ...productData,
           powerSeries: '',
@@ -501,7 +533,7 @@ const ItemSuggestions = ({
           salePrice: newProductPrice,
           price: newProductPrice
         };
-      } else if (productType === 'service') {
+      } else if (selectedProductType === 'service') {
         productData = {
           ...productData,
           serviceName: newProductName,
@@ -528,10 +560,10 @@ const ItemSuggestions = ({
             itemName: newProductName,
             price: newProductPrice,
             total: newProductPrice * (parseInt(rowQty) || 1),
-            isService: productType === 'service',
-            isStockLens: productType === 'stock',
-            serviceData: productType === 'service' ? productData : null,
-            stockData: productType === 'stock' ? productData : null
+            isService: selectedProductType === 'service',
+            isStockLens: selectedProductType === 'stock',
+            serviceData: selectedProductType === 'service' ? productData : null,
+            stockData: selectedProductType === 'stock' ? productData : null
           };
           
           onSelect(index, dataToSend);
@@ -543,6 +575,13 @@ const ItemSuggestions = ({
       // Reset states
       setNewProductName('');
       setNewProductPrice(0);
+      setSelectedProductType('');
+      setPowerRangeFields({
+        maxSph: '',
+        maxCyl: '',
+        maxAxis: '',
+        maxAdd: ''
+      });
       
       // Refresh items list from parent
       if (onRefreshItems) {
@@ -550,7 +589,7 @@ const ItemSuggestions = ({
       }
       
       // Show success message
-      alert(`Successfully created new ${productType} product: "${newProductName}"`);
+      alert(`Successfully created new ${selectedProductType} product: "${newProductName}"`);
 
     } catch (error) {
       console.error('Error creating new product:', error);
@@ -565,6 +604,13 @@ const ItemSuggestions = ({
     setShowCreateModal(false);
     setNewProductName('');
     setNewProductPrice(0);
+    setSelectedProductType('');
+    setPowerRangeFields({
+      maxSph: '',
+      maxCyl: '',
+      maxAxis: '',
+      maxAdd: ''
+    });
     setShowSuggestions(false);
     hadFocusRef.current = false;
   };
@@ -718,7 +764,7 @@ const ItemSuggestions = ({
       {/* Create New Product Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Create New Product</h3>
               <p className="text-sm text-gray-600 dark:text-gray-300">
@@ -760,9 +806,13 @@ const ItemSuggestions = ({
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <button
-                  onClick={() => createNewProduct('prescription')}
+                  onClick={() => setSelectedProductType('prescription')}
                   disabled={creatingProduct}
-                  className="flex flex-col items-center p-3 border-2 border-blue-200 dark:border-blue-700 bg-white dark:bg-gray-700 rounded-lg hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors disabled:opacity-50"
+                  className={`flex flex-col items-center p-3 border-2 rounded-lg transition-colors disabled:opacity-50 ${
+                    selectedProductType === 'prescription'
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
+                      : 'border-blue-200 dark:border-blue-700 bg-white dark:bg-gray-700 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                  }`}
                 >
                   <svg className="w-8 h-8 text-blue-600 dark:text-blue-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -770,21 +820,87 @@ const ItemSuggestions = ({
                   <span className="text-sm font-medium text-blue-900 dark:text-blue-100">RX Lens</span>
                 </button>
 
-                <button
-                  onClick={() => createNewProduct('stock')}
-                  disabled={creatingProduct}
-                  className="flex flex-col items-center p-3 border-2 border-emerald-200 dark:border-emerald-700 bg-white dark:bg-gray-700 rounded-lg hover:border-emerald-400 dark:hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors disabled:opacity-50"
-                >
-                  <svg className="w-8 h-8 text-emerald-600 dark:text-emerald-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                  </svg>
-                  <span className="text-sm font-medium text-emerald-900 dark:text-emerald-100">Stock Lens</span>
-                </button>
+                <div className="flex flex-col">
+                  <button
+                    onClick={() => setSelectedProductType('stock')}
+                    disabled={creatingProduct}
+                    className={`flex flex-col items-center p-3 border-2 rounded-lg transition-colors disabled:opacity-50 ${
+                      selectedProductType === 'stock'
+                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-400'
+                        : 'border-emerald-200 dark:border-emerald-700 bg-white dark:bg-gray-700 hover:border-emerald-400 dark:hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                    }`}
+                  >
+                    <svg className="w-8 h-8 text-emerald-600 dark:text-emerald-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                    <span className="text-sm font-medium text-emerald-900 dark:text-emerald-100">Stock Lens</span>
+                  </button>
+
+                  {/* Power Range Fields - Right below Stock Lens button */}
+                  {selectedProductType === 'stock' && (
+                    <div className="mt-3 p-3 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-700 rounded-lg">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-xs font-medium text-emerald-800 dark:text-emerald-200 mb-1">
+                            Max SPH
+                          </label>
+                          <input
+                            type="text"
+                            value={powerRangeFields.maxSph}
+                            onChange={(e) => setPowerRangeFields(prev => ({ ...prev, maxSph: e.target.value }))}
+                            className="w-full px-2 py-1 text-sm border border-emerald-300 dark:border-emerald-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:focus:ring-emerald-400"
+                            placeholder="+6.00"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-emerald-800 dark:text-emerald-200 mb-1">
+                            Max CYL
+                          </label>
+                          <input
+                            type="text"
+                            value={powerRangeFields.maxCyl}
+                            onChange={(e) => setPowerRangeFields(prev => ({ ...prev, maxCyl: e.target.value }))}
+                            className="w-full px-2 py-1 text-sm border border-emerald-300 dark:border-emerald-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:focus:ring-emerald-400"
+                            placeholder="-6.00"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-emerald-800 dark:text-emerald-200 mb-1">
+                            Max AXIS
+                          </label>
+                          <input
+                            type="text"
+                            value={powerRangeFields.maxAxis}
+                            onChange={(e) => setPowerRangeFields(prev => ({ ...prev, maxAxis: e.target.value }))}
+                            className="w-full px-2 py-1 text-sm border border-emerald-300 dark:border-emerald-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:focus:ring-emerald-400"
+                            placeholder="180"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-emerald-800 dark:text-emerald-200 mb-1">
+                            Max ADD
+                          </label>
+                          <input
+                            type="text"
+                            value={powerRangeFields.maxAdd}
+                            onChange={(e) => setPowerRangeFields(prev => ({ ...prev, maxAdd: e.target.value }))}
+                            className="w-full px-2 py-1 text-sm border border-emerald-300 dark:border-emerald-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:focus:ring-emerald-400"
+                            placeholder="+3.50"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 <button
-                  onClick={() => createNewProduct('contact')}
+                  onClick={() => setSelectedProductType('contact')}
                   disabled={creatingProduct}
-                  className="flex flex-col items-center p-3 border-2 border-purple-200 dark:border-purple-700 bg-white dark:bg-gray-700 rounded-lg hover:border-purple-400 dark:hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors disabled:opacity-50"
+                  className={`flex flex-col items-center p-3 border-2 rounded-lg transition-colors disabled:opacity-50 ${
+                    selectedProductType === 'contact'
+                      ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 dark:border-purple-400'
+                      : 'border-purple-200 dark:border-purple-700 bg-white dark:bg-gray-700 hover:border-purple-400 dark:hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20'
+                  }`}
                 >
                   <svg className="w-8 h-8 text-purple-600 dark:text-purple-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -794,9 +910,13 @@ const ItemSuggestions = ({
                 </button>
 
                 <button
-                  onClick={() => createNewProduct('service')}
+                  onClick={() => setSelectedProductType('service')}
                   disabled={creatingProduct}
-                  className="flex flex-col items-center p-3 border-2 border-teal-200 dark:border-teal-700 bg-white dark:bg-gray-700 rounded-lg hover:border-teal-400 dark:hover:border-teal-500 hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-colors disabled:opacity-50"
+                  className={`flex flex-col items-center p-3 border-2 rounded-lg transition-colors disabled:opacity-50 ${
+                    selectedProductType === 'service'
+                      ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/20 dark:border-teal-400'
+                      : 'border-teal-200 dark:border-teal-700 bg-white dark:bg-gray-700 hover:border-teal-400 dark:hover:border-teal-500 hover:bg-teal-50 dark:hover:bg-teal-900/20'
+                  }`}
                 >
                   <svg className="w-8 h-8 text-teal-600 dark:text-teal-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -806,6 +926,9 @@ const ItemSuggestions = ({
               </div>
             </div>
 
+
+
+            {/* Action Buttons */}
             <div className="flex justify-end space-x-3">
               <button
                 onClick={closeCreateModal}
@@ -814,6 +937,28 @@ const ItemSuggestions = ({
               >
                 Cancel
               </button>
+              
+              {selectedProductType && (
+                <button
+                  onClick={createNewProduct}
+                  disabled={creatingProduct || !newProductName.trim()}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 transition-colors"
+                >
+                  {creatingProduct ? (
+                    <span className="flex items-center">
+                      <svg className="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Creating...
+                    </span>
+                  ) : (
+                    `Create ${selectedProductType === 'prescription' ? 'RX Lens' : 
+                           selectedProductType === 'stock' ? 'Stock Lens' : 
+                           selectedProductType === 'contact' ? 'Contact Lens' : 'Service'}`
+                  )}
+                </button>
+              )}
             </div>
 
             {creatingProduct && (
