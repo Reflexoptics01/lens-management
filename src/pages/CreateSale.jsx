@@ -146,7 +146,9 @@ const CreateSale = () => {
   // Validate power range for SPH/CYL values
   const validatePowerRange = (rowIndex, field, value) => {
     const row = tableRows[rowIndex];
-    if (!row || !row.stockLensData || !value || value === '') {
+    console.log('validatePowerRange called:', { rowIndex, field, value, row });
+    
+    if (!row || !value || value === '') {
       // Clear any existing warning for this field
       setPowerRangeWarnings(prev => {
         const newWarnings = { ...prev };
@@ -161,7 +163,23 @@ const CreateSale = () => {
       return;
     }
 
-    const stockData = row.stockLensData.stockData || row.stockLensData;
+    // Check multiple possible sources for power range data
+    let stockData = null;
+    if (row.stockLensData) {
+      stockData = row.stockLensData.stockData || row.stockLensData;
+    } else {
+      // For regular stock lens items, the maxSph/maxCyl might be directly in the row
+      stockData = row;
+    }
+    
+    console.log('Stock data found:', stockData);
+    
+    // If we still don't have power range data, exit
+    if (!stockData || (!stockData.maxSph && !stockData.maxCyl)) {
+      console.log('No power range data available');
+      return;
+    }
+    
     const numValue = parseFloat(value);
     
     if (isNaN(numValue)) return;
@@ -175,15 +193,18 @@ const CreateSale = () => {
       const minSph = -Math.abs(maxSph);
       isOutOfRange = numValue < minSph || numValue > maxSph;
       rangeText = `SPH range: ${minSph.toFixed(2)} to +${maxSph.toFixed(2)}`;
+      console.log('SPH validation:', { numValue, minSph, maxSph, isOutOfRange, rangeText });
     } else if (field === 'cyl' && stockData.maxCyl) {
       const maxCyl = parseFloat(stockData.maxCyl);
       // CYL is usually from 0 to negative maxCyl
       const minCyl = -Math.abs(maxCyl);
       isOutOfRange = numValue < minCyl || numValue > 0;
       rangeText = `CYL range: ${minCyl.toFixed(2)} to 0.00`;
+      console.log('CYL validation:', { numValue, minCyl, maxCyl, isOutOfRange, rangeText });
     }
 
     if (isOutOfRange) {
+      console.log('Setting warning for out of range value');
       setPowerRangeWarnings(prev => ({
         ...prev,
         [rowIndex]: {
@@ -192,6 +213,7 @@ const CreateSale = () => {
         }
       }));
     } else {
+      console.log('Value is in range, clearing warning');
       // Clear warning if value is in range
       setPowerRangeWarnings(prev => {
         const newWarnings = { ...prev };
@@ -1359,16 +1381,32 @@ const CreateSale = () => {
       updatedRows[index].add = '';
     }
     
-    // Store lens data for stock lenses to be used by PowerSelectionModal
-    if (itemData.isStockLens && itemData.stockData) {
-      updatedRows[index].powerSeries = itemData.stockData.powerSeries || itemData.powerSeries || '';
-      updatedRows[index].stockLensData = itemData; // Store complete lens data for modal use
+    // Store lens data for stock lenses - check multiple ways to identify stock lenses
+    const isStockLens = itemData.isStockLens || 
+                       (itemData.maxSph || itemData.maxCyl) || 
+                       (itemData.stockData && (itemData.stockData.maxSph || itemData.stockData.maxCyl));
+    
+    if (isStockLens) {
+      // Store power series from various sources
+      updatedRows[index].powerSeries = itemData.powerSeries || 
+                                      (itemData.stockData && itemData.stockData.powerSeries) || '';
       
-      // For stock lenses, clear optical values and guide user to use PowerSelectionModal
-      updatedRows[index].sph = '';
-      updatedRows[index].cyl = '';
-      updatedRows[index].axis = '';
-      updatedRows[index].add = '';
+      // Store complete lens data for modal use and power range validation
+      updatedRows[index].stockLensData = itemData;
+      
+      // Also store power range values directly in the row for easy access
+      updatedRows[index].maxSph = itemData.maxSph || (itemData.stockData && itemData.stockData.maxSph) || '';
+      updatedRows[index].maxCyl = itemData.maxCyl || (itemData.stockData && itemData.stockData.maxCyl) || '';
+      updatedRows[index].maxAxis = itemData.maxAxis || (itemData.stockData && itemData.stockData.maxAxis) || '';
+      updatedRows[index].maxAdd = itemData.maxAdd || (itemData.stockData && itemData.stockData.maxAdd) || '';
+      
+      // For stock lenses with PowerSelectionModal, clear optical values
+      if (itemData.isStockLens && itemData.stockData) {
+        updatedRows[index].sph = '';
+        updatedRows[index].cyl = '';
+        updatedRows[index].axis = '';
+        updatedRows[index].add = '';
+      }
       
       // Clear any existing power range warnings for this row
       setPowerRangeWarnings(prev => {
@@ -1379,6 +1417,10 @@ const CreateSale = () => {
     } else {
       // For non-stock lenses, clear stockLensData and warnings
       delete updatedRows[index].stockLensData;
+      delete updatedRows[index].maxSph;
+      delete updatedRows[index].maxCyl;
+      delete updatedRows[index].maxAxis;
+      delete updatedRows[index].maxAdd;
       setPowerRangeWarnings(prev => {
         const newWarnings = { ...prev };
         delete newWarnings[index];
@@ -1389,7 +1431,7 @@ const CreateSale = () => {
     // Update the table with all changes at once
     setTableRows(updatedRows);
     
-    // Auto-focus the power selection button for stock lenses after a short delay
+    // Auto-focus the power selection button for stock lenses with PowerSelectionModal after a short delay
     if (itemData.isStockLens && itemData.stockData) {
       setTimeout(() => {
         const powerButton = document.querySelector(`[data-power-button="${index}"]`);
