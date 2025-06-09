@@ -263,7 +263,7 @@ const LensInventory = () => {
               'Power Series': 'Reading',
               'Inventory Type': 'bulk',
               'Bulk Quantity': '100',
-              'Axis': '90',
+              'Axis': '0',
               'Purchase Price': '150',
               'Sale Price': '250'
             },
@@ -273,7 +273,7 @@ const LensInventory = () => {
               'Inventory Type': 'individual',
               'SPH Range': '-2.00 to +2.00',
               'CYL Range': '-1.00 to +1.00',
-              'Axis': '180',
+              'Axis': '0',
               'Purchase Price': '200',
               'Sale Price': '350'
             }
@@ -409,7 +409,7 @@ const LensInventory = () => {
               type: 'stock',
               powerSeries: row['Power Series'] || '',
               inventoryType: row['Inventory Type'] || 'bulk',
-              axis: parseInt(row['Axis']) || 90,
+              axis: parseInt(row['Axis']) || 0,
               purchasePrice: parseFloat(row['Purchase Price']) || 0,
               salePrice: parseFloat(row['Sale Price']) || 0
             };

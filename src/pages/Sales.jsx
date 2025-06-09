@@ -47,7 +47,7 @@ const Sales = () => {
       
       // Add debugging for user authentication
       const userUid = localStorage.getItem('userUid');
-      console.log('fetchSales: Current user UID:', userUid);
+      // Fetching sales for current user
       
       if (!userUid) {
         console.error('fetchSales: No user UID found in localStorage');
@@ -56,17 +56,8 @@ const Sales = () => {
       }
       
       const salesRef = getUserCollection('sales');
-      console.log('fetchSales: Got sales collection reference');
-      
-      // Remove orderBy from query since we'll sort after fetching
+      // Execute sales query
       const snapshot = await getDocs(salesRef);
-      
-      console.log('fetchSales: Query executed, got', snapshot.docs.length, 'documents');
-      console.log('fetchSales: Current user path should be: users/' + userUid + '/sales');
-      
-      if (snapshot.docs.length > 0) {
-        console.log('fetchSales: First document data sample:', snapshot.docs[0].data());
-      }
       
       const salesList = snapshot.docs
         .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
@@ -209,7 +200,7 @@ const Sales = () => {
         sale.displayId = `S-${(index + 1).toString().padStart(3, '0')}`;
       });
       
-      console.log('Processed sales data:', salesList.slice(0, 3));
+      // Sales data processed and sorted successfully
       setSales(salesList);
     } catch (error) {
       console.error('Error fetching sales:', error);
@@ -282,6 +273,21 @@ const Sales = () => {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2 
     })}`;
+  };
+
+  // Extract only the suffix (number part) from invoice number
+  const getInvoiceSuffix = (invoiceNumber) => {
+    if (!invoiceNumber) return '';
+    
+    // Try to match pattern like "2024-2025/61" and extract "61"
+    const match = invoiceNumber.match(/^(\d{4}-\d{4})\/(\d+)$/);
+    if (match) {
+      return match[2]; // Return just the number part
+    }
+    
+    // Fallback: extract numbers from end of string
+    const numberMatch = invoiceNumber.match(/(\d+)$/);
+    return numberMatch ? numberMatch[1] : invoiceNumber;
   };
 
   const getCustomerDetails = (customerId) => {
@@ -598,7 +604,9 @@ const Sales = () => {
                           >
                             <td className="px-6 py-4">
                               <div className="flex items-center">
-                                <span className="text-sm font-medium text-sky-600 dark:text-sky-400">{sale.invoiceNumber || sale.displayId}</span>
+                                <span className="text-sm font-medium text-sky-600 dark:text-sky-400">
+                                  {getInvoiceSuffix(sale.invoiceNumber) || sale.displayId}
+                                </span>
                                 {sale.isImported && (
                                   <span className="ml-2 px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full">
                                     Imported
@@ -732,7 +740,9 @@ const Sales = () => {
                   >
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center">
-                        <span className="text-sm font-medium text-sky-600 dark:text-sky-400">{sale.invoiceNumber || sale.displayId}</span>
+                        <span className="text-sm font-medium text-sky-600 dark:text-sky-400">
+                          {getInvoiceSuffix(sale.invoiceNumber) || sale.displayId}
+                        </span>
                         {sale.isImported && (
                           <span className="ml-2 px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full">
                             Imported

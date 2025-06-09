@@ -187,7 +187,7 @@ const PowerSelectionModal = ({
               sph,
               cyl,
               addition,
-              axis: lensData.axis || 90,
+              axis: lensData.axis || 0,
               quantity: parseInt(powerData?.quantity) || 0,
               displayText: `SPH: ${formatPowerValue(sph)}, CYL: ${formatPowerValue(cyl)}, ADD: ${formatPowerValue(addition)}`,
               type: 'bifocal'
@@ -199,7 +199,7 @@ const PowerSelectionModal = ({
               powerKey,
               sph,
               cyl,
-              axis: lensData.axis || 90,
+              axis: lensData.axis || 0,
               quantity: parseInt(powerData?.quantity) || 0,
               displayText: `SPH: ${formatPowerValue(sph)}, CYL: ${formatPowerValue(cyl)}`,
               type: 'single'

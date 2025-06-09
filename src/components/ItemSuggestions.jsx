@@ -33,6 +33,13 @@ const ItemSuggestions = ({
   const [newProductPrice, setNewProductPrice] = useState(0);
   const [creatingProduct, setCreatingProduct] = useState(false);
 
+  // Initialize search term from value prop when component loads
+  useEffect(() => {
+    if (value !== undefined && value !== searchTerm) {
+      setSearchTerm(value);
+    }
+  }, [value]);
+
   // Initialize and sync searchTerm with value
   useEffect(() => {
     if (value !== undefined && value !== searchTerm && !isSelectingRef.current) {
@@ -190,6 +197,17 @@ const ItemSuggestions = ({
     setSearchTerm(item.name);
     setShowSuggestions(false);
     setSelectedIndex(-1);
+    
+    // Immediately update the parent with the full item name
+    if (onChange) {
+      if (typeof index === 'number') {
+        // For DailyDispatchLog and CreatePurchase format: onChange(index, field, value)
+        onChange(index, 'itemName', item.name);
+      } else {
+        // For simple format: onChange(value)
+        onChange(item.name);
+      }
+    }
     
     if (onSelect) {
       if (typeof index === 'number') {
@@ -494,43 +512,37 @@ const ItemSuggestions = ({
                     </span>
                     
                     {/* Show lens type and details */}
-                    {item.type === 'stock' && item.powerSeries && (
-                      <span className="text-xs text-emerald-600 dark:text-emerald-400">Stock Lens - {item.powerSeries}</span>
+                    {(item.isStockLens || item.type === 'stock') && item.powerSeries && (
+                      <span className="text-xs text-emerald-600 dark:text-emerald-400 truncate">
+                        Stock Lens - {item.powerSeries}
+                      </span>
                     )}
                     
-                    {item.type === 'prescription' && (
-                      <span className="text-xs text-blue-600 dark:text-blue-400">
-                        RX Lens - SPH: {item.sph || 'N/A'}, CYL: {item.cyl || 'N/A'}
+                    {(item.isContactLens || item.type === 'contact') && item.powerSeries && (
+                      <span className="text-xs text-purple-600 dark:text-purple-400 truncate">
+                        Contact Lens - {item.powerSeries}
+                        {item.category && ` (${item.category})`}
+                      </span>
+                    )}
+                    
+                    {(item.isPrescription || item.type === 'prescription') && (
+                      <span className="text-xs text-blue-600 dark:text-blue-400 truncate">
+                        RX Lens
+                        {item.sph && ` - SPH: ${item.sph}`}
+                        {item.cyl && `, CYL: ${item.cyl}`}
                         {item.material && `, ${item.material}`}
                         {item.index && ` ${item.index}`}
                       </span>
                     )}
                     
-                    {item.type === 'contact' && (
-                      <span className="text-xs text-purple-600 dark:text-purple-400">
-                        Contact Lens - {item.powerSeries || 'N/A'}
-                        {item.category && ` (${item.category})`}
+                    {(item.isService || item.type === 'service') && (
+                      <span className="text-xs text-teal-600 dark:text-teal-400 truncate">
+                        Service - {item.serviceType || item.serviceData?.serviceType || 'General Service'}
                       </span>
                     )}
                     
-                    {item.type === 'service' && (
-                      <span className="text-xs text-teal-600 dark:text-teal-400">
-                        Service - {item.serviceType || 'General Service'}
-                      </span>
-                    )}
-                    
-                    {/* Fallback for stock lens detection */}
-                    {item.isStockLens && item.stockData && !item.type && (
-                      <span className="text-xs text-emerald-600 dark:text-emerald-400">Stock Lens {item.stockData.powerSeries}</span>
-                    )}
-                    
-                    {/* Fallback for service detection */}
-                    {item.isService && item.serviceData && !item.type && (
-                      <span className="text-xs text-teal-600 dark:text-teal-400">Service - {item.serviceData.serviceType || 'General Service'}</span>
-                    )}
-                    
-                    {/* Show quantity if available */}
-                    {item.qty && parseInt(item.qty) !== 1 && (
+                    {/* Show available quantity if it exists and is not 1 */}
+                    {item.qty && parseInt(item.qty) > 1 && (
                       <span className="text-xs text-gray-500 dark:text-gray-400">Available: {item.qty} pcs</span>
                     )}
                   </div>

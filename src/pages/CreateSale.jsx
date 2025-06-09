@@ -34,6 +34,8 @@ const CreateSale = () => {
   
   // Invoice details
   const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [invoicePrefix, setInvoicePrefix] = useState(''); // e.g., "2024-2025"
+  const [invoiceSimpleNumber, setInvoiceSimpleNumber] = useState(''); // e.g., "61"
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueDate, setDueDate] = useState('');
   const [selectedTaxOption, setSelectedTaxOption] = useState(TAX_OPTIONS[0].id);
@@ -260,136 +262,29 @@ const CreateSale = () => {
   // Preview the next invoice number without incrementing the counter
   const previewNextInvoiceNumber = async () => {
     try {
-      // Get the current financial year from user-specific settings
-      const settingsDoc = await getDoc(getUserDoc('settings', 'shopSettings'));
-      if (!settingsDoc.exists()) {
-        // Fallback to old method for preview
-        const salesRef = getUserCollection('sales');
-        const snapshot = await getDocs(salesRef);
-        const previewNumber = `INV-${(snapshot.docs.length + 1).toString().padStart(4, '0')}`;
-        setInvoiceNumber(previewNumber);
-        return;
-      }
+      const { previewNextInvoiceNumber: getPreview } = await import('../utils/invoiceNumberingImproved');
+      const preview = await getPreview();
       
-      const settings = settingsDoc.data();
-      const financialYear = settings.financialYear;
-      
-      if (!financialYear) {
-        // Fallback to old method for preview
-        const salesRef = getUserCollection('sales');
-        const snapshot = await getDocs(salesRef);
-        const previewNumber = `INV-${(snapshot.docs.length + 1).toString().padStart(4, '0')}`;
-        setInvoiceNumber(previewNumber);
-        return;
-      }
-      
-      // Get the user-specific counter document for this financial year (without incrementing)
-      const counterRef = getUserDoc('counters', `invoices_${financialYear}`);
-      const counterDoc = await getDoc(counterRef);
-      
-      let counter;
-      if (!counterDoc.exists()) {
-        // If counter doesn't exist, preview would be 01
-        counter = {
-          count: 0,
-          prefix: financialYear,
-          separator: '/',
-          format: '${prefix}${separator}${number}'
-        };
-      } else {
-        counter = counterDoc.data();
-      }
-      
-      // Preview the next number (current count + 1) without saving
-      const nextCount = (counter.count || 0) + 1;
-      const paddedNumber = nextCount.toString().padStart(2, '0');
-      
-      // Use the format specified in the counter or fall back to default
-      let previewInvoiceNumber;
-      if (counter.format) {
-        previewInvoiceNumber = counter.format
-          .replace('${prefix}', counter.prefix || '')
-          .replace('${separator}', counter.separator || '')
-          .replace('${number}', paddedNumber);
-      } else {
-        previewInvoiceNumber = `${counter.prefix || financialYear}${counter.separator || '/'}${paddedNumber}`;
-      }
-      
-      setInvoiceNumber(previewInvoiceNumber);
+      // Store both the display format and separated components
+      setInvoiceNumber(preview.fullDisplay);
+      setInvoicePrefix(preview.prefix);
+      setInvoiceSimpleNumber(preview.paddedNumber);
     } catch (error) {
       console.error('Error previewing invoice number:', error);
       // Fallback preview
       setInvoiceNumber('PREVIEW-ERROR');
+      setInvoicePrefix('2024-2025');
+      setInvoiceSimpleNumber('01');
     }
   };
 
   // Generate actual invoice number and increment counter (only used when saving)
   const generateInvoiceNumberForSave = async () => {
     try {
-      // Get the current financial year from user-specific settings
-      const settingsDoc = await getDoc(getUserDoc('settings', 'shopSettings'));
-      if (!settingsDoc.exists()) {
-        throw new Error('Settings not found');
-      }
+      const { generateInvoiceNumber } = await import('../utils/invoiceNumberingImproved');
+      const invoice = await generateInvoiceNumber();
       
-      const settings = settingsDoc.data();
-      const financialYear = settings.financialYear;
-      
-      if (!financialYear) {
-        // If no financial year is set, fall back to old method
-        const salesRef = getUserCollection('sales');
-        const snapshot = await getDocs(salesRef);
-        const newInvoiceNumber = `INV-${(snapshot.docs.length + 1).toString().padStart(4, '0')}`;
-        return newInvoiceNumber;
-      }
-      
-      // Get or create the user-specific counter document for this financial year
-      const counterRef = getUserDoc('counters', `invoices_${financialYear}`);
-      const counterDoc = await getDoc(counterRef);
-      
-      let counter;
-      if (!counterDoc.exists()) {
-        // If counter doesn't exist, create it
-        counter = {
-          count: 0,
-          prefix: financialYear,
-          separator: '/',
-          format: '${prefix}${separator}${number}'
-        };
-        await setDoc(counterRef, {
-          ...counter,
-          createdAt: serverTimestamp()
-        });
-      } else {
-        counter = counterDoc.data();
-      }
-      
-      // Increment the counter
-      const newCount = (counter.count || 0) + 1;
-      
-      // Update the counter in user-specific Firestore
-      await updateDoc(counterRef, {
-        count: newCount,
-        updatedAt: serverTimestamp()
-      });
-      
-      // Format the invoice number
-      const paddedNumber = newCount.toString().padStart(2, '0');
-      
-      // Use the format specified in the counter or fall back to default
-      let invoiceNumber;
-      if (counter.format) {
-        // Replace placeholders in the format string
-        invoiceNumber = counter.format
-          .replace('${prefix}', counter.prefix || '')
-          .replace('${separator}', counter.separator || '')
-          .replace('${number}', paddedNumber);
-      } else {
-        // Default format if none specified
-        invoiceNumber = `${counter.prefix || financialYear}${counter.separator || '/'}${paddedNumber}`;
-      }
-      
-      return invoiceNumber;
+      return invoice.fullDisplay;
     } catch (error) {
       console.error('Error generating invoice number:', error);
       // Fall back to the old method if there's an error
@@ -465,7 +360,7 @@ const CreateSale = () => {
       if (snapshot.empty) {
         const paddedDisplayId = orderId.toString().padStart(3, '0');
         
-        q = query(ordersRef, where('displayId', '==', paddedDisplayId));
+        let q = query(ordersRef, where('displayId', '==', paddedDisplayId));
         snapshot = await getDocs(q);
         
         if (snapshot.empty) {
@@ -1124,6 +1019,9 @@ const CreateSale = () => {
   const resetForm = () => {
     setSelectedCustomer(null);
     setCustomerBalance(0);
+    setInvoiceNumber('');
+    setInvoicePrefix('');
+    setInvoiceSimpleNumber('');
     setInvoiceDate(new Date().toISOString().split('T')[0]);
     setDueDate('');
     setSelectedTaxOption(TAX_OPTIONS[0].id);
@@ -1152,23 +1050,46 @@ const CreateSale = () => {
   };
 
   const handleSendWhatsApp = () => {
-    if (!selectedCustomer || !selectedCustomer.phone) return;
+    if (!selectedCustomer) {
+      alert('Please select a customer first.');
+      return;
+    }
+    
+    if (!selectedCustomer.phone) {
+      alert(`No phone number found for ${selectedCustomer.opticalName || 'this customer'}. Please add a phone number to the customer record.`);
+      return;
+    }
     
     const phone = selectedCustomer.phone.replace(/[^0-9+]/g, '');
+    
+    if (phone.length < 10) {
+      alert('Invalid phone number format. Please check the customer\'s phone number.');
+      return;
+    }
+    
     const total = calculateTotal().toLocaleString('en-IN', {
       style: 'currency',
       currency: 'INR'
     });
     
+    const customerName = (selectedCustomer.opticalName || 'Customer').replace(/[^\w\s]/g, '');
+    const safeInvoiceNumber = (invoiceNumber || 'N/A').replace(/[^\w\s-]/g, '');
+    
     const message = 
       `*Invoice from PRISM OPTICAL*\n\n` +
-      `Dear ${selectedCustomer.opticalName},\n\n` +
-      `Your invoice ${invoiceNumber} has been generated for amount ${total}.\n\n` +
+      `Dear ${customerName},\n\n` +
+      `Your invoice ${safeInvoiceNumber} has been generated with amount ${total}.\n\n` +
       `Thank you for your business!\n` +
       `For any questions, please contact us.`;
     
     const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
+    
+    try {
+      window.open(whatsappUrl, '_blank');
+    } catch (error) {
+      console.error('Error opening WhatsApp:', error);
+      alert('Could not open WhatsApp. Please check if your browser allows popups.');
+    }
   };
 
   // Format currency for display - use the utility function
@@ -1203,7 +1124,8 @@ const CreateSale = () => {
         
         // Determine item name and price based on lens type
         if (lens.type === 'stock') {
-          itemName = `${lens.brandName || ''} ${lens.powerSeries || ''}`.trim();
+          // Use only brandName, not powerSeries to avoid long detailed strings
+          itemName = lens.brandName || '';
           itemPrice = lens.salePrice || 0;
         } else if (lens.type === 'service') {
           itemName = lens.serviceName || lens.brandName || '';
@@ -1212,7 +1134,8 @@ const CreateSale = () => {
           itemName = lens.brandName || '';
           itemPrice = lens.salePrice || 0;
         } else if (lens.type === 'contact') {
-          itemName = `${lens.brandName || ''} ${lens.powerSeries || ''}`.trim();
+          // Use only brandName for contact lenses too
+          itemName = lens.brandName || '';
           itemPrice = lens.salePrice || 0;
         }
         
@@ -1236,7 +1159,14 @@ const CreateSale = () => {
               stockData: lens.type === 'stock' ? lens : null,
               serviceData: lens.type === 'service' ? lens : null,
               contactData: lens.type === 'contact' ? lens : null,
-              prescriptionData: lens.type === 'prescription' ? lens : null
+              prescriptionData: lens.type === 'prescription' ? lens : null,
+              // Store powerSeries separately for display purposes but not in the main name
+              powerSeries: lens.powerSeries || '',
+              // Store additional lens details for reference
+              maxSph: lens.maxSph,
+              maxCyl: lens.maxCyl,
+              type: lens.type,
+              brandName: lens.brandName
             };
           }
         }
@@ -1307,32 +1237,53 @@ const CreateSale = () => {
       itemPrice = parseFloat(itemData.stockData.salePrice || 0);
     }
     
-    // First update the item name
-    handleTableRowChange(index, 'itemName', itemData.name || itemData.itemName);
+    // Update the rows directly to ensure the full item name is set
+    const updatedRows = [...tableRows];
     
-    // Then update the price, which will trigger total calculation
+    // Extract just the clean brand name, avoiding any power series details
+    let cleanItemName = '';
+    if (itemData.brandName) {
+      // Use brandName if available (most reliable)
+      cleanItemName = itemData.brandName;
+    } else if (itemData.name) {
+      // Use name field, but ensure it's clean
+      cleanItemName = itemData.name;
+    } else if (itemData.itemName) {
+      // Fallback to itemName
+      cleanItemName = itemData.itemName;
+    }
+    
+    // For services, use serviceName if available
+    if (itemData.isService && itemData.serviceData && itemData.serviceData.serviceName) {
+      cleanItemName = itemData.serviceData.serviceName;
+    }
+    
+    // Ensure the item name is set to the clean name
+    updatedRows[index] = {
+      ...updatedRows[index],
+      itemName: cleanItemName.trim()
+    };
+    
+    // Set the price if available
     if (itemPrice > 0) {
-      setTimeout(() => {
-        handleTableRowChange(index, 'price', itemPrice.toString());
-      }, 10);
+      updatedRows[index].price = itemPrice.toString();
+      // Recalculate total
+      updatedRows[index].total = itemPrice * parseInt(updatedRows[index].qty || 1);
     }
     
     // Set appropriate unit for services
     if (itemData.isService) {
-      setTimeout(() => {
-        handleTableRowChange(index, 'unit', 'Service');
-        // Clear optical values for services as they don't apply
-        handleTableRowChange(index, 'sph', '');
-        handleTableRowChange(index, 'cyl', '');
-        handleTableRowChange(index, 'axis', '');
-        handleTableRowChange(index, 'add', '');
-      }, 20);
+      updatedRows[index].unit = 'Service';
+      // Clear optical values for services as they don't apply
+      updatedRows[index].sph = '';
+      updatedRows[index].cyl = '';
+      updatedRows[index].axis = '';
+      updatedRows[index].add = '';
     }
     
     // Store lens data for stock lenses to be used by PowerSelectionModal
     if (itemData.isStockLens && itemData.stockData) {
-      const updatedRows = [...tableRows];
-      updatedRows[index].powerSeries = itemData.stockData.powerSeries || '';
+      updatedRows[index].powerSeries = itemData.stockData.powerSeries || itemData.powerSeries || '';
       updatedRows[index].stockLensData = itemData; // Store complete lens data for modal use
       
       // For stock lenses, clear optical values and guide user to use PowerSelectionModal
@@ -1340,10 +1291,13 @@ const CreateSale = () => {
       updatedRows[index].cyl = '';
       updatedRows[index].axis = '';
       updatedRows[index].add = '';
-      
-      setTableRows(updatedRows);
-      
-      // Auto-focus the power selection button after a short delay
+    }
+    
+    // Update the table with all changes at once
+    setTableRows(updatedRows);
+    
+    // Auto-focus the power selection button for stock lenses after a short delay
+    if (itemData.isStockLens && itemData.stockData) {
       setTimeout(() => {
         const powerButton = document.querySelector(`[data-power-button="${index}"]`);
         if (powerButton) {
@@ -1806,77 +1760,123 @@ const CreateSale = () => {
 
   // Success Modal
   const SuccessModal = () => {
+    // Handle keyboard shortcuts and ESC key
+    useEffect(() => {
+      const handleKeyDown = (e) => {
+        // Prevent default behavior for our custom shortcuts
+        if (['Escape', 'n', 'N', 'd', 'D', 'p', 'P', 'w', 'W'].includes(e.key)) {
+          e.preventDefault();
+        }
+        
+        switch (e.key) {
+          case 'Escape':
+            // ESC key - go to Sales page
+            setShowSuccessModal(false);
+            navigate('/sales');
+            break;
+          case 'n':
+          case 'N':
+            // N key - New bill
+            setShowSuccessModal(false);
+            resetForm();
+            break;
+          case 'd':
+          case 'D':
+            // D key - View details
+            setShowSuccessModal(false);
+            navigate(`/sales/${savedSaleId}`);
+            break;
+          case 'p':
+          case 'P':
+            // P key - Print bill
+            handlePrintBill();
+            break;
+          case 'w':
+          case 'W':
+            // W key - Send WhatsApp
+            handleSendWhatsApp();
+            break;
+        }
+      };
+
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [savedSaleId]);
+
+    const handleCloseModal = () => {
+      setShowSuccessModal(false);
+      navigate('/sales');
+    };
+
     return (
-      <div className="fixed inset-0 overflow-y-auto z-50">
-        <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-          <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-            <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-          </div>
+      <div className="fixed inset-0 bg-gray-600 dark:bg-gray-900 bg-opacity-50 dark:bg-opacity-70 overflow-y-auto h-full w-full z-50">
+        <div className="relative top-20 mx-auto p-6 border border-gray-200 dark:border-gray-700 w-full max-w-lg shadow-lg rounded-lg bg-white dark:bg-gray-800">
+          {/* Close Button */}
+          <button
+            onClick={handleCloseModal}
+            className="absolute top-4 right-4 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
 
-          <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-
-          <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-            <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-              <div className="sm:flex sm:items-start">
-                <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100 sm:mx-0 sm:h-10 sm:w-10">
-                  <svg className="h-6 w-6 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900">Sale Created Successfully!</h3>
-                  <div className="mt-2">
-                    <p className="text-sm text-gray-500">
-                      The sale has been created successfully with invoice number {invoiceNumber}.
-                    </p>
-                  </div>
-                </div>
-              </div>
+          <div className="text-center">
+            {/* Success Icon */}
+            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
+              <svg className="h-6 w-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+              </svg>
             </div>
-            <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-              <button
-                type="button"
-                onClick={handlePrintBill}
-                className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm"
-              >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                </svg>
-                Print Bill
-              </button>
+
+            {/* Title */}
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+              Sale Saved Successfully!
+            </h3>
+            
+            {/* Message */}
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              Invoice #{invoiceNumber} has been created and saved.
+            </p>
+
+            {/* Action Buttons */}
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    resetForm();
+                  }}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-sm font-medium"
+                >
+                  New Bill (N)
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    navigate(`/sales/${savedSaleId}`);
+                  }}
+                  className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors text-sm font-medium"
+                >
+                  Details (D)
+                </button>
+              </div>
               
-              <button
-                type="button"
-                onClick={handlePrintAddress}
-                className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm"
-              >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                Print Address
-              </button>
-              
-              <button
-                type="button"
-                onClick={() => {
-                  setShowSuccessModal(false);
-                  resetForm();
-                }}
-                className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-              >
-                New Sale
-              </button>
-              
-              <button
-                type="button"
-                onClick={() => {
-                  setShowSuccessModal(false);
-                  navigate(`/sales/${savedSaleId}`);
-                }}
-                className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-              >
-                View Details
-              </button>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={handlePrintBill}
+                  className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors text-sm font-medium"
+                >
+                  Print Bill (P)
+                </button>
+                <button
+                  onClick={handleSendWhatsApp}
+                  disabled={!selectedCustomer || !selectedCustomer.phone}
+                  className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  WhatsApp (W)
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -2008,13 +2008,32 @@ const CreateSale = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Invoice Number</label>
-                  <input
-                    type="text"
-                    value={invoiceNumber}
-                    className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white"
-                    readOnly
-                    placeholder="Will be generated when saving"
-                  />
+                  <div className="mt-1 flex items-center space-x-2">
+                    {/* Financial Year Prefix - Non-editable */}
+                    <div className="flex-shrink-0">
+                      <input
+                        type="text"
+                        value={invoicePrefix}
+                        className="block w-24 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 text-center font-medium"
+                        readOnly
+                        placeholder="2024-2025"
+                      />
+                    </div>
+                    
+                    {/* Separator */}
+                    <span className="text-gray-500 dark:text-gray-400 font-medium">/</span>
+                    
+                    {/* Simple Invoice Number - Non-editable */}
+                    <div className="flex-shrink-0">
+                      <input
+                        type="text"
+                        value={invoiceSimpleNumber}
+                        className="block w-16 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 text-center font-bold text-lg"
+                        readOnly
+                        placeholder="61"
+                      />
+                    </div>
+                  </div>
                 </div>
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Invoice Date</label>
@@ -2692,7 +2711,7 @@ const CreateSale = () => {
           saleId={savedSaleId} 
           onClose={() => {
             setShowPrintModal(false);
-            console.log('Print modal closed');
+            // Print modal closed
           }}
           title={`Invoice #${invoiceNumber}`}
         />

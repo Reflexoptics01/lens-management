@@ -15,6 +15,8 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
       brandName: '',
       maxSph: '',
       maxCyl: '',
+      axis: '0', // Default axis value
+      maxAdd: '', // Maximum addition power for bifocal/progressive lenses
       purchasePrice: '',
       salePrice: '',
       qty: 1,
@@ -42,6 +44,8 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
         brandName: lensToEdit.brandName || '',
         maxSph: lensToEdit.maxSph || '',
         maxCyl: lensToEdit.maxCyl || '',
+        axis: lensToEdit.axis || '0',
+        maxAdd: lensToEdit.maxAdd || '',
         purchasePrice: lensToEdit.purchasePrice || '',
         salePrice: lensToEdit.salePrice || '',
         qty: parseFloat(lensToEdit.qty) || lensToEdit.totalQuantity || 1,
@@ -75,6 +79,8 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
         brandName: '',
         maxSph: '',
         maxCyl: '',
+        axis: '0',
+        maxAdd: '',
         purchasePrice: '',
         salePrice: '',
         qty: 1,
@@ -147,6 +153,8 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
     // Convert to numbers
     const maxSphNum = parseFloat(row.maxSph);
     const maxCylNum = parseFloat(row.maxCyl);
+    const axisNum = parseFloat(row.axis) || 0;
+    const maxAddNum = row.maxAdd ? parseFloat(row.maxAdd) : null;
     
     if (isNaN(maxSphNum) || isNaN(maxCylNum)) {
       setError('Max SPH and Max CYL must be valid numbers.');
@@ -162,18 +170,28 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
     const cylMax = maxCylNum < 0 ? 0 : maxCylNum;
     
     // Create power range string for display
-    const powerRange = `SPH: ${sphMin} to ${sphMax}, CYL: ${cylMin} to ${cylMax}`;
+    let powerRange = `SPH: ${sphMin} to ${sphMax}, CYL: ${cylMin} to ${cylMax}`;
+    if (axisNum) {
+      powerRange += `, AXIS: ${axisNum}°`;
+    }
+    if (maxAddNum) {
+      powerRange += `, ADD: +1.00 to +${maxAddNum}`;
+    }
     
     // Debug logging
     console.log('Setting up power inventory for:', {
       brandName: row.brandName,
       enteredMaxSph: row.maxSph,
       enteredMaxCyl: row.maxCyl,
+      enteredAxis: row.axis,
+      enteredMaxAdd: row.maxAdd,
       calculatedRanges: {
         sphMin,
         sphMax,
         cylMin,
-        cylMax
+        cylMax,
+        axis: axisNum,
+        maxAdd: maxAddNum
       },
       powerRange
     });
@@ -186,6 +204,8 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
       powerRange: powerRange,
       maxSph: row.maxSph,
       maxCyl: row.maxCyl,
+      axis: axisNum,
+      maxAdd: maxAddNum,
       sphMin,
       sphMax,
       cylMin,
@@ -220,15 +240,28 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
         // Generate power series from maxSph and maxCyl
         const maxSphNum = parseFloat(row.maxSph);
         const maxCylNum = parseFloat(row.maxCyl);
+        const axisNum = parseFloat(row.axis) || 0;
+        const maxAddNum = row.maxAdd ? parseFloat(row.maxAdd) : null;
+        
         const sphRange = maxSphNum < 0 ? `${maxSphNum} to 0` : `0 to +${maxSphNum}`;
         const cylRange = maxCylNum < 0 ? `${maxCylNum} to 0` : `0 to +${maxCylNum}`;
-        const powerSeries = `SPH: ${sphRange}, CYL: ${cylRange}`;
+        let powerSeries = `SPH: ${sphRange}, CYL: ${cylRange}`;
+        
+        // Add axis and addition to power series if provided
+        if (axisNum) {
+          powerSeries += `, AXIS: ${axisNum}°`;
+        }
+        if (maxAddNum) {
+          powerSeries += `, ADD: +1.00 to +${maxAddNum}`;
+        }
         
         let lensData = {
           brandName: row.brandName,
           powerSeries: powerSeries,
           maxSph: row.maxSph,
           maxCyl: row.maxCyl,
+          axis: axisNum,
+          maxAdd: maxAddNum,
           purchasePrice: row.purchasePrice,
           salePrice: row.salePrice,
           type: 'stock',
@@ -246,7 +279,7 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
             // Add new fields for bifocal/progressive lenses
             lensType: row.powerInventoryData.lensType || 'single',
             ...(row.powerInventoryData.lensType === 'bifocal' && {
-              axis: row.powerInventoryData.axis || 90
+              axis: row.powerInventoryData.axis || 0
             })
           };
           // Remove qty if using individual power inventory
@@ -275,15 +308,28 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
           // Generate power series from maxSph and maxCyl
           const maxSphNum = parseFloat(row.maxSph);
           const maxCylNum = parseFloat(row.maxCyl);
+          const axisNum = parseFloat(row.axis) || 0;
+          const maxAddNum = row.maxAdd ? parseFloat(row.maxAdd) : null;
+          
           const sphRange = maxSphNum < 0 ? `${maxSphNum} to 0` : `0 to +${maxSphNum}`;
           const cylRange = maxCylNum < 0 ? `${maxCylNum} to 0` : `0 to +${maxCylNum}`;
-          const powerSeries = `SPH: ${sphRange}, CYL: ${cylRange}`;
+          let powerSeries = `SPH: ${sphRange}, CYL: ${cylRange}`;
+          
+          // Add axis and addition to power series if provided
+          if (axisNum) {
+            powerSeries += `, AXIS: ${axisNum}°`;
+          }
+          if (maxAddNum) {
+            powerSeries += `, ADD: +1.00 to +${maxAddNum}`;
+          }
           
           let lensData = {
             brandName: row.brandName,
             powerSeries: powerSeries,
             maxSph: row.maxSph,
             maxCyl: row.maxCyl,
+            axis: axisNum,
+            maxAdd: maxAddNum,
             purchasePrice: row.purchasePrice,
             salePrice: row.salePrice,
             type: 'stock',
@@ -301,7 +347,7 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
               // Add new fields for bifocal/progressive lenses
               lensType: row.powerInventoryData.lensType || 'single',
               ...(row.powerInventoryData.lensType === 'bifocal' && {
-                axis: row.powerInventoryData.axis || 90
+                axis: row.powerInventoryData.axis || 0
               })
             };
           } else {
@@ -358,6 +404,8 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Lens Brand Name</th>
                   <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-20">Max SPH</th>
                   <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-20">Max CYL</th>
+                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-20">AXIS</th>
+                  <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-20">Max ADD</th>
                   <th scope="col" className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24">Setup</th>
                   <th scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-20">QTY (Pairs)</th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Purchase Price</th>
@@ -398,6 +446,32 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
                         className={inputClassName + " text-xs w-full"}
                         placeholder="-2.00"
                         step="0.25"
+                      />
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap w-20">
+                      <input
+                        type="number"
+                        value={row.axis}
+                        onChange={(e) => handleStockLensChange(index, 'axis', e.target.value)}
+                        className={inputClassName + " text-xs w-full"}
+                        placeholder="0"
+                        step="1"
+                        min="0"
+                        max="180"
+                        title="AXIS in degrees (0° to 180°, default is 0°)"
+                      />
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap w-20">
+                      <input
+                        type="number"
+                        value={row.maxAdd}
+                        onChange={(e) => handleStockLensChange(index, 'maxAdd', e.target.value)}
+                        className={inputClassName + " text-xs w-full"}
+                        placeholder="Leave blank for single vision"
+                        step="0.25"
+                        min="0"
+                        max="5"
+                        title="Maximum addition power for bifocal/progressive lenses (leave blank for single vision)"
                       />
                     </td>
                     <td className="px-2 py-2 whitespace-nowrap w-24 text-center">
@@ -473,7 +547,7 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
                 ))}
                 {stockLensRows.length === 0 && (
                   <tr>
-                    <td colSpan="9" className="px-3 py-4 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan="11" className="px-3 py-4 text-center text-gray-500 dark:text-gray-400">
                       No stock lenses added yet. Click the "Add Row" button to add stock lens details.
                     </td>
                   </tr>

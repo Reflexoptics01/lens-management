@@ -441,7 +441,38 @@ const SaleDetail = () => {
                 <div className="grid grid-cols-2 gap-4">
                       <div>
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Invoice Number</p>
-                    <p className="text-lg font-semibold text-gray-900 dark:text-white">{sale.invoiceNumber || 'N/A'}</p>
+                    <div className="flex items-center space-x-2 mt-1">
+                      {(() => {
+                        // Parse the invoice number to separate components
+                        const invoiceNum = sale.invoiceNumber || '';
+                        const match = invoiceNum.match(/^(\d{4}-\d{4})\/(\d+)$/);
+                        
+                        if (match) {
+                          const [, prefix, number] = match;
+                          return (
+                            <>
+                              <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded font-medium text-sm">
+                                {prefix}
+                              </span>
+                              <span className="text-gray-500 dark:text-gray-400">/</span>
+                              <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded font-bold text-lg">
+                                {number}
+                              </span>
+                              <span className="text-gray-400 dark:text-gray-500 text-sm">
+                                ({invoiceNum})
+                              </span>
+                            </>
+                          );
+                        } else {
+                          // Fallback for other formats
+                          return (
+                            <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                              {invoiceNum || 'N/A'}
+                            </span>
+                          );
+                        }
+                      })()}
+                    </div>
                       </div>
                       <div>
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Invoice Date</p>

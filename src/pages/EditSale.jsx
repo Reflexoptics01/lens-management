@@ -35,6 +35,8 @@ const EditSale = () => {
   
   // Invoice details
   const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [invoicePrefix, setInvoicePrefix] = useState(''); // e.g., "2024-2025"
+  const [invoiceSimpleNumber, setInvoiceSimpleNumber] = useState(''); // e.g., "61"
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueDate, setDueDate] = useState('');
   const [selectedTaxOption, setSelectedTaxOption] = useState(TAX_OPTIONS[0].id);
@@ -205,7 +207,21 @@ const EditSale = () => {
       const saleData = saleDoc.data();
       
       // Set invoice details
-      setInvoiceNumber(saleData.invoiceNumber || '');
+      const invoiceNum = saleData.invoiceNumber || '';
+      setInvoiceNumber(invoiceNum);
+      
+      // Parse the invoice number to separate components
+      const match = invoiceNum.match(/^(\d{4}-\d{4})\/(\d+)$/);
+      if (match) {
+        const [, prefix, number] = match;
+        setInvoicePrefix(prefix);
+        setInvoiceSimpleNumber(number);
+      } else {
+        // Fallback for old format or empty
+        setInvoicePrefix('2024-2025');
+        setInvoiceSimpleNumber(invoiceNum.replace(/[^\d]/g, '') || '');
+      }
+      
       setInvoiceDate(saleData.invoiceDate?.toDate?.().toISOString().split('T')[0] || new Date().toISOString().split('T')[0]);
       setDueDate(saleData.dueDate?.toDate?.().toISOString().split('T')[0] || '');
       setSelectedTaxOption(saleData.taxOption || TAX_OPTIONS[0].id);
@@ -535,68 +551,79 @@ const EditSale = () => {
   };
 
   const handleUpdateSale = async () => {
-    if (!selectedCustomer || !selectedCustomer.id) {
-      setError('Please select a customer');
-      return;
-    }
-
-    const filledRows = tableRows.filter(row => row.total > 0);
-    if (filledRows.length === 0) {
-      setError('Please add at least one item to the invoice');
-      return;
-    }
-
     try {
-      setLoading(true);
       setError('');
+      setLoading(true);
 
-      // Create updated sale document
-      const updatedSaleData = {
+      if (!selectedCustomer) {
+        setError('Please select a customer');
+        return;
+      }
+
+      if (!invoiceNumber.trim()) {
+        setError('Please enter an invoice number');
+        return;
+      }
+
+      // Validate table rows
+      const validRows = tableRows.filter(row => row.itemName && row.itemName.trim() !== '');
+      if (validRows.length === 0) {
+        setError('Please add at least one item to the sale');
+        return;
+      }
+
+      // Calculate totals
+      const subtotal = calculateSubtotal();
+      const discountAmount = calculateDiscountAmount();
+      const taxAmount = calculateTaxAmount();
+      const total = calculateTotal();
+      const taxOption = getTaxOption(selectedTaxOption);
+
+      // Update sale data
+      const saleData = {
         customerId: selectedCustomer.id,
-        customerName: selectedCustomer.opticalName || selectedCustomer.name || '',
-        customerAddress: selectedCustomer.address || '',
+        customerName: selectedCustomer.opticalName,
         customerCity: selectedCustomer.city || '',
-        customerState: selectedCustomer.state || '',
-        phone: selectedCustomer.phone || '', // Add phone number from customer
-        gstNumber: selectedCustomer.gstNumber || '',
-        invoiceDate: new Date(invoiceDate),
-        dueDate: dueDate ? new Date(dueDate) : null,
-        items: filledRows.map(row => ({
-          orderId: row.orderId,
-          itemName: row.itemName,
-          sph: row.sph,
-          cyl: row.cyl,
-          axis: row.axis,
-          add: row.add,
-          qty: parseInt(row.qty),
-          price: parseFloat(row.price),
-          total: parseFloat(row.total)
-        })),
-        subtotal: calculateSubtotal(),
+        customerPhone: selectedCustomer.phone || '',
+        invoiceNumber: invoiceNumber.trim(),
+        invoiceDate: Timestamp.fromDate(new Date(invoiceDate)),
+        dueDate: dueDate ? Timestamp.fromDate(new Date(dueDate)) : null,
+        subtotal,
         discountType,
         discountValue: parseFloat(discountValue || 0),
-        discountAmount: calculateDiscountAmount(),
+        discountAmount,
         taxOption: selectedTaxOption,
-        taxRate: getTaxOption(selectedTaxOption).rate,
-        taxAmount: calculateTaxAmount(),
+        taxRate: taxOption.rate,
+        taxAmount,
         frieghtCharge: parseFloat(frieghtCharge || 0),
-        totalAmount: calculateTotal(),
-        amountPaid: parseFloat(amountPaid || 0),
-        balanceDue: calculateTotal() - parseFloat(amountPaid || 0),
+        total,
         paymentStatus,
-        notes,
-        updatedAt: serverTimestamp()
+        amountPaid: parseFloat(amountPaid || 0),
+        notes: notes.trim(),
+        items: validRows.map(row => ({
+          orderId: row.orderId || '',
+          itemName: row.itemName.trim(),
+          sph: row.sph || '',
+          cyl: row.cyl || '',
+          axis: row.axis || '',
+          add: row.add || '',
+          qty: parseInt(row.qty) || 1,
+          price: parseFloat(row.price) || 0,
+          total: parseFloat(row.total) || 0
+        })),
+        updatedAt: Timestamp.now()
       };
 
-      await updateDoc(getUserDoc('sales', saleId), updatedSaleData);
-      
+      // Update the sale document
+      await updateDoc(getUserDoc('sales', saleId), saleData);
+
       setSavedSaleId(saleId);
       setShowSuccessModal(true);
-      setSuccess(true);
+      setLoading(false);
+
     } catch (error) {
       console.error('Error updating sale:', error);
-      setError('Failed to update sale. Please try again.');
-    } finally {
+      setError('Failed to update sale: ' + error.message);
       setLoading(false);
     }
   };
@@ -1290,13 +1317,32 @@ const EditSale = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Invoice Number</label>
-                      <input
-                        type="text"
-                        value={invoiceNumber}
-                        onChange={(e) => setInvoiceNumber(e.target.value)}
-                        className="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400"
-                        readOnly
-                      />
+                      <div className="mt-1 flex items-center space-x-2">
+                        {/* Financial Year Prefix - Non-editable */}
+                        <div className="flex-shrink-0">
+                          <input
+                            type="text"
+                            value={invoicePrefix}
+                            className="block w-24 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 text-center font-medium"
+                            readOnly
+                            placeholder="2024-2025"
+                          />
+                        </div>
+                        
+                        {/* Separator */}
+                        <span className="text-gray-500 dark:text-gray-400 font-medium">/</span>
+                        
+                        {/* Simple Invoice Number - Non-editable */}
+                        <div className="flex-shrink-0">
+                          <input
+                            type="text"
+                            value={invoiceSimpleNumber}
+                            className="block w-16 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 text-center font-bold text-lg"
+                            readOnly
+                            placeholder="61"
+                          />
+                        </div>
+                      </div>
                     </div>
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Invoice Date</label>
@@ -1755,76 +1801,77 @@ const EditSale = () => {
       
       {/* Success Modal */}
       {showSuccessModal && (
-        <div className="fixed inset-0 overflow-y-auto z-50">
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-              <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
-            </div>
+        <div className="fixed inset-0 bg-gray-600 dark:bg-gray-900 bg-opacity-50 dark:bg-opacity-70 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-6 border border-gray-200 dark:border-gray-700 w-full max-w-lg shadow-lg rounded-lg bg-white dark:bg-gray-800">
+            {/* Close Button */}
+            <button
+              onClick={() => {
+                setShowSuccessModal(false);
+                navigate('/sales');
+              }}
+              className="absolute top-4 right-4 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
 
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-
-            <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
-                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/30 sm:mx-0 sm:h-10 sm:w-10">
-                    <svg className="h-6 w-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
-                      Invoice Updated Successfully
-                    </h3>
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Your invoice has been successfully updated and saved.
-                      </p>
-                    </div>
-                  </div>
-                </div>
+            <div className="text-center">
+              {/* Success Icon */}
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
+                <svg className="h-6 w-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                </svg>
               </div>
-              <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={handlePrintBill}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-blue-500 sm:w-auto sm:text-sm"
-                  disabled={loading}
-                >
-                  <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                  </svg>
-                  Print Bill
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={handlePrintAddress}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-purple-500 sm:w-auto sm:text-sm"
-                >
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  Print Address
-                </button>
 
-                <button
-                  type="button"
-                  onClick={handleSendWhatsApp}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-teal-600 text-base font-medium text-white hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-teal-500 sm:mt-0 sm:w-auto sm:text-sm"
-                  disabled={loading}
-                >
-                  <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                  </svg>
-                  Send via WhatsApp
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate('/sales')}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-sky-500 sm:mt-0 sm:w-auto sm:text-sm"
-                >
-                  Close
-                </button>
+              {/* Title */}
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                Sale Updated Successfully!
+              </h3>
+              
+              {/* Message */}
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                Invoice #{invoiceNumber} has been updated and saved.
+              </p>
+
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => {
+                      setShowSuccessModal(false);
+                      navigate('/sales');
+                    }}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-sm font-medium"
+                  >
+                    Sales List
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSuccessModal(false);
+                      navigate(`/sales/${savedSaleId}`);
+                    }}
+                    className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors text-sm font-medium"
+                  >
+                    View Details
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={handlePrintBill}
+                    className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors text-sm font-medium"
+                  >
+                    Print Bill
+                  </button>
+                  <button
+                    onClick={handleSendWhatsApp}
+                    disabled={!selectedCustomer || !selectedCustomer.phone}
+                    className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    WhatsApp
+                  </button>
+                </div>
               </div>
             </div>
           </div>

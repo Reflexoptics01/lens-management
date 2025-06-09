@@ -1387,7 +1387,7 @@ const LensDetail = () => {
                 Individual Power Inventory
                 {lens.type === 'stock' && lens.lensType === 'bifocal' && (
                   <span className="ml-2 text-sm font-normal text-blue-600 dark:text-blue-400">
-                    (Bifocal/Progressive - Axis: {lens.axis || 90}°)
+                    (Bifocal/Progressive - Axis: {lens.axis || 0}°)
                   </span>
                 )}
                 {lens.type === 'contact' && (
@@ -1597,7 +1597,7 @@ const LensDetail = () => {
                 <div className="bg-indigo-50 dark:bg-indigo-900/30 p-4 rounded-lg border border-indigo-200 dark:border-indigo-700">
                   <h3 className="text-sm font-semibold text-indigo-700 dark:text-indigo-300 uppercase mb-2">Axis</h3>
                   <div className="text-xl font-bold text-indigo-700 dark:text-indigo-300">
-                    {lens.axis || 90}°
+                    {lens.axis || 0}°
                   </div>
                   <p className="text-sm text-indigo-600 dark:text-indigo-400 mt-1">Standard axis orientation</p>
                 </div>
@@ -1648,7 +1648,7 @@ const LensDetail = () => {
                 if (parts.length >= 3) {
                   // Bifocal format: "sph_cyl_addition"
                   const [sph, cyl, addition] = parts.map(p => parseFloat(p));
-                  const axisValue = powerData?.axis || lens.axis || 90;
+                  const axisValue = powerData?.axis || lens.axis || 0;
                   powerInfo = {
                     sph,
                     cyl,
@@ -1662,7 +1662,7 @@ const LensDetail = () => {
                 } else {
                   // Single vision format: "sph_cyl"
                   const [sph, cyl] = parts.map(p => parseFloat(p));
-                  const axisValue = powerData?.axis || lens.axis || 90;
+                  const axisValue = powerData?.axis || lens.axis || 0;
                   powerInfo = {
                     sph,
                     cyl,

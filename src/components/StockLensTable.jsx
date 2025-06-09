@@ -136,7 +136,7 @@ const StockLensTable = ({
                 </td>
                 <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">
                   {lens.inventoryType === 'individual' && lens.totalQuantity 
-                    ? `${lens.totalQuantity} pieces${lens.lensType === 'bifocal' ? ` (Axis: ${lens.axis || 90}°)` : ''}` 
+                    ? `${lens.totalQuantity} pieces${lens.lensType === 'bifocal' ? ` (Axis: ${lens.axis || 0}°)` : ''}` 
                     : `${parseFloat(lens.qty) || 1} pairs`}
                 </td>
                 <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm font-medium text-left">
@@ -177,7 +177,7 @@ const StockLensTable = ({
             purchasePrice: selectedLens.purchasePrice,
             salePrice: selectedLens.salePrice,
             type: selectedLens.lensType || 'single',
-            axis: selectedLens.axis || 90
+            axis: selectedLens.axis || 0
           }}
           isEdit={true}
           existingInventory={selectedLens.powerInventory || null}

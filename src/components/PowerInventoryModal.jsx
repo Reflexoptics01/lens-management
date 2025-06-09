@@ -10,14 +10,14 @@ const PowerInventoryModal = ({
 }) => {
   const [inventoryType, setInventoryType] = useState('range');
   const [lensType, setLensType] = useState('single'); // 'single' or 'bifocal'
-  const [axis, setAxis] = useState(90);
+  const [axis, setAxis] = useState(0);
   const [powerLimits, setPowerLimits] = useState({
     minSph: -10,
     maxSph: 10,
     minCyl: -6,
     maxCyl: 0,
-    axis: 90,
-    addition: 3
+    axis: 0,
+    maxAddition: 3
   });
   const [loading, setLoading] = useState(false);
   
@@ -42,9 +42,19 @@ const PowerInventoryModal = ({
         maxSph: lensData.sphMax,
         minCyl: lensData.cylMin,
         maxCyl: lensData.cylMax,
-        axis: 90,
-        addition: 3
+        axis: lensData.axis || 0,
+        maxAddition: lensData.maxAdd || 3
       });
+      
+      // Set axis if provided
+      if (lensData.axis !== undefined) {
+        setAxis(lensData.axis || 0);
+      }
+      
+      // Set lens type based on whether maxAdd is provided
+      if (lensData.maxAdd && lensData.maxAdd > 0) {
+        setLensType('bifocal');
+      }
     }
   }, [lensData]);
 
@@ -82,10 +92,11 @@ const PowerInventoryModal = ({
     return powers;
   };
 
-  // Generate addition powers from +1.00 to +3.00
+  // Generate addition powers from +1.00 to maxAddition
   const generateAdditionArray = () => {
     const additions = [];
-    for (let i = 1; i <= 3; i += 0.25) {
+    const maxAdd = powerLimits.maxAddition || 3;
+    for (let i = 1; i <= maxAdd; i += 0.25) {
       additions.push(parseFloat(i.toFixed(2)));
     }
     return additions;
@@ -882,14 +893,14 @@ const PowerInventoryModal = ({
                     <input
                       type="number"
                       value={axis}
-                      onChange={(e) => setAxis(parseInt(e.target.value) || 90)}
-                      min="1"
+                      onChange={(e) => setAxis(parseInt(e.target.value) || 0)}
+                      min="0"
                       max="180"
                       className="w-32 px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                      placeholder="90"
+                      placeholder="0"
                     />
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Typically 90° for most bifocal/progressive lenses
+                      Enter axis in degrees (0° to 180°, default is 0°)
                     </p>
                   </div>
                 )}

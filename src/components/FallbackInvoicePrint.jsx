@@ -14,7 +14,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        console.log('Starting to fetch data for invoice:', saleId);
+        // Fetching invoice data
         setLoading(true);
         
         // Fetch sale data from user-specific collection
@@ -34,12 +34,12 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
         if (settingsDoc.exists()) {
           const settings = settingsDoc.data();
           settingsData = settings;
-          console.log('Shop settings loaded successfully');
+          // Shop settings loaded
           setShopSettings(settings);
           
           // Check if bank details are stored within the shopSettings document
           if (settings.bankDetails) {
-            console.log('Using bank details from shopSettings.bankDetails');
+            // Using bank details from shop settings
             bankDetailsData = settings.bankDetails;
           } else {
             // Try to extract bank details directly from settings
@@ -69,15 +69,15 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
         // If bank details are not complete, try dedicated bankDetails document from user-specific collection
         if (!bankDetailsData || Object.keys(bankDetailsData).filter(k => bankDetailsData[k]).length < 3) {
           try {
-            console.log('Trying to fetch from dedicated bankDetails document');
+                          // Fetching bank details from dedicated document
             const bankDoc = await getDoc(getUserDoc('settings', 'bankDetails'));
             
             if (bankDoc.exists()) {
               const bankData = bankDoc.data();
-              console.log('Found dedicated bank details document');
+                              // Found dedicated bank details document
               bankDetailsData = bankData;
             } else {
-              console.log('No dedicated bank details document found, searching in other settings');
+                              // Searching in other settings documents
               
               // Try to find bank details in any settings document from user-specific collection
               const settingsCollection = await getDocs(getUserCollection('settings'));
@@ -183,7 +183,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
         <!DOCTYPE html>
         <html>
           <head>
-            <title>Invoice #${saleData?.invoiceNumber || 'Print'}</title>
+            <title>Invoice #${getInvoiceSuffix(saleData?.invoiceNumber) || 'Print'}</title>
             <meta charset="UTF-8">
             <style>
               body {
@@ -346,21 +346,65 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
     const addressParts = [];
     
     // Add the main address if available
-    if (saleData.customerAddress) {
-      addressParts.push(saleData.customerAddress);
+    if (saleData.customerAddress || saleData.selectedCustomer?.address) {
+      addressParts.push(saleData.customerAddress || saleData.selectedCustomer?.address);
     }
     
     // Add the location line (city, state, pincode)
     const locationParts = [];
-    if (saleData.customerCity) locationParts.push(saleData.customerCity);
-    if (saleData.customerState) locationParts.push(saleData.customerState);
-    if (saleData.customerPincode) locationParts.push(saleData.customerPincode);
+    if (saleData.customerCity || saleData.selectedCustomer?.city) {
+      locationParts.push(saleData.customerCity || saleData.selectedCustomer?.city);
+    }
+    if (saleData.customerState || saleData.selectedCustomer?.state) {
+      locationParts.push(saleData.customerState || saleData.selectedCustomer?.state);
+    }
+    if (saleData.customerPincode || saleData.selectedCustomer?.pincode || saleData.selectedCustomer?.pinCode) {
+      locationParts.push(saleData.customerPincode || saleData.selectedCustomer?.pincode || saleData.selectedCustomer?.pinCode);
+    }
     
     if (locationParts.length > 0) {
       addressParts.push(locationParts.join(', '));
     }
     
     return addressParts;
+  };
+
+  // Get customer phone number from various possible sources
+  const getCustomerPhone = () => {
+    return saleData.customerPhone || 
+           saleData.selectedCustomer?.phone || 
+           saleData.selectedCustomer?.phoneNumber || 
+           saleData.selectedCustomer?.mobile || 
+           null;
+  };
+
+  // Get customer GST number from various possible sources
+  const getCustomerGST = () => {
+    return saleData.customerGst || 
+           saleData.customerGstNumber || 
+           saleData.selectedCustomer?.gstNumber || 
+           saleData.selectedCustomer?.gst || 
+           null;
+  };
+
+  // Extract only the suffix (number part) from invoice number
+  const getInvoiceSuffix = (invoiceNumber) => {
+    if (!invoiceNumber) return '';
+    
+    // Try to match pattern like "2024-2025/61" and extract "61"
+    const match = invoiceNumber.match(/^(\d{4}-\d{4})\/(\d+)$/);
+    if (match) {
+      return match[2]; // Return just the number part
+    }
+    
+    // If no match, try to extract any trailing numbers
+    const fallbackMatch = invoiceNumber.match(/(\d+)$/);
+    if (fallbackMatch) {
+      return fallbackMatch[1];
+    }
+    
+    // If still no match, return the original
+    return invoiceNumber;
   };
 
   if (loading) {
@@ -469,7 +513,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
       
       <div className="no-print mb-4 p-4" style={{ backgroundColor: '#f3f4f6', color: '#374151' }}>
         <div className="flex justify-between items-center">
-          <h2 className="text-xl font-bold" style={{ color: '#111827' }}>Invoice #{saleData.invoiceNumber}</h2>
+          <h2 className="text-xl font-bold" style={{ color: '#111827' }}>Invoice #{getInvoiceSuffix(saleData.invoiceNumber)}</h2>
           <div className="flex space-x-2">
             <button 
               onClick={handlePrint} 
@@ -554,7 +598,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
             
             <div>
               <h2 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '5px' }}>INVOICE</h2>
-              <p style={{ fontSize: '11px', marginBottom: '2px' }}>#{saleData.invoiceNumber}</p>
+              <p style={{ fontSize: '11px', marginBottom: '2px' }}>#{getInvoiceSuffix(saleData.invoiceNumber)}</p>
               <p style={{ fontSize: '11px', marginBottom: '2px' }}>Date: {formatDate(saleData.invoiceDate)}</p>
             </div>
           </div>
@@ -565,7 +609,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
             <div style={{ maxWidth: '60%' }}>
               <h3 style={{ fontWeight: 'bold', fontSize: '12px', marginBottom: '3px' }}>Bill To:</h3>
-              <p style={{ fontWeight: 'bold', fontSize: '11px', marginBottom: '2px' }}>{saleData.customerName}</p>
+              <p style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '2px' }}>{saleData.customerName || saleData.selectedCustomer?.opticalName}</p>
               
               {/* Format and display customer address components */}
               {formatCustomerAddress().map((addressLine, index) => (
@@ -573,16 +617,16 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
               ))}
               
               {/* Customer phone number */}
-              {saleData.customerPhone && (
+              {getCustomerPhone() && (
                 <p style={{ fontSize: '11px', marginBottom: '2px' }}>
-                  Phone: {saleData.customerPhone}
+                  Phone: {getCustomerPhone()}
                 </p>
               )}
               
               {/* Customer GST number */}
-              {saleData.customerGst && (
+              {getCustomerGST() && (
                 <p style={{ fontSize: '11px', marginBottom: '2px', fontWeight: 'bold' }}>
-                  GSTIN: {saleData.customerGst}
+                  GSTIN: {getCustomerGST()}
                 </p>
               )}
             </div>
