@@ -121,6 +121,9 @@ const CreateSale = () => {
   const [selectedStockPowers, setSelectedStockPowers] = useState({}); // Track selected powers by row index
   const [selectedLensForPowerModal, setSelectedLensForPowerModal] = useState(null); // Store the lens object for the modal
 
+  // Power range validation state
+  const [powerRangeWarnings, setPowerRangeWarnings] = useState({}); // Track warnings for each row
+
   // Format optical values (SPH, CYL, ADD) to "0.00" format with signs
   const formatOpticalValue = (value) => {
     if (!value || value === '') return '';
@@ -138,6 +141,69 @@ const CreateSale = () => {
     }
     
     return formattedValue;
+  };
+
+  // Validate power range for SPH/CYL values
+  const validatePowerRange = (rowIndex, field, value) => {
+    const row = tableRows[rowIndex];
+    if (!row || !row.stockLensData || !value || value === '') {
+      // Clear any existing warning for this field
+      setPowerRangeWarnings(prev => {
+        const newWarnings = { ...prev };
+        if (newWarnings[rowIndex]) {
+          delete newWarnings[rowIndex][field];
+          if (Object.keys(newWarnings[rowIndex]).length === 0) {
+            delete newWarnings[rowIndex];
+          }
+        }
+        return newWarnings;
+      });
+      return;
+    }
+
+    const stockData = row.stockLensData.stockData || row.stockLensData;
+    const numValue = parseFloat(value);
+    
+    if (isNaN(numValue)) return;
+
+    let isOutOfRange = false;
+    let rangeText = '';
+
+    if (field === 'sph' && stockData.maxSph) {
+      const maxSph = parseFloat(stockData.maxSph);
+      // Assuming range is from negative maxSph to positive maxSph
+      const minSph = -Math.abs(maxSph);
+      isOutOfRange = numValue < minSph || numValue > maxSph;
+      rangeText = `SPH range: ${minSph.toFixed(2)} to +${maxSph.toFixed(2)}`;
+    } else if (field === 'cyl' && stockData.maxCyl) {
+      const maxCyl = parseFloat(stockData.maxCyl);
+      // CYL is usually from 0 to negative maxCyl
+      const minCyl = -Math.abs(maxCyl);
+      isOutOfRange = numValue < minCyl || numValue > 0;
+      rangeText = `CYL range: ${minCyl.toFixed(2)} to 0.00`;
+    }
+
+    if (isOutOfRange) {
+      setPowerRangeWarnings(prev => ({
+        ...prev,
+        [rowIndex]: {
+          ...prev[rowIndex],
+          [field]: `⚠️ Out of range! ${rangeText}`
+        }
+      }));
+    } else {
+      // Clear warning if value is in range
+      setPowerRangeWarnings(prev => {
+        const newWarnings = { ...prev };
+        if (newWarnings[rowIndex]) {
+          delete newWarnings[rowIndex][field];
+          if (Object.keys(newWarnings[rowIndex]).length === 0) {
+            delete newWarnings[rowIndex];
+          }
+        }
+        return newWarnings;
+      });
+    }
   };
 
   // Handlers for tax calculations
@@ -531,12 +597,18 @@ const CreateSale = () => {
   
   // Format SPH, CYL, and ADD when the field loses focus
   const handleOpticalValueBlur = (index, field, value) => {
+    const formattedValue = formatOpticalValue(value);
     const updatedRows = [...tableRows];
     updatedRows[index] = {
       ...updatedRows[index],
-      [field]: formatOpticalValue(value)
+      [field]: formattedValue
     };
     setTableRows(updatedRows);
+    
+    // Validate power range for SPH and CYL
+    if (field === 'sph' || field === 'cyl') {
+      validatePowerRange(index, field, formattedValue);
+    }
   };
 
   // Function to register payment transaction in ledger
@@ -1045,6 +1117,7 @@ const CreateSale = () => {
       total: 0
     })));
     setSelectedStockPowers({});
+    setPowerRangeWarnings({});
     setError('');
     previewNextInvoiceNumber();
   };
@@ -1296,6 +1369,21 @@ const CreateSale = () => {
       updatedRows[index].cyl = '';
       updatedRows[index].axis = '';
       updatedRows[index].add = '';
+      
+      // Clear any existing power range warnings for this row
+      setPowerRangeWarnings(prev => {
+        const newWarnings = { ...prev };
+        delete newWarnings[index];
+        return newWarnings;
+      });
+    } else {
+      // For non-stock lenses, clear stockLensData and warnings
+      delete updatedRows[index].stockLensData;
+      setPowerRangeWarnings(prev => {
+        const newWarnings = { ...prev };
+        delete newWarnings[index];
+        return newWarnings;
+      });
     }
     
     // Update the table with all changes at once
@@ -2181,25 +2269,43 @@ const CreateSale = () => {
                     </div>
                   </td>
                   
-                  <td className="px-3 py-2 whitespace-nowrap">
+                  <td className="px-3 py-2">
                     <input
                       type="text"
                       value={row.sph}
                       onChange={(e) => handleTableRowChange(index, 'sph', e.target.value)}
                       onBlur={(e) => handleOpticalValueBlur(index, 'sph', e.target.value)}
-                      className="block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className={`block w-full rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                        powerRangeWarnings[index]?.sph 
+                          ? 'border-red-300 dark:border-red-600' 
+                          : 'border-gray-300 dark:border-gray-600'
+                      }`}
                       placeholder="SPH"
                     />
+                    {powerRangeWarnings[index]?.sph && (
+                      <div className="text-xs text-red-600 dark:text-red-400 mt-1 whitespace-nowrap">
+                        {powerRangeWarnings[index].sph}
+                      </div>
+                    )}
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
+                  <td className="px-3 py-2">
                     <input
                       type="text"
                       value={row.cyl}
                       onChange={(e) => handleTableRowChange(index, 'cyl', e.target.value)}
                       onBlur={(e) => handleOpticalValueBlur(index, 'cyl', e.target.value)}
-                      className="block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className={`block w-full rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                        powerRangeWarnings[index]?.cyl 
+                          ? 'border-red-300 dark:border-red-600' 
+                          : 'border-gray-300 dark:border-gray-600'
+                      }`}
                       placeholder="CYL"
                     />
+                    {powerRangeWarnings[index]?.cyl && (
+                      <div className="text-xs text-red-600 dark:text-red-400 mt-1 whitespace-nowrap">
+                        {powerRangeWarnings[index].cyl}
+                      </div>
+                    )}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     <input
@@ -2225,12 +2331,6 @@ const CreateSale = () => {
                       type="text"
                       value={row.qty}
                       onChange={(e) => handleTableRowChange(index, 'qty', e.target.value)}
-                      onFocus={(e) => {
-                        // Clear default value of 1 when focused
-                        if (e.target.value === '1') {
-                          handleTableRowChange(index, 'qty', '');
-                        }
-                      }}
                       className="block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-center bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       placeholder="QTY"
                       style={{
