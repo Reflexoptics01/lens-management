@@ -262,7 +262,14 @@ const ItemSuggestions = ({
           return itemName.toLowerCase() === trimmedSearchTerm.toLowerCase();
         });
 
-        if (!itemExists) {
+        // Check if there are any partial matches (suggestions)
+        const hasSuggestions = items.some(item => {
+          const itemName = item.name || item.itemName || '';
+          return itemName.toLowerCase().includes(trimmedSearchTerm.toLowerCase());
+        });
+
+        // Show create modal if item doesn't exist exactly and no suggestions are available
+        if (!itemExists && !hasSuggestions) {
           e.preventDefault();
           setNewProductName(trimmedSearchTerm);
           setNewProductPrice(currentPrice || 0);
@@ -304,10 +311,15 @@ const ItemSuggestions = ({
   // Move focus to the next input
   const moveToNextInput = () => {
     setTimeout(() => {
-      const inputs = Array.from(document.querySelectorAll('input:not([type=hidden])'));
+      const inputs = Array.from(document.querySelectorAll('input:not([type=hidden]):not([disabled])'));
       const currentIndex = inputs.indexOf(inputRef.current);
       if (currentIndex >= 0 && currentIndex < inputs.length - 1) {
-        inputs[currentIndex + 1].focus();
+        const nextInput = inputs[currentIndex + 1];
+        if (nextInput) {
+          nextInput.focus();
+          // Ensure suggestions are hidden when moving to next input
+          setShowSuggestions(false);
+        }
       }
     }, 50);
   };
@@ -320,6 +332,7 @@ const ItemSuggestions = ({
     setSearchTerm(item.name);
     setShowSuggestions(false);
     setSelectedIndex(-1);
+    hadFocusRef.current = false; // Reset focus flag to prevent suggestions from showing again
     
     // Immediately update the parent with the full item name
     if (onChange) {
@@ -410,20 +423,23 @@ const ItemSuggestions = ({
       return itemName.toLowerCase().includes(trimmedSearchTerm.toLowerCase());
     });
 
-    // Only show create modal if:
-    // 1. User typed something
-    // 2. Item doesn't exist exactly
-    // 3. No item was just selected
-    // 4. Not clicking on suggestions
-    // 5. No suggestions are available for the search term
-    if (trimmedSearchTerm && !itemExists && !lastSelectedItemRef.current && 
-        (!e.relatedTarget || !suggestionsRef.current?.contains(e.relatedTarget)) &&
-        !hasSuggestions) {
+    // Check if this is just normal navigation to an existing filled field
+    const isTabNavigation = e.relatedTarget && 
+      (e.relatedTarget.tagName === 'INPUT' || e.relatedTarget.tagName === 'SELECT' || e.relatedTarget.tagName === 'BUTTON');
+    
+    // If it's a new product name (doesn't exist and no suggestions), show create modal even during tab navigation
+    const isNewProductName = trimmedSearchTerm && !itemExists && !hasSuggestions && !lastSelectedItemRef.current;
+    
+    // Show create modal if:
+    // 1. User typed something new that doesn't exist
+    // 2. Not clicking on suggestions
+    // 3. Either not tab navigation OR it's a new product name (allow create modal during tab for new products)
+    if (isNewProductName && (!e.relatedTarget || !suggestionsRef.current?.contains(e.relatedTarget))) {
       setTimeout(() => {
         setNewProductName(trimmedSearchTerm);
         setNewProductPrice(currentPrice || 0);
         setShowCreateModal(true);
-      }, 100); // Small delay to allow selection to complete
+      }, 100);
       return;
     }
 
@@ -438,23 +454,27 @@ const ItemSuggestions = ({
       }
     }
     
-    // Hide suggestions after a delay to allow click events to register
+    // Hide suggestions immediately and reset focus state
+    setShowSuggestions(false);
+    hadFocusRef.current = false;
+    
+    // Reset lastSelectedItemRef after a shorter delay to prevent interference with tab navigation
     setTimeout(() => {
-      setShowSuggestions(false);
-      hadFocusRef.current = false; // Reset focus state on blur
-      // Reset lastSelectedItemRef after some time
-      setTimeout(() => {
-        lastSelectedItemRef.current = null;
-      }, 500);
-    }, 200);
+      lastSelectedItemRef.current = null;
+    }, 100);
   };
 
   const handleFocus = () => {
     hadFocusRef.current = true;
     
-    // Only show suggestions if the search term doesn't match what was just selected
+    // Only show suggestions if:
+    // 1. There's a search term
+    // 2. There are filtered items available
+    // 3. The search term doesn't match what was just selected
+    // 4. The user actually typed something (not just focused on an empty/pre-filled field)
     if (searchTerm.trim() && filteredItems.length > 0 && 
-        (!lastSelectedItemRef.current || lastSelectedItemRef.current !== searchTerm)) {
+        (!lastSelectedItemRef.current || lastSelectedItemRef.current !== searchTerm) &&
+        searchTerm.length > 1) { // Reduced from 3 to 2 characters to be less restrictive
       setShowSuggestions(true);
     }
   };
@@ -538,10 +558,12 @@ const ItemSuggestions = ({
           ...productData,
           serviceName: newProductName,
           serviceType: 'General Service',
-          serviceDescription: '',
+          serviceDescription: `Service created from sales invoice`, // Give it a meaningful description
+          category: 'General', // Add category field that ServiceTable expects
           servicePrice: newProductPrice,
           salePrice: newProductPrice,
           price: newProductPrice,
+          purchasePrice: newProductPrice, // Add purchase price field that ServiceTable expects
           isActive: true
         };
       }
@@ -587,6 +609,14 @@ const ItemSuggestions = ({
       if (onRefreshItems) {
         await onRefreshItems();
       }
+      
+      // Trigger inventory update event to refresh LensInventory page if it's open
+      window.dispatchEvent(new CustomEvent('lensInventoryUpdated', {
+        detail: { 
+          type: selectedProductType, 
+          product: productData 
+        }
+      }));
       
       // Show success message
       alert(`Successfully created new ${selectedProductType} product: "${newProductName}"`);
@@ -702,6 +732,7 @@ const ItemSuggestions = ({
                     {(item.isService || item.type === 'service') && (
                       <span className="text-xs text-teal-600 dark:text-teal-400 truncate">
                         Service - {item.serviceType || item.serviceData?.serviceType || 'General Service'}
+                        {item.serviceDescription && ` • ${item.serviceDescription}`}
                       </span>
                     )}
                     

@@ -124,6 +124,8 @@ const CreateSale = () => {
   // Power range validation state
   const [powerRangeWarnings, setPowerRangeWarnings] = useState({}); // Track warnings for each row
 
+
+
   // Format optical values (SPH, CYL, ADD) to "0.00" format with signs
   const formatOpticalValue = (value) => {
     if (!value || value === '') return '';
@@ -146,7 +148,6 @@ const CreateSale = () => {
   // Validate power range for SPH/CYL values
   const validatePowerRange = (rowIndex, field, value) => {
     const row = tableRows[rowIndex];
-    console.log('validatePowerRange called:', { rowIndex, field, value, row });
     
     if (!row || !value || value === '') {
       // Clear any existing warning for this field
@@ -172,11 +173,8 @@ const CreateSale = () => {
       stockData = row;
     }
     
-    console.log('Stock data found:', stockData);
-    
     // If we still don't have power range data, exit
     if (!stockData || (!stockData.maxSph && !stockData.maxCyl)) {
-      console.log('No power range data available');
       return;
     }
     
@@ -189,31 +187,43 @@ const CreateSale = () => {
 
     if (field === 'sph' && stockData.maxSph) {
       const maxSph = parseFloat(stockData.maxSph);
-      // Assuming range is from negative maxSph to positive maxSph
-      const minSph = -Math.abs(maxSph);
-      isOutOfRange = numValue < minSph || numValue > maxSph;
-      rangeText = `SPH range: ${minSph.toFixed(2)} to +${maxSph.toFixed(2)}`;
-      console.log('SPH validation:', { numValue, minSph, maxSph, isOutOfRange, rangeText });
+      // For SPH: if maxSph is positive, range is 0 to +maxSph; if negative, range is maxSph to 0
+      let minSph, maxSphRange;
+      if (maxSph >= 0) {
+        minSph = 0;
+        maxSphRange = maxSph;
+        rangeText = `0 to +${maxSph.toFixed(2)}`;
+      } else {
+        minSph = maxSph;
+        maxSphRange = 0;
+        rangeText = `${maxSph.toFixed(2)} to 0`;
+      }
+      isOutOfRange = numValue < minSph || numValue > maxSphRange;
     } else if (field === 'cyl' && stockData.maxCyl) {
       const maxCyl = parseFloat(stockData.maxCyl);
-      // CYL is usually from 0 to negative maxCyl
-      const minCyl = -Math.abs(maxCyl);
-      isOutOfRange = numValue < minCyl || numValue > 0;
-      rangeText = `CYL range: ${minCyl.toFixed(2)} to 0.00`;
-      console.log('CYL validation:', { numValue, minCyl, maxCyl, isOutOfRange, rangeText });
+      // For CYL: if maxCyl is positive, range is 0 to +maxCyl; if negative, range is maxCyl to 0
+      let minCyl, maxCylRange;
+      if (maxCyl >= 0) {
+        minCyl = 0;
+        maxCylRange = maxCyl;
+        rangeText = `0 to +${maxCyl.toFixed(2)}`;
+      } else {
+        minCyl = maxCyl;
+        maxCylRange = 0;
+        rangeText = `${maxCyl.toFixed(2)} to 0`;
+      }
+      isOutOfRange = numValue < minCyl || numValue > maxCylRange;
     }
 
     if (isOutOfRange) {
-      console.log('Setting warning for out of range value');
       setPowerRangeWarnings(prev => ({
         ...prev,
         [rowIndex]: {
           ...prev[rowIndex],
-          [field]: `⚠️ Out of range! ${rangeText}`
+          [field]: `⚠️ ${rangeText}` // Remove "Out of range!" to make it shorter
         }
       }));
     } else {
-      console.log('Value is in range, clearing warning');
       // Clear warning if value is in range
       setPowerRangeWarnings(prev => {
         const newWarnings = { ...prev };
@@ -265,6 +275,50 @@ const CreateSale = () => {
     return subtotal - discountAmount + taxAmount + freight;
   };
 
+  // Calculate total quantities with service separation
+  const calculateTotalQuantities = () => {
+    const filledRows = tableRows.filter(row => row.total > 0);
+    
+    let totalPairs = 0;
+    let totalServices = 0;
+    let totalOthers = 0;
+    
+    filledRows.forEach(row => {
+      const qty = parseInt(row.qty) || 0;
+      const unit = (row.unit || '').toLowerCase();
+      
+      if (unit === 'service') {
+        totalServices += qty;
+      } else if (unit === 'pairs') {
+        totalPairs += qty;
+      } else {
+        totalOthers += qty;
+      }
+    });
+    
+    return { totalPairs, totalServices, totalOthers };
+  };
+
+  // Format quantity display
+  const formatQuantityDisplay = () => {
+    const { totalPairs, totalServices, totalOthers } = calculateTotalQuantities();
+    const parts = [];
+    
+    if (totalPairs > 0) {
+      parts.push(`${totalPairs} PR`);
+    }
+    
+    if (totalServices > 0) {
+      parts.push(`${totalServices} SV`);
+    }
+    
+    if (totalOthers > 0) {
+      parts.push(`${totalOthers} PC`);
+    }
+    
+    return parts.length > 0 ? parts.join(' & ') : '0';
+  };
+
   useEffect(() => {
     fetchCustomers();
     previewNextInvoiceNumber();
@@ -278,6 +332,17 @@ const CreateSale = () => {
       fetchDispatchLogs(selectedLogDate);
     }
   }, [selectedLogDate]);
+
+  // Auto-update amount paid for cash customers
+  useEffect(() => {
+    if (selectedCustomer && 
+        selectedCustomer.opticalName && 
+        selectedCustomer.opticalName.toUpperCase().includes('CASH CUSTOMER') &&
+        paymentStatus === 'PAID') {
+      const total = calculateTotal();
+      setAmountPaid(total);
+    }
+  }, [selectedCustomer, paymentStatus, tableRows, discountValue, discountType, selectedTaxOption, frieghtCharge]);
   
   // Fetch shop information for the address
   const fetchShopInfo = async () => {
@@ -420,10 +485,63 @@ const CreateSale = () => {
   };
 
   const handleAddNewCustomer = () => {
-    // Show the customer form modal instead of opening a new window
     setShowCustomerForm(true);
   };
-  
+
+  // Handle cash sale - auto-select cash customer
+  const handleCashSale = async () => {
+    try {
+      setLoading(true);
+      
+      // Look for existing cash customer
+      let cashCustomer = customers.find(customer => 
+        customer.opticalName && customer.opticalName.toUpperCase().includes('CASH CUSTOMER')
+      );
+      
+      // If no cash customer exists, create one
+      if (!cashCustomer) {
+        const cashCustomerData = {
+          opticalName: 'CASH CUSTOMER',
+          contactPerson: 'Walk-in Customer',
+          phone: '',
+          address: '',
+          city: shopInfo?.city || '',
+          state: shopInfo?.state || '',
+          pincode: '',
+          gstNumber: '',
+          openingBalance: 0,
+          createdAt: serverTimestamp(),
+          isVendor: false,
+          type: 'customer'
+        };
+        
+        const docRef = await addDoc(getUserCollection('customers'), cashCustomerData);
+        
+        // Create the cash customer object with ID
+        cashCustomer = {
+          id: docRef.id,
+          ...cashCustomerData
+        };
+        
+        // Add to customers list
+        setCustomers(prev => [...prev, cashCustomer]);
+      }
+      
+      // Select the cash customer
+      await handleCustomerSelect(cashCustomer);
+      
+      // Set payment status to PAID (since it's cash)
+      setPaymentStatus('PAID');
+      setAmountPaid(0); // Will be updated when total is calculated
+      
+    } catch (error) {
+      console.error('Error setting up cash sale:', error);
+      setError('Failed to set up cash sale: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCustomerFormClose = (customerWasAdded) => {
     setShowCustomerForm(false);
     if (customerWasAdded) {
@@ -803,7 +921,7 @@ const CreateSale = () => {
               // Skip orders with invalid statuses
               const invalidStatuses = ['PENDING', 'PLACED', 'CANCELLED', 'DECLINED'];
               if (invalidStatuses.includes(orderData.status)) {
-                console.log(`Skipping order ${paddedDisplayId} due to status: ${orderData.status}`);
+  
                 continue;
               }
               
@@ -812,12 +930,12 @@ const CreateSale = () => {
                 status: 'DELIVERED',
                 updatedAt: serverTimestamp()
               });
-              console.log(`Updated order ${paddedDisplayId} status to DELIVERED`);
+
               
               // Deduct lenses from inventory
               await deductLensesFromInventory(orderData);
               
-              console.log(`Processed order ${paddedDisplayId} for inventory`);
+
               continue; // Skip to next order since we found this one with padding
             }
           }
@@ -825,12 +943,12 @@ const CreateSale = () => {
           const orderDoc = snapshot.docs[0];
           const orderData = { id: orderDoc.id, ...orderDoc.data() };
           
-          console.log(`Order details: ID=${orderData.id}, Status=${orderData.status}, DisplayID=${orderData.displayId}`);
+
           
           // Skip orders with invalid statuses
           const invalidStatuses = ['PENDING', 'PLACED', 'CANCELLED', 'DECLINED'];
           if (invalidStatuses.includes(orderData.status)) {
-            console.log(`Skipping order ${displayId} due to status: ${orderData.status}`);
+
             continue;
           }
           
@@ -839,12 +957,12 @@ const CreateSale = () => {
             status: 'DELIVERED',
             updatedAt: serverTimestamp()
           });
-          console.log(`Updated order ${displayId} status to DELIVERED`);
+
           
           // Deduct lenses from inventory
           await deductLensesFromInventory(orderData);
           
-          console.log(`Processed order ${displayId} for inventory`);
+
         } catch (error) {
           console.error(`Error processing order ID ${displayId}:`, error);
         }
@@ -925,10 +1043,24 @@ const CreateSale = () => {
             continue;
           }
           
-                      // Skip stock lenses with power selection as they're already handled above
-            if (item.lensType === 'stockLens' && item.lensId && item.powerKey) {
-              continue;
-            }
+          // Skip stock lenses with power selection as they're already handled above
+          if (item.lensType === 'stockLens' && item.lensId && item.powerKey) {
+            continue;
+          }
+          
+          // Skip services - they shouldn't be deducted from inventory
+          // Check multiple ways services can be identified
+          const isServiceItem = item.isService || 
+                              item.type === 'service' || 
+                              item.unit === 'Service' || 
+                              item.unit === 'service' ||
+                              (item.itemName && item.itemName.toLowerCase().includes('service')) ||
+                              (item.serviceData && Object.keys(item.serviceData).length > 0);
+          
+          if (isServiceItem) {
+
+            continue;
+          }
           
           // Validate item has necessary data
           if (!item.itemName || item.itemName.trim() === '') {
@@ -1277,7 +1409,7 @@ const CreateSale = () => {
       });
       
       setItemSuggestions(itemsList);
-      console.log(`Fetched ${itemsList.length} lens items (all variants included)`);
+
     } catch (error) {
       console.error('Error fetching items:', error);
     }
@@ -1371,9 +1503,11 @@ const CreateSale = () => {
       updatedRows[index].total = itemPrice * parseInt(updatedRows[index].qty || 1);
     }
     
-    // Set appropriate unit for services
-    if (itemData.isService) {
+    // Set appropriate unit for services and store service flag
+    if (itemData.isService || itemData.type === 'service') {
       updatedRows[index].unit = 'Service';
+      updatedRows[index].isService = true; // Explicitly set the service flag
+      updatedRows[index].type = 'service'; // Also set the type for consistency
       // Clear optical values for services as they don't apply
       updatedRows[index].sph = '';
       updatedRows[index].cyl = '';
@@ -2071,6 +2205,7 @@ const CreateSale = () => {
                   onSelect={handleCustomerSelect}
                   onAddNew={handleAddNewCustomer}
                   onViewLedger={handleViewLedger}
+                  onCashSale={handleCashSale}
                 />
               </div>
 
@@ -2188,6 +2323,7 @@ const CreateSale = () => {
                     className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
                 </div>
+
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Status</label>
                   <select
@@ -2325,7 +2461,7 @@ const CreateSale = () => {
                       placeholder="SPH"
                     />
                     {powerRangeWarnings[index]?.sph && (
-                      <div className="text-xs text-red-600 dark:text-red-400 mt-1 whitespace-nowrap">
+                      <div className="text-xs text-red-600 dark:text-red-400 mt-1 text-center truncate">
                         {powerRangeWarnings[index].sph}
                       </div>
                     )}
@@ -2344,7 +2480,7 @@ const CreateSale = () => {
                       placeholder="CYL"
                     />
                     {powerRangeWarnings[index]?.cyl && (
-                      <div className="text-xs text-red-600 dark:text-red-400 mt-1 whitespace-nowrap">
+                      <div className="text-xs text-red-600 dark:text-red-400 mt-1 text-center truncate">
                         {powerRangeWarnings[index].cyl}
                       </div>
                     )}
@@ -2582,6 +2718,11 @@ const CreateSale = () => {
               <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
                 <span className="text-gray-600 dark:text-gray-400">Freight Charge:</span>
                 <span className="text-gray-800 dark:text-gray-200">{formatCurrency(parseFloat(frieghtCharge || 0))}</span>
+              </div>
+              
+              <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                <span className="text-gray-600 dark:text-gray-400">Total Quantity:</span>
+                <span className="font-medium text-gray-800 dark:text-gray-200">{formatQuantityDisplay()}</span>
               </div>
               
               <div className="flex justify-between py-3 border-b border-gray-200 dark:border-gray-600 text-lg">

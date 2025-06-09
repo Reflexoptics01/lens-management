@@ -62,6 +62,12 @@ const InvoiceLedgerView = ({ ledgerData, formatDate, formatCurrency, onInvoiceCl
                         🛒 Purchase
                       </span>
                     </div>
+                  ) : item.type === 'opening' ? (
+                    <div className="font-medium text-purple-800 dark:text-purple-200">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 dark:bg-purple-900/30">
+                        📊 Opening Balance
+                      </span>
+                    </div>
                   ) : (
                     <div className="font-medium text-green-800 dark:text-green-200">
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 dark:bg-green-900/30">
@@ -75,6 +81,8 @@ const InvoiceLedgerView = ({ ledgerData, formatDate, formatCurrency, onInvoiceCl
                     <span className="font-medium">{item.invoiceNumber}</span>
                   ) : item.type === 'purchase' ? (
                     <span className="font-medium">{item.purchaseNumber || item.invoiceNumber || 'Purchase'}</span>
+                  ) : item.type === 'opening' ? (
+                    <span className="font-medium text-purple-600 dark:text-purple-400">Opening Balance</span>
                   ) : (
                     <span>{item.notes || item.paymentMethod || '-'}</span>
                   )}
@@ -83,6 +91,10 @@ const InvoiceLedgerView = ({ ledgerData, formatDate, formatCurrency, onInvoiceCl
                   {item.type === 'invoice' || item.type === 'purchase' ? (
                     <span className="font-medium text-red-600 dark:text-red-400">
                       {formatCurrency(item.totalAmount || item.total || item.amount || 0)}
+                    </span>
+                  ) : item.type === 'opening' ? (
+                    <span className="font-medium text-purple-600 dark:text-purple-400">
+                      {formatCurrency(item.amount)}
                     </span>
                   ) : (
                     <span className="font-medium text-green-600 dark:text-green-400">
@@ -100,7 +112,11 @@ const InvoiceLedgerView = ({ ledgerData, formatDate, formatCurrency, onInvoiceCl
               </td>
               <td className="px-4 py-3 text-right font-bold">
                 {(() => {
-                  // Calculate net amount (invoices + purchases - payments)
+                  // Calculate net amount (opening balance + invoices + purchases - payments)
+                  const openingBalance = ledgerData
+                    .filter(item => item.type === 'opening')
+                    .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+                  
                   const totalInvoices = ledgerData
                     .filter(item => item.type === 'invoice')
                     .reduce((sum, invoice) => sum + parseFloat(invoice.totalAmount || invoice.total || invoice.amount || 0), 0);
@@ -113,7 +129,7 @@ const InvoiceLedgerView = ({ ledgerData, formatDate, formatCurrency, onInvoiceCl
                     .filter(item => item.type === 'transaction' || item.type === 'received' || item.type === 'paid')
                     .reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0);
                   
-                  const netAmount = totalInvoices + totalPurchases - totalPayments;
+                  const netAmount = openingBalance + totalInvoices + totalPurchases - totalPayments;
                   
                   const className = netAmount > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400';
                   return <span className={className}>{formatCurrency(netAmount)}</span>;

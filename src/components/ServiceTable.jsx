@@ -57,7 +57,7 @@ const ServiceTable = ({
             <tr key={service.id} className={`${index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700'} hover:bg-gray-100 dark:hover:bg-gray-600`}>
               <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">
                 <a href={`/lens-inventory/${service.id}`} className="text-sky-600 hover:text-sky-800 hover:underline">
-                  {service.brandName || 'N/A'}
+                  {service.brandName || service.serviceName || service.name || 'N/A'}
                 </a>
               </td>
               <td className="px-2 sm:px-3 py-2 sm:py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white text-left">{service.serviceType || 'N/A'}</td>

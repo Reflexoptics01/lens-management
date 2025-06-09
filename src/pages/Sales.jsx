@@ -335,14 +335,15 @@ const Sales = () => {
       
       filtered = filtered.filter(sale => {
         try {
-          // Use our utility function to safely parse dates
-          const saleDate = sale.createdAt instanceof Date 
-            ? sale.createdAt 
-            : safelyParseDate(sale.createdAt);
+          // Use invoiceDate for filtering, fall back to createdAt if not available
+          const dateToUse = sale.invoiceDate || sale.createdAt;
+          const saleDate = dateToUse instanceof Date 
+            ? dateToUse 
+            : safelyParseDate(dateToUse);
           
           // Debug info for date comparison
           if (!saleDate || isNaN(saleDate.getTime())) {
-            console.warn('Invalid sale date during filtering:', sale.createdAt, 'for sale:', sale.id);
+            console.warn('Invalid sale date during filtering:', dateToUse, 'for sale:', sale.id);
             return false;
           }
           
@@ -370,13 +371,14 @@ const Sales = () => {
       
       filtered = filtered.filter(sale => {
         try {
-          // Use our utility function to safely parse dates
-          const saleDate = sale.createdAt instanceof Date 
-            ? sale.createdAt 
-            : safelyParseDate(sale.createdAt);
+          // Use invoiceDate for filtering, fall back to createdAt if not available
+          const dateToUse = sale.invoiceDate || sale.createdAt;
+          const saleDate = dateToUse instanceof Date 
+            ? dateToUse 
+            : safelyParseDate(dateToUse);
           
           if (!saleDate || isNaN(saleDate.getTime())) {
-            console.warn('Invalid sale date during filtering:', sale.createdAt, 'for sale:', sale.id);
+            console.warn('Invalid sale date during filtering:', dateToUse, 'for sale:', sale.id);
             return false;
           }
           
@@ -580,8 +582,8 @@ const Sales = () => {
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         {filteredSales.map((sale) => {
-                        // For imported sales, use invoiceDate instead of createdAt, and customerName directly
-                        const displayDate = sale.isImported ? sale.invoiceDate : sale.createdAt;
+                        // Use invoiceDate for all sales (both regular and imported), fall back to createdAt if invoiceDate is not available
+                        const displayDate = sale.invoiceDate || sale.createdAt;
                         const { date, time } = formatDisplayDate(displayDate);
                         const customerDetails = getCustomerDetails(sale.customerId);
                         const displayCustomerName = sale.isImported ? sale.customerName : (customerDetails?.opticalName || 'Unknown Customer');
@@ -716,8 +718,8 @@ const Sales = () => {
                 </div>
               ) : (
                 filteredSales.map((sale) => {
-                // For imported sales, use invoiceDate instead of createdAt, and customerName directly
-                const displayDate = sale.isImported ? sale.invoiceDate : sale.createdAt;
+                // Use invoiceDate for all sales (both regular and imported), fall back to createdAt if invoiceDate is not available
+                const displayDate = sale.invoiceDate || sale.createdAt;
                 const { date } = formatDisplayDate(displayDate);
                 const customerDetails = getCustomerDetails(sale.customerId);
                 const displayCustomerName = sale.isImported ? sale.customerName : (customerDetails?.opticalName || 'Unknown Customer');

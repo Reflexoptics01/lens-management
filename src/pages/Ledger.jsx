@@ -146,7 +146,7 @@ const Ledger = () => {
           
           return {
             id: doc.id,
-            type: 'transaction',
+            type: data.type, // Use the actual transaction type ('received' or 'paid')
             ...data,
             date: transactionDate
           };
@@ -159,8 +159,22 @@ const Ledger = () => {
         return transaction.date >= startDateObj && transaction.date <= endDateObj;
       });
       
-      // Combine invoices/purchases and transactions, then sort by date
-      const combinedData = [...invoices, ...purchases, ...transactions].sort((a, b) => {
+      // Create opening balance entry if it exists
+      const openingBalanceEntries = [];
+      const openingBalance = parseFloat(selectedEntity.openingBalance || 0);
+      if (openingBalance !== 0) {
+        openingBalanceEntries.push({
+          id: 'opening-balance',
+          type: 'opening',
+          date: startDateObj,
+          description: 'Opening Balance',
+          totalAmount: openingBalance,
+          amount: openingBalance
+        });
+      }
+      
+      // Combine opening balance, invoices/purchases and transactions, then sort by date
+      const combinedData = [...openingBalanceEntries, ...invoices, ...purchases, ...transactions].sort((a, b) => {
         if (!a.date) return -1;
         if (!b.date) return 1;
         return a.date - b.date;
@@ -169,7 +183,10 @@ const Ledger = () => {
       // Calculate running balance
       let balance = 0;
       const dataWithBalance = combinedData.map(item => {
-        if (item.type === 'invoice') {
+        if (item.type === 'opening') {
+          // Opening balance sets the initial balance
+          balance = parseFloat(item.amount || 0);
+        } else if (item.type === 'invoice') {
           // For customer invoices, add to the balance (customer owes us money)
           const amount = parseFloat(item.totalAmount || item.total || item.amount || 0);
           balance += amount;
@@ -177,25 +194,25 @@ const Ledger = () => {
           // For vendor purchases, add to the balance (we owe vendor money)
           const amount = parseFloat(item.totalAmount || item.total || item.amount || 0);
           balance += amount;
-        } else if (item.type === 'transaction') {
+        } else if (item.type === 'received' || item.type === 'paid') {
           // Handle transactions based on entity type and transaction type
           const amount = parseFloat(item.amount || 0);
           
           if (!isVendor) {
             // For customers:
-            if (item.transactionType === 'received' || item.type === 'received') {
+            if (item.type === 'received') {
               // Payment received from customer reduces their balance
               balance -= amount;
-            } else if (item.transactionType === 'paid' || item.type === 'paid') {
+            } else if (item.type === 'paid') {
               // Payment made to customer (refund) increases their balance
               balance += amount;
             }
           } else {
             // For vendors:
-            if (item.transactionType === 'paid' || item.type === 'paid') {
+            if (item.type === 'paid') {
               // Payment made to vendor reduces what we owe them
               balance -= amount;
-            } else if (item.transactionType === 'received' || item.type === 'received') {
+            } else if (item.type === 'received') {
               // Payment received from vendor (rare, but could be refund) increases what we owe
               balance += amount;
             }

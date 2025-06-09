@@ -46,9 +46,11 @@ const AccountStatementView = ({ ledgerData, formatDate, formatCurrency, getPayme
                       ? <div className="font-medium">Invoice</div>
                       : item.type === 'purchase'
                         ? <div className="font-medium">Purchase</div>
-                        : item.type === 'transaction' || item.type === 'received' || item.type === 'paid' 
-                          ? <div className="font-medium">Payment {item.type === 'received' ? 'Received' : 'Made'}</div>
-                          : ''}
+                        : item.type === 'opening'
+                          ? <div className="font-medium text-blue-600 dark:text-blue-400">Opening Balance</div>
+                          : item.type === 'transaction' || item.type === 'received' || item.type === 'paid' 
+                            ? <div className="font-medium">Payment {item.type === 'received' ? 'Received' : 'Made'}</div>
+                            : ''}
                     {item.type === 'transaction' || item.type === 'received' || item.type === 'paid' 
                       ? <div className="text-xs text-gray-600 dark:text-gray-400">{getPaymentMethodLabel(item.paymentMethod)} {item.notes ? `- ${item.notes}` : ''}</div>
                       : null}
@@ -56,12 +58,15 @@ const AccountStatementView = ({ ledgerData, formatDate, formatCurrency, getPayme
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600">
                     {item.type === 'invoice' ? item.invoiceNumber 
                       : item.type === 'purchase' ? (item.purchaseNumber || item.invoiceNumber || 'Purchase')
+                      : item.type === 'opening' ? 'Opening Balance'
                       : item.notes || '-'}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600">
                     {(item.type === 'invoice' || item.type === 'purchase')
-                      ? <span className="font-medium">{formatCurrency(item.totalAmount || item.total || item.amount || 0)}</span> 
-                      : '-'}
+                      ? <span className="font-medium">{formatCurrency(item.totalAmount || item.total || item.amount || 0)}</span>
+                      : item.type === 'opening'
+                        ? <span className="font-medium text-blue-600 dark:text-blue-400">{formatCurrency(item.amount || 0)}</span> 
+                        : '-'}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600">
                     {(item.type === 'transaction' || item.type === 'received' || item.type === 'paid')
@@ -137,6 +142,11 @@ const AccountStatementView = ({ ledgerData, formatDate, formatCurrency, getPayme
                   // Recalculate the balance directly from the displayed items
                   let recalculatedBalance = 0;
                   
+                  // Calculate opening balance
+                  const openingBalance = ledgerData
+                    .filter(item => item.type === 'opening')
+                    .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+                  
                   // Calculate total invoices and purchases
                   const totalInvoicesAndPurchases = ledgerData
                     .filter(item => item.type === 'invoice' || item.type === 'purchase')
@@ -147,8 +157,8 @@ const AccountStatementView = ({ ledgerData, formatDate, formatCurrency, getPayme
                     .filter(item => item.type === 'transaction' || item.type === 'received' || item.type === 'paid')
                     .reduce((sum, transaction) => sum + parseFloat(transaction.amount || 0), 0);
                   
-                  recalculatedBalance = totalInvoicesAndPurchases - totalTransactions;
-                  console.log('Recalculated balance:', recalculatedBalance, 'Total invoices/purchases:', totalInvoicesAndPurchases, 'Total transactions:', totalTransactions);
+                  recalculatedBalance = openingBalance + totalInvoicesAndPurchases - totalTransactions;
+                  console.log('Recalculated balance:', recalculatedBalance, 'Opening balance:', openingBalance, 'Total invoices/purchases:', totalInvoicesAndPurchases, 'Total transactions:', totalTransactions);
                   
                   const className = recalculatedBalance > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400';
                   return <span className={className}>{formatCurrency(recalculatedBalance)}</span>;

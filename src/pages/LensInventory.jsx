@@ -34,6 +34,20 @@ const LensInventory = () => {
   useEffect(() => {
     fetchLensInventory();
   }, []);
+
+  // Listen for inventory updates from other components
+  useEffect(() => {
+    const handleInventoryUpdate = () => {
+      fetchLensInventory();
+    };
+
+    // Listen for custom inventory update events
+    window.addEventListener('lensInventoryUpdated', handleInventoryUpdate);
+    
+    return () => {
+      window.removeEventListener('lensInventoryUpdated', handleInventoryUpdate);
+    };
+  }, []);
   
   useEffect(() => {
     // Filter lenses based on search term and active tab
@@ -65,7 +79,11 @@ const LensInventory = () => {
         (lens.type && lens.type.toLowerCase().includes(lowercaseSearch)) ||
         (lens.category && lens.category.toLowerCase().includes(lowercaseSearch)) ||
         (lens.contactType && lens.contactType.toLowerCase().includes(lowercaseSearch)) ||
-        (lens.color && lens.color.toLowerCase().includes(lowercaseSearch))
+        (lens.color && lens.color.toLowerCase().includes(lowercaseSearch)) ||
+        // Add service-specific search fields
+        (lens.serviceName && lens.serviceName.toLowerCase().includes(lowercaseSearch)) ||
+        (lens.serviceType && lens.serviceType.toLowerCase().includes(lowercaseSearch)) ||
+        (lens.serviceDescription && lens.serviceDescription.toLowerCase().includes(lowercaseSearch))
       );
     }
     

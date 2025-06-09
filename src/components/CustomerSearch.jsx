@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { calculateCustomerBalance, calculateVendorBalance, isVendor, formatCurrency, getBalanceColorClass } from '../utils/ledgerUtils';
 
-const CustomerSearch = ({ customers, value, onChange, onSelect, onAddNew, onViewLedger, isOrderFlow = false, className = '' }) => {
+const CustomerSearch = ({ customers, value, onChange, onSelect, onAddNew, onViewLedger, onCashSale, isOrderFlow = false, className = '' }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filteredCustomers, setFilteredCustomers] = useState([]);
@@ -354,6 +354,16 @@ const CustomerSearch = ({ customers, value, onChange, onSelect, onAddNew, onView
         >
           Add New
         </button>
+        {onCashSale && (
+          <button
+            type="button"
+            onClick={onCashSale}
+            className="inline-flex items-center px-2 py-2 border border-transparent text-xs font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-green-500 dark:focus:ring-green-400 transition-colors"
+            title="Quick cash sale setup"
+          >
+            💰
+          </button>
+        )}
       </div>
       {value && (
         <div className="mt-1 text-xs font-semibold text-sky-700 dark:text-sky-300">

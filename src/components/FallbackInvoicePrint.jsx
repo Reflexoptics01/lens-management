@@ -407,6 +407,50 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
     return invoiceNumber;
   };
 
+  // Calculate total quantities with service separation
+  const calculateTotalQuantities = () => {
+    if (!saleData?.items) return { totalPairs: 0, totalServices: 0, totalOthers: 0 };
+    
+    let totalPairs = 0;
+    let totalServices = 0;
+    let totalOthers = 0;
+    
+    saleData.items.forEach(item => {
+      const qty = parseInt(item.qty) || 0;
+      const unit = (item.unit || '').toLowerCase();
+      
+      if (unit === 'service') {
+        totalServices += qty;
+      } else if (unit === 'pairs') {
+        totalPairs += qty;
+      } else {
+        totalOthers += qty;
+      }
+    });
+    
+    return { totalPairs, totalServices, totalOthers };
+  };
+
+  // Format quantity display
+  const formatQuantityDisplay = () => {
+    const { totalPairs, totalServices, totalOthers } = calculateTotalQuantities();
+    const parts = [];
+    
+    if (totalPairs > 0) {
+      parts.push(`${totalPairs} PR`);
+    }
+    
+    if (totalServices > 0) {
+      parts.push(`${totalServices} SV`);
+    }
+    
+    if (totalOthers > 0) {
+      parts.push(`${totalOthers} PC`);
+    }
+    
+    return parts.length > 0 ? parts.join(' & ') : '0';
+  };
+
   if (loading) {
     return <div className="p-4" style={{ color: '#374151' }}>Loading invoice data...</div>;
   }
@@ -715,6 +759,11 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
                   <span>{formatCurrency(saleData.frieghtCharge)}</span>
                 </div>
               )}
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #eee' }}>
+                <span>Total Quantity:</span>
+                <span style={{ fontWeight: 'bold' }}>{formatQuantityDisplay()}</span>
+              </div>
               
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #eee', fontWeight: 'bold' }}>
                 <span>Total:</span>

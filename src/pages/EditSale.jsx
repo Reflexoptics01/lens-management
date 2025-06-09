@@ -181,6 +181,50 @@ const EditSale = () => {
     }
   };
 
+  // Calculate total quantities with service separation
+  const calculateTotalQuantities = () => {
+    const filledRows = tableRows.filter(row => row.total > 0);
+    
+    let totalPairs = 0;
+    let totalServices = 0;
+    let totalOthers = 0;
+    
+    filledRows.forEach(row => {
+      const qty = parseInt(row.qty) || 0;
+      const unit = (row.unit || '').toLowerCase();
+      
+      if (unit === 'service') {
+        totalServices += qty;
+      } else if (unit === 'pairs') {
+        totalPairs += qty;
+      } else {
+        totalOthers += qty;
+      }
+    });
+    
+    return { totalPairs, totalServices, totalOthers };
+  };
+
+  // Format quantity display
+  const formatQuantityDisplay = () => {
+    const { totalPairs, totalServices, totalOthers } = calculateTotalQuantities();
+    const parts = [];
+    
+    if (totalPairs > 0) {
+      parts.push(`${totalPairs} PR`);
+    }
+    
+    if (totalServices > 0) {
+      parts.push(`${totalServices} SV`);
+    }
+    
+    if (totalOthers > 0) {
+      parts.push(`${totalOthers} PC`);
+    }
+    
+    return parts.length > 0 ? parts.join(' & ') : '0';
+  };
+
   // Fetch shop information for the address
   const fetchShopInfo = async () => {
     try {
@@ -1725,6 +1769,11 @@ const EditSale = () => {
                   <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
                     <span className="text-gray-600 dark:text-gray-400">Freight Charge:</span>
                     <span className="text-gray-800 dark:text-gray-200">{formatCurrency(parseFloat(frieghtCharge || 0))}</span>
+                  </div>
+                  
+                  <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                    <span className="text-gray-600 dark:text-gray-400">Total Quantity:</span>
+                    <span className="font-medium text-gray-800 dark:text-gray-200">{formatQuantityDisplay()}</span>
                   </div>
                   
                   <div className="flex justify-between py-3 border-b border-gray-200 dark:border-gray-600 text-lg">

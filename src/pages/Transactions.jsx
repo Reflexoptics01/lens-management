@@ -53,6 +53,9 @@ const Transactions = () => {
   // New states for balance calculation
   const [entityBalances, setEntityBalances] = useState({});
   const [loadingBalances, setLoadingBalances] = useState(false);
+  // New state for suggestion balances
+  const [suggestionBalances, setSuggestionBalances] = useState({});
+  const [loadingSuggestionBalances, setLoadingSuggestionBalances] = useState(false);
   
   useEffect(() => {
     fetchEntities();
@@ -180,12 +183,13 @@ const Transactions = () => {
     }
   };
 
-  const handleSearch = (value) => {
+  const handleSearch = async (value) => {
     setSearchTerm(value);
     
     if (value.trim() === '') {
       setFilteredEntities([]);
       setShowEntityList(false);
+      setSuggestionBalances({}); // Clear suggestion balances
       return;
     }
     
@@ -197,6 +201,32 @@ const Transactions = () => {
     setFilteredEntities(filtered);
     setShowEntityList(filtered.length > 0);
     setSelectedEntityIndex(-1); // Reset the selected index when search results change
+    
+    // Calculate balances for suggestion entities
+    if (filtered.length > 0) {
+      setLoadingSuggestionBalances(true);
+      const balances = {};
+      
+      try {
+        await Promise.all(
+          filtered.map(async (entity) => {
+            try {
+              const balance = await calculateCustomerBalance(entity.id, entity.openingBalance || 0);
+              balances[entity.id] = balance;
+            } catch (error) {
+              console.error(`Error calculating balance for entity ${entity.id}:`, error);
+              balances[entity.id] = entity.openingBalance || 0;
+            }
+          })
+        );
+        
+        setSuggestionBalances(balances);
+      } catch (error) {
+        console.error('Error calculating suggestion balances:', error);
+      } finally {
+        setLoadingSuggestionBalances(false);
+      }
+    }
   };
   
   const handleKeyDown = (e, rowIndex) => {
@@ -318,6 +348,22 @@ const Transactions = () => {
       // Refresh transactions
       await fetchTransactions();
       
+      // Recalculate balances for entities that had new transactions
+      const updatedEntitiesIds = [...new Set(transactionsToSave.map(t => t.entityId))];
+      const balances = {};
+      
+      for (const entityId of updatedEntitiesIds) {
+        try {
+          const entity = entities.find(e => e.id === entityId);
+          const balance = await calculateCustomerBalance(entityId, entity?.openingBalance || 0);
+          balances[entityId] = balance;
+        } catch (error) {
+          console.error(`Error recalculating balance for entity ${entityId}:`, error);
+        }
+      }
+      
+      setEntityBalances(prev => ({ ...prev, ...balances }));
+      
     } catch (error) {
       console.error('Error saving transactions:', error);
       setError('Failed to save transactions');
@@ -378,6 +424,18 @@ const Transactions = () => {
       
       // Refresh transactions
       await fetchTransactions();
+      
+      // Recalculate balance for the edited entity
+      try {
+        const entity = entities.find(e => e.id === editingTransaction.entityId);
+        if (entity) {
+          const balance = await calculateCustomerBalance(editingTransaction.entityId, entity.openingBalance || 0);
+          setEntityBalances(prev => ({ ...prev, [editingTransaction.entityId]: balance }));
+        }
+      } catch (error) {
+        console.error('Error recalculating balance after edit:', error);
+      }
+      
     } catch (error) {
       console.error('Error updating transaction:', error);
       setError('Failed to update transaction: ' + error.message);
@@ -391,6 +449,9 @@ const Transactions = () => {
       setLoading(true);
       setError('');
       
+      // Get the transaction before deleting to know which entity to update
+      const transactionToDelete = transactions.find(t => t.id === transactionId);
+      
       // Delete from Firestore
       await deleteDoc(getUserDoc('transactions', transactionId));
       
@@ -403,6 +464,20 @@ const Transactions = () => {
       
       // Refresh the transaction list
       await fetchTransactions();
+      
+      // Recalculate balance for the deleted transaction's entity
+      if (transactionToDelete && transactionToDelete.entityId) {
+        try {
+          const entity = entities.find(e => e.id === transactionToDelete.entityId);
+          if (entity) {
+            const balance = await calculateCustomerBalance(transactionToDelete.entityId, entity.openingBalance || 0);
+            setEntityBalances(prev => ({ ...prev, [transactionToDelete.entityId]: balance }));
+          }
+        } catch (error) {
+          console.error('Error recalculating balance after delete:', error);
+        }
+      }
+      
     } catch (error) {
       console.error('Error deleting transaction:', error);
       setError('Failed to delete transaction: ' + error.message);
@@ -567,20 +642,62 @@ const Transactions = () => {
                           className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                         />
                         {activeRowIndex === index && showEntityList && filteredEntities.length > 0 && (
-                          <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 shadow-lg max-h-60 rounded-md py-1 text-sm overflow-auto border border-gray-300 dark:border-gray-600">
+                          <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 shadow-lg max-h-60 rounded-md py-1 text-sm overflow-auto border border-gray-300 dark:border-gray-600 min-w-[300px]">
                             {filteredEntities.map((entity, idx) => (
                               <div
                                 key={entity.id}
                                 onClick={() => handleEntitySelect(entity, index)}
                                 onMouseEnter={() => setSelectedEntityIndex(idx)}
-                                className={`cursor-pointer py-2 pl-3 pr-9 hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                className={`cursor-pointer py-3 pl-3 pr-3 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-b-0 ${
                                   selectedEntityIndex === idx ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300' : ''
                                 }`}
                               >
-                                <span className="font-medium block truncate text-gray-900 dark:text-white">{entity.opticalName}</span>
-                                {entity.contactPerson && (
-                                  <span className="text-gray-500 dark:text-gray-400 block truncate text-xs">{entity.contactPerson}</span>
-                                )}
+                                <div className="flex justify-between items-start">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium block truncate text-gray-900 dark:text-white">
+                                      {entity.opticalName}
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      {entity.city && (
+                                        <span className="text-gray-500 dark:text-gray-400 text-xs flex items-center">
+                                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                          </svg>
+                                          {entity.city}
+                                        </span>
+                                      )}
+                                      {entity.contactPerson && (
+                                        <span className="text-gray-500 dark:text-gray-400 text-xs">
+                                          • {entity.contactPerson}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="ml-3 text-right">
+                                    {loadingSuggestionBalances ? (
+                                      <div className="flex items-center text-xs text-gray-400">
+                                        <svg className="animate-spin h-3 w-3 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                      </div>
+                                    ) : suggestionBalances[entity.id] !== undefined ? (
+                                      <div className="text-xs">
+                                        <div className={`font-medium ${getBalanceColorClass(suggestionBalances[entity.id])}`}>
+                                          {formatCurrencyLocal(Math.abs(suggestionBalances[entity.id]))}
+                                        </div>
+                                        <div className="text-gray-500 dark:text-gray-400">
+                                          {getBalanceStatusText(suggestionBalances[entity.id])}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="text-xs text-gray-400">
+                                        Balance: --
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             ))}
                           </div>

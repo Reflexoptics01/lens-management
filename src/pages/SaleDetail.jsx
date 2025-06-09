@@ -170,6 +170,50 @@ const SaleDetail = () => {
     setShowAddressModal(true);
   };
 
+  // Calculate total quantities with service separation
+  const calculateTotalQuantities = () => {
+    if (!sale?.items) return { totalPairs: 0, totalServices: 0, totalOthers: 0 };
+    
+    let totalPairs = 0;
+    let totalServices = 0;
+    let totalOthers = 0;
+    
+    sale.items.forEach(item => {
+      const qty = parseInt(item.qty || item.quantity) || 0;
+      const unit = (item.unit || '').toLowerCase();
+      
+      if (unit === 'service') {
+        totalServices += qty;
+      } else if (unit === 'pairs') {
+        totalPairs += qty;
+      } else {
+        totalOthers += qty;
+      }
+    });
+    
+    return { totalPairs, totalServices, totalOthers };
+  };
+
+  // Format quantity display
+  const formatQuantityDisplay = () => {
+    const { totalPairs, totalServices, totalOthers } = calculateTotalQuantities();
+    const parts = [];
+    
+    if (totalPairs > 0) {
+      parts.push(`${totalPairs} PR`);
+    }
+    
+    if (totalServices > 0) {
+      parts.push(`${totalServices} SV`);
+    }
+    
+    if (totalOthers > 0) {
+      parts.push(`${totalOthers} PC`);
+    }
+    
+    return parts.length > 0 ? parts.join(' & ') : '0';
+  };
+
   // Function to actually print the address content
   const printAddressContent = () => {
     const content = document.getElementById('address-content');
@@ -651,6 +695,10 @@ const SaleDetail = () => {
                   <div className="flex justify-between mb-2">
                     <span className="text-gray-600 dark:text-gray-300">Tax:</span>
                     <span className="font-medium text-gray-900 dark:text-white">₹{sale.totalTax?.toFixed(2) || '0.00'}</span>
+                    </div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-gray-600 dark:text-gray-300">Total Quantity:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{formatQuantityDisplay()}</span>
                     </div>
                   <div className="flex justify-between pt-2 border-t border-gray-200 dark:border-gray-600">
                     <span className="text-gray-800 dark:text-gray-200 font-medium">Total:</span>
