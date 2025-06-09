@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
@@ -37,6 +37,7 @@ import Shop from './pages/Shop';
 import FloatingShopIcon from './components/FloatingShopIcon';
 import UserManagement from './pages/UserManagement';
 import SystemAnalytics from './pages/SystemAnalytics';
+import GlobalCalculator from './components/GlobalCalculator';
 import './App.css';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
@@ -48,6 +49,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { initializeMonitoring } from './utils/productionMonitoring';
 
 function App() {
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
+
   useEffect(() => {
     // Remove console.log statements for production
     // Environment validation is handled by firebaseConfig.js
@@ -61,6 +64,22 @@ function App() {
       initializeMonitoring();
     }
   }, []);
+
+  // Global keyboard listener for calculator
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      // Only trigger if not typing in an input field and calculator is not already open
+      const isTypingInInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.contentEditable === 'true';
+      
+      if (!isTypingInInput && e.key.toLowerCase() === 'c' && !calculatorOpen) {
+        e.preventDefault();
+        setCalculatorOpen(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [calculatorOpen]);
 
   return (
     <div className="app-container">
@@ -317,6 +336,12 @@ function App() {
             {/* Floating Shop Icon - appears only on specific pages */}
             <FloatingShopIcon />
           </Router>
+          
+          {/* Global Calculator - accessible from anywhere with 'C' key */}
+          <GlobalCalculator 
+            isOpen={calculatorOpen} 
+            onClose={() => setCalculatorOpen(false)} 
+          />
         </ThemeProvider>
       </AuthProvider>
     </div>
