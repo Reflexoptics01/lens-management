@@ -508,6 +508,13 @@ const ItemSuggestions = ({
         type: selectedProductType
       };
 
+      // Special handling for RX lenses created from CreateSale page - hide from inventory but keep for suggestions
+      if (selectedProductType === 'prescription' && (dataSection === 'create-sale' || window.location.pathname === '/create-sale')) {
+        productData.hiddenFromInventory = true;
+        productData.qty = 0; // Set quantity to 0 since it will be consumed immediately
+        productData.createdForSale = true; // Flag to indicate this was created for immediate sale
+      }
+
       // Add type-specific data and pricing
       if (selectedProductType === 'stock') {
         // Create power series description from max range fields
@@ -540,7 +547,7 @@ const ItemSuggestions = ({
           salePrice: newProductPrice,
           price: newProductPrice
         };
-      } else if (selectedProductType === 'prescription') {
+              } else if (selectedProductType === 'prescription') {
         productData = {
           ...productData,
           eye: 'both',
@@ -633,7 +640,11 @@ const ItemSuggestions = ({
       }));
       
       // Show success message
-      alert(`Successfully created new ${selectedProductType} product: "${newProductName}" with quantity ${newProductQty}`);
+      if (selectedProductType === 'prescription' && (dataSection === 'create-sale' || window.location.pathname === '/create-sale')) {
+        alert(`Successfully created new RX lens template: "${newProductName}" (available for future use)`);
+      } else {
+        alert(`Successfully created new ${selectedProductType} product: "${newProductName}" with quantity ${newProductQty}`);
+      }
 
     } catch (error) {
       console.error('Error creating new product:', error);

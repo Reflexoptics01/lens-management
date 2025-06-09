@@ -1503,6 +1503,9 @@ const CreateSale = () => {
           return;
         }
         
+        // Include ALL items for suggestions, even those hidden from inventory
+        // (hiddenFromInventory RX lenses are still available for suggestions)
+        
         let itemName = '';
         let displayName = '';
         let itemPrice = 0;
@@ -2587,7 +2590,7 @@ const CreateSale = () => {
                           saveItemToDatabase={saveItemToDatabase}
                           onRefreshItems={fetchItems}
                           currentPrice={parseFloat(row.price) || 0}
-                          dataSection="item-input"
+                          dataSection="create-sale"
                         />
                         {row.powerSeries && (
                           <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">

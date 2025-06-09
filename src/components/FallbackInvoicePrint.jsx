@@ -899,59 +899,55 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
                 <div style={{ marginTop: '5px', border: '1px solid #ddd', padding: '8px', borderRadius: '4px', backgroundColor: '#f9f9f9' }}>
                   <p style={{ fontWeight: 'bold', marginBottom: '5px', fontSize: '11px', color: '#333' }}>Bank Details</p>
                   
-                  {/* Always show this section regardless of bankDetails being null */}
-                  <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-                    <tbody>
-                      {/* Only show account name if it comes from settings */}
-                      {displayBankDetails.accountName && (
-                        <tr>
-                          <td style={{ padding: '2px 5px 2px 0', fontWeight: 'bold', fontSize: '10px' }}>Account Name:</td>
-                          <td style={{ padding: '2px 0', fontSize: '10px' }}>{displayBankDetails.accountName}</td>
-                        </tr>
-                      )}
-                      
-                      {/* Only show bank name if it comes from settings */}
-                      {displayBankDetails.bankName && (
-                        <tr>
-                          <td style={{ padding: '2px 5px 2px 0', fontWeight: 'bold', fontSize: '10px' }}>Bank Name:</td>
-                          <td style={{ padding: '2px 0', fontSize: '10px' }}>{displayBankDetails.bankName}</td>
-                        </tr>
-                      )}
-                      
-                      {/* Only show account number if it comes from settings */}
-                      {displayBankDetails.accountNumber && (
-                        <tr>
-                          <td style={{ padding: '2px 5px 2px 0', fontWeight: 'bold', fontSize: '10px' }}>Account Number:</td>
-                          <td style={{ padding: '2px 0', fontSize: '10px' }}>{displayBankDetails.accountNumber}</td>
-                        </tr>
-                      )}
-                      
-                      {/* Show branch if available */}
-                      {(displayBankDetails.branchName || displayBankDetails.branch) && (
-                        <tr>
-                          <td style={{ padding: '2px 5px 2px 0', fontWeight: 'bold', fontSize: '10px' }}>Branch:</td>
-                          <td style={{ padding: '2px 0', fontSize: '10px' }}>{displayBankDetails.branchName || displayBankDetails.branch}</td>
-                        </tr>
-                      )}
-                      
-                      {/* Only show IFSC if it comes from settings */}
-                      {displayBankDetails.ifscCode && (
-                        <tr>
-                          <td style={{ padding: '2px 5px 2px 0', fontWeight: 'bold', fontSize: '10px' }}>IFSC Code:</td>
-                          <td style={{ padding: '2px 0', fontSize: '10px' }}>{displayBankDetails.ifscCode}</td>
-                        </tr>
-                      )}
-                      
-                      {/* Only show in development and only if nothing is found */}
-                      {false && process.env.NODE_ENV === 'development' && Object.keys(displayBankDetails).length === 0 && (
-                        <tr>
-                          <td colSpan="2" style={{ color: 'red', fontSize: '8px', padding: '2px 0' }}>
-                            No bank details found in settings.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                  {/* Bank details without table structure */}
+                  <div>
+                    {/* Only show account name if it comes from settings */}
+                    {displayBankDetails.accountName && (
+                      <div style={{ marginBottom: '3px' }}>
+                        <span style={{ fontWeight: 'bold', fontSize: '10px' }}>Account Name: </span>
+                        <span style={{ fontSize: '10px' }}>{displayBankDetails.accountName}</span>
+                      </div>
+                    )}
+                    
+                    {/* Only show bank name if it comes from settings */}
+                    {displayBankDetails.bankName && (
+                      <div style={{ marginBottom: '3px' }}>
+                        <span style={{ fontWeight: 'bold', fontSize: '10px' }}>Bank Name: </span>
+                        <span style={{ fontSize: '10px' }}>{displayBankDetails.bankName}</span>
+                      </div>
+                    )}
+                    
+                    {/* Only show account number if it comes from settings */}
+                    {displayBankDetails.accountNumber && (
+                      <div style={{ marginBottom: '3px' }}>
+                        <span style={{ fontWeight: 'bold', fontSize: '10px' }}>Account Number: </span>
+                        <span style={{ fontSize: '10px' }}>{displayBankDetails.accountNumber}</span>
+                      </div>
+                    )}
+                    
+                    {/* Show branch if available */}
+                    {(displayBankDetails.branchName || displayBankDetails.branch) && (
+                      <div style={{ marginBottom: '3px' }}>
+                        <span style={{ fontWeight: 'bold', fontSize: '10px' }}>Branch: </span>
+                        <span style={{ fontSize: '10px' }}>{displayBankDetails.branchName || displayBankDetails.branch}</span>
+                      </div>
+                    )}
+                    
+                    {/* Only show IFSC if it comes from settings */}
+                    {displayBankDetails.ifscCode && (
+                      <div style={{ marginBottom: '3px' }}>
+                        <span style={{ fontWeight: 'bold', fontSize: '10px' }}>IFSC Code: </span>
+                        <span style={{ fontSize: '10px' }}>{displayBankDetails.ifscCode}</span>
+                      </div>
+                    )}
+                    
+                    {/* Only show in development and only if nothing is found */}
+                    {false && process.env.NODE_ENV === 'development' && Object.keys(displayBankDetails).length === 0 && (
+                      <div style={{ color: 'red', fontSize: '8px', marginBottom: '3px' }}>
+                        No bank details found in settings.
+                      </div>
+                    )}
+                  </div>
                 </div>
                 
                 {shopSettings?.termsAndConditions && (

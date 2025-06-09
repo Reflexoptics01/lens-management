@@ -100,6 +100,7 @@ const LensInventory = () => {
       
       const lensesList = snapshot.docs
         .filter(doc => !doc.data()._placeholder)
+        .filter(doc => !doc.data().hiddenFromInventory) // Hide RX lenses created via CreateSale - they're remembered for suggestions but not shown in inventory
         .map(doc => ({
           id: doc.id,
           ...doc.data()

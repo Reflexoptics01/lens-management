@@ -28,6 +28,11 @@ const CustomerForm = ({ onClose, customer, isVendor = false }) => {
   const [activeSection, setActiveSection] = useState('business'); // 'business', 'address', 'financial'
   const [savedCustomer, setSavedCustomer] = useState(null);
 
+  // Set entity-specific labels - moved up to be available in all functions
+  const entityName = isVendor ? 'Vendor' : 'Customer';
+  const businessLabel = isVendor ? 'Business Name' : 'Optical Name';
+  const businessPlaceholder = isVendor ? 'e.g. ABC Lens Suppliers' : 'e.g. Vision Plus Optics';
+
   // Handle modal scrolling when opened
   useEffect(() => {
     // Lock body scroll but allow modal to scroll
@@ -153,11 +158,6 @@ const CustomerForm = ({ onClose, customer, isVendor = false }) => {
   const inputClassName = "mt-1 block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2.5 text-gray-700 dark:text-gray-100 shadow-sm focus:border-sky-500 dark:focus:border-sky-400 focus:ring-2 focus:ring-sky-500 dark:focus:ring-sky-400 text-sm focus:outline-none";
   const labelClassName = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1";
   const sectionClassName = "transition-all duration-200 ease-in-out";
-
-  // Set entity-specific labels
-  const entityName = isVendor ? 'Vendor' : 'Customer';
-  const businessLabel = isVendor ? 'Business Name' : 'Optical Name';
-  const businessPlaceholder = isVendor ? 'e.g. ABC Lens Suppliers' : 'e.g. Vision Plus Optics';
 
   return (
     <div 
