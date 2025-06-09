@@ -20,11 +20,26 @@ self.addEventListener('install', event => {
 
 // Fetch event - serve from cache when offline
 self.addEventListener('fetch', event => {
+  // Skip service worker for Firebase and external API requests
+  if (event.request.url.includes('firestore.googleapis.com') ||
+      event.request.url.includes('firebase') ||
+      event.request.url.includes('googleapis.com') ||
+      event.request.url.includes('chrome-extension://')) {
+    return; // Let the network handle these requests directly
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then(response => {
         // Return cached version or fetch from network
         return response || fetch(event.request);
+      })
+      .catch(() => {
+        // If both cache and network fail, handle gracefully
+        return new Response('Offline - content not available', {
+          status: 503,
+          statusText: 'Service Unavailable'
+        });
       })
   );
 });

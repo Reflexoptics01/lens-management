@@ -66,18 +66,125 @@ const ItemSuggestions = ({
   // Filter items and prepare suggestions when search term changes
   useEffect(() => {
     if (searchTerm && searchTerm.trim() && items && items.length > 0) {
-      // Simple filtering without deduplication - let parent handle uniqueness
+      // Filter items that match the search term
       const filtered = items.filter(item => {
         const itemName = item.name || item.itemName || '';
         return itemName.toLowerCase().includes(searchTerm.toLowerCase());
       });
 
-      setFilteredItems(filtered);
+
+
+      // Enhanced base name extraction function
+      const extractBaseName = (fullName, powerSeries) => {
+        // First, normalize the full name by trimming and removing extra spaces
+        let baseName = fullName.trim().replace(/\s+/g, ' ');
+        
+        // If powerSeries exists and is contained in the name, remove it
+        if (powerSeries && baseName.includes(powerSeries)) {
+          baseName = baseName.replace(powerSeries, '').trim();
+        }
+        
+        // Remove various power patterns more comprehensively
+        const powerPatterns = [
+          // Patterns like (+1.00 to +6.00), [-1.00 to -6.00], etc.
+          /[\(\[][\+\-]?\d+\.?\d*\s*to\s*[\+\-]?\d+\.?\d*[\)\]]/gi,
+          // Patterns like (+1.00), [-2.50], etc.
+          /[\(\[][\+\-]?\d+\.?\d*[\)\]]/gi,
+          // Patterns at the end like " +1.00 to +6.00", " -1.00 to -6.00"
+          /\s+[\+\-]?\d+\.?\d*\s*to\s*[\+\-]?\d+\.?\d*$/gi,
+          // Single power values at the end like " +1.00", " -2.50"
+          /\s+[\+\-]?\d+\.?\d*$/gi,
+          // Patterns with "D" like "+1.00D to +6.00D"
+          /[\(\[][\+\-]?\d+\.?\d*D?\s*to\s*[\+\-]?\d+\.?\d*D?[\)\]]/gi,
+          /\s+[\+\-]?\d+\.?\d*D?\s*to\s*[\+\-]?\d+\.?\d*D?$/gi,
+          /\s+[\+\-]?\d+\.?\d*D?$/gi,
+          // Power ranges with different formats like "1.00-6.00", "1.00~6.00"
+          /[\(\[][\+\-]?\d+\.?\d*[\-~][\+\-]?\d+\.?\d*[\)\]]/gi,
+          /\s+[\+\-]?\d+\.?\d*[\-~][\+\-]?\d+\.?\d*$/gi,
+          // Remove power series info that might be in different formats
+          /\s*\(.*power.*\)/gi,
+          /\s*\[.*power.*\]/gi,
+          /\s*power\s*:?\s*[\+\-]?\d+\.?\d*\s*to\s*[\+\-]?\d+\.?\d*/gi
+        ];
+        
+        // Apply all patterns
+        powerPatterns.forEach(pattern => {
+          baseName = baseName.replace(pattern, '').trim();
+        });
+        
+        // Remove trailing separators, dashes, parentheses, brackets and normalize spaces again
+        baseName = baseName.replace(/[\s\-\(\)\[\],\.]+$/, '').trim().replace(/\s+/g, ' ');
+        
+        // If baseName becomes empty or too short, use normalized original name
+        if (!baseName || baseName.length < 2) {
+          baseName = fullName.trim().replace(/\s+/g, ' ');
+        }
+        
+        return baseName;
+      };
+
+      // Group items by base name and sort by price within each group
+      const groupedByBaseName = {};
+      
+      filtered.forEach(item => {
+        const fullName = item.name || item.itemName || '';
+        const powerSeries = item.powerSeries || '';
+        
+        // Extract base name using enhanced function
+        const baseName = extractBaseName(fullName, powerSeries);
+        
+        
+        
+        // Initialize group if it doesn't exist
+        if (!groupedByBaseName[baseName]) {
+          groupedByBaseName[baseName] = [];
+        }
+        
+        groupedByBaseName[baseName].push(item);
+      });
+
+
+
+      // Sort items within each group by price (lowest first), then flatten
+      const sortedFiltered = [];
+      Object.keys(groupedByBaseName).forEach(baseName => {
+        const group = groupedByBaseName[baseName];
+        
+        // Sort group by price (lowest first), handle cases where price might be undefined
+        group.sort((a, b) => {
+          const priceA = parseFloat(a.price) || 0;
+          const priceB = parseFloat(b.price) || 0;
+          
+          // Primary sort: by price (lowest first)
+          if (priceA !== priceB) {
+            return priceA - priceB;
+          }
+          
+          // Secondary sort: by power series if available
+          const powerA = a.powerSeries || a.name || '';
+          const powerB = b.powerSeries || b.name || '';
+          if (powerA !== powerB) {
+            return powerA.localeCompare(powerB);
+          }
+          
+          // Tertiary sort: by full name
+          const nameA = a.name || a.itemName || '';
+          const nameB = b.name || b.itemName || '';
+          return nameA.localeCompare(nameB);
+        });
+        
+        // Add all items from this group to the final array
+        sortedFiltered.push(...group);
+      });
+
+
+
+      setFilteredItems(sortedFiltered);
       
       // Only show suggestions if we're actively typing (input is focused)
       // and the current search term doesn't match what was just selected
       const doShowSuggestions = 
-        filtered.length > 0 && 
+        sortedFiltered.length > 0 && 
         hadFocusRef.current && 
         (!lastSelectedItemRef.current || lastSelectedItemRef.current !== searchTerm);
         
@@ -470,7 +577,9 @@ const ItemSuggestions = ({
         autoComplete="off"
       />
       {showSuggestions && filteredItems.length > 0 && (
-        <div className="absolute z-50 left-0 w-[150%] mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 shadow-md rounded-md py-1 max-h-48 overflow-y-auto overflow-x-hidden">
+        <div className="absolute z-50 left-0 w-[150%] mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 shadow-md rounded-md py-1 max-h-64 overflow-y-auto overflow-x-hidden">
+
+          
           <div 
             ref={suggestionsRef}
             className="w-full"
@@ -512,16 +621,18 @@ const ItemSuggestions = ({
                     </span>
                     
                     {/* Show lens type and details */}
-                    {(item.isStockLens || item.type === 'stock') && item.powerSeries && (
+                    {(item.isStockLens || item.type === 'stock') && (
                       <span className="text-xs text-emerald-600 dark:text-emerald-400 truncate">
-                        Stock Lens - {item.powerSeries}
+                        Stock Lens{item.powerSeries && ` - ${item.powerSeries}`}
+                        {item.brandName && item.brandName !== item.name && ` • ${item.brandName}`}
                       </span>
                     )}
                     
-                    {(item.isContactLens || item.type === 'contact') && item.powerSeries && (
+                    {(item.isContactLens || item.type === 'contact') && (
                       <span className="text-xs text-purple-600 dark:text-purple-400 truncate">
-                        Contact Lens - {item.powerSeries}
+                        Contact Lens{item.powerSeries && ` - ${item.powerSeries}`}
                         {item.category && ` (${item.category})`}
+                        {item.contactType && ` • ${item.contactType}`}
                       </span>
                     )}
                     
@@ -530,7 +641,7 @@ const ItemSuggestions = ({
                         RX Lens
                         {item.sph && ` - SPH: ${item.sph}`}
                         {item.cyl && `, CYL: ${item.cyl}`}
-                        {item.material && `, ${item.material}`}
+                        {item.material && ` • ${item.material}`}
                         {item.index && ` ${item.index}`}
                       </span>
                     )}
@@ -541,10 +652,30 @@ const ItemSuggestions = ({
                       </span>
                     )}
                     
-                    {/* Show available quantity if it exists and is not 1 */}
-                    {item.qty && parseInt(item.qty) > 1 && (
-                      <span className="text-xs text-gray-500 dark:text-gray-400">Available: {item.qty} pcs</span>
+                    {/* Show power series prominently if it's not already shown above */}
+                    {item.powerSeries && !(item.isStockLens || item.type === 'stock') && !(item.isContactLens || item.type === 'contact') && (
+                      <span className="text-xs text-gray-600 dark:text-gray-400 truncate font-medium">
+                        Power: {item.powerSeries}
+                      </span>
                     )}
+                    
+                    {/* Show additional details */}
+                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                      {/* Show available quantity if it exists and is not 1 */}
+                      {item.qty && parseInt(item.qty) > 1 && (
+                        <span>Qty: {item.qty}</span>
+                      )}
+                      
+                      {/* Show material for stock lenses */}
+                      {(item.isStockLens || item.type === 'stock') && item.material && (
+                        <span>• {item.material}</span>
+                      )}
+                      
+                      {/* Show index for stock lenses */}
+                      {(item.isStockLens || item.type === 'stock') && item.index && (
+                        <span>• Index {item.index}</span>
+                      )}
+                    </div>
                   </div>
                   {item.price && (
                     <span className="text-xs text-gray-500 dark:text-gray-400 ml-2 whitespace-nowrap">₹{item.price}</span>

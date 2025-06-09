@@ -232,10 +232,10 @@ const CreatePurchase = () => {
       const lensRef = getUserCollection('lensInventory');
       const lensSnapshot = await getDocs(lensRef);
       
-      // Create a map to deduplicate items by name
-      const uniqueItems = {};
+      // Process all items without deduplication to show all variants
+      const itemsList = [];
       
-      // Add lens inventory items to the unique items
+      // Add lens inventory items to the list
       lensSnapshot.docs.forEach(doc => {
         const lens = { id: doc.id, ...doc.data() };
         
@@ -258,41 +258,43 @@ const CreatePurchase = () => {
         }
         
         if (itemName) {
-          const normalizedName = displayName.toLowerCase(); // Use display name for uniqueness
-          
-          // Add to uniqueItems if it doesn't exist or if this is a newer entry
-          if (!uniqueItems[normalizedName] || 
-              (lens.createdAt && uniqueItems[normalizedName].createdAt && 
-               lens.createdAt.toDate() > uniqueItems[normalizedName].createdAt.toDate())) {
-            uniqueItems[normalizedName] = {
-              id: lens.id,
-              name: displayName, // For showing in suggestions with power range
-              itemName: itemName, // Actual item name (brand only)
-              price: lens.salePrice || lens.purchasePrice || lens.servicePrice || 0,
-              createdAt: lens.createdAt,
-              isStockLens: lens.type === 'stock',
-              isService: lens.type === 'service',
-              isContactLens: lens.type === 'contact',
-              stockData: lens.type === 'stock' ? lens : null,
-              serviceData: lens.type === 'service' ? lens : null,
-              contactData: lens.type === 'contact' ? lens : null,
-              type: lens.type,
-              // Separate fields for proper form filling
-              brandName: lens.brandName,
-              powerSeries: lens.powerSeries,
-              serviceDescription: lens.serviceDescription,
-              ...lens
-            };
-          }
+          itemsList.push({
+            id: lens.id,
+            name: displayName, // For showing in suggestions with power range
+            itemName: itemName, // Actual item name (brand only)
+            price: lens.salePrice || lens.purchasePrice || lens.servicePrice || 0,
+            createdAt: lens.createdAt,
+            isStockLens: lens.type === 'stock',
+            isService: lens.type === 'service',
+            isContactLens: lens.type === 'contact',
+            stockData: lens.type === 'stock' ? lens : null,
+            serviceData: lens.type === 'service' ? lens : null,
+            contactData: lens.type === 'contact' ? lens : null,
+            type: lens.type,
+            // Separate fields for proper form filling
+            brandName: lens.brandName,
+            powerSeries: lens.powerSeries,
+            serviceDescription: lens.serviceDescription,
+            maxSph: lens.maxSph,
+            maxCyl: lens.maxCyl,
+            material: lens.material,
+            index: lens.index,
+            axis: lens.axis,
+            lensType: lens.lensType,
+            ...lens
+          });
         }
       });
       
-      // Convert to array and sort by name
-      const itemsList = Object.values(uniqueItems).sort((a, b) => 
-        a.name.toLowerCase().localeCompare(b.name.toLowerCase())
-      );
+      // Sort by display name and then by price
+      itemsList.sort((a, b) => {
+        const nameCompare = a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+        if (nameCompare !== 0) return nameCompare;
+        return (parseFloat(a.price) || 0) - (parseFloat(b.price) || 0);
+      });
       
       setItemSuggestions(itemsList);
+      console.log(`Fetched ${itemsList.length} lens items for purchase (all variants included)`);
     } catch (error) {
       console.error('Error fetching items for purchase:', error);
     }

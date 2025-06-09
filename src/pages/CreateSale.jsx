@@ -1112,72 +1112,77 @@ const CreateSale = () => {
       const lensRef = getUserCollection('lensInventory');
       const allSnapshot = await getDocs(lensRef);
       
-      // Create a map to deduplicate items by name
-      const uniqueItems = {};
+      // Process all items from lens_inventory - NO DEDUPLICATION to show all variants
+      const itemsList = [];
       
       // Process all items from lens_inventory
       allSnapshot.docs.forEach(doc => {
         const lens = { id: doc.id, ...doc.data() };
         
         let itemName = '';
+        let displayName = '';
         let itemPrice = 0;
         
         // Determine item name and price based on lens type
         if (lens.type === 'stock') {
-          // Use only brandName, not powerSeries to avoid long detailed strings
+          // For stock lenses, show full name with power series for distinction
           itemName = lens.brandName || '';
+          displayName = lens.powerSeries ? `${lens.brandName} (${lens.powerSeries})` : lens.brandName;
           itemPrice = lens.salePrice || 0;
         } else if (lens.type === 'service') {
           itemName = lens.serviceName || lens.brandName || '';
+          displayName = itemName;
           itemPrice = lens.salePrice || lens.servicePrice || 0;
         } else if (lens.type === 'prescription') {
           itemName = lens.brandName || '';
+          displayName = itemName;
           itemPrice = lens.salePrice || 0;
         } else if (lens.type === 'contact') {
-          // Use only brandName for contact lenses too
+          // For contact lenses, show full name with power series for distinction
           itemName = lens.brandName || '';
+          displayName = lens.powerSeries ? `${lens.brandName} (${lens.powerSeries})` : lens.brandName;
           itemPrice = lens.salePrice || 0;
         }
         
         if (itemName.trim()) {
-          const normalizedName = itemName.toLowerCase();
-          
-          // Add to uniqueItems if it doesn't exist or if this is a newer entry
-          if (!uniqueItems[normalizedName] || 
-              (lens.createdAt && uniqueItems[normalizedName].createdAt && 
-               lens.createdAt.toDate() > uniqueItems[normalizedName].createdAt.toDate())) {
-            
-            uniqueItems[normalizedName] = {
-              id: lens.id,
-              name: itemName,
-              price: itemPrice,
-              createdAt: lens.createdAt,
-              isStockLens: lens.type === 'stock',
-              isService: lens.type === 'service',
-              isContactLens: lens.type === 'contact',
-              isPrescription: lens.type === 'prescription',
-              stockData: lens.type === 'stock' ? lens : null,
-              serviceData: lens.type === 'service' ? lens : null,
-              contactData: lens.type === 'contact' ? lens : null,
-              prescriptionData: lens.type === 'prescription' ? lens : null,
-              // Store powerSeries separately for display purposes but not in the main name
-              powerSeries: lens.powerSeries || '',
-              // Store additional lens details for reference
-              maxSph: lens.maxSph,
-              maxCyl: lens.maxCyl,
-              type: lens.type,
-              brandName: lens.brandName
-            };
-          }
+          itemsList.push({
+            id: lens.id,
+            name: displayName, // Full display name with power series
+            itemName: itemName, // Clean brand name for form fields
+            price: itemPrice,
+            createdAt: lens.createdAt,
+            isStockLens: lens.type === 'stock',
+            isService: lens.type === 'service',
+            isContactLens: lens.type === 'contact',
+            isPrescription: lens.type === 'prescription',
+            stockData: lens.type === 'stock' ? lens : null,
+            serviceData: lens.type === 'service' ? lens : null,
+            contactData: lens.type === 'contact' ? lens : null,
+            prescriptionData: lens.type === 'prescription' ? lens : null,
+            // Store powerSeries and additional lens details
+            powerSeries: lens.powerSeries || '',
+            maxSph: lens.maxSph,
+            maxCyl: lens.maxCyl,
+            type: lens.type,
+            brandName: lens.brandName,
+            // Additional fields for proper identification
+            material: lens.material,
+            index: lens.index,
+            axis: lens.axis,
+            lensType: lens.lensType
+          });
         }
       });
       
-      // Convert to array and sort by name
-      const itemsList = Object.values(uniqueItems).sort((a, b) => 
-        a.name.toLowerCase().localeCompare(b.name.toLowerCase())
-      );
+      // Sort by display name (with power series) and then by price
+      itemsList.sort((a, b) => {
+        const nameCompare = a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+        if (nameCompare !== 0) return nameCompare;
+        return (parseFloat(a.price) || 0) - (parseFloat(b.price) || 0);
+      });
       
       setItemSuggestions(itemsList);
+      console.log(`Fetched ${itemsList.length} lens items (all variants included)`);
     } catch (error) {
       console.error('Error fetching items:', error);
     }
