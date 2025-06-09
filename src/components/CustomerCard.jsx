@@ -12,7 +12,7 @@ import {
   UserIcon
 } from '@heroicons/react/24/outline';
 
-const CustomerCard = ({ customer, onEdit, onDelete, formatCurrency, isVendor = false, onPrintAddress }) => {
+const CustomerCard = ({ customer, onEdit, onDelete, formatCurrency, isVendor = false, onPrintAddress, isSelected = false, onSelect }) => {
   const {
     opticalName,
     contactPerson,
@@ -38,17 +38,29 @@ const CustomerCard = ({ customer, onEdit, onDelete, formatCurrency, isVendor = f
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
       <div className="p-4 sm:p-6">
         <div className="flex justify-between items-start">
-          <div className="space-y-1">
-            <div className="flex items-center">
-              <EntityIcon className="w-5 h-5 mr-2 text-gray-500 dark:text-gray-400" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{opticalName}</h3>
-            </div>
-            {contactPerson && (
-              <p className="text-sm text-gray-600 dark:text-gray-300 flex items-center">
-                <IdentificationIcon className="w-4 h-4 mr-1 text-gray-400 dark:text-gray-500" />
-                {contactPerson}
-              </p>
+          <div className="flex items-start space-x-3 flex-1">
+            {onSelect && (
+              <div className="flex items-center mt-1">
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => onSelect(customer.id)}
+                  className="h-4 w-4 text-sky-600 focus:ring-sky-500 border-gray-300 rounded"
+                />
+              </div>
             )}
+            <div className="space-y-1 flex-1">
+              <div className="flex items-center">
+                <EntityIcon className="w-5 h-5 mr-2 text-gray-500 dark:text-gray-400" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{opticalName}</h3>
+              </div>
+              {contactPerson && (
+                <p className="text-sm text-gray-600 dark:text-gray-300 flex items-center">
+                  <IdentificationIcon className="w-4 h-4 mr-1 text-gray-400 dark:text-gray-500" />
+                  {contactPerson}
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex space-x-1">
             <button

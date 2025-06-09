@@ -13,10 +13,86 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
   });
   const [customerBalances, setCustomerBalances] = useState([]);
   const [vendorBalances, setVendorBalances] = useState([]);
+  
+  // Sorting state
+  const [sortConfig, setSortConfig] = useState({
+    key: 'name',
+    direction: 'asc'
+  });
 
   useEffect(() => {
     calculateBalanceSummary();
   }, []);
+
+  // Sorting function
+  const sortData = (data, key, direction) => {
+    return [...data].sort((a, b) => {
+      let aValue = a[key];
+      let bValue = b[key];
+      
+      // Handle numeric values
+      if (key !== 'name') {
+        aValue = parseFloat(aValue) || 0;
+        bValue = parseFloat(bValue) || 0;
+      } else {
+        // Handle string values (names)
+        aValue = aValue?.toString().toLowerCase() || '';
+        bValue = bValue?.toString().toLowerCase() || '';
+      }
+      
+      if (direction === 'asc') {
+        if (typeof aValue === 'string') {
+          return aValue.localeCompare(bValue);
+        }
+        return aValue - bValue;
+      } else {
+        if (typeof aValue === 'string') {
+          return bValue.localeCompare(aValue);
+        }
+        return bValue - aValue;
+      }
+    });
+  };
+
+  // Handle sort
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  // Get sorted data based on current view and sort config
+  const getSortedData = () => {
+    const data = viewMode === 'customers' ? customerBalances : vendorBalances;
+    return sortData(data, sortConfig.key, sortConfig.direction);
+  };
+
+  // Sort icon component
+  const SortIcon = ({ column }) => {
+    if (sortConfig.key !== column) {
+      return (
+        <svg className="w-4 h-4 ml-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+        </svg>
+      );
+    }
+    
+    if (sortConfig.direction === 'asc') {
+      return (
+        <svg className="w-4 h-4 ml-1 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+        </svg>
+      );
+    } else {
+      return (
+        <svg className="w-4 h-4 ml-1 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      );
+    }
+  };
 
   // Helper function to parse dates consistently
   const parseDate = (dateInput) => {
@@ -142,7 +218,8 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
         Math.abs(customer.currentBalance) > 0.01 // Use small threshold to account for floating point precision
       );
       
-      filteredCustomerBalances.sort((a, b) => b.currentBalance - a.currentBalance);
+      // Default sort by name alphabetically
+      filteredCustomerBalances.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
       
       return filteredCustomerBalances;
     } catch (error) {
@@ -232,7 +309,8 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
         Math.abs(vendor.currentBalance) > 0.01 // Use small threshold to account for floating point precision
       );
       
-      filteredVendorBalances.sort((a, b) => b.currentBalance - a.currentBalance);
+      // Default sort by name alphabetically
+      filteredVendorBalances.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
       
       return filteredVendorBalances;
     } catch (error) {
@@ -392,7 +470,10 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
           {/* Switch buttons for customer/vendor view */}
           <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1 mt-2 sm:mt-0">
             <button
-              onClick={() => setViewMode('customers')}
+              onClick={() => {
+                setViewMode('customers');
+                setSortConfig({ key: 'name', direction: 'asc' }); // Reset to default sort
+              }}
               className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
                 viewMode === 'customers'
                   ? 'bg-blue-600 text-white shadow-sm'
@@ -402,7 +483,10 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
               Customers
             </button>
             <button
-              onClick={() => setViewMode('vendors')}
+              onClick={() => {
+                setViewMode('vendors');
+                setSortConfig({ key: 'name', direction: 'asc' }); // Reset to default sort
+              }}
               className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
                 viewMode === 'vendors'
                   ? 'bg-orange-600 text-white shadow-sm'
@@ -456,15 +540,55 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
                 <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr className="border-b border-gray-300 dark:border-gray-600">
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600 w-[60px]">S.No</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">Customer Name</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px]">Opening Balance</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px]">Total Sales</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px]">Total Payments</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px]">Current Balance</th>
+                    <th 
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                      onClick={() => handleSort('name')}
+                    >
+                      <div className="flex items-center">
+                        Customer Name
+                        <SortIcon column="name" />
+                      </div>
+                    </th>
+                    <th 
+                      className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                      onClick={() => handleSort('openingBalance')}
+                    >
+                      <div className="flex items-center justify-end">
+                        Opening Balance
+                        <SortIcon column="openingBalance" />
+                      </div>
+                    </th>
+                    <th 
+                      className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                      onClick={() => handleSort('totalSales')}
+                    >
+                      <div className="flex items-center justify-end">
+                        Total Sales
+                        <SortIcon column="totalSales" />
+                      </div>
+                    </th>
+                    <th 
+                      className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                      onClick={() => handleSort('totalPayments')}
+                    >
+                      <div className="flex items-center justify-end">
+                        Total Payments
+                        <SortIcon column="totalPayments" />
+                      </div>
+                    </th>
+                    <th 
+                      className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                      onClick={() => handleSort('currentBalance')}
+                    >
+                      <div className="flex items-center justify-end">
+                        Current Balance
+                        <SortIcon column="currentBalance" />
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
-                  {customerBalances.map((summary, index) => (
+                  {getSortedData().map((summary, index) => (
                     <tr 
                       key={`customer-${summary.id}`} 
                       className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-600"
@@ -505,7 +629,7 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
                       Total Customer Balance
                     </td>
                     <td className="px-4 py-3 text-right font-bold text-blue-900 dark:text-blue-100">
-                      {formatCurrency(customerBalances.reduce((sum, item) => sum + item.currentBalance, 0))}
+                      {formatCurrency(getSortedData().reduce((sum, item) => sum + item.currentBalance, 0))}
                     </td>
                   </tr>
                 </tbody>
@@ -520,15 +644,55 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
                 <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr className="border-b border-gray-300 dark:border-gray-600">
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600 w-[60px]">S.No</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">Vendor Name</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px]">Opening Balance</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px]">Total Purchases</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px]">Total Payments</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px]">Current Balance</th>
+                    <th 
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                      onClick={() => handleSort('name')}
+                    >
+                      <div className="flex items-center">
+                        Vendor Name
+                        <SortIcon column="name" />
+                      </div>
+                    </th>
+                    <th 
+                      className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                      onClick={() => handleSort('openingBalance')}
+                    >
+                      <div className="flex items-center justify-end">
+                        Opening Balance
+                        <SortIcon column="openingBalance" />
+                      </div>
+                    </th>
+                    <th 
+                      className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                      onClick={() => handleSort('totalPurchases')}
+                    >
+                      <div className="flex items-center justify-end">
+                        Total Purchases
+                        <SortIcon column="totalPurchases" />
+                      </div>
+                    </th>
+                    <th 
+                      className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                      onClick={() => handleSort('totalPayments')}
+                    >
+                      <div className="flex items-center justify-end">
+                        Total Payments
+                        <SortIcon column="totalPayments" />
+                      </div>
+                    </th>
+                    <th 
+                      className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[150px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                      onClick={() => handleSort('currentBalance')}
+                    >
+                      <div className="flex items-center justify-end">
+                        Current Balance
+                        <SortIcon column="currentBalance" />
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
-                  {vendorBalances.map((summary, index) => (
+                  {getSortedData().map((summary, index) => (
                     <tr 
                       key={`vendor-${summary.id}`} 
                       className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-600"
@@ -569,7 +733,7 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
                       Total Vendor Balance
                     </td>
                     <td className="px-4 py-3 text-right font-bold text-orange-900 dark:text-orange-100">
-                      {formatCurrency(vendorBalances.reduce((sum, item) => sum + item.currentBalance, 0))}
+                      {formatCurrency(getSortedData().reduce((sum, item) => sum + item.currentBalance, 0))}
                     </td>
                   </tr>
                 </tbody>

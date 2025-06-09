@@ -39,6 +39,13 @@ const Customers = () => {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [shopInfo, setShopInfo] = useState(null);
 
+  // States for batch selection and delete
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [selectAll, setSelectAll] = useState(false);
+  const [isBatchMode, setIsBatchMode] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+
   // Use centralized auth
   const { isAuthenticated } = useAuth();
 
@@ -71,6 +78,15 @@ const Customers = () => {
       setComponentError(null);
     }
   }, [customers, vendors, activeTab, searchTerm]);
+
+  // Reset selections when switching tabs or search changes
+  useEffect(() => {
+    setSelectedItems([]);
+    setSelectAll(false);
+    setIsBatchMode(false);
+    setShowDeleteModal(false);
+    setItemToDelete(null);
+  }, [activeTab, searchTerm]);
 
   useEffect(() => {
     console.log("Mounting Customers component");
@@ -185,20 +201,102 @@ const Customers = () => {
     }
   };
 
-  const handleDelete = async (itemId) => {
+  const handleDelete = (itemId, item) => {
+    setItemToDelete({ id: itemId, item });
+    setShowDeleteModal(true);
+  };
+
+  const confirmSingleDelete = async () => {
     const itemType = activeTab === 'customers' ? 'customer' : 'vendor';
     
-    if (!window.confirm(`Are you sure you want to delete this ${itemType}?`)) {
+    try {
+      await deleteDoc(getUserDoc('customers', itemToDelete.id));
+      console.log(`${itemType} deleted successfully`);
+      setShowDeleteModal(false);
+      setItemToDelete(null);
+    } catch (error) {
+      console.error(`Error deleting ${itemType}:`, error);
+      setError(`Failed to delete ${itemType}`);
+    }
+  };
+
+  const startBatchMode = () => {
+    setIsBatchMode(true);
+    setShowDeleteModal(false);
+    setItemToDelete(null);
+  };
+
+  const cancelBatchMode = () => {
+    setIsBatchMode(false);
+    setSelectedItems([]);
+    setSelectAll(false);
+  };
+
+  // Handle batch delete
+  const handleBatchDelete = async () => {
+    const itemType = activeTab === 'customers' ? 'customers' : 'vendors';
+    const count = selectedItems.length;
+    
+    if (count === 0) {
+      alert('No items selected for deletion');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete ${count} selected ${itemType}? This action cannot be undone.`)) {
       return;
     }
 
     try {
-      await deleteDoc(getUserDoc('customers', itemId));
-      console.log(`${itemType} deleted successfully`);
-      // No need to update state as the onSnapshot listener will handle it
+      setLoading(true);
+      const deletePromises = selectedItems.map(itemId => 
+        deleteDoc(getUserDoc('customers', itemId))
+      );
+      
+      await Promise.all(deletePromises);
+      console.log(`${count} ${itemType} deleted successfully`);
+      
+      // Clear selections
+      setSelectedItems([]);
+      setSelectAll(false);
+      
+      // Success message
+      alert(`Successfully deleted ${count} ${itemType}`);
+      
     } catch (error) {
       console.error(`Error deleting ${itemType}:`, error);
-      setError(`Failed to delete ${itemType}`);
+      setError(`Failed to delete some ${itemType}. Please try again.`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle individual item selection
+  const handleItemSelect = (itemId) => {
+    setSelectedItems(prev => {
+      const newSelection = prev.includes(itemId) 
+        ? prev.filter(id => id !== itemId)
+        : [...prev, itemId];
+      
+      // Update select all state
+      const filteredItemIds = filteredItems.map(item => item.id);
+      setSelectAll(newSelection.length === filteredItemIds.length && filteredItemIds.length > 0);
+      
+      return newSelection;
+    });
+  };
+
+  // Handle select all toggle
+  const handleSelectAll = () => {
+    const filteredItemIds = filteredItems.map(item => item.id);
+    
+    if (selectAll) {
+      // Deselect all
+      setSelectedItems([]);
+      setSelectAll(false);
+    } else {
+      // Select all visible items
+      setSelectedItems(filteredItemIds);
+      setSelectAll(true);
     }
   };
 
@@ -248,28 +346,36 @@ const Customers = () => {
     }
   };
 
-  // Filter items based on search term with error handling
+  // Filter and sort items based on search term with error handling
   const getFilteredItems = () => {
     const items = activeTab === 'customers' ? customers : vendors;
     console.log(`Filtering ${items.length} ${activeTab} with search term: "${searchTerm}"`);
     
+    let filteredItems;
     if (!searchTerm || !searchTerm.trim()) {
-      return items;
+      filteredItems = items;
+    } else {
+      const term = searchTerm.toLowerCase().trim();
+      filteredItems = items.filter(item => {
+        try {
+          return (
+            safeGet(item, 'opticalName', '').toLowerCase().includes(term) ||
+            safeGet(item, 'contactPerson', '').toLowerCase().includes(term) ||
+            safeGet(item, 'phone', '').includes(term) ||
+            safeGet(item, 'city', '').toLowerCase().includes(term)
+          );
+        } catch (error) {
+          console.error("Error filtering item:", error, item);
+          return false;
+        }
+      });
     }
     
-    const term = searchTerm.toLowerCase().trim();
-    return items.filter(item => {
-      try {
-        return (
-          safeGet(item, 'opticalName', '').toLowerCase().includes(term) ||
-          safeGet(item, 'contactPerson', '').toLowerCase().includes(term) ||
-          safeGet(item, 'phone', '').includes(term) ||
-          safeGet(item, 'city', '').toLowerCase().includes(term)
-        );
-      } catch (error) {
-        console.error("Error filtering item:", error, item);
-        return false;
-      }
+    // Sort alphabetically by optical name
+    return filteredItems.sort((a, b) => {
+      const nameA = safeGet(a, 'opticalName', '').toLowerCase();
+      const nameB = safeGet(b, 'opticalName', '').toLowerCase();
+      return nameA.localeCompare(nameB);
     });
   };
   
@@ -918,6 +1024,32 @@ const Customers = () => {
               Export {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
             </button>
             
+            {/* Batch Mode Controls - Only show in batch mode */}
+            {isBatchMode && (
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={handleBatchDelete}
+                  disabled={selectedItems.length === 0}
+                  className={`inline-flex items-center px-4 py-2 border text-sm font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                    selectedItems.length > 0
+                      ? 'border-red-300 text-red-700 bg-red-50 hover:bg-red-100 focus:ring-red-500'
+                      : 'border-gray-300 text-gray-400 bg-gray-50 cursor-not-allowed'
+                  }`}
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Delete Selected ({selectedItems.length})
+                </button>
+                <button
+                  onClick={cancelBatchMode}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+            
             <button
               onClick={handleAddNew}
               className="btn-primary inline-flex items-center justify-center px-4 py-2"
@@ -1063,6 +1195,17 @@ const Customers = () => {
                   <table className="min-w-full divide-y" style={{ borderColor: 'var(--border-primary)' }}>
                     <thead style={{ backgroundColor: 'var(--bg-tertiary)' }}>
                       <tr>
+                        {isBatchMode && (
+                          <th className="px-4 py-3 text-left" style={{ width: '50px' }}>
+                            <input
+                              type="checkbox"
+                              checked={selectAll}
+                              onChange={handleSelectAll}
+                              className="h-4 w-4 text-sky-600 focus:ring-sky-500 border-gray-300 rounded"
+                              disabled={filteredItems.length === 0}
+                            />
+                          </th>
+                        )}
                         <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)', width: '60px' }}>
                           S.No
                         </th>
@@ -1086,6 +1229,16 @@ const Customers = () => {
                     <tbody className="divide-y" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
                       {filteredItems.map((item, index) => (
                         <tr key={item.id} className="hover:bg-opacity-50" style={{ ':hover': { backgroundColor: 'var(--bg-tertiary)' } }}>
+                          {isBatchMode && (
+                            <td className="px-4 py-4 whitespace-nowrap text-left">
+                              <input
+                                type="checkbox"
+                                checked={selectedItems.includes(item.id)}
+                                onChange={() => handleItemSelect(item.id)}
+                                className="h-4 w-4 text-sky-600 focus:ring-sky-500 border-gray-300 rounded"
+                              />
+                            </td>
+                          )}
                           <td className="px-4 py-4 whitespace-nowrap text-left">
                             <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                               {index + 1}
@@ -1157,7 +1310,7 @@ const Customers = () => {
                               Print Address
                             </button>
                             <button
-                              onClick={() => handleDelete(item.id)}
+                              onClick={() => handleDelete(item.id, item)}
                               className="text-red-600 hover:text-red-900"
                             >
                               Delete
@@ -1172,18 +1325,44 @@ const Customers = () => {
             </div>
 
             {/* Mobile Cards View */}
-            <div className="md:hidden space-y-4">
-              {filteredItems.map((item) => (
-                <CustomerCard
-                  key={item.id}
-                  customer={item}
-                  onEdit={() => handleEdit(item)}
-                  onDelete={() => handleDelete(item.id)}
-                  onPrintAddress={() => handlePrintAddress(item)}
-                  formatCurrency={formatCurrency}
-                  isVendor={activeTab === 'vendors'}
-                />
-              ))}
+            <div className="md:hidden">
+              {/* Mobile Select All - Only show in batch mode */}
+              {isBatchMode && filteredItems.length > 0 && (
+                <div className="mb-4 flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectAll}
+                      onChange={handleSelectAll}
+                      className="h-4 w-4 text-sky-600 focus:ring-sky-500 border-gray-300 rounded"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      {selectAll ? 'Deselect All' : 'Select All'} ({filteredItems.length})
+                    </span>
+                  </label>
+                  {selectedItems.length > 0 && (
+                    <span className="text-sm text-gray-600">
+                      {selectedItems.length} selected
+                    </span>
+                  )}
+                </div>
+              )}
+              
+                              <div className="space-y-4">
+                  {filteredItems.map((item) => (
+                    <CustomerCard
+                      key={item.id}
+                      customer={item}
+                      onEdit={() => handleEdit(item)}
+                      onDelete={() => handleDelete(item.id, item)}
+                      onPrintAddress={() => handlePrintAddress(item)}
+                      formatCurrency={formatCurrency}
+                      isVendor={activeTab === 'vendors'}
+                      isSelected={isBatchMode ? selectedItems.includes(item.id) : false}
+                      onSelect={isBatchMode ? handleItemSelect : null}
+                    />
+                  ))}
+              </div>
             </div>
           </>
         )}
@@ -1201,6 +1380,75 @@ const Customers = () => {
       {/* Address Modal */}
       {showAddressModal && (
         <AddressModal />
+      )}
+
+      {/* Delete Options Modal */}
+      {showDeleteModal && itemToDelete && (
+        <div className="fixed inset-0 overflow-y-auto z-50">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </div>
+                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">
+                      Delete {activeTab === 'customers' ? 'Customer' : 'Vendor'}
+                    </h3>
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-500 mb-4">
+                        You're about to delete "{itemToDelete.item.opticalName}". Choose how you'd like to proceed:
+                      </p>
+                      
+                      <div className="space-y-3">
+                        <button
+                          onClick={confirmSingleDelete}
+                          className="w-full inline-flex items-center justify-center px-4 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                        >
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Delete This {activeTab === 'customers' ? 'Customer' : 'Vendor'} Only
+                        </button>
+                        
+                        <button
+                          onClick={startBatchMode}
+                          className="w-full inline-flex items-center justify-center px-4 py-2 border border-orange-300 text-sm font-medium rounded-md text-orange-700 bg-orange-50 hover:bg-orange-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+                        >
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Select Multiple {activeTab === 'customers' ? 'Customers' : 'Vendors'} to Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setItemToDelete(null);
+                  }}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
