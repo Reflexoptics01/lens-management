@@ -66,10 +66,17 @@ const ItemSuggestions = ({
   // Filter items and prepare suggestions when search term changes
   useEffect(() => {
     if (searchTerm && searchTerm.trim() && items && items.length > 0) {
-      // Filter items that match the search term
+      // Filter items that match the search term using flexible word matching
       const filtered = items.filter(item => {
         const itemName = item.name || item.itemName || '';
-        return itemName.toLowerCase().includes(searchTerm.toLowerCase());
+        const itemNameLower = itemName.toLowerCase();
+        const searchTermLower = searchTerm.toLowerCase().trim();
+        
+        // Split search term into words and remove empty strings
+        const searchWords = searchTermLower.split(/\s+/).filter(word => word.length > 0);
+        
+        // Check if all search words are present in the item name
+        return searchWords.every(word => itemNameLower.includes(word));
       });
 
 
