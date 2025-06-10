@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebaseConfig';
-import { collection, getDocs, query, orderBy, where, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
 import { getUserCollection } from '../utils/multiTenancy';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import { safelyParseDate, formatDate, formatDateTime } from '../utils/dateUtils';
+import { safelyParseDate, formatDate } from '../utils/dateUtils';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -14,6 +13,7 @@ const Dashboard = () => {
   });
   
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [salesData, setSalesData] = useState({
     today: 0,
     thisMonth: 0,
@@ -26,7 +26,7 @@ const Dashboard = () => {
   });
   
   const [topProducts, setTopProducts] = useState([]);
-  const [topPowers, setTopPowers] = useState([]);
+  const [topProductPowers, setTopProductPowers] = useState([]);
   const [topProfitProducts, setTopProfitProducts] = useState([]);
   
   // GST Notification states
@@ -34,6 +34,23 @@ const Dashboard = () => {
   const [backupNotifications, setBackupNotifications] = useState([]);
   const [reorderNotifications, setReorderNotifications] = useState([]);
   
+  // New states for additional dashboard metrics
+  const [timePeriod, setTimePeriod] = useState('monthly'); // daily, monthly, quarterly, yearly
+  const [additionalMetrics, setAdditionalMetrics] = useState({
+    totalFreightCharges: 0,
+    totalCashReceived: 0,
+    totalUPIReceived: 0,
+    totalBankTransferReceived: 0,
+    topCustomers: []
+  });
+
+  // New state for monthly sales chart
+  const [monthlySalesData, setMonthlySalesData] = useState([]);
+  
+  // New states for services section
+  const [servicesTimePeriod, setServicesTimePeriod] = useState('monthly'); // daily, monthly, quarterly, yearly
+  const [topServices, setTopServices] = useState([]);
+
   useEffect(() => {
     loadDashboardData();
     checkGSTNotifications();
@@ -47,14 +64,31 @@ const Dashboard = () => {
     loadDashboardData();
   }, []);
 
+  // Reload additional metrics when time period changes
+  useEffect(() => {
+    if (selectedDate) { // Only fetch if selectedDate is set
+      fetchAdditionalMetrics();
+    }
+  }, [timePeriod]);
+
+  // Refresh services data when services time period changes
+  useEffect(() => {
+    if (servicesTimePeriod && selectedDate) {
+      fetchTopServices();
+    }
+  }, [servicesTimePeriod, selectedDate]);
+
   const loadDashboardData = async () => {
     setLoading(true);
     try {
       await Promise.all([
         fetchSalesData(),
         fetchTopProducts(),
-        fetchTopPowers(),
-        fetchTopProfitProducts()
+        fetchTopServices(),
+        fetchTopProductPowers(),
+        fetchTopProfitProducts(),
+        fetchAdditionalMetrics(),
+        fetchMonthlySalesData()
       ]);
     } catch (error) {
       setError('Failed to load dashboard data');
@@ -107,27 +141,21 @@ const Dashboard = () => {
       let lastYearSameMonthSales = 0;
       let lastYearTotalSales = 0;
       
-      let processedCount = 0;
-      let skippedCount = 0;
-      
       salesSnapshot.docs.forEach(doc => {
         const sale = doc.data();
         
         // Skip if no invoiceDate or totalAmount
         if (!sale.invoiceDate || !sale.totalAmount) {
-          skippedCount++;
           return;
         }
         
         // Convert timestamp safely
         const saleDate = safelyParseDate(sale.invoiceDate);
         if (!saleDate) {
-          skippedCount++;
           return;
         }
         
         const amount = parseFloat(sale.totalAmount) || 0;
-        processedCount++;
         
         // Today's sales
         if (saleDate >= startOfToday && saleDate <= endOfToday) {
@@ -210,26 +238,34 @@ const Dashboard = () => {
       const salesSnapshot = await getDocs(salesRef);
       
       const productCounts = {};
-      let processedSales = 0;
-      let processedItems = 0;
       
       salesSnapshot.docs.forEach(doc => {
         const sale = doc.data();
-        processedSales++;
         
         if (sale.items && Array.isArray(sale.items)) {
           sale.items.forEach(item => {
             try {
+              // Skip services - check multiple ways services can be identified
+              const isServiceItem = item.isService || 
+                                  item.type === 'service' || 
+                                  item.unit === 'Service' || 
+                                  item.unit === 'service' ||
+                                  (item.itemName && item.itemName.toLowerCase().includes('service')) ||
+                                  (item.serviceData && Object.keys(item.serviceData).length > 0);
+              
+              if (isServiceItem) {
+                return; // Skip this item
+              }
+              
               const productName = item.itemName || item.productName || 'Unknown Product';
               const qty = parseInt(item.qty) || 1;
-              processedItems++;
               
               if (!productCounts[productName]) {
                 productCounts[productName] = 0;
               }
               productCounts[productName] += qty;
             } catch (error) {
-              console.warn('Error processing item:', item, error);
+              // Skip invalid items silently in production
             }
           });
         }
@@ -246,31 +282,152 @@ const Dashboard = () => {
     }
   };
 
-  const fetchTopPowers = async () => {
+  const fetchTopServices = async () => {
     try {
+      const selectedDateObj = new Date(selectedDate);
+      let startDate, endDate;
+      
+      // Calculate date range based on services time period
+      switch (servicesTimePeriod) {
+        case 'daily':
+          startDate = new Date(selectedDateObj);
+          startDate.setHours(0, 0, 0, 0);
+          endDate = new Date(selectedDateObj);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case 'monthly':
+          startDate = new Date(selectedDateObj.getFullYear(), selectedDateObj.getMonth(), 1);
+          endDate = new Date(selectedDateObj.getFullYear(), selectedDateObj.getMonth() + 1, 0);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case 'quarterly':
+          const quarter = Math.floor(selectedDateObj.getMonth() / 3);
+          startDate = new Date(selectedDateObj.getFullYear(), quarter * 3, 1);
+          endDate = new Date(selectedDateObj.getFullYear(), quarter * 3 + 3, 0);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case 'yearly':
+          startDate = new Date(selectedDateObj.getFullYear(), 0, 1);
+          endDate = new Date(selectedDateObj.getFullYear(), 11, 31);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        default:
+          startDate = new Date(selectedDateObj.getFullYear(), selectedDateObj.getMonth(), 1);
+          endDate = new Date(selectedDateObj.getFullYear(), selectedDateObj.getMonth() + 1, 0);
+          endDate.setHours(23, 59, 59, 999);
+      }
+      
       const salesRef = getUserCollection('sales');
       const salesSnapshot = await getDocs(salesRef);
       
-      const powerCounts = {};
-      let processedSales = 0;
-      let processedItems = 0;
+      const serviceCounts = {};
       
       salesSnapshot.docs.forEach(doc => {
         const sale = doc.data();
-        processedSales++;
+        
+        // Skip if no invoiceDate
+        if (!sale.invoiceDate) return;
+        
+        const saleDate = safelyParseDate(sale.invoiceDate);
+        if (!saleDate || saleDate < startDate || saleDate > endDate) return;
         
         if (sale.items && Array.isArray(sale.items)) {
           sale.items.forEach(item => {
             try {
-              if (item.sph) {
-                const power = item.sph.toString();
-                const qty = parseInt(item.qty) || 1;
-                processedItems++;
+              // Only include services - check multiple ways services can be identified
+              const isServiceItem = item.isService || 
+                                  item.type === 'service' || 
+                                  item.unit === 'Service' || 
+                                  item.unit === 'service' ||
+                                  (item.itemName && item.itemName.toLowerCase().includes('service')) ||
+                                  (item.serviceData && Object.keys(item.serviceData).length > 0);
+              
+              if (!isServiceItem) {
+                return; // Skip non-service items
+              }
+              
+              const serviceName = item.itemName || item.productName || 'Unknown Service';
+              const qty = parseInt(item.qty) || 1;
+              const price = parseFloat(item.price) || 0;
+              const totalEarned = price * qty;
+              
+              if (!serviceCounts[serviceName]) {
+                serviceCounts[serviceName] = {
+                  name: serviceName,
+                  count: 0,
+                  totalEarned: 0
+                };
+              }
+              serviceCounts[serviceName].count += qty;
+              serviceCounts[serviceName].totalEarned += totalEarned;
+            } catch (error) {
+              // Skip invalid service items silently in production
+            }
+          });
+        }
+      });
+      
+      const sortedServices = Object.values(serviceCounts)
+        .sort((a, b) => b.totalEarned - a.totalEarned) // Sort by total earnings
+        .slice(0, 10);
+      
+      setTopServices(sortedServices);
+    } catch (error) {
+      // Handle errors gracefully by setting empty array
+      setTopServices([]);
+    }
+  };
+
+  const fetchTopProductPowers = async () => {
+    try {
+      const salesRef = getUserCollection('sales');
+      const salesSnapshot = await getDocs(salesRef);
+      
+      const productPowerCounts = {};
+      
+      salesSnapshot.docs.forEach(doc => {
+        const sale = doc.data();
+        
+        if (sale.items && Array.isArray(sale.items)) {
+          sale.items.forEach(item => {
+            try {
+              const productName = item.itemName || item.productName || 'Unknown Product';
+              const qty = parseInt(item.qty) || 1;
+              
+              // Build power specification string
+              let powerSpec = '';
+              const sph = item.sph ? parseFloat(item.sph).toFixed(2) : null;
+              const cyl = item.cyl ? parseFloat(item.cyl).toFixed(2) : null;
+              const axis = item.axis ? parseInt(item.axis) : null;
+              const add = item.add ? parseFloat(item.add).toFixed(2) : null;
+              
+              // Only process items that have at least SPH power
+              if (sph !== null && sph !== '0.00') {
+                powerSpec = `${sph} SPH`;
                 
-                if (!powerCounts[power]) {
-                  powerCounts[power] = 0;
+                if (cyl !== null && cyl !== '0.00') {
+                  powerSpec += ` ${cyl} CYL`;
+                  
+                  if (axis !== null && axis !== 0) {
+                    powerSpec += ` ${axis}°`;
+                  }
                 }
-                powerCounts[power] += qty;
+                
+                if (add !== null && add !== '0.00') {
+                  powerSpec += ` ${add} ADD`;
+                }
+                
+                // Create unique key combining product name and power
+                const productPowerKey = `${productName} | ${powerSpec}`;
+                
+                if (!productPowerCounts[productPowerKey]) {
+                  productPowerCounts[productPowerKey] = {
+                    productName,
+                    powerSpec,
+                    count: 0
+                  };
+                }
+                productPowerCounts[productPowerKey].count += qty;
               }
             } catch (error) {
               // Skip invalid items
@@ -279,14 +436,19 @@ const Dashboard = () => {
         }
       });
       
-      const sortedPowers = Object.entries(powerCounts)
-        .map(([power, count]) => ({ power, count }))
+      const sortedProductPowers = Object.entries(productPowerCounts)
+        .map(([key, data]) => ({
+          productName: data.productName,
+          powerSpec: data.powerSpec,
+          count: data.count,
+          displayName: `${data.productName} | ${data.powerSpec}`
+        }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 20);
       
-      setTopPowers(sortedPowers);
+      setTopProductPowers(sortedProductPowers);
     } catch (error) {
-      setTopPowers([]);
+      setTopProductPowers([]);
     }
   };
 
@@ -296,12 +458,9 @@ const Dashboard = () => {
       const salesSnapshot = await getDocs(salesRef);
       
       const productProfits = {};
-      let processedSales = 0;
-      let processedItems = 0;
       
       salesSnapshot.docs.forEach(doc => {
         const sale = doc.data();
-        processedSales++;
         
         if (sale.items && Array.isArray(sale.items)) {
           sale.items.forEach(item => {
@@ -309,15 +468,37 @@ const Dashboard = () => {
               const productName = item.itemName || item.productName || 'Unknown Product';
               const qty = parseInt(item.qty) || 1;
               const price = parseFloat(item.price) || 0;
-              const cost = parseFloat(item.cost) || parseFloat(item.costPrice) || 0;
+              
+              // Get cost price - if not available, assume 25% margin (cost = 75% of price)
+              let cost = parseFloat(item.cost) || parseFloat(item.costPrice) || 0;
+              let isEstimatedCost = false;
+              
+              if (cost === 0 && price > 0) {
+                cost = price * 0.75; // Assume 25% margin if no cost price
+                isEstimatedCost = true;
+              }
+              
               const profit = (price - cost) * qty;
-              processedItems++;
               
               if (!productProfits[productName]) {
-                productProfits[productName] = { profit: 0, revenue: 0 };
+                productProfits[productName] = { 
+                  profit: 0, 
+                  revenue: 0, 
+                  hasEstimatedCost: false,
+                  actualCostItems: 0,
+                  estimatedCostItems: 0
+                };
               }
               productProfits[productName].profit += profit;
               productProfits[productName].revenue += price * qty;
+              
+              // Track whether this product has estimated costs
+              if (isEstimatedCost) {
+                productProfits[productName].hasEstimatedCost = true;
+                productProfits[productName].estimatedCostItems += qty;
+              } else {
+                productProfits[productName].actualCostItems += qty;
+              }
             } catch (error) {
               // Skip invalid items
             }
@@ -330,7 +511,10 @@ const Dashboard = () => {
           name, 
           profit: data.profit, 
           revenue: data.revenue,
-          profitMargin: data.revenue > 0 ? (data.profit / data.revenue * 100) : 0
+          profitMargin: data.revenue > 0 ? (data.profit / data.revenue * 100) : 0,
+          hasEstimatedCost: data.hasEstimatedCost,
+          actualCostItems: data.actualCostItems,
+          estimatedCostItems: data.estimatedCostItems
         }))
         .sort((a, b) => b.profit - a.profit)
         .slice(0, 20);
@@ -338,6 +522,203 @@ const Dashboard = () => {
       setTopProfitProducts(sortedProfitProducts);
     } catch (error) {
       setTopProfitProducts([]);
+    }
+  };
+
+  const fetchAdditionalMetrics = async () => {
+    try {
+      const selectedDateObj = new Date(selectedDate);
+      let startDate, endDate;
+      
+      // Calculate date range based on time period
+      switch (timePeriod) {
+        case 'daily':
+          startDate = new Date(selectedDateObj);
+          startDate.setHours(0, 0, 0, 0);
+          endDate = new Date(selectedDateObj);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case 'monthly':
+          startDate = new Date(selectedDateObj.getFullYear(), selectedDateObj.getMonth(), 1);
+          endDate = new Date(selectedDateObj.getFullYear(), selectedDateObj.getMonth() + 1, 0);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case 'quarterly':
+          const quarter = Math.floor(selectedDateObj.getMonth() / 3);
+          startDate = new Date(selectedDateObj.getFullYear(), quarter * 3, 1);
+          endDate = new Date(selectedDateObj.getFullYear(), quarter * 3 + 3, 0);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case 'yearly':
+          startDate = new Date(selectedDateObj.getFullYear(), 0, 1);
+          endDate = new Date(selectedDateObj.getFullYear(), 11, 31);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        default:
+          startDate = new Date(selectedDateObj.getFullYear(), selectedDateObj.getMonth(), 1);
+          endDate = new Date(selectedDateObj.getFullYear(), selectedDateObj.getMonth() + 1, 0);
+          endDate.setHours(23, 59, 59, 999);
+      }
+      
+      // Fetch freight charges from sales
+      const salesRef = getUserCollection('sales');
+      const salesSnapshot = await getDocs(salesRef);
+      
+      let totalFreightCharges = 0;
+      let totalCashReceived = 0;
+      let totalUPIReceived = 0;
+      let totalBankTransferReceived = 0;
+      const customerSales = {};
+      
+      salesSnapshot.docs.forEach(doc => {
+        const sale = doc.data();
+        
+        // Skip if no invoiceDate
+        if (!sale.invoiceDate) return;
+        
+        const saleDate = safelyParseDate(sale.invoiceDate);
+        if (!saleDate || saleDate < startDate || saleDate > endDate) return;
+        
+        // Calculate freight charges - fix field name (it's frieghtCharge with typo in the data)
+        const freightCharge = parseFloat(sale.frieghtCharge) || 0;
+        totalFreightCharges += freightCharge;
+        
+        // Calculate customer sales
+        if (sale.customerId && sale.customerName) {
+          const totalAmount = parseFloat(sale.totalAmount) || 0;
+          if (!customerSales[sale.customerId]) {
+            customerSales[sale.customerId] = {
+              name: sale.customerName,
+              total: 0
+            };
+          }
+          customerSales[sale.customerId].total += totalAmount;
+        }
+        
+        // Add cash amounts from sales - since paymentMethod field doesn't exist in sales documents,
+        // we identify cash sales by checking if customer name contains "CASH CUSTOMER" and payment status is PAID
+        const totalAmount = parseFloat(sale.totalAmount) || 0;
+        const amountPaid = parseFloat(sale.amountPaid) || 0;
+        
+        // For cash sales, add the amount paid if customer is a cash customer
+        if (sale.customerName && 
+            sale.customerName.toUpperCase().includes('CASH CUSTOMER') && 
+            amountPaid > 0) {
+          totalCashReceived += amountPaid;
+        }
+        // Note: UPI and bank transfer amounts will come from transactions only since
+        // sales documents don't have paymentMethod field
+      });
+      
+      // Get top 5 customers
+      const topCustomers = Object.entries(customerSales)
+        .map(([id, data]) => ({ id, ...data }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5);
+      
+      // Fetch cash/UPI/bank received from transactions
+      const transactionsRef = getUserCollection('transactions');
+      const transactionsQuery = query(
+        transactionsRef,
+        where('type', '==', 'received')
+      );
+      const transactionsSnapshot = await getDocs(transactionsQuery);
+      
+      transactionsSnapshot.docs.forEach(doc => {
+        const transaction = doc.data();
+        
+        // Check date range
+        if (!transaction.date) return;
+        const transactionDate = new Date(transaction.date);
+        if (transactionDate < startDate || transactionDate > endDate) return;
+        
+        const amount = parseFloat(transaction.amount) || 0;
+        
+        // Separate by payment method
+        if (transaction.paymentMethod === 'cash') {
+          totalCashReceived += amount;
+        } else if (transaction.paymentMethod === 'upi') {
+          totalUPIReceived += amount;
+        } else if (transaction.paymentMethod === 'bank_transfer') {
+          totalBankTransferReceived += amount;
+        }
+      });
+      
+
+      
+      setAdditionalMetrics({
+        totalFreightCharges,
+        totalCashReceived,
+        totalUPIReceived,
+        totalBankTransferReceived,
+        topCustomers
+      });
+      
+    } catch (error) {
+      // Handle errors gracefully by setting default values
+      setAdditionalMetrics({
+        totalFreightCharges: 0,
+        totalCashReceived: 0,
+        totalUPIReceived: 0,
+        totalBankTransferReceived: 0,
+        topCustomers: []
+      });
+    }
+  };
+
+  const fetchMonthlySalesData = async () => {
+    try {
+      const salesRef = getUserCollection('sales');
+      const salesSnapshot = await getDocs(salesRef);
+      
+      // Get data from April of current year to current month
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth(); // 0-based (0 = January)
+      const monthlyData = {};
+      
+      // Initialize from April (month 3) to current month
+      for (let month = 3; month <= currentMonth; month++) {
+        const date = new Date(currentYear, month, 1);
+        const monthKey = `${currentYear}-${(month + 1).toString().padStart(2, '0')}`;
+        const monthName = date.toLocaleDateString('en-US', { month: 'short' });
+        monthlyData[monthKey] = {
+          month: monthName,
+          sales: 0,
+          count: 0
+        };
+      }
+      
+      // Process sales data
+      salesSnapshot.docs.forEach(doc => {
+        const sale = doc.data();
+        
+        if (!sale.invoiceDate || !sale.totalAmount) return;
+        
+        const saleDate = safelyParseDate(sale.invoiceDate);
+        if (!saleDate) return;
+        
+        // Only include data from April of current year onwards
+        if (saleDate.getFullYear() === currentYear && saleDate.getMonth() >= 3) {
+          const monthKey = `${saleDate.getFullYear()}-${(saleDate.getMonth() + 1).toString().padStart(2, '0')}`;
+          
+          if (monthlyData[monthKey]) {
+            monthlyData[monthKey].sales += parseFloat(sale.totalAmount) || 0;
+            monthlyData[monthKey].count += 1;
+          }
+        }
+      });
+      
+      // Convert to array and sort by month order
+      const chartData = Object.keys(monthlyData)
+        .sort()
+        .map(key => monthlyData[key]);
+      
+      setMonthlySalesData(chartData);
+      
+    } catch (error) {
+      // Handle errors gracefully by setting empty array
+      setMonthlySalesData([]);
     }
   };
 
@@ -928,19 +1309,37 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Date Selector */}
+        {/* Date Selector and Time Period */}
         <div className="mb-6 rounded-lg shadow p-4" style={{ backgroundColor: 'var(--bg-secondary)' }}>
           <div className="flex items-center justify-between">
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-                Select Date for Analysis
-              </label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="form-input"
-              />
+            <div className="flex items-center space-x-6">
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+                  Select Date for Analysis
+                </label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+                  Time Period
+                </label>
+                <select
+                  value={timePeriod}
+                  onChange={(e) => setTimePeriod(e.target.value)}
+                  className="form-input"
+                >
+                  <option value="daily">Daily</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="quarterly">Quarterly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </div>
             </div>
             
             <button
@@ -1034,55 +1433,343 @@ const Dashboard = () => {
           </div>
         </div>
         
-        {/* Top Products Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Top Products by Quantity */}
-            <div className="card overflow-hidden p-0">
-            <div className="px-6 py-4 border-b" style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-primary)' }}>
-              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Top 20 Products by Sales</h3>
-              </div>
-            <div className="max-h-96 overflow-y-auto">
-              <table className="min-w-full">
-                <thead className="sticky top-0" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>#</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Product</th>
-                    <th className="px-4 py-2 text-right text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Qty</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y" style={{ borderColor: 'var(--border-primary)' }}>
-                  {topProducts.map((product, index) => (
-                    <tr key={index} className="hover:bg-opacity-50" style={{ ':hover': { backgroundColor: 'var(--bg-tertiary)' } }}>
-                      <td className="px-4 py-2 text-sm" style={{ color: 'var(--text-primary)' }}>{index + 1}</td>
-                      <td className="px-4 py-2 text-sm" style={{ color: 'var(--text-primary)' }}>{product.name}</td>
-                      <td className="px-4 py-2 text-sm text-right" style={{ color: 'var(--text-primary)' }}>{product.count}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+        {/* Additional Metrics Section */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
+              {timePeriod.charAt(0).toUpperCase() + timePeriod.slice(1)} Overview
+            </h2>
+            <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              {timePeriod === 'daily' && formatDate(selectedDate)}
+              {timePeriod === 'monthly' && `${new Date(selectedDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`}
+              {timePeriod === 'quarterly' && `Q${Math.floor(new Date(selectedDate).getMonth() / 3) + 1} ${new Date(selectedDate).getFullYear()}`}
+              {timePeriod === 'yearly' && `${new Date(selectedDate).getFullYear()}`}
             </div>
           </div>
           
-          {/* Top Powers */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            {/* Total Freight Charges */}
+            <div className="card">
+              <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>Total Freight Charges</h3>
+              <p className="text-3xl font-bold text-orange-600">{formatCurrency(additionalMetrics.totalFreightCharges)}</p>
+              <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+                From all sales in selected period
+              </p>
+            </div>
+            
+            {/* Total Cash Received */}
+            <div className="card">
+              <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>Cash Received</h3>
+              <p className="text-3xl font-bold text-green-600">{formatCurrency(additionalMetrics.totalCashReceived)}</p>
+              <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+                Cash payments only
+              </p>
+            </div>
+            
+            {/* Total UPI Received */}
+            <div className="card">
+              <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>UPI Received</h3>
+              <p className="text-3xl font-bold text-blue-600">{formatCurrency(additionalMetrics.totalUPIReceived)}</p>
+              <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+                UPI payments only
+              </p>
+            </div>
+            
+            {/* Total Bank Transfer Received */}
+            <div className="card">
+              <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>Bank Transfer Received</h3>
+              <p className="text-3xl font-bold text-purple-600">{formatCurrency(additionalMetrics.totalBankTransferReceived)}</p>
+              <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+                Bank transfers only
+              </p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            {/* Top 5 Customers */}
             <div className="card overflow-hidden p-0">
+              <div className="px-6 py-4 border-b" style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-primary)' }}>
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Top 5 Customers</h3>
+              </div>
+              <div className="max-h-80 overflow-y-auto">
+                {additionalMetrics.topCustomers.length > 0 ? (
+                  <table className="min-w-full">
+                    <tbody className="divide-y" style={{ borderColor: 'var(--border-primary)' }}>
+                      {additionalMetrics.topCustomers.map((customer, index) => (
+                        <tr key={customer.id} className="hover:bg-opacity-50">
+                          <td className="px-4 py-3 text-sm" style={{ color: 'var(--text-primary)' }}>
+                            <div className="flex items-center">
+                              <span className="w-6 h-6 bg-blue-100 text-blue-800 rounded-full flex items-center justify-center text-xs font-medium mr-3">
+                                {index + 1}
+                              </span>
+                              <div>
+                                <div className="font-medium">{customer.name}</div>
+                                <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                                  {formatCurrency(customer.total)}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="px-4 py-8 text-center" style={{ color: 'var(--text-muted)' }}>
+                    <svg className="w-12 h-12 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5l-5 5-5-5h5v-12a1 1 0 00-1-1H5a1 1 0 00-1-1v12h5l-5 5-5-5h5V8a1 1 0 011-1h12a1 1 0 011 1v12z" />
+                    </svg>
+                    <p className="text-sm">No customer data found</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Monthly Sales Trend Chart */}
+            <div className="card overflow-hidden p-0">
+              <div className="px-6 py-4 border-b" style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-primary)' }}>
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Monthly Sales Trend (Apr - Current)</h3>
+              </div>
+              <div className="p-4">
+                {monthlySalesData.length > 0 ? (
+                  <div className="space-y-3">
+                    {/* Chart Container */}
+                    <div className="relative">
+                      {/* Chart Area */}
+                      <div className="flex items-end justify-between h-40 mb-2 border-b border-gray-200" style={{ borderColor: 'var(--border-primary)' }}>
+                        {monthlySalesData.map((month, index) => {
+                          const maxSales = Math.max(...monthlySalesData.map(m => m.sales));
+                          const height = maxSales > 0 ? (month.sales / maxSales) * 100 : 0;
+                          const barHeight = Math.max(height, month.sales > 0 ? 5 : 0); // Minimum 5% height for non-zero values
+                          
+                          return (
+                            <div key={index} className="flex-1 flex flex-col items-center">
+                              {/* Bar */}
+                              <div 
+                                className="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t-sm transition-all hover:from-blue-600 hover:to-blue-500 cursor-pointer relative group"
+                                style={{ 
+                                  height: `${barHeight}%`,
+                                  minHeight: month.sales > 0 ? '8px' : '2px',
+                                  backgroundColor: month.sales === 0 ? '#e5e7eb' : undefined,
+                                  marginBottom: '0px'
+                                }}
+                                title={`${month.month}: ${formatCurrency(month.sales)} (${month.count} sales)`}
+                              >
+                                {/* Tooltip on hover */}
+                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                                  {formatCurrency(month.sales)}
+                                  <br />
+                                  {month.count} sales
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      
+                      {/* Month Labels */}
+                      <div className="flex justify-between">
+                        {monthlySalesData.map((month, index) => (
+                          <div key={index} className="flex-1 text-center">
+                            <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                              {month.month}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {/* Summary Stats */}
+                    <div className="border-t pt-3" style={{ borderColor: 'var(--border-primary)' }}>
+                      <div className="grid grid-cols-2 gap-4 text-center">
+                        <div>
+                          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Avg Monthly</div>
+                          <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                            {formatCurrency(monthlySalesData.reduce((sum, m) => sum + m.sales, 0) / monthlySalesData.length)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>This Month</div>
+                          <div className="text-sm font-semibold text-blue-600">
+                            {monthlySalesData.length > 0 ? formatCurrency(monthlySalesData[monthlySalesData.length - 1].sales) : '₹0'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-8 text-center" style={{ color: 'var(--text-muted)' }}>
+                    <svg className="w-12 h-12 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    <p className="text-sm">No sales data available</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Top Services Section */}
+        <div className="grid grid-cols-1 gap-6 mb-6">
+          <div className="card overflow-hidden p-0">
             <div className="px-6 py-4 border-b" style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-primary)' }}>
-              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Top 20 SPH Powers</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Top 10 Services by Revenue</h3>
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm" style={{ color: 'var(--text-muted)' }}>Period:</label>
+                  <select
+                    value={servicesTimePeriod}
+                    onChange={(e) => setServicesTimePeriod(e.target.value)}
+                    className="px-3 py-1 text-sm border rounded-md"
+                    style={{
+                      backgroundColor: 'var(--bg-primary)',
+                      borderColor: 'var(--border-primary)',
+                      color: 'var(--text-primary)'
+                    }}
+                  >
+                    <option value="daily">Daily</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="max-h-96 overflow-y-auto">
+              {topServices.length > 0 ? (
+                <table className="min-w-full">
+                  <thead className="sticky top-0" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>#</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Service</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Count</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y" style={{ borderColor: 'var(--border-primary)' }}>
+                    {topServices.map((service, index) => (
+                      <tr key={index} className="hover:bg-opacity-50" style={{ ':hover': { backgroundColor: 'var(--bg-tertiary)' } }}>
+                        <td className="px-4 py-2 text-sm text-left" style={{ color: 'var(--text-primary)' }}>{index + 1}</td>
+                        <td className="px-4 py-2 text-sm" style={{ color: 'var(--text-primary)' }}>
+                          <div className="flex items-center">
+                            <svg className="w-4 h-4 mr-2 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                            </svg>
+                            {service.name}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 text-sm text-right" style={{ color: 'var(--text-primary)' }}>{service.count}</td>
+                        <td className="px-4 py-2 text-sm text-right font-semibold text-green-600">
+                          {formatCurrency(service.totalEarned)}
+                        </td>
+                      </tr>
+                    ))}
+                    {/* Totals Row */}
+                    <tr className="border-t-2 bg-gray-50 dark:bg-gray-700" style={{ borderColor: 'var(--border-primary)' }}>
+                      <td className="px-4 py-3"></td>
+                      <td className="px-4 py-3 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        Total ({topServices.length} services)
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right font-bold" style={{ color: 'var(--text-primary)' }}>
+                        {topServices.reduce((sum, service) => sum + service.count, 0)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right font-bold text-green-700 dark:text-green-400">
+                        {formatCurrency(topServices.reduce((sum, service) => sum + service.totalEarned, 0))}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              ) : (
+                <div className="px-4 py-8 text-center" style={{ color: 'var(--text-muted)' }}>
+                  <svg className="w-12 h-12 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 003.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                  </svg>
+                  <p className="text-sm">No service data found for selected period</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Top Products Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Top Products by Quantity */}
+          <div className="card overflow-hidden p-0">
+            <div className="px-6 py-4 border-b" style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-primary)' }}>
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Top 20 Products by Sales</h3>
             </div>
             <div className="max-h-96 overflow-y-auto">
               <table className="min-w-full">
                 <thead className="sticky top-0" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>#</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Power</th>
-                    <th className="px-4 py-2 text-right text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Count</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>#</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Product</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Qty</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y" style={{ borderColor: 'var(--border-primary)' }}>
-                  {topPowers.map((power, index) => (
-                    <tr key={index} className="hover:bg-opacity-50" style={{ ':hover': { backgroundColor: 'var(--bg-tertiary)' } }}>
-                      <td className="px-4 py-2 text-sm" style={{ color: 'var(--text-primary)' }}>{index + 1}</td>
-                      <td className="px-4 py-2 text-sm" style={{ color: 'var(--text-primary)' }}>{power.power}</td>
-                      <td className="px-4 py-2 text-sm text-right" style={{ color: 'var(--text-primary)' }}>{power.count}</td>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700" style={{ borderColor: 'var(--border-primary)' }}>
+                  {topProducts.map((product, index) => (
+                    <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
+                      <td className="px-4 py-3 text-sm text-left font-medium" style={{ color: 'var(--text-primary)' }}>{index + 1}</td>
+                      <td className="px-4 py-3 text-sm text-left" style={{ color: 'var(--text-primary)' }}>
+                        <div className="flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          </svg>
+                          <span className="font-medium">{product.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300">
+                          {product.count}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          {/* Top Product Powers */}
+          <div className="card overflow-hidden p-0">
+            <div className="px-6 py-4 border-b" style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-primary)' }}>
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Top 20 Product-Power Combinations</h3>
+            </div>
+            <div className="max-h-96 overflow-y-auto">
+              <table className="min-w-full">
+                <thead className="sticky top-0" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>#</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Product</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Power</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Qty</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700" style={{ borderColor: 'var(--border-primary)' }}>
+                  {topProductPowers.map((item, index) => (
+                    <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
+                      <td className="px-4 py-3 text-sm text-left font-medium" style={{ color: 'var(--text-primary)' }}>{index + 1}</td>
+                      <td className="px-4 py-3 text-sm text-left" style={{ color: 'var(--text-primary)' }}>
+                        <div className="flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          <span className="font-medium">{item.productName}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-left">
+                        <span className="font-mono text-xs bg-gray-100 dark:bg-gray-600 px-2 py-1 rounded" style={{ color: 'var(--text-primary)' }}>
+                          {item.powerSpec}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300">
+                          {item.count}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1099,25 +1786,59 @@ const Dashboard = () => {
               <table className="min-w-full">
                 <thead className="sticky top-0" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>#</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Product</th>
-                    <th className="px-4 py-2 text-right text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Profit</th>
-                    <th className="px-4 py-2 text-right text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Margin</th>
-                    </tr>
-                  </thead>
-                <tbody className="divide-y" style={{ borderColor: 'var(--border-primary)' }}>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>#</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Product</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Profit</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Margin</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Cost</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700" style={{ borderColor: 'var(--border-primary)' }}>
                   {topProfitProducts.map((product, index) => (
-                      <tr key={index} className="hover:bg-opacity-50" style={{ ':hover': { backgroundColor: 'var(--bg-tertiary)' } }}>
-                      <td className="px-4 py-2 text-sm" style={{ color: 'var(--text-primary)' }}>{index + 1}</td>
-                      <td className="px-4 py-2 text-sm" style={{ color: 'var(--text-primary)' }}>{product.name}</td>
-                      <td className="px-4 py-2 text-sm text-right" style={{ color: 'var(--text-primary)' }}>
-                        {formatCurrency(product.profit)}
+                    <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
+                      <td className="px-4 py-3 text-sm text-left font-medium" style={{ color: 'var(--text-primary)' }}>{index + 1}</td>
+                      <td className="px-4 py-3 text-sm text-left" style={{ color: 'var(--text-primary)' }}>
+                        <div className="flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span className="font-medium">{product.name}</span>
+                        </div>
                       </td>
-                      <td className="px-4 py-2 text-sm text-right" style={{ color: 'var(--text-primary)' }}>
-                        {product.profitMargin.toFixed(1)}%
-                        </td>
-                      </tr>
-                    ))}
+                      <td className="px-4 py-3 text-sm text-right font-semibold">
+                        <span className="text-green-600 dark:text-green-400">
+                          {formatCurrency(product.profit)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          product.profitMargin >= 50 ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' :
+                          product.profitMargin >= 25 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300' :
+                          'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+                        }`}>
+                          {product.profitMargin.toFixed(1)}%
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-center" style={{ color: 'var(--text-primary)' }}>
+                        {product.hasEstimatedCost ? (
+                          <div className="flex flex-col items-center">
+                            <span className="text-xs bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300 px-1.5 py-0.5 rounded-full font-medium">
+                              Est
+                            </span>
+                            {product.actualCostItems > 0 && (
+                              <span className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                {product.estimatedCostItems}E/{product.actualCostItems}A
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300 px-1.5 py-0.5 rounded-full font-medium">
+                            Actual
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
