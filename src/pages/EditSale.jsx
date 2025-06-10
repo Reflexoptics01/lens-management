@@ -65,6 +65,7 @@ const EditSale = () => {
       axis: '',
       add: '',
       qty: 1,
+      unit: 'Pairs',
       price: 0,
       total: 0
     }));
@@ -377,6 +378,7 @@ const EditSale = () => {
           axis: item.axis || '',
           add: item.add || '',
           qty: item.qty || 1,
+          unit: item.unit || 'Pairs', // Ensure unit field is loaded
           price: item.price || 0,
           total: item.total || 0
         })));
@@ -391,6 +393,7 @@ const EditSale = () => {
           axis: '',
           add: '',
           qty: 1,
+          unit: 'Pairs',
           price: 0,
           total: 0
         })));
@@ -517,6 +520,7 @@ const EditSale = () => {
         axis: '',
         add: '',
         qty: 1,
+        unit: 'Pairs',
         price: 0,
         total: 0
       };
@@ -590,6 +594,7 @@ const EditSale = () => {
           axis: orderData.rightAxis || orderData.leftAxis || '', // No formatting for AXIS
           add: formatOpticalValue(orderData.rightAdd || orderData.leftAdd || ''),
           qty: quantity,
+          unit: 'Pairs', // Orders are typically for lens pairs
           price: orderData.price || 0,
           total: (orderData.price || 0) * quantity
         };
@@ -713,6 +718,7 @@ const EditSale = () => {
           axis: row.axis || '',
           add: row.add || '',
           qty: parseFloat(row.qty) || 1,
+          unit: row.unit || 'Pairs',
           price: parseFloat(row.price) || 0,
           total: parseFloat(row.total) || 0
         })),
@@ -780,6 +786,7 @@ const EditSale = () => {
       axis: '',
       add: '',
       qty: 1,
+      unit: 'Pairs',
       price: 0,
       total: 0
     })));
@@ -880,6 +887,11 @@ const EditSale = () => {
           itemName = lens.brandName || '';
           displayName = lens.powerSeries ? `${lens.brandName} (${lens.powerSeries})` : lens.brandName;
           itemPrice = lens.salePrice || 0;
+        } else if (lens.type === 'item') {
+          // For general optical items (frames, boxes, accessories, etc.)
+          itemName = lens.itemName || lens.brandName || '';
+          displayName = itemName;
+          itemPrice = lens.salePrice || lens.price || 0;
         }
         
         if (itemName.trim()) {
@@ -893,10 +905,12 @@ const EditSale = () => {
             isService: lens.type === 'service',
             isContactLens: lens.type === 'contact',
             isPrescription: lens.type === 'prescription',
+            isItem: lens.type === 'item',
             stockData: lens.type === 'stock' ? lens : null,
             serviceData: lens.type === 'service' ? lens : null,
             contactData: lens.type === 'contact' ? lens : null,
             prescriptionData: lens.type === 'prescription' ? lens : null,
+            itemData: lens.type === 'item' ? lens : null,
             powerSeries: lens.powerSeries || '',
             maxSph: lens.maxSph,
             maxCyl: lens.maxCyl,
@@ -905,7 +919,11 @@ const EditSale = () => {
             material: lens.material,
             index: lens.index,
             axis: lens.axis,
-            lensType: lens.lensType
+            lensType: lens.lensType,
+            // Item-specific fields
+            category: lens.category,
+            brand: lens.brand,
+            unit: lens.unit
           });
         }
       });
@@ -979,8 +997,59 @@ const EditSale = () => {
       itemPrice = parseFloat(itemData.stockData.salePrice || 0);
     }
     
+    // If still no price, try item-specific fields
+    if (itemPrice === 0 && itemData.isItem && itemData.itemData) {
+      itemPrice = parseFloat(
+        itemData.itemData.salePrice || 
+        itemData.itemData.price || 
+        0
+      );
+    }
+    
+    // Extract proper item name based on type - prioritize the display name from suggestions
+    let cleanItemName = '';
+    
+    // First priority: use the display name from the suggestion (this is what user saw and selected)
+    if (itemData.name && itemData.name.trim()) {
+      cleanItemName = itemData.name.trim();
+    }
+    // Second priority: use itemName field
+    else if (itemData.itemName && itemData.itemName.trim()) {
+      cleanItemName = itemData.itemName.trim();
+    }
+    // Third priority: use brandName
+    else if (itemData.brandName && itemData.brandName.trim()) {
+      cleanItemName = itemData.brandName.trim();
+    }
+    
+    // For services, prioritize serviceName if available
+    if (itemData.isService && itemData.serviceData && itemData.serviceData.serviceName) {
+      cleanItemName = itemData.serviceData.serviceName.trim();
+    }
+    
+    // For items, prioritize itemName from itemData if available
+    if (itemData.isItem && itemData.itemData && itemData.itemData.itemName) {
+      cleanItemName = itemData.itemData.itemName.trim();
+    }
+    
+    // Remove any power series info from display name for cleaner item names
+    if (cleanItemName.includes('(') && cleanItemName.includes(')')) {
+      // For items like "Crizal Prevencia (Progressive)" -> "Crizal Prevencia"
+      // But keep the full name as shown in suggestions
+      const baseItemName = cleanItemName.split('(')[0].trim();
+      // Only use base name if it's not too short (to avoid "BO" -> "B")
+      if (baseItemName.length >= 3) {
+        cleanItemName = baseItemName;
+      }
+    }
+    
+    // Fallback to ensure we have some name
+    if (!cleanItemName) {
+      cleanItemName = itemData.name || itemData.itemName || itemData.brandName || '';
+    }
+    
     // First update the item name
-    handleTableRowChange(index, 'itemName', itemData.name || itemData.itemName);
+    handleTableRowChange(index, 'itemName', cleanItemName);
     
     // Then update the price, which will trigger total calculation
     if (itemPrice > 0) {
@@ -1018,6 +1087,33 @@ const EditSale = () => {
           }
         }
       }, 100);
+    } else if (itemData.isItem || itemData.type === 'item') {
+      // For general optical items, clear optical values as they don't apply
+      const updatedRows = [...tableRows];
+      updatedRows[index].sph = '';
+      updatedRows[index].cyl = '';
+      updatedRows[index].axis = '';
+      updatedRows[index].add = '';
+      updatedRows[index].isItem = true;
+      updatedRows[index].type = 'item';
+      updatedRows[index].unit = itemData.unit || itemData.itemData?.unit || 'Pieces';
+      setTableRows(updatedRows);
+    } else if (itemData.isService || itemData.type === 'service') {
+      // For services, clear optical values as they don't apply
+      const updatedRows = [...tableRows];
+      updatedRows[index].sph = '';
+      updatedRows[index].cyl = '';
+      updatedRows[index].axis = '';
+      updatedRows[index].add = '';
+      updatedRows[index].isService = true;
+      updatedRows[index].type = 'service';
+      updatedRows[index].unit = 'Service';
+      setTableRows(updatedRows);
+    } else {
+      // For lenses (stock, prescription, contact), set unit to Pairs
+      const updatedRows = [...tableRows];
+      updatedRows[index].unit = 'Pairs';
+      setTableRows(updatedRows);
     }
   };
 

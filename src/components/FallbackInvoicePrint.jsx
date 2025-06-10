@@ -527,14 +527,19 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
   const getItemUnit = (item) => {
     if (!item) return 'Pcs';
     
-    // Try to determine unit based on item category or type
+    // Use the actual unit from the item if available
+    if (item.unit) {
+      return item.unit;
+    }
+    
+    // Try to determine unit based on item category or type if unit is missing
     if (item.category === 'lenses' || item.type === 'lenses' || 
         item.itemName?.toLowerCase().includes('lens')) {
       return 'Pairs';
     }
     
-    // Default unit
-    return item.unit || 'Pcs';
+    // Default unit for items without specific unit
+    return 'Pcs';
   };
 
   // Determine if the tax is IGST or CGST/SGST
@@ -639,7 +644,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
     
     saleData.items.forEach(item => {
       const qty = parseInt(item.qty) || 0;
-      const unit = (item.unit || '').toLowerCase();
+      const unit = getItemUnit(item).toLowerCase();
       
       if (unit === 'service') {
         totalServices += qty;

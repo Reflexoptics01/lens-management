@@ -1287,6 +1287,20 @@ const CreateSale = () => {
                 });
               });
             }
+            
+            // Method 2.5: If no matches by service name, try searching by item name for general items
+            if (matchingLenses.length === 0 && item.itemName && item.itemName.trim() !== '') {
+              const itemQuery = query(lensRef, where('itemName', '==', item.itemName.trim()));
+              const itemSnapshot = await getDocs(itemQuery);
+              
+              itemSnapshot.docs.forEach(doc => {
+                const lensData = doc.data();
+                matchingLenses.push({
+                  id: doc.id,
+                  ...lensData
+                });
+              });
+            }
           
                       // Method 3: If we have prescription details, try to match RX lenses
             if (matchingLenses.length === 0 && (item.sph || item.cyl)) {
@@ -1325,9 +1339,11 @@ const CreateSale = () => {
                 const lensData = doc.data();
                 const brandName = (lensData.brandName || '').toLowerCase();
                 const serviceName = (lensData.serviceName || '').toLowerCase();
+                const itemName = (lensData.itemName || '').toLowerCase(); // Support for Items type
                 
                 if (brandName.includes(searchTerm) || searchTerm.includes(brandName) ||
-                    serviceName.includes(searchTerm) || searchTerm.includes(serviceName)) {
+                    serviceName.includes(searchTerm) || searchTerm.includes(serviceName) ||
+                    itemName.includes(searchTerm) || searchTerm.includes(itemName)) {
                   matchingLenses.push({
                     id: doc.id,
                     ...lensData
@@ -1573,6 +1589,11 @@ const CreateSale = () => {
           itemName = lens.brandName || '';
           displayName = lens.powerSeries ? `${lens.brandName} (${lens.powerSeries})` : lens.brandName;
           itemPrice = lens.salePrice || 0;
+        } else if (lens.type === 'item') {
+          // For general optical items (frames, boxes, accessories, etc.)
+          itemName = lens.itemName || lens.brandName || '';
+          displayName = itemName;
+          itemPrice = lens.salePrice || lens.price || 0;
         }
         
         // Include ALL items with a name, regardless of quantity (even 0 or negative)
@@ -1588,10 +1609,12 @@ const CreateSale = () => {
             isService: lens.type === 'service',
             isContactLens: lens.type === 'contact',
             isPrescription: lens.type === 'prescription',
+            isItem: lens.type === 'item',
             stockData: lens.type === 'stock' ? lens : null,
             serviceData: lens.type === 'service' ? lens : null,
             contactData: lens.type === 'contact' ? lens : null,
             prescriptionData: lens.type === 'prescription' ? lens : null,
+            itemData: lens.type === 'item' ? lens : null,
             // Store powerSeries and additional lens details
             powerSeries: lens.powerSeries || '',
             maxSph: lens.maxSph,
@@ -1602,7 +1625,11 @@ const CreateSale = () => {
             material: lens.material,
             index: lens.index,
             axis: lens.axis,
-            lensType: lens.lensType
+            lensType: lens.lensType,
+            // Item-specific fields
+            category: lens.category,
+            brand: lens.brand,
+            unit: lens.unit
           });
         }
       });
@@ -1675,26 +1702,75 @@ const CreateSale = () => {
       itemPrice = parseFloat(itemData.stockData.salePrice || 0);
     }
     
+    // If still no price, try item-specific fields
+    if (itemPrice === 0 && itemData.isItem && itemData.itemData) {
+      itemPrice = parseFloat(
+        itemData.itemData.salePrice || 
+        itemData.itemData.price || 
+        0
+      );
+    }
+    
     // Update the rows directly to ensure the full item name is set
     const updatedRows = [...tableRows];
+    const currentRow = updatedRows[index];
     
-    // Extract just the clean brand name, avoiding any power series details
+    // Extract proper item name based on type - prioritize the display name from suggestions
     let cleanItemName = '';
-    if (itemData.brandName) {
-      // Use brandName if available (most reliable)
-      cleanItemName = itemData.brandName;
-    } else if (itemData.name) {
-      // Use name field, but ensure it's clean
-      cleanItemName = itemData.name;
-    } else if (itemData.itemName) {
-      // Fallback to itemName
-      cleanItemName = itemData.itemName;
+    
+    // First priority: use the display name from the suggestion (this is what user saw and selected)
+    if (itemData.name && itemData.name.trim()) {
+      cleanItemName = itemData.name.trim();
+    }
+    // Second priority: use itemName field
+    else if (itemData.itemName && itemData.itemName.trim()) {
+      cleanItemName = itemData.itemName.trim();
+    }
+    // Third priority: use brandName
+    else if (itemData.brandName && itemData.brandName.trim()) {
+      cleanItemName = itemData.brandName.trim();
     }
     
-    // For services, use serviceName if available
+    // For services, prioritize serviceName if available
     if (itemData.isService && itemData.serviceData && itemData.serviceData.serviceName) {
-      cleanItemName = itemData.serviceData.serviceName;
+      cleanItemName = itemData.serviceData.serviceName.trim();
     }
+    
+    // For items, prioritize itemName from itemData if available
+    if (itemData.isItem && itemData.itemData && itemData.itemData.itemName) {
+      cleanItemName = itemData.itemData.itemName.trim();
+    }
+    
+    // Remove any power series info from display name for cleaner item names
+    if (cleanItemName.includes('(') && cleanItemName.includes(')')) {
+      // For items like "Crizal Prevencia (Progressive)" -> "Crizal Prevencia"
+      // But keep the full name as shown in suggestions
+      const baseItemName = cleanItemName.split('(')[0].trim();
+      // Only use base name if it's not too short (to avoid "BO" -> "B")
+      if (baseItemName.length >= 3) {
+        cleanItemName = baseItemName;
+      }
+    }
+    
+    // Fallback to ensure we have some name
+    if (!cleanItemName) {
+      cleanItemName = itemData.name || itemData.itemName || itemData.brandName || '';
+    }
+    
+    // Check if this is a re-selection of the same item (like from dispatch import)
+    const isSameItem = currentRow.itemName && (
+      currentRow.itemName.toLowerCase().trim() === cleanItemName.toLowerCase().trim() ||
+      currentRow.itemName.toLowerCase().includes(cleanItemName.toLowerCase()) ||
+      cleanItemName.toLowerCase().includes(currentRow.itemName.toLowerCase())
+    );
+    
+    // Preserve existing power values if this is the same item and they already exist
+    const preservePowerValues = isSameItem && (
+      currentRow.sph || currentRow.cyl || currentRow.axis || currentRow.add
+    );
+    
+    // Preserve existing quantity if it's different from default
+    const preserveQuantity = isSameItem && currentRow.qty && currentRow.qty !== 1;
     
     // Ensure the item name is set to the clean name
     updatedRows[index] = {
@@ -1702,10 +1778,20 @@ const CreateSale = () => {
       itemName: cleanItemName.trim()
     };
     
+    // Preserve quantity if it was already set
+    if (preserveQuantity) {
+      // Keep existing quantity
+    } else if (currentRow.qty && currentRow.qty !== 1) {
+      // Keep existing quantity if it's different from default
+    } else {
+      // Set default quantity
+      updatedRows[index].qty = 1;
+    }
+    
     // Set the price if available
     if (itemPrice > 0) {
       updatedRows[index].price = itemPrice.toString();
-      // Recalculate total
+      // Recalculate total with current quantity
       updatedRows[index].total = itemPrice * parseFloat(updatedRows[index].qty || 1);
     }
     
@@ -1714,11 +1800,24 @@ const CreateSale = () => {
       updatedRows[index].unit = 'Service';
       updatedRows[index].isService = true; // Explicitly set the service flag
       updatedRows[index].type = 'service'; // Also set the type for consistency
-      // Clear optical values for services as they don't apply
+      // Clear optical values for services as they don't apply (don't preserve for services)
       updatedRows[index].sph = '';
       updatedRows[index].cyl = '';
       updatedRows[index].axis = '';
       updatedRows[index].add = '';
+    } else if (itemData.isItem || itemData.type === 'item') {
+      // For general optical items, set appropriate unit and flags
+      updatedRows[index].unit = itemData.unit || itemData.itemData?.unit || 'Pieces';
+      updatedRows[index].isItem = true; // Set the item flag
+      updatedRows[index].type = 'item'; // Set the type for consistency
+      // Clear optical values for items as they don't apply
+      updatedRows[index].sph = '';
+      updatedRows[index].cyl = '';
+      updatedRows[index].axis = '';
+      updatedRows[index].add = '';
+    } else {
+      // For lenses (stock, prescription, contact), set unit to Pairs
+      updatedRows[index].unit = 'Pairs';
     }
     
     // Store lens data for stock lenses - check multiple ways to identify stock lenses
@@ -1740,8 +1839,8 @@ const CreateSale = () => {
       updatedRows[index].maxAxis = itemData.maxAxis || (itemData.stockData && itemData.stockData.maxAxis) || '';
       updatedRows[index].maxAdd = itemData.maxAdd || (itemData.stockData && itemData.stockData.maxAdd) || '';
       
-      // For stock lenses with PowerSelectionModal, clear optical values
-      if (itemData.isStockLens && itemData.stockData) {
+      // For stock lenses with PowerSelectionModal, only clear optical values if they weren't preserved
+      if (itemData.isStockLens && itemData.stockData && !preservePowerValues) {
         updatedRows[index].sph = '';
         updatedRows[index].cyl = '';
         updatedRows[index].axis = '';
@@ -1755,12 +1854,24 @@ const CreateSale = () => {
         return newWarnings;
       });
     } else {
-      // For non-stock lenses, clear stockLensData and warnings
-      delete updatedRows[index].stockLensData;
-      delete updatedRows[index].maxSph;
-      delete updatedRows[index].maxCyl;
-      delete updatedRows[index].maxAxis;
-      delete updatedRows[index].maxAdd;
+      // For non-stock lenses, preserve power values if it's the same item
+      if (!preservePowerValues) {
+        // Only clear if not preserving
+        delete updatedRows[index].stockLensData;
+        delete updatedRows[index].maxSph;
+        delete updatedRows[index].maxCyl;
+        delete updatedRows[index].maxAxis;
+        delete updatedRows[index].maxAdd;
+      } else {
+        // Store power range data for validation even for non-stock lenses
+        if (itemData.sph || itemData.cyl || itemData.axis || itemData.add) {
+          updatedRows[index].maxSph = itemData.sph || '';
+          updatedRows[index].maxCyl = itemData.cyl || '';
+          updatedRows[index].maxAxis = itemData.axis || '';
+          updatedRows[index].maxAdd = itemData.add || '';
+        }
+      }
+      
       setPowerRangeWarnings(prev => {
         const newWarnings = { ...prev };
         delete newWarnings[index];
@@ -1772,7 +1883,8 @@ const CreateSale = () => {
     setTableRows(updatedRows);
     
     // Auto-focus the power selection button for stock lenses with PowerSelectionModal after a short delay
-    if (itemData.isStockLens && itemData.stockData) {
+    // But only if this is not a re-selection of the same item
+    if (itemData.isStockLens && itemData.stockData && !preservePowerValues) {
       setTimeout(() => {
         const powerButton = document.querySelector(`[data-power-button="${index}"]`);
         if (powerButton) {
@@ -1826,7 +1938,6 @@ const CreateSale = () => {
   
   // Add function to import dispatch log entries to invoice
   const importDispatchLog = (log) => {
-
     
     // First check if we have a customer selected, if not try to find matching customer
     if (!selectedCustomer) {
@@ -1879,38 +1990,126 @@ const CreateSale = () => {
               add: '',
               qty: 1,
               unit: 'Pairs',
-              price: 0, // Price will need to be filled manually
+              price: 0,
               total: 0
             });
           }
         }
         
-        // Import the item data
-        updatedRows[targetIndex] = {
-          ...updatedRows[targetIndex],
-          orderId: log.logId || '', // Put log ID in order ID column
-          itemName: item.itemName || '',
-          sph: item.sph || '',
-          cyl: item.cyl || '',
-          axis: item.axis || '',
-          add: item.add || '',
-          qty: parseFloat(item.qty) || 1, // Use parseFloat to handle decimal quantities like 0.5
-          unit: 'Pairs',
-          price: 0, // Price will need to be filled manually
-          total: 0
-        };
+        // Try to find matching item from lens inventory
+        const matchingItem = itemSuggestions.find(inventoryItem => {
+          const inventoryName = (inventoryItem.brandName || inventoryItem.serviceName || inventoryItem.name || '').toLowerCase().trim();
+          const dispatchItemName = (item.itemName || '').toLowerCase().trim();
+          
+          // Check exact match first
+          if (inventoryName === dispatchItemName) {
+            return true;
+          }
+          
+          // Check if the inventory item name is contained in dispatch item name
+          if (dispatchItemName.includes(inventoryName) && inventoryName.length > 3) {
+            return true;
+          }
+          
+          // Check if dispatch item name is contained in inventory item name
+          if (inventoryName.includes(dispatchItemName) && dispatchItemName.length > 3) {
+            return true;
+          }
+          
+          return false;
+        });
+        
+        if (matchingItem) {
+          // Use handleItemSelect to properly set up the item with all its properties
+          // First set the basic row data
+          updatedRows[targetIndex] = {
+            ...updatedRows[targetIndex],
+            orderId: log.logId || '',
+            itemName: matchingItem.brandName || matchingItem.serviceName || matchingItem.name || item.itemName,
+            sph: item.sph || '',
+            cyl: item.cyl || '',
+            axis: item.axis || '',
+            add: item.add || '',
+            qty: parseFloat(item.qty) || 1,
+            unit: 'Pairs',
+            price: parseFloat(matchingItem.salePrice || matchingItem.servicePrice || matchingItem.price || 0),
+            total: (parseFloat(matchingItem.salePrice || matchingItem.servicePrice || matchingItem.price || 0)) * (parseFloat(item.qty) || 1)
+          };
+          
+          // Set additional properties based on item type
+          if (matchingItem.isService || matchingItem.type === 'service') {
+            updatedRows[targetIndex].unit = 'Service';
+            updatedRows[targetIndex].isService = true;
+            updatedRows[targetIndex].type = 'service';
+            // Services don't have optical values
+            updatedRows[targetIndex].sph = '';
+            updatedRows[targetIndex].cyl = '';
+            updatedRows[targetIndex].axis = '';
+            updatedRows[targetIndex].add = '';
+          } else if (matchingItem.isStockLens || matchingItem.type === 'stock') {
+            // For stock lenses, store the lens data for power selection
+            updatedRows[targetIndex].stockLensData = matchingItem;
+            updatedRows[targetIndex].powerSeries = matchingItem.powerSeries || '';
+            updatedRows[targetIndex].maxSph = matchingItem.maxSph || '';
+            updatedRows[targetIndex].maxCyl = matchingItem.maxCyl || '';
+            updatedRows[targetIndex].maxAxis = matchingItem.maxAxis || '';
+            updatedRows[targetIndex].maxAdd = matchingItem.maxAdd || '';
+          } else {
+            // For regular lenses (made-to-order), keep the power values from dispatch log
+            // and store lens data for power range validation
+            if (matchingItem.sph || matchingItem.cyl || matchingItem.axis || matchingItem.add) {
+              updatedRows[targetIndex].maxSph = matchingItem.sph || '';
+              updatedRows[targetIndex].maxCyl = matchingItem.cyl || '';
+              updatedRows[targetIndex].maxAxis = matchingItem.axis || '';
+              updatedRows[targetIndex].maxAdd = matchingItem.add || '';
+            }
+          }
+        } else {
+          // If no matching item found, import as is with a note
+          updatedRows[targetIndex] = {
+            ...updatedRows[targetIndex],
+            orderId: log.logId || '',
+            itemName: item.itemName || '',
+            sph: item.sph || '',
+            cyl: item.cyl || '',
+            axis: item.axis || '',
+            add: item.add || '',
+            qty: parseFloat(item.qty) || 1,
+            unit: 'Pairs',
+            price: 0, // Price will need to be filled manually
+            total: 0
+          };
+        }
       });
       
       // Update the table with imported data
       setTableRows(updatedRows);
       
-      // Set success message instead of error
-      setTimeout(() => {
-        const importedItemDetails = log.items.map(item => 
-          `${item.itemName} (Qty: ${item.qty})`
-        ).join(', ');
-        alert(`Successfully imported ${log.items.length} items from dispatch log ${log.logId}:\n${importedItemDetails}`);
-      }, 100);
+              // Set success message
+        setTimeout(() => {
+          const matchedItems = log.items.filter(item => {
+            const itemName = (item.itemName || '').toLowerCase().trim();
+            return itemSuggestions.some(inventoryItem => {
+              const inventoryName = (inventoryItem.brandName || inventoryItem.serviceName || inventoryItem.name || '').toLowerCase().trim();
+              return inventoryName === itemName || 
+                     (itemName.includes(inventoryName) && inventoryName.length > 3) ||
+                     (inventoryName.includes(itemName) && itemName.length > 3);
+            });
+          });
+          
+          const importedItemDetails = log.items.map(item => {
+            const isMatched = itemSuggestions.some(inventoryItem => {
+              const inventoryName = (inventoryItem.brandName || inventoryItem.serviceName || inventoryItem.name || '').toLowerCase().trim();
+              const itemName = (item.itemName || '').toLowerCase().trim();
+              return inventoryName === itemName || 
+                     (itemName.includes(inventoryName) && inventoryName.length > 3) ||
+                     (inventoryName.includes(itemName) && itemName.length > 3);
+            });
+            return `${item.itemName} (Qty: ${item.qty})${isMatched ? ' ✓' : ' ⚠️'}`;
+          }).join('\n');
+          
+          alert(`Successfully imported ${log.items.length} items from dispatch log ${log.logId}:\n\n${importedItemDetails}\n\n✓ = Matched with inventory\n⚠️ = Manual price entry needed`);
+        }, 100);
       
     } catch (error) {
       console.error("Error importing dispatch log:", error);
@@ -2347,12 +2546,7 @@ const CreateSale = () => {
               )}
             </p>
             
-            {/* Efficiency Tip */}
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-3 mb-6">
-              <p className="text-xs text-blue-700 dark:text-blue-300">
-                💡 <strong>Quick Print</strong> will auto-close all modals and pre-fill filename with customer name.
-              </p>
-            </div>
+
 
             {/* Action Buttons */}
             <div className="space-y-3">
@@ -2814,8 +3008,14 @@ const CreateSale = () => {
                       <option value="Pairs">Pairs</option>
                       <option value="Pieces">Pieces</option>
                       <option value="Dozen">Dozen</option>
-                      <option value="Pack">Pack</option>
                       <option value="Box">Box</option>
+                      <option value="Pair">Pair</option>
+                      <option value="Set">Set</option>
+                      <option value="Pack">Pack</option>
+                      <option value="Roll">Roll</option>
+                      <option value="Meter">Meter</option>
+                      <option value="Gram">Gram</option>
+                      <option value="Kilogram">Kilogram</option>
                     </select>
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">

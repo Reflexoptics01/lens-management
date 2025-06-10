@@ -170,6 +170,25 @@ const SaleDetail = () => {
     setShowAddressModal(true);
   };
 
+  // Get unit for an item
+  const getItemUnit = (item) => {
+    if (!item) return 'Pcs';
+    
+    // Use the actual unit from the item if available
+    if (item.unit) {
+      return item.unit;
+    }
+    
+    // Try to determine unit based on item category or type if unit is missing
+    if (item.category === 'lenses' || item.type === 'lenses' || 
+        item.itemName?.toLowerCase().includes('lens')) {
+      return 'Pairs';
+    }
+    
+    // Default unit for items without specific unit
+    return 'Pcs';
+  };
+
   // Calculate total quantities with service separation
   const calculateTotalQuantities = () => {
     if (!sale?.items) return { totalPairs: 0, totalServices: 0, totalOthers: 0 };
@@ -180,7 +199,7 @@ const SaleDetail = () => {
     
     sale.items.forEach(item => {
       const qty = parseInt(item.qty || item.quantity) || 0;
-      const unit = (item.unit || '').toLowerCase();
+      const unit = getItemUnit(item).toLowerCase();
       
       if (unit === 'service') {
         totalServices += qty;
@@ -602,8 +621,8 @@ const SaleDetail = () => {
                         // Get quantity, accommodating different property names
                         const quantity = item.qty || item.quantity || 0;
                         
-                        // Get unit (default to "Pairs" if not specified)
-                        const unit = item.unit || "Pairs";
+                        // Get unit using the proper unit function
+                        const unit = getItemUnit(item);
                         
                         // Get rate/price, accommodating different property names
                         const rate = item.rate || item.price || 0;
