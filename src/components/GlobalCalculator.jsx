@@ -350,7 +350,7 @@ const GlobalCalculator = ({ isOpen, onClose }) => {
 
         {/* Keyboard shortcuts info */}
         <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
-          C=Open • ESC=Close • G=Remove GST • H=Add GST
+          T=Open • ESC=Close • G=Remove GST • H=Add GST
         </div>
       </div>
     </div>

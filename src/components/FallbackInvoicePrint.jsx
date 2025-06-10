@@ -1109,10 +1109,6 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
                     )}
                   </div>
                 </div>
-                
-                {shopSettings?.termsAndConditions && (
-                  <p style={{ fontSize: '8px', marginTop: '7px' }}>{shopSettings.termsAndConditions}</p>
-                )}
               </div>
               
               {/* Right side - UPI & QR Code */}
@@ -1164,6 +1160,39 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
                 </div>
               </div>
             </div>
+            
+            {/* Terms and Conditions Section */}
+            {shopSettings?.termsAndConditions && (
+              <div style={{ marginTop: '15px', border: '1px solid #ddd', padding: '8px', borderRadius: '4px', backgroundColor: '#f9f9f9' }}>
+                <p style={{ fontWeight: 'bold', marginBottom: '5px', fontSize: '11px', color: '#333' }}>Terms and Conditions</p>
+                <div style={{ fontSize: '8px', lineHeight: '1.4', color: '#555' }}>
+                  {shopSettings.termsAndConditions.split('\n').map((line, index) => {
+                    const trimmedLine = line.trim();
+                    if (!trimmedLine) return null;
+                    
+                    // Check if line starts with bullet point indicators
+                    const isBulletPoint = trimmedLine.startsWith('•') || 
+                                        trimmedLine.startsWith('-') || 
+                                        trimmedLine.startsWith('*') ||
+                                        /^\d+\./.test(trimmedLine);
+                    
+                    if (isBulletPoint) {
+                      return (
+                        <div key={index} style={{ marginBottom: '2px', paddingLeft: '8px' }}>
+                          {trimmedLine}
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div key={index} style={{ marginBottom: '3px' }}>
+                          {trimmedLine}
+                        </div>
+                      );
+                    }
+                  }).filter(Boolean)}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

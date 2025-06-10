@@ -23,7 +23,7 @@ export const logError = async (error, context = {}) => {
     
     // Log to console in development
     if (import.meta.env?.MODE === 'development') {
-      console.error('Error logged:', errorLog);
+      // Error logged to Firestore
     }
   } catch (logError) {
     // Fallback to console if logging fails

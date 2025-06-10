@@ -123,7 +123,7 @@ export const diagnoseAuthIssues = () => {
     diagnosis.recommendations.push('Clear browser data and login again');
   }
   
-  console.log('Authentication Diagnosis:', diagnosis);
+      // Authentication diagnosis performed
   return diagnosis;
 };
 
@@ -135,10 +135,10 @@ export const attemptAuthFix = () => {
   try {
     // Check if Firebase auth has current user but localStorage doesn't
     if (auth.currentUser && !localStorage.getItem('userUid')) {
-      console.log('Found authenticated user but missing localStorage data');
+      // Found authenticated user but missing localStorage data
       localStorage.setItem('userUid', auth.currentUser.uid);
       localStorage.setItem('userEmail', auth.currentUser.email);
-      console.log('Restored localStorage authentication data');
+      // Restored localStorage authentication data
       return true;
     }
   } catch (error) {

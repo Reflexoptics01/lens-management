@@ -4,6 +4,7 @@ import { getUserCollection } from '../utils/multiTenancy';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { safelyParseDate, formatDate } from '../utils/dateUtils';
+import * as XLSX from 'xlsx';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -1002,6 +1003,224 @@ const Dashboard = () => {
     keysToRemove.forEach(key => localStorage.removeItem(key));
   };
 
+  // Export functions for Excel
+  const exportTopProductsToExcel = async () => {
+    try {
+      const salesRef = getUserCollection('sales');
+      const salesSnapshot = await getDocs(salesRef);
+      
+      const productCounts = {};
+      
+      salesSnapshot.docs.forEach(doc => {
+        const sale = doc.data();
+        
+        if (sale.items && Array.isArray(sale.items)) {
+          sale.items.forEach(item => {
+            try {
+              // Skip services
+              const isServiceItem = item.isService || 
+                                  item.type === 'service' || 
+                                  item.unit === 'Service' || 
+                                  item.unit === 'service' ||
+                                  (item.itemName && item.itemName.toLowerCase().includes('service')) ||
+                                  (item.serviceData && Object.keys(item.serviceData).length > 0);
+              
+              if (isServiceItem) {
+                return;
+              }
+              
+              const productName = item.itemName || item.productName || 'Unknown Product';
+              const qty = parseInt(item.qty) || 1;
+              
+              if (!productCounts[productName]) {
+                productCounts[productName] = 0;
+              }
+              productCounts[productName] += qty;
+            } catch (error) {
+              // Skip invalid items
+            }
+          });
+        }
+      });
+      
+      const sortedProducts = Object.entries(productCounts)
+        .map(([name, count]) => ({ 
+          'Rank': 0,
+          'Product Name': name, 
+          'Quantity Sold': count 
+        }))
+        .sort((a, b) => b['Quantity Sold'] - a['Quantity Sold'])
+        .slice(0, 100)
+        .map((item, index) => ({ ...item, 'Rank': index + 1 }));
+      
+      const ws = XLSX.utils.json_to_sheet(sortedProducts);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Top 100 Products by Sales");
+      
+      const fileName = `Top_100_Products_by_Sales_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+    } catch (error) {
+      alert('Error exporting data to Excel. Please try again.');
+    }
+  };
+
+  const exportTopProductPowersToExcel = async () => {
+    try {
+      const salesRef = getUserCollection('sales');
+      const salesSnapshot = await getDocs(salesRef);
+      
+      const productPowerCounts = {};
+      
+      salesSnapshot.docs.forEach(doc => {
+        const sale = doc.data();
+        
+        if (sale.items && Array.isArray(sale.items)) {
+          sale.items.forEach(item => {
+            try {
+              const productName = item.itemName || item.productName || 'Unknown Product';
+              const qty = parseInt(item.qty) || 1;
+              
+              // Build power specification string
+              let powerSpec = '';
+              const sph = item.sph ? parseFloat(item.sph).toFixed(2) : null;
+              const cyl = item.cyl ? parseFloat(item.cyl).toFixed(2) : null;
+              const axis = item.axis ? parseInt(item.axis) : null;
+              const add = item.add ? parseFloat(item.add).toFixed(2) : null;
+              
+              // Only process items that have at least SPH power
+              if (sph !== null && sph !== '0.00') {
+                powerSpec = `${sph} SPH`;
+                
+                if (cyl !== null && cyl !== '0.00') {
+                  powerSpec += ` ${cyl} CYL`;
+                  
+                  if (axis !== null && axis !== 0) {
+                    powerSpec += ` ${axis}°`;
+                  }
+                }
+                
+                if (add !== null && add !== '0.00') {
+                  powerSpec += ` ${add} ADD`;
+                }
+                
+                const productPowerKey = `${productName} | ${powerSpec}`;
+                
+                if (!productPowerCounts[productPowerKey]) {
+                  productPowerCounts[productPowerKey] = {
+                    productName,
+                    powerSpec,
+                    count: 0
+                  };
+                }
+                productPowerCounts[productPowerKey].count += qty;
+              }
+            } catch (error) {
+              // Skip invalid items
+            }
+          });
+        }
+      });
+      
+      const sortedProductPowers = Object.entries(productPowerCounts)
+        .map(([key, data]) => ({
+          'Rank': 0,
+          'Product Name': data.productName,
+          'Power Specification': data.powerSpec,
+          'Quantity Sold': data.count
+        }))
+        .sort((a, b) => b['Quantity Sold'] - a['Quantity Sold'])
+        .slice(0, 100)
+        .map((item, index) => ({ ...item, 'Rank': index + 1 }));
+      
+      const ws = XLSX.utils.json_to_sheet(sortedProductPowers);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Top 100 Product-Power Combos");
+      
+      const fileName = `Top_100_Product_Power_Combinations_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+    } catch (error) {
+      alert('Error exporting data to Excel. Please try again.');
+    }
+  };
+
+  const exportTopProfitProductsToExcel = async () => {
+    try {
+      const salesRef = getUserCollection('sales');
+      const salesSnapshot = await getDocs(salesRef);
+      
+      const productProfits = {};
+      
+      salesSnapshot.docs.forEach(doc => {
+        const sale = doc.data();
+        
+        if (sale.items && Array.isArray(sale.items)) {
+          sale.items.forEach(item => {
+            try {
+              const productName = item.itemName || item.productName || 'Unknown Product';
+              const qty = parseInt(item.qty) || 1;
+              const price = parseFloat(item.price) || 0;
+              
+              let cost = parseFloat(item.cost) || parseFloat(item.costPrice) || 0;
+              let isEstimatedCost = false;
+              
+              if (cost === 0 && price > 0) {
+                cost = price * 0.75;
+                isEstimatedCost = true;
+              }
+              
+              const profit = (price - cost) * qty;
+              
+              if (!productProfits[productName]) {
+                productProfits[productName] = { 
+                  profit: 0, 
+                  revenue: 0, 
+                  hasEstimatedCost: false,
+                  actualCostItems: 0,
+                  estimatedCostItems: 0
+                };
+              }
+              productProfits[productName].profit += profit;
+              productProfits[productName].revenue += price * qty;
+              
+              if (isEstimatedCost) {
+                productProfits[productName].hasEstimatedCost = true;
+                productProfits[productName].estimatedCostItems += qty;
+              } else {
+                productProfits[productName].actualCostItems += qty;
+              }
+            } catch (error) {
+              // Skip invalid items
+            }
+          });
+        }
+      });
+      
+      const sortedProfitProducts = Object.entries(productProfits)
+        .map(([name, data]) => ({ 
+          'Rank': 0,
+          'Product Name': name, 
+          'Total Profit': parseFloat(data.profit.toFixed(2)),
+          'Total Revenue': parseFloat(data.revenue.toFixed(2)),
+          'Profit Margin (%)': data.revenue > 0 ? parseFloat((data.profit / data.revenue * 100).toFixed(2)) : 0,
+          'Cost Type': data.hasEstimatedCost ? 'Estimated' : 'Actual',
+          'Estimated Cost Items': data.estimatedCostItems,
+          'Actual Cost Items': data.actualCostItems
+        }))
+        .sort((a, b) => b['Total Profit'] - a['Total Profit'])
+        .slice(0, 100)
+        .map((item, index) => ({ ...item, 'Rank': index + 1 }));
+      
+      const ws = XLSX.utils.json_to_sheet(sortedProfitProducts);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Top 100 Profit Products");
+      
+      const fileName = `Top_100_Profit_Products_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+    } catch (error) {
+      alert('Error exporting data to Excel. Please try again.');
+    }
+  };
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
       <Navbar />
@@ -1697,7 +1916,19 @@ const Dashboard = () => {
           {/* Top Products by Quantity */}
           <div className="card overflow-hidden p-0">
             <div className="px-6 py-4 border-b" style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-primary)' }}>
-              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Top 20 Products by Sales</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Top 20 Products by Sales</h3>
+                <button
+                  onClick={exportTopProductsToExcel}
+                  className="p-2 text-green-600 hover:bg-green-50 rounded-md transition-colors"
+                  title="Export Top 100 to Excel"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+                    <path d="M11.5,15.5L10,14L8.5,15.5L7,14V17H17V14L15.5,15.5L14,14L12.5,15.5L11.5,15.5Z" />
+                  </svg>
+                </button>
+              </div>
             </div>
             <div className="max-h-96 overflow-y-auto">
               <table className="min-w-full">
@@ -1735,7 +1966,19 @@ const Dashboard = () => {
           {/* Top Product Powers */}
           <div className="card overflow-hidden p-0">
             <div className="px-6 py-4 border-b" style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-primary)' }}>
-              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Top 20 Product-Power Combinations</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Top 20 Product-Power Combinations</h3>
+                <button
+                  onClick={exportTopProductPowersToExcel}
+                  className="p-2 text-green-600 hover:bg-green-50 rounded-md transition-colors"
+                  title="Export Top 100 to Excel"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+                    <path d="M11.5,15.5L10,14L8.5,15.5L7,14V17H17V14L15.5,15.5L14,14L12.5,15.5L11.5,15.5Z" />
+                  </svg>
+                </button>
+              </div>
             </div>
             <div className="max-h-96 overflow-y-auto">
               <table className="min-w-full">
@@ -1780,7 +2023,19 @@ const Dashboard = () => {
           {/* Top Profit Products */}
           <div className="card overflow-hidden p-0">
             <div className="px-6 py-4 border-b" style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-primary)' }}>
-              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Top 20 Profit Products</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Top 20 Profit Products</h3>
+                <button
+                  onClick={exportTopProfitProductsToExcel}
+                  className="p-2 text-green-600 hover:bg-green-50 rounded-md transition-colors"
+                  title="Export Top 100 to Excel"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+                    <path d="M11.5,15.5L10,14L8.5,15.5L7,14V17H17V14L15.5,15.5L14,14L12.5,15.5L11.5,15.5Z" />
+                  </svg>
+                </button>
+              </div>
             </div>
             <div className="max-h-96 overflow-y-auto">
               <table className="min-w-full">

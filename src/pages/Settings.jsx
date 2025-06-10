@@ -28,6 +28,7 @@ const Settings = () => {
   const [pincode, setPincode] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [termsAndConditions, setTermsAndConditions] = useState('');
   
   // Logo and QR Code (stored directly as data URL)
   const [logoDataURL, setLogoDataURL] = useState('');
@@ -145,6 +146,7 @@ const Settings = () => {
         setPincode(data.pincode || '');
         setPhone(data.phone || '');
         setEmail(data.email || '');
+        setTermsAndConditions(data.termsAndConditions || '');
         
         // Logo Data URL
         if (data.logoDataURL) {
@@ -152,7 +154,7 @@ const Settings = () => {
         } else if (data.logoURL) {
           // Handle transition from old storage method (URL) to new one (data URL)
           // Just show a notification that the user should re-upload logo
-          console.log('Old logo URL format detected. Please re-upload your logo for better performance.');
+          // Old logo URL format detected
           setLogoDataURL('');
         } else {
           setLogoDataURL('');
@@ -164,7 +166,7 @@ const Settings = () => {
         } else if (data.qrCodeURL) {
           // Handle transition from old storage method (URL) to new one (data URL)
           // Just show a notification that the user should re-upload QR code
-          console.log('Old QR code URL format detected. Please re-upload your QR code for better performance.');
+          // Old QR code URL format detected
           setQrCodeDataURL('');
         } else {
           setQrCodeDataURL('');
@@ -218,6 +220,7 @@ const Settings = () => {
         pincode,
         phone,
         email,
+        termsAndConditions,
         
         // Logo Data URL
         logoDataURL,
@@ -239,21 +242,21 @@ const Settings = () => {
         updatedAt: new Date()
       };
       
-      console.log('Preparing to save settings...'); 
+      // Preparing to save settings 
       
       // Save to Firestore using user-specific document
       try {
-        console.log('Saving settings to Firestore...');
+        // Saving settings to Firestore
         try {
           // First try to update the existing document
           await setDoc(getUserDoc('settings', 'shopSettings'), settingsData);
-          console.log('Settings saved successfully to Firestore');
+          // Settings saved successfully to Firestore
         } catch (initialError) {
           console.warn('Initial save attempt failed, trying alternative approach:', initialError);
           
           // Try with merge option
           await setDoc(getUserDoc('settings', 'shopSettings'), settingsData, { merge: true });
-          console.log('Settings saved successfully using merge option');
+                      // Settings saved successfully using merge option
         }
         
         displaySuccess('Settings saved successfully!');
@@ -828,13 +831,12 @@ const Settings = () => {
       ];
       const backupData = {};
       
-      console.log('Starting backup process for collections:', collectionsToBackup);
-      console.log('Current user creating backup:', user.uid, user.email);
+              // Starting backup process for collections
       
       // Fetch data from each user-specific collection
       for (const collectionName of collectionsToBackup) {
         try {
-          console.log(`Backing up collection: ${collectionName}`);
+          // Backing up collection
           const collectionRef = getUserCollection(collectionName);
           const snapshot = await getDocs(collectionRef);
           
@@ -961,13 +963,8 @@ const Settings = () => {
         }
       }
       
-      console.log(`Backup completed: ${totalDocuments} documents across ${collectionsToBackup.length} collections`);
-      console.log(`Backup completed: ${totalDocuments} documents across ${collectionsToBackup.length} collections`);
-      console.log('Backup metadata:', {
-        userId: backupData.metadata.userId,
-        userEmail: backupData.metadata.userEmail,
-        version: backupData.metadata.version
-      });
+              // Backup completed successfully
+      // Backup metadata logged
       
       // Convert to JSON and create download link
       const backupJSON = JSON.stringify(backupData, null, 2);
@@ -1047,7 +1044,7 @@ const Settings = () => {
         throw new Error('User not authenticated. Please login again to restore backup.');
       }
       
-      console.log('Current user attempting restore:', user.uid, user.email);
+      // Current user attempting restore
       
       // Read the file
       const reader = new FileReader();
@@ -1061,13 +1058,12 @@ const Settings = () => {
             throw new Error('Invalid backup file format. Please ensure you are using a valid backup file.');
           }
           
-          console.log('Restore: Backup file validation passed');
-          console.log('Backup metadata:', backupData.metadata);
+          // Backup file validation passed
           
           // CRITICAL: Validate backup ownership
           const validationResult = validateBackupOwnership(backupData.metadata, user);
           
-          console.log('Backup ownership validation result:', validationResult);
+          // Backup ownership validation performed
           
           if (!validationResult.isValid) {
             const errorMessage = `🔒 SECURITY ERROR: This backup cannot be restored by your account.
@@ -1088,7 +1084,7 @@ For security reasons, you can only restore backups created by your own account.`
             console.warn('Backup validation warnings:', validationResult.warnings);
           }
           
-          console.log('✅ Backup ownership validation successful');
+          // Backup ownership validation successful
           
           // Collections to restore
           const collections = backupData.metadata.collections;
@@ -1144,7 +1140,7 @@ Are you sure you want to continue with the restoration?`
             return;
           }
           
-          console.log('User confirmed restoration');
+          // User confirmed restoration
           setBackupSuccess('🔒 Ownership verified. Starting restoration process...');
           
           let restoredCount = 0;
@@ -2238,6 +2234,40 @@ The page will refresh in 3 seconds to load your restored data...`;
                     <span className="text-amber-600 dark:text-amber-400 font-medium">Note: Max file size 1MB. Supported formats: JPEG, PNG, GIF, WEBP.</span><br />
                     <span className="text-gray-500 dark:text-gray-400 italic">Large images will be automatically compressed to fit size limits.</span>
                   </p>
+                </div>
+                
+                {/* Terms and Conditions Section */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Terms and Conditions (Optional)</label>
+                  <textarea
+                    value={termsAndConditions}
+                    onChange={(e) => setTermsAndConditions(e.target.value)}
+                    rows={8}
+                    className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:focus:ring-sky-400 dark:focus:border-sky-400 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono"
+                    placeholder="• Payment due within 30 days of invoice date
+• All sales are final - no returns after 7 days  
+• Warranty: 1 year on frames, 6 months on lenses
+• Late payment charges: 2% per month on overdue amounts
+• Any disputes subject to local jurisdiction only
+
+Note: Use bullet points (•, -, *) or numbers (1., 2., 3.) for better formatting"
+                  />
+                  <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    <p className="mb-2">
+                      <strong>Formatting Tips:</strong> Use bullet points or numbers for better presentation on invoices.
+                    </p>
+                    <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded border text-xs">
+                      <p className="font-medium mb-1">Supported formats:</p>
+                      <ul className="space-y-1">
+                        <li>• Bullet points with •, -, or *</li>
+                        <li>1. Numbered lists (1., 2., 3.)</li>
+                        <li>Regular text paragraphs</li>
+                      </ul>
+                    </div>
+                    <p className="mt-2">
+                      These terms will appear in a dedicated section at the bottom of all invoices and receipts.
+                    </p>
+                  </div>
                 </div>
                 
                 {/* Reflex Shop - Inventory Sharing Section */}

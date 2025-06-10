@@ -90,7 +90,7 @@ export const uploadLensesToShop = async (lenses, userInfo = null) => {
     });
 
     const results = await Promise.all(uploadPromises);
-    console.log(`Successfully uploaded ${results.length} user lenses to shop`);
+    // Successfully uploaded user lenses to shop
     return results;
   } catch (error) {
     console.error('Error uploading user lenses to shop:', error);
@@ -127,7 +127,7 @@ export const removeLensesFromShop = async (lenses, userInfo = null) => {
           if (!response.ok) {
             // Don't throw error if item doesn't exist
             if (response.status === 404) {
-              console.log(`User lens ${lens.id} not found in shop, skipping...`);
+              // User lens not found in shop, skipping
               return { success: true, message: 'Not found, skipped' };
             }
             const errorText = await response.text();
@@ -142,7 +142,7 @@ export const removeLensesFromShop = async (lenses, userInfo = null) => {
       });
 
     const results = await Promise.all(removePromises);
-    console.log(`Successfully processed ${results.length} lens removals from shop`);
+    // Successfully processed lens removals from shop
     return results;
   } catch (error) {
     console.error('Error removing user lenses from shop:', error);
@@ -172,11 +172,11 @@ export const getAllShopLenses = async (limit = 1000, includeOwnLenses = false) =
     }
 
     const allShopLenses = result.data.documents;
-    console.log(`Found ${allShopLenses.length} lenses in centralized shop`);
+    // Found lenses in centralized shop
 
     if (includeOwnLenses) {
       // Include all lenses (own and others) when explicitly requested
-      console.log(`Including all ${allShopLenses.length} lenses (including own inventory)`);
+              // Including all lenses (including own inventory)
       return allShopLenses;
     } else {
       // Filter out user's own lenses and only show others' lenses
@@ -184,7 +184,7 @@ export const getAllShopLenses = async (limit = 1000, includeOwnLenses = false) =
         return lens.ownerId !== userUid && lens.userInfo?.userId !== userUid;
       });
 
-      console.log(`Filtering to ${otherUsersLenses.length} lenses from other distributors`);
+              // Filtering to lenses from other distributors
       return otherUsersLenses;
     }
   } catch (error) {

@@ -10,7 +10,7 @@ import { getUserCollection } from './multiTenancy';
  */
 export const calculateCustomerBalance = async (customerId, openingBalance = 0) => {
   try {
-    console.log('calculateCustomerBalance: Starting calculation for customer:', customerId);
+    // Starting balance calculation for customer
     
     let currentBalance = parseFloat(openingBalance) || 0;
     

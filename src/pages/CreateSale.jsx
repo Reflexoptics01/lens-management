@@ -10,6 +10,7 @@ import ItemSuggestions from '../components/ItemSuggestions';
 import PrintInvoiceModal from '../components/PrintInvoiceModal';
 import BottomActionBar from '../components/BottomActionBar';
 import PowerSelectionModal from '../components/PowerSelectionModal';
+import QuickTransactionModal from '../components/QuickTransactionModal';
 import { calculateCustomerBalance, calculateVendorBalance, formatCurrency as formatCurrencyUtil, getBalanceColorClass, getBalanceStatusText } from '../utils/ledgerUtils';
 
 const TAX_OPTIONS = [
@@ -134,6 +135,7 @@ const CreateSale = () => {
   // Success modal
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [savedSaleId, setSavedSaleId] = useState(null);
+  const [hasPrintedInvoice, setHasPrintedInvoice] = useState(false);
   
   // Add state for address modal
   const [showAddressModal, setShowAddressModal] = useState(false);
@@ -173,6 +175,9 @@ const CreateSale = () => {
 
   // Section navigation state
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
+
+  // Quick Transaction Modal state
+  const [showQuickTransactionModal, setShowQuickTransactionModal] = useState(false);
 
 
 
@@ -420,7 +425,7 @@ const CreateSale = () => {
   // Add keyboard navigation listener
   useEffect(() => {
     const handleKeyPress = (event) => {
-      // Only handle 'S' key when not typing in input fields
+      // Handle 'S' key for section navigation when not typing in input fields
       if (event.key.toLowerCase() === 's' && 
           !['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName) &&
           !event.ctrlKey && !event.altKey && !event.metaKey) {
@@ -454,6 +459,29 @@ const CreateSale = () => {
           
           return nextIndex;
         });
+      }
+      
+      // Handle 'O' key for Quick Transaction Modal
+      if (event.key.toLowerCase() === 'o' && 
+          !['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName) &&
+          !event.ctrlKey && !event.altKey && !event.metaKey) {
+        event.preventDefault();
+        setShowQuickTransactionModal(true);
+        
+        // Show a brief notification
+        const toast = document.createElement('div');
+        toast.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity';
+        toast.textContent = '🚀 Quick Transaction Entry';
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          setTimeout(() => {
+            if (document.body.contains(toast)) {
+              document.body.removeChild(toast);
+            }
+          }, 300);
+        }, 1500);
       }
     };
 
@@ -939,7 +967,7 @@ const CreateSale = () => {
     } catch (error) {
       console.error('Error registering payment transaction:', error);
       // Don't throw error to prevent sale creation from failing
-              console.warn('Sale was created successfully, but payment transaction registration failed');
+              // Sale was created successfully, but payment transaction registration failed
     }
   };
 
@@ -1144,14 +1172,14 @@ const CreateSale = () => {
             const lensDoc = await getDoc(lensDocRef);
             
             if (!lensDoc.exists()) {
-              console.warn(`⚠️ Lens document ${item.lensId} not found`);
+              // Lens document not found
               continue;
             }
             
             const lensData = lensDoc.data();
             
             if (!lensData.powerInventory || !lensData.powerInventory[item.powerKey]) {
-              console.warn(`⚠️ Power ${item.powerKey} not found in lens ${item.lensId} inventory`);
+              // Power not found in lens inventory
               continue;
             }
             
@@ -1159,7 +1187,7 @@ const CreateSale = () => {
             const qtyToDeduct = parseInt(item.pieceQuantity) || 0;
             
             if (currentPowerQty < qtyToDeduct) {
-              console.warn(`⚠️ Insufficient stock for power ${item.powerKey}. Available: ${currentPowerQty}, Requested: ${qtyToDeduct}`);
+              // Insufficient stock for power
               continue;
             }
             
@@ -1364,6 +1392,7 @@ const CreateSale = () => {
     if (savedSaleId) {
       // Use the PrintInvoiceModal component for printing
       setShowPrintModal(true);
+      setHasPrintedInvoice(true);
       // Clear any previous errors when opening print
       setError('');
     } else {
@@ -1376,9 +1405,9 @@ const CreateSale = () => {
   // Enhanced print function with auto-close modal option
   const handleQuickPrint = () => {
     if (savedSaleId) {
-      // Auto-close success modal and open print with auto-close enabled
-      setShowSuccessModal(false);
+      // Keep success modal open and also open print modal
       setShowPrintModal(true);
+      setHasPrintedInvoice(true);
       
       // Use a timeout to allow modal to render, then trigger quick print
       setTimeout(() => {
@@ -1439,6 +1468,7 @@ const CreateSale = () => {
     setSelectedStockPowers({});
     setPowerRangeWarnings({});
     setError('');
+    setHasPrintedInvoice(false);
     previewNextInvoiceNumber();
   };
 
@@ -1975,6 +2005,34 @@ const CreateSale = () => {
     setSelectedLensForPowerModal(null);
   };
 
+  // Quick Transaction Modal handlers
+  const handleQuickTransactionSaved = async (transactionData) => {
+    // Refresh customer balance if the transaction is for the selected customer
+    if (selectedCustomer && transactionData.entityId === selectedCustomer.id) {
+      try {
+        setLoadingBalance(true);
+        const entityIsVendor = selectedCustomer.isVendor || selectedCustomer.type === 'vendor';
+        
+        let currentBalance;
+        if (entityIsVendor) {
+          currentBalance = await calculateVendorBalance(selectedCustomer.id, selectedCustomer.openingBalance || 0);
+        } else {
+          currentBalance = await calculateCustomerBalance(selectedCustomer.id, selectedCustomer.openingBalance || 0);
+        }
+        
+        setCustomerBalance(currentBalance);
+      } catch (error) {
+        console.error('Error refreshing customer balance:', error);
+      } finally {
+        setLoadingBalance(false);
+      }
+    }
+  };
+
+  const handleCloseQuickTransaction = () => {
+    setShowQuickTransactionModal(false);
+  };
+
   // Add function to fetch dispatch logs by search query
   const searchDispatchLogs = async (query) => {
     if (!query || query.trim() === '') {
@@ -2282,6 +2340,11 @@ const CreateSale = () => {
             {/* Message */}
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
               Invoice #{invoiceNumber} has been created and saved.
+              {hasPrintedInvoice && (
+                <span className="block mt-1 text-green-600 dark:text-green-400 font-medium">
+                  ✓ Printed successfully
+                </span>
+              )}
             </p>
             
             {/* Efficiency Tip */}
@@ -2362,12 +2425,24 @@ const CreateSale = () => {
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Create Invoice</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">Create a new sales invoice</p>
           </div>
-          <button
-            onClick={() => navigate('/sales')}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
-          >
-            Cancel
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowQuickTransactionModal(true)}
+              className="px-2 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors flex items-center gap-1 text-sm"
+              title="Quick Payment Entry (Press O)"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Payment
+            </button>
+            <button
+              onClick={() => navigate('/sales')}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -3004,25 +3079,37 @@ const CreateSale = () => {
         {/* Mobile Save Button - Fixed at bottom*/}
         <div className="mobile-only">
           <BottomActionBar fixed={true} bgColor="bg-gray-50 dark:bg-gray-800">
-            <button
-              type="button"
-              onClick={handleSaveSale}
-              disabled={loading}
-              data-section="save-button"
-              className="w-full px-4 py-3 bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors disabled:opacity-50"
-            >
-              {loading ? (
-                <span className="flex items-center justify-center">
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Saving...
-                </span>
-              ) : (
-                'Save Invoice'
-              )}
-            </button>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowQuickTransactionModal(true)}
+                className="px-4 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors flex items-center"
+                title="Quick Payment Entry"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveSale}
+                disabled={loading}
+                data-section="save-button"
+                className="flex-1 px-4 py-3 bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors disabled:opacity-50"
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Saving...
+                  </span>
+                ) : (
+                  'Save Invoice'
+                )}
+              </button>
+            </div>
           </BottomActionBar>
         </div>
 
@@ -3228,7 +3315,8 @@ const CreateSale = () => {
           saleId={savedSaleId} 
           onClose={() => {
             setShowPrintModal(false);
-            // Print modal closed
+            // Ensure success modal remains visible after print modal closes
+            setShowSuccessModal(true);
           }}
           title={`Invoice #${invoiceNumber}`}
         />
@@ -3241,6 +3329,14 @@ const CreateSale = () => {
         onSelectPower={handlePowerSelection}
         selectedLens={selectedLensForPowerModal}
         rowIndex={powerSelectionRowIndex}
+      />
+
+      {/* Quick Transaction Modal */}
+      <QuickTransactionModal
+        isOpen={showQuickTransactionModal}
+        onClose={handleCloseQuickTransaction}
+        preSelectedCustomer={selectedCustomer}
+        onTransactionSaved={handleQuickTransactionSaved}
       />
     </div>
   );

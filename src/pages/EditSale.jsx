@@ -75,6 +75,7 @@ const EditSale = () => {
   // Success modal
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [savedSaleId, setSavedSaleId] = useState(null);
+  const [hasPrintedInvoice, setHasPrintedInvoice] = useState(false);
 
   const [searchCustomer, setSearchCustomer] = useState('');
 
@@ -138,6 +139,66 @@ const EditSale = () => {
       fetchDispatchLogs(selectedLogDate);
     }
   }, [selectedLogDate]);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (event) => {
+      // Handle 'Ctrl+S' for quick save when not typing in input fields
+      if (event.ctrlKey && event.key.toLowerCase() === 's' && 
+          !['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)) {
+        event.preventDefault();
+        
+        if (!loading) {
+          handleUpdateSale();
+          
+          // Show a brief notification
+          const toast = document.createElement('div');
+          toast.className = 'fixed top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity';
+          toast.textContent = '💾 Saving Invoice...';
+          document.body.appendChild(toast);
+          
+          setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => {
+              if (document.body.contains(toast)) {
+                document.body.removeChild(toast);
+              }
+            }, 300);
+          }, 1500);
+        }
+      }
+      
+      // Handle 'Ctrl+P' for quick print when not typing in input fields
+      if (event.ctrlKey && event.key.toLowerCase() === 'p' && 
+          !['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)) {
+        event.preventDefault();
+        
+        if (saleId) {
+          handlePrintBill();
+          
+          // Show a brief notification
+          const toast = document.createElement('div');
+          toast.className = 'fixed top-4 right-4 bg-gray-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity';
+          toast.textContent = '🖨️ Opening Print...';
+          document.body.appendChild(toast);
+          
+          setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => {
+              if (document.body.contains(toast)) {
+                document.body.removeChild(toast);
+              }
+            }, 300);
+          }, 1500);
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    return () => {
+      document.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [loading, saleId]); // Dependencies for the shortcuts
 
   // Handlers for tax calculations
   const getTaxOption = (taxId) => {
@@ -675,9 +736,57 @@ const EditSale = () => {
   const handlePrintBill = () => {
     if (saleId) {
       setShowPrintModal(true);
+      setHasPrintedInvoice(true);
     } else {
       setError('Sale ID not found');
     }
+  };
+
+  // Enhanced print function with auto-close modal option
+  const handleQuickPrint = () => {
+    if (saleId) {
+      // Keep success modal open and also open print modal
+      setShowPrintModal(true);
+      setHasPrintedInvoice(true);
+      
+      // Use a timeout to allow modal to render, then trigger quick print
+      setTimeout(() => {
+        // The FallbackInvoicePrint component will handle auto-close
+      }, 100);
+    }
+  };
+
+  const resetForm = () => {
+    setSelectedCustomer(null);
+    setCustomerBalance(0);
+    setInvoiceNumber('');
+    setInvoicePrefix('');
+    setInvoiceSimpleNumber('');
+    setInvoiceDate(new Date().toISOString().split('T')[0]);
+    setDueDate('');
+    setSelectedTaxOption(TAX_OPTIONS[0].id);
+    setDiscountType('amount');
+    setDiscountValue(0);
+    setFrieghtCharge(0);
+    setNotes('');
+    setPaymentStatus('UNPAID');
+    setAmountPaid(0);
+    setTableRows(Array(5).fill().map(() => ({
+      orderId: '',
+      orderDetails: null,
+      itemName: '',
+      sph: '',
+      cyl: '',
+      axis: '',
+      add: '',
+      qty: 1,
+      price: 0,
+      total: 0
+    })));
+    setSelectedStockPowers({});
+    setError('');
+    setHasPrintedInvoice(false);
+    navigate('/create-sale');
   };
 
   const handleSendWhatsApp = () => {
@@ -1240,6 +1349,137 @@ const EditSale = () => {
       case 'UNPAID': return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-600';
       default: return 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-600';
     }
+  };
+
+  const SuccessModal = () => {
+    // Handle keyboard shortcuts and ESC key
+    useEffect(() => {
+      const handleKeyDown = (e) => {
+        // Prevent default behavior for our custom shortcuts
+        if (['Escape', 's', 'S', 'd', 'D', 'p', 'P', 'w', 'W'].includes(e.key)) {
+          e.preventDefault();
+        }
+        
+        switch (e.key) {
+          case 'Escape':
+            // ESC key - go to Sales page
+            setShowSuccessModal(false);
+            navigate('/sales');
+            break;
+          case 's':
+          case 'S':
+            // S key - Sales list
+            setShowSuccessModal(false);
+            navigate('/sales');
+            break;
+          case 'd':
+          case 'D':
+            // D key - View details
+            setShowSuccessModal(false);
+            navigate(`/sales/${savedSaleId}`);
+            break;
+          case 'p':
+          case 'P':
+            // P key - Quick print (auto-close)
+            handleQuickPrint();
+            break;
+          case 'w':
+          case 'W':
+            // W key - Send WhatsApp
+            handleSendWhatsApp();
+            break;
+        }
+      };
+
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [savedSaleId]);
+
+    const handleCloseModal = () => {
+      setShowSuccessModal(false);
+      navigate('/sales');
+    };
+
+    return (
+      <div className="fixed inset-0 bg-gray-600 dark:bg-gray-900 bg-opacity-50 dark:bg-opacity-70 overflow-y-auto h-full w-full z-50">
+        <div className="relative top-20 mx-auto p-6 border border-gray-200 dark:border-gray-700 w-full max-w-lg shadow-lg rounded-lg bg-white dark:bg-gray-800">
+          {/* Close Button */}
+          <button
+            onClick={handleCloseModal}
+            className="absolute top-4 right-4 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          <div className="text-center">
+            {/* Success Icon */}
+            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
+              <svg className="h-6 w-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+            </div>
+
+            {/* Title */}
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+              Invoice Updated Successfully!
+            </h3>
+            
+            {/* Message */}
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Invoice #{invoiceNumber} has been updated and saved.
+              {hasPrintedInvoice && (
+                <span className="block mt-1 text-green-600 dark:text-green-400 font-medium">
+                  ✓ Printed successfully
+                </span>
+              )}
+            </p>
+
+            {/* Action Buttons */}
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    navigate('/sales');
+                  }}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-sm font-medium"
+                >
+                  Sales List (S)
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    navigate(`/sales/${savedSaleId}`);
+                  }}
+                  className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors text-sm font-medium"
+                >
+                  Details (D)
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={handleQuickPrint}
+                  className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors text-sm font-medium"
+                  title="One-click print with auto-close and pre-filled filename"
+                >
+                  Quick Print (P)
+                </button>
+                <button
+                  onClick={handleSendWhatsApp}
+                  disabled={!selectedCustomer || !selectedCustomer.phone}
+                  className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  WhatsApp (W)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -1862,81 +2102,7 @@ const EditSale = () => {
       
       {/* Success Modal */}
       {showSuccessModal && (
-        <div className="fixed inset-0 bg-gray-600 dark:bg-gray-900 bg-opacity-50 dark:bg-opacity-70 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-6 border border-gray-200 dark:border-gray-700 w-full max-w-lg shadow-lg rounded-lg bg-white dark:bg-gray-800">
-            {/* Close Button */}
-            <button
-              onClick={() => {
-                setShowSuccessModal(false);
-                navigate('/sales');
-              }}
-              className="absolute top-4 right-4 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-
-            <div className="text-center">
-              {/* Success Icon */}
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
-                <svg className="h-6 w-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-              </div>
-
-              {/* Title */}
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                Sale Updated Successfully!
-              </h3>
-              
-              {/* Message */}
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                Invoice #{invoiceNumber} has been updated and saved.
-              </p>
-
-              {/* Action Buttons */}
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => {
-                      setShowSuccessModal(false);
-                      navigate('/sales');
-                    }}
-                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-sm font-medium"
-                  >
-                    Sales List
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowSuccessModal(false);
-                      navigate(`/sales/${savedSaleId}`);
-                    }}
-                    className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors text-sm font-medium"
-                  >
-                    View Details
-                  </button>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={handlePrintBill}
-                    className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors text-sm font-medium"
-                  >
-                    Print Bill
-                  </button>
-                  <button
-                    onClick={handleSendWhatsApp}
-                    disabled={!selectedCustomer || !selectedCustomer.phone}
-                    className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    WhatsApp
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <SuccessModal />
       )}
 
       {/* Print Invoice Modal */}

@@ -71,7 +71,7 @@ function App() {
       // Only trigger if not typing in an input field and calculator is not already open
       const isTypingInInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.contentEditable === 'true';
       
-      if (!isTypingInInput && e.key.toLowerCase() === 'c' && !calculatorOpen) {
+      if (!isTypingInInput && e.key.toLowerCase() === 't' && !calculatorOpen) {
         e.preventDefault();
         setCalculatorOpen(true);
       }
