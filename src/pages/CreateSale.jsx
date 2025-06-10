@@ -1373,6 +1373,20 @@ const CreateSale = () => {
     }
   };
 
+  // Enhanced print function with auto-close modal option
+  const handleQuickPrint = () => {
+    if (savedSaleId) {
+      // Auto-close success modal and open print with auto-close enabled
+      setShowSuccessModal(false);
+      setShowPrintModal(true);
+      
+      // Use a timeout to allow modal to render, then trigger quick print
+      setTimeout(() => {
+        // The FallbackInvoicePrint component will handle auto-close
+      }, 100);
+    }
+  };
+
   // Alternative print method - opens sale detail in new window
   const handlePrintBillAlternative = () => {
     if (savedSaleId) {
@@ -2219,8 +2233,8 @@ const CreateSale = () => {
             break;
           case 'p':
           case 'P':
-            // P key - Print bill
-            handlePrintBill();
+            // P key - Quick print (auto-close)
+            handleQuickPrint();
             break;
           case 'w':
           case 'W':
@@ -2266,9 +2280,16 @@ const CreateSale = () => {
             </h3>
             
             {/* Message */}
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
               Invoice #{invoiceNumber} has been created and saved.
             </p>
+            
+            {/* Efficiency Tip */}
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-3 mb-6">
+              <p className="text-xs text-blue-700 dark:text-blue-300">
+                💡 <strong>Quick Print</strong> will auto-close all modals and pre-fill filename with customer name.
+              </p>
+            </div>
 
             {/* Action Buttons */}
             <div className="space-y-3">
@@ -2294,12 +2315,13 @@ const CreateSale = () => {
               </div>
               
               <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={handlePrintBill}
-                  className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors text-sm font-medium"
-                >
-                  Print Bill (P)
-                </button>
+                                  <button
+                    onClick={handleQuickPrint}
+                    className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors text-sm font-medium"
+                    title="One-click print with auto-close and pre-filled filename"
+                  >
+                    Quick Print (P)
+                  </button>
                 <button
                   onClick={handleSendWhatsApp}
                   disabled={!selectedCustomer || !selectedCustomer.phone}

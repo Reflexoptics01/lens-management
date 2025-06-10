@@ -86,10 +86,46 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
       return Math.max(0, currentBalance);
       
     } catch (error) {
-      console.error('Error calculating customer outstanding:', error);
+              // Error calculating customer outstanding - fail silently and show 0
       return 0;
     }
   };
+
+  // Add keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (event) => {
+      // Only handle if not typing in input fields
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)) {
+        return;
+      }
+
+      switch (event.key.toLowerCase()) {
+        case 'p':
+          event.preventDefault();
+          if (!printing && !loading) {
+            handlePrint();
+          }
+          break;
+        case 'd':
+          event.preventDefault();
+          if (!loading) {
+            handleDirectDownload();
+          }
+          break;
+        case 'escape':
+          event.preventDefault();
+          if (onClose) {
+            onClose();
+          }
+          break;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    return () => {
+      document.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [printing, loading, onClose]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -187,7 +223,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
               });
             }
           } catch (error) {
-            console.error('Error fetching bank details from settings:', error);
+            // Error fetching bank details - use defaults
           }
         }
         
@@ -214,7 +250,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
             setCustomerOutstanding(outstanding);
           })
           .catch(error => {
-            console.error('Error calculating outstanding:', error);
+            // Error calculating outstanding - fail silently
             setCustomerOutstanding(0);
           });
       }
@@ -227,7 +263,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
           }, 1200);
         }
       } catch (err) {
-        console.error('Error:', err);
+        // Error during setup - fail silently
         setError(err.message || 'Failed to load invoice');
         setLoading(false);
       }
@@ -251,7 +287,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      console.error("Couldn't open print window. Make sure popup blocker is disabled.");
+              // Print window blocked - user will need to allow popups
       alert("Please allow popups to print the invoice. Check your browser's popup blocker settings.");
       setPrinting(false);
       return;
@@ -260,12 +296,20 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
     // Get the HTML content of the print-only div
     const content = document.querySelector('.print-only');
     if (!content) {
-      console.error("Print content not found");
+              // Print content not ready yet
       alert("Print content is not ready. Please wait for the invoice to load completely.");
       printWindow.close();
       setPrinting(false);
       return;
     }
+
+    // Generate intelligent filename with customer name and invoice number
+    const customerName = (saleData.customerName || saleData.selectedCustomer?.opticalName || 'Customer')
+      .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters
+      .replace(/\s+/g, '_'); // Replace spaces with underscores
+    
+    const invoiceNum = getInvoiceSuffix(saleData?.invoiceNumber) || 'Invoice';
+    const suggestedFilename = `${customerName}_Invoice_${invoiceNum}`;
 
     try {
       // Write to the new window
@@ -273,7 +317,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
         <!DOCTYPE html>
         <html>
           <head>
-            <title>Invoice #${getInvoiceSuffix(saleData?.invoiceNumber) || 'Print'}</title>
+            <title>${suggestedFilename}</title>
             <meta charset="UTF-8">
             <style>
               body {
@@ -330,6 +374,9 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
           <body>
             ${content.innerHTML}
             <script>
+              // Set document title for better PDF naming
+              document.title = '${suggestedFilename}';
+              
               // Wait for images to load before printing
               window.onload = function() {
                 setTimeout(function() {
@@ -337,9 +384,18 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
                 }, 500);
               };
               
-              // Handle print dialog close
+              // Handle print dialog events
               window.onafterprint = function() {
-                // Print dialog closed
+                // Auto-close the print window after printing is complete
+                setTimeout(function() {
+                  window.close();
+                }, 1000);
+              };
+              
+              // Also handle if user cancels the print dialog
+              window.onbeforeunload = function() {
+                // This will trigger when window is about to close
+                return null;
               };
             </script>
           </body>
@@ -348,21 +404,28 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
 
       printWindow.document.close();
       
-      // Fallback if window.onload doesn't trigger
+      // Enhanced fallback handling
       setTimeout(() => {
         if (printWindow && !printWindow.closed) {
           printWindow.focus();
           try {
             printWindow.print();
           } catch (e) {
-            console.error('Error printing:', e);
+            // Error during printing - fail silently
           }
         }
         setPrinting(false);
+        
+        // Auto-close the print modal after a delay (user will be in print dialog)
+        setTimeout(() => {
+          if (onClose) {
+            onClose();
+          }
+        }, 2000);
       }, 1000);
 
     } catch (error) {
-      console.error('Error setting up print window:', error);
+              // Error setting up print window
       alert('Error preparing the invoice for printing. Please try again.');
       if (printWindow) {
         printWindow.close();
@@ -370,6 +433,75 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
       setPrinting(false);
     }
   };
+
+  // Add direct PDF download function
+  const handleDirectDownload = async () => {
+    if (!saleData) {
+      alert("Please wait for the invoice data to load completely.");
+      return;
+    }
+
+    try {
+      // Generate filename
+      const customerName = (saleData.customerName || saleData.selectedCustomer?.opticalName || 'Customer')
+        .replace(/[^a-zA-Z0-9\s]/g, '')
+        .replace(/\s+/g, '_');
+      
+      const invoiceNum = getInvoiceSuffix(saleData?.invoiceNumber) || 'Invoice';
+      const filename = `${customerName}_Invoice_${invoiceNum}.pdf`;
+
+      // Create a temporary link to trigger download
+      const content = document.querySelector('.print-only');
+      if (!content) {
+        alert("Invoice content not ready. Please wait.");
+        return;
+      }
+
+      // Use window.print() but with a different approach for direct download
+      const printCSS = `
+        @media print {
+          @page { margin: 10mm; size: A4; }
+          body { margin: 0; padding: 20px; font-family: Arial, sans-serif; font-size: 12px; }
+          * { background-color: white !important; color: black !important; }
+        }
+      `;
+
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>${filename}</title>
+            <style>${printCSS}</style>
+          </head>
+          <body>
+            ${content.innerHTML}
+            <script>
+              document.title = '${filename}';
+              window.onload = function() {
+                setTimeout(function() {
+                  window.print();
+                  setTimeout(function() { window.close(); }, 2000);
+                }, 500);
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+
+      // Close the modal immediately since user wanted direct download
+      setTimeout(() => {
+        if (onClose) onClose();
+      }, 1000);
+
+    } catch (error) {
+              // Error creating download
+      alert('Error preparing download. Please try the regular print option.');
+    }
+  };
+
+
 
   // Format currency
   const formatCurrency = (amount) => {
@@ -673,10 +805,36 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
                   <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                   </svg>
-                  Print Invoice
+                  Quick Print (P)
                 </>
               )}
             </button>
+
+            {/* Direct Download */}
+            <button 
+              onClick={handleDirectDownload} 
+              disabled={loading}
+              className="px-3 py-2 text-white rounded flex items-center transition-colors"
+              style={{ backgroundColor: loading ? '#9ca3af' : '#059669' }}
+              onMouseOver={(e) => {
+                if (!loading) {
+                  e.target.style.backgroundColor = '#047857';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!loading) {
+                  e.target.style.backgroundColor = '#059669';
+                }
+              }}
+              title="Direct download with customer name in filename (Press D)"
+            >
+              <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Download (D)
+            </button>
+
+
             <button 
               onClick={onClose} 
               className="px-4 py-2 text-white rounded flex items-center transition-colors"
@@ -687,10 +845,12 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
               <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
-              Close
+              Close (ESC)
             </button>
           </div>
         </div>
+        
+
       </div>
       
       <div className="print-only">
