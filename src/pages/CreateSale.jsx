@@ -1742,13 +1742,23 @@ const CreateSale = () => {
     }
     
     // Remove any power series info from display name for cleaner item names
+    // Only remove parenthetical content that looks like power ranges, not service names
     if (cleanItemName.includes('(') && cleanItemName.includes(')')) {
-      // For items like "Crizal Prevencia (Progressive)" -> "Crizal Prevencia"
-      // But keep the full name as shown in suggestions
-      const baseItemName = cleanItemName.split('(')[0].trim();
-      // Only use base name if it's not too short (to avoid "BO" -> "B")
-      if (baseItemName.length >= 3) {
-        cleanItemName = baseItemName;
+      // Check if the parenthetical content looks like power range (contains numbers or "to")
+      const parentheticalContent = cleanItemName.match(/\(([^)]+)\)/);
+      if (parentheticalContent && parentheticalContent[1]) {
+        const content = parentheticalContent[1].toLowerCase();
+        // Only remove if it looks like power range: contains numbers, "to", "+", "-", "D", "sph", "cyl"
+        const isPowerRange = /[\d\+\-]|to|sph|cyl|axis|add|progressive|bifocal/i.test(content);
+        
+        if (isPowerRange) {
+          const baseItemName = cleanItemName.split('(')[0].trim();
+          // Only use base name if it's not too short and the original was clearly a power range
+          if (baseItemName.length >= 3) {
+            cleanItemName = baseItemName;
+          }
+        }
+        // For service names like "full frame fitting", keep the full name
       }
     }
     
@@ -1901,38 +1911,45 @@ const CreateSale = () => {
   // Add function to fetch dispatch logs
   const fetchDispatchLogs = async (date) => {
     try {
-
-      
       const dispatchRef = getUserCollection('dispatchLogs');
       
-      // Try without orderBy first to see if we get any results
-      const simpleQuery = query(dispatchRef, where('date', '==', date));
-      const snapshot = await getDocs(simpleQuery);
+      // Query for dispatch logs with the specific date
+      const dateQuery = query(dispatchRef, where('date', '==', date));
+      const snapshot = await getDocs(dateQuery);
       
       if (snapshot.empty) {
-        // Try getting all logs and filter in memory
-        const allSnapshot = await getDocs(dispatchRef);
-        
-        // Filter manually
-        const logsList = allSnapshot.docs
+        // If no logs found for the specific date, set empty array
+        setDispatchLogs([]);
+      } else {
+        // Filter out placeholder documents and return only logs for the specific date
+        const logsList = snapshot.docs
           .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
           .map(doc => ({
             id: doc.id,
             ...doc.data()
-          }));
-        
-        setDispatchLogs(logsList);
-      } else {
-        const logsList = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
+          }))
+          .filter(log => log.date === date); // Double-check date filtering
         
         setDispatchLogs(logsList);
       }
     } catch (error) {
       console.error('Error fetching dispatch logs:', error);
-      setDispatchLogs([]);
+      // Try fallback method with manual filtering if the query fails
+      try {
+        const allSnapshot = await getDocs(getUserCollection('dispatchLogs'));
+        const logsList = allSnapshot.docs
+          .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
+          .map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }))
+          .filter(log => log.date === date); // Filter by date manually
+        
+        setDispatchLogs(logsList);
+      } catch (fallbackError) {
+        console.error('Error in fallback dispatch logs fetch:', fallbackError);
+        setDispatchLogs([]);
+      }
     }
   };
   
@@ -2244,13 +2261,16 @@ const CreateSale = () => {
       
       const normalizedQuery = query.toLowerCase().trim();
       
-      // Search in dispatch logs
+      // Search across ALL dispatch logs (not filtered by date)
       const dispatchRef = getUserCollection('dispatchLogs');
       const snapshot = await getDocs(dispatchRef);
       
       const matchingLogs = [];
       snapshot.docs.forEach(doc => {
         const log = { id: doc.id, ...doc.data() };
+        
+        // Skip placeholder documents
+        if (log._placeholder) return;
         
         // Check if log matches search criteria
         const matchesLogId = log.logId && log.logId.toLowerCase().includes(normalizedQuery);
@@ -2276,7 +2296,7 @@ const CreateSale = () => {
         return dateB - dateA;
       });
       
-              setSearchResults(matchingLogs);
+      setSearchResults(matchingLogs);
     } catch (error) {
       console.error('Error searching dispatch logs:', error);
       setSearchResults([]);
@@ -3422,7 +3442,10 @@ const CreateSale = () => {
                                       <h4 className="font-medium text-gray-900 dark:text-white">{log.opticalShop}</h4>
                                       <p className="text-sm text-gray-500 dark:text-gray-400">
                                         Log ID: {log.logId} ({log.items ? log.items.length : 0} items) - 
-                                        {log.date}
+                                        {log.date && typeof log.date === 'object' && log.date.toDate 
+                                          ? log.date.toDate().toLocaleDateString() 
+                                          : log.date || 'No date'
+                                        }
                                       </p>
                                     </div>
                                     <button

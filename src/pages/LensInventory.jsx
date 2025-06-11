@@ -7,10 +7,12 @@ import AddLensForm from '../components/AddLensForm';
 import AddStockLensForm from '../components/AddStockLensForm';
 import AddContactLensForm from '../components/AddContactLensForm';
 import AddServiceForm from '../components/AddServiceForm';
+import AddItemForm from '../components/AddItemForm';
 import RxLensTable from '../components/RxLensTable';
 import StockLensTable from '../components/StockLensTable';
 import ContactLensTable from '../components/ContactLensTable';
 import ServiceTable from '../components/ServiceTable';
+import ItemTable from '../components/ItemTable';
 import * as XLSX from 'xlsx';
 
 const LensInventory = () => {
@@ -21,6 +23,7 @@ const LensInventory = () => {
   const [showStockLensForm, setShowStockLensForm] = useState(false);
   const [showContactLensForm, setShowContactLensForm] = useState(false);
   const [showServiceForm, setShowServiceForm] = useState(false);
+  const [showItemForm, setShowItemForm] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [lensToEdit, setLensToEdit] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -62,6 +65,8 @@ const LensInventory = () => {
       filtered = filtered.filter(lens => lens.type === 'contact');
     } else if (activeTab === 'services') {
       filtered = filtered.filter(lens => lens.type === 'service');
+    } else if (activeTab === 'items') {
+      filtered = filtered.filter(lens => lens.type === 'item');
     }
     
     // Apply search filter
@@ -83,7 +88,12 @@ const LensInventory = () => {
         // Add service-specific search fields
         (lens.serviceName && lens.serviceName.toLowerCase().includes(lowercaseSearch)) ||
         (lens.serviceType && lens.serviceType.toLowerCase().includes(lowercaseSearch)) ||
-        (lens.serviceDescription && lens.serviceDescription.toLowerCase().includes(lowercaseSearch))
+        (lens.serviceDescription && lens.serviceDescription.toLowerCase().includes(lowercaseSearch)) ||
+        // Add item-specific search fields
+        (lens.itemName && lens.itemName.toLowerCase().includes(lowercaseSearch)) ||
+        (lens.brand && lens.brand.toLowerCase().includes(lowercaseSearch)) ||
+        (lens.supplier && lens.supplier.toLowerCase().includes(lowercaseSearch)) ||
+        (lens.location && lens.location.toLowerCase().includes(lowercaseSearch))
       );
     }
     
@@ -156,11 +166,19 @@ const LensInventory = () => {
       setShowAddForm(false);
       setShowStockLensForm(false);
       setShowContactLensForm(false);
+      setShowItemForm(false);
+    } else if (lens.type === 'item') {
+      setShowItemForm(true);
+      setShowAddForm(false);
+      setShowStockLensForm(false);
+      setShowContactLensForm(false);
+      setShowServiceForm(false);
     } else {
       setShowAddForm(true);
       setShowStockLensForm(false);
       setShowContactLensForm(false);
       setShowServiceForm(false);
+      setShowItemForm(false);
     }
   };
   
@@ -171,6 +189,7 @@ const LensInventory = () => {
     setShowStockLensForm(false);
     setShowContactLensForm(false);
     setShowServiceForm(false);
+    setShowItemForm(false);
   };
 
   const handleUpdateStockInventory = async (lensId, inventoryData) => {
@@ -328,29 +347,68 @@ const LensInventory = () => {
           ];
           break;
           
-        case 'service':
-        case 'services':
-          templateData = [
-            {
-              'Service Name': 'Anti-Reflective Coating',
-              'Service Category': 'Coating',
-              'Service Price': '500',
-              'Description': 'Premium AR coating for better clarity'
-            },
-            {
-              'Service Name': 'Lens Fitting',
-              'Service Category': 'Fitting',
-              'Service Price': '200',
-              'Description': 'Professional lens fitting service'
-            },
-            {
-              'Service Name': 'Frame Repair',
-              'Service Category': 'Repair',
-              'Service Price': '300',
-              'Description': 'Frame repair and adjustment service'
-            }
-          ];
-          break;
+                  case 'service':
+          case 'services':
+            templateData = [
+              {
+                'Service Name': 'Anti-Reflective Coating',
+                'Service Category': 'Coating',
+                'Service Price': '500',
+                'Description': 'Premium AR coating for better clarity'
+              },
+              {
+                'Service Name': 'Lens Fitting',
+                'Service Category': 'Fitting',
+                'Service Price': '200',
+                'Description': 'Professional lens fitting service'
+              },
+              {
+                'Service Name': 'Frame Repair',
+                'Service Category': 'Repair',
+                'Service Price': '300',
+                'Description': 'Frame repair and adjustment service'
+              }
+            ];
+            break;
+            
+          case 'item':
+          case 'items':
+            templateData = [
+              {
+                'Item Name': 'Designer Frame',
+                'Category': 'Frames',
+                'Brand': 'Ray-Ban',
+                'Unit': 'Pieces',
+                'Purchase Price': '1500',
+                'Sale Price': '2500',
+                'Quantity': '50',
+                'Min Stock Level': '10',
+                'Description': 'Premium designer frames'
+              },
+              {
+                'Item Name': 'Lens Cleaning Cloth',
+                'Category': 'Cleaning',
+                'Brand': 'Zeiss',
+                'Unit': 'Pack',
+                'Purchase Price': '50',
+                'Sale Price': '100',
+                'Quantity': '200',
+                'Min Stock Level': '20',
+                'Description': 'Microfiber cleaning cloths'
+              },
+              {
+                'Item Name': 'Frame Case',
+                'Category': 'Cases',
+                'Brand': 'Generic',
+                'Unit': 'Pieces',
+                'Purchase Price': '25',
+                'Sale Price': '50',
+                'Quantity': '100',
+                'Min Stock Level': '15',
+                'Description': 'Protective frame storage case'
+              }
+            ];
+            break;
           
         default:
           setError('Invalid template type');
@@ -475,6 +533,28 @@ const LensInventory = () => {
             };
             break;
             
+          case 'item':
+          case 'items':
+            if (!row['Item Name'] || row['Item Name'].trim() === '') continue;
+            lensData = {
+              ...lensData,
+              itemName: row['Item Name'],
+              brandName: row['Item Name'], // For compatibility
+              name: row['Item Name'], // For compatibility
+              type: 'item',
+              category: row['Category'] || '',
+              brand: row['Brand'] || '',
+              unit: row['Unit'] || 'Pieces',
+              purchasePrice: parseFloat(row['Purchase Price']) || 0,
+              salePrice: parseFloat(row['Sale Price']) || 0,
+              price: parseFloat(row['Sale Price']) || 0,
+              qty: parseInt(row['Quantity']) || 0,
+              minStockLevel: parseInt(row['Min Stock Level']) || 5,
+              description: row['Description'] || '',
+              isItem: true
+            };
+            break;
+            
           default:
             // Fallback to basic format
             if (!row['Brand Name'] || row['Brand Name'].trim() === '') continue;
@@ -578,10 +658,23 @@ const LensInventory = () => {
                       setShowAddForm(false);
                       setShowStockLensForm(false);
                       setShowContactLensForm(false);
+                      setShowItemForm(false);
                     }}
                     className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
                   >
                     Add Service
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowItemForm(true);
+                      setShowAddForm(false);
+                      setShowStockLensForm(false);
+                      setShowContactLensForm(false);
+                      setShowServiceForm(false);
+                    }}
+                    className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                  >
+                    Add Item
                   </button>
                   <button
                     onClick={() => exportToExcel('all')}
@@ -648,8 +741,18 @@ const LensInventory = () => {
           />
         )}
         
+        {/* Add Item Form Section */}
+        {showItemForm && (
+          <AddItemForm 
+            editMode={editMode} 
+            itemToEdit={lensToEdit} 
+            onSubmit={handleFormSubmit} 
+            onCancel={resetForms} 
+          />
+        )}
+        
         {/* Inventory Table Section */}
-        {(!showAddForm && !showStockLensForm && !showContactLensForm && !showServiceForm) && (
+        {(!showAddForm && !showStockLensForm && !showContactLensForm && !showServiceForm && !showItemForm) && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-3">
               <div className="flex flex-wrap gap-1 sm:gap-2 overflow-x-auto pb-1">
@@ -676,6 +779,12 @@ const LensInventory = () => {
                   className={`px-4 py-2 text-sm font-medium rounded-lg ${activeTab === 'services' ? 'bg-indigo-600 text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                 >
                   Services
+                </button>
+                <button
+                  onClick={() => setActiveTab('items')}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg ${activeTab === 'items' ? 'bg-indigo-600 text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                >
+                  Items
                 </button>
               </div>
               
@@ -787,6 +896,15 @@ const LensInventory = () => {
             {activeTab === 'services' && (
               <ServiceTable 
                 services={filteredLenses}
+                loading={loading}
+                onEdit={handleEditLens}
+                onDelete={removeLens}
+              />
+            )}
+            
+            {activeTab === 'items' && (
+              <ItemTable 
+                items={filteredLenses}
                 loading={loading}
                 onEdit={handleEditLens}
                 onDelete={removeLens}

@@ -52,7 +52,7 @@ const Login = () => {
   // Handle navigation when user is authenticated
   useEffect(() => {
     if (isAuthenticated()) {
-      console.log('🔐 User authenticated, navigating based on role:', userRole);
+
       
       // Navigate based on user role
       switch (userRole) {
@@ -90,21 +90,21 @@ const Login = () => {
     setLoading(true);
 
     try {
-      console.log('🔐 Attempting to sign in with email:', email);
+
       
       // Trim whitespace from email and password
       const trimmedEmail = email.trim();
       const trimmedPassword = password.trim();
       
       if (trimmedEmail !== email || trimmedPassword !== password) {
-        console.log('🔐 Trimmed whitespace from credentials');
+
       }
       
       // Sign in user with Firebase authentication
       // The AuthContext will handle the rest (validation, role assignment, navigation)
       await signInWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
       
-      console.log('🔐 Firebase sign-in successful, AuthContext will handle the rest');
+      
       
     } catch (error) {
       console.error('🔐 Error signing in:', error);

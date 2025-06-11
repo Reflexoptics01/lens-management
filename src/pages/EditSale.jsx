@@ -1033,13 +1033,23 @@ const EditSale = () => {
     }
     
     // Remove any power series info from display name for cleaner item names
+    // Only remove parenthetical content that looks like power ranges, not service names
     if (cleanItemName.includes('(') && cleanItemName.includes(')')) {
-      // For items like "Crizal Prevencia (Progressive)" -> "Crizal Prevencia"
-      // But keep the full name as shown in suggestions
-      const baseItemName = cleanItemName.split('(')[0].trim();
-      // Only use base name if it's not too short (to avoid "BO" -> "B")
-      if (baseItemName.length >= 3) {
-        cleanItemName = baseItemName;
+      // Check if the parenthetical content looks like power range (contains numbers or "to")
+      const parentheticalContent = cleanItemName.match(/\(([^)]+)\)/);
+      if (parentheticalContent && parentheticalContent[1]) {
+        const content = parentheticalContent[1].toLowerCase();
+        // Only remove if it looks like power range: contains numbers, "to", "+", "-", "D", "sph", "cyl"
+        const isPowerRange = /[\d\+\-]|to|sph|cyl|axis|add|progressive|bifocal/i.test(content);
+        
+        if (isPowerRange) {
+          const baseItemName = cleanItemName.split('(')[0].trim();
+          // Only use base name if it's not too short and the original was clearly a power range
+          if (baseItemName.length >= 3) {
+            cleanItemName = baseItemName;
+          }
+        }
+        // For service names like "full frame fitting", keep the full name
       }
     }
     

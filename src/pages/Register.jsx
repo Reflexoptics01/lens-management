@@ -20,9 +20,9 @@ const Register = () => {
     const clearAuthState = async () => {
       try {
         if (user) {
-          console.log('Clearing existing auth state for user:', user.email);
+      
           await auth.signOut();
-          console.log('Auth state cleared successfully');
+          
         }
       } catch (error) {
         console.error('Error clearing auth state:', error);

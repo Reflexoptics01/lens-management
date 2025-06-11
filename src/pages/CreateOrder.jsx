@@ -458,7 +458,7 @@ const CreateOrder = () => {
       }
       
       if (!financialYear) {
-        console.log('No financial year set, using simple counter');
+
         // Fallback to simple counter without financial year
         const counterDoc = await getDoc(getUserDoc('counters', 'orderCounter'));
         
@@ -683,14 +683,14 @@ const CreateOrder = () => {
       const hasLeftEye = orderData.leftSph || orderData.leftCyl;
       
       if (!hasRightEye && !hasLeftEye) {
-        console.log('No prescription data to add to inventory');
+
         return;
       }
       
       // Check order status - only add to inventory for valid statuses
       const validStatuses = ['RECEIVED', 'DISPATCHED', 'DELIVERED'];
       if (!validStatuses.includes(orderData.status)) {
-        console.log(`Not adding to inventory due to status: ${orderData.status}`);
+
         return;
       }
       
@@ -722,7 +722,7 @@ const CreateOrder = () => {
         };
         
         await addDoc(getUserCollection('lensInventory'), rightLensData);
-        console.log('Added right eye lens to inventory');
+
       }
       
       if (hasLeftEye) {
@@ -752,7 +752,7 @@ const CreateOrder = () => {
         };
         
         await addDoc(getUserCollection('lensInventory'), leftLensData);
-        console.log('Added left eye lens to inventory');
+
       }
     } catch (error) {
       console.error('Error adding lens to inventory:', error);
@@ -771,8 +771,8 @@ const CreateOrder = () => {
     if (!phone || !orderId) return;
     const cleanPhone = phone.replace(/[^0-9+]/g, '');
     
-    // Get the display ID from the form data or use the first 3 characters of the ID as fallback
-    const displayOrderId = formData.displayId || orderId.substring(0, 3);
+    // Use the nextOrderDisplayId that's already calculated and displayed in the UI
+    const displayOrderId = nextOrderDisplayId || orderId.substring(0, 3);
     
     const message = type === 'vendor' 
       ? `🔔 *New Order #${displayOrderId}*\n\n` +
@@ -838,7 +838,7 @@ const CreateOrder = () => {
     
     const encodedMessage = encodeURIComponent(message);
     const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
-    console.log('Opening WhatsApp URL:', whatsappUrl);
+
     window.open(whatsappUrl, '_blank');
   };
 

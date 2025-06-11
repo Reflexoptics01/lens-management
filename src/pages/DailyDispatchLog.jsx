@@ -95,12 +95,12 @@ const DailyDispatchLog = () => {
         .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
         .map(doc => {
           const data = doc.data();
-          return {
-            id: doc.id,
-            name: data.brandName || data.serviceName || 'Unknown Item',
-            brandName: data.brandName,
-            serviceName: data.serviceName,
-            price: data.salePrice || data.purchasePrice || data.servicePrice || 0,
+                  return {
+          id: doc.id,
+          name: data.type === 'service' ? (data.serviceName || data.brandName || 'Unknown Service') : (data.brandName || data.serviceName || 'Unknown Item'),
+          brandName: data.brandName,
+          serviceName: data.serviceName,
+          price: data.salePrice || data.purchasePrice || data.servicePrice || 0,
             salePrice: data.salePrice,
             purchasePrice: data.purchasePrice,
             servicePrice: data.servicePrice,
@@ -129,6 +129,7 @@ const DailyDispatchLog = () => {
               type: 'stock'
             } : null,
             serviceData: data.type === 'service' ? {
+              serviceName: data.serviceName,
               serviceType: data.serviceType,
               serviceDescription: data.serviceDescription,
               serviceDuration: data.serviceDuration,
@@ -239,9 +240,41 @@ const DailyDispatchLog = () => {
 
   const handleItemSelect = (index, itemData) => {
     const updatedRows = [...dispatchRows];
+    
+    // Extract proper item name based on type - prioritize the display name from suggestions
+    let cleanItemName = '';
+    
+    // First priority: use the display name from the suggestion (this is what user saw and selected)
+    if (itemData.name && itemData.name.trim()) {
+      cleanItemName = itemData.name.trim();
+    }
+    // Second priority: use itemName field
+    else if (itemData.itemName && itemData.itemName.trim()) {
+      cleanItemName = itemData.itemName.trim();
+    }
+    // Third priority: use brandName
+    else if (itemData.brandName && itemData.brandName.trim()) {
+      cleanItemName = itemData.brandName.trim();
+    }
+    // Fourth priority: use serviceName for services
+    else if (itemData.serviceName && itemData.serviceName.trim()) {
+      cleanItemName = itemData.serviceName.trim();
+    }
+    // Fallback to the raw string if provided
+    else if (typeof itemData === 'string') {
+      cleanItemName = itemData.trim();
+    }
+    
+    // For services, prioritize serviceName if available
+    if (itemData.isService && itemData.serviceData && itemData.serviceData.serviceName) {
+      cleanItemName = itemData.serviceData.serviceName.trim();
+    } else if (itemData.isService && itemData.serviceName) {
+      cleanItemName = itemData.serviceName.trim();
+    }
+    
     updatedRows[index] = {
       ...updatedRows[index],
-      itemName: itemData.itemName || itemData.name || itemData,
+      itemName: cleanItemName,
     };
     setDispatchRows(updatedRows);
   };

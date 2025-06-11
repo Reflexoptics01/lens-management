@@ -89,7 +89,7 @@ const Customers = () => {
   }, [activeTab, searchTerm]);
 
   useEffect(() => {
-    console.log("Mounting Customers component");
+
     let unsubscribeCustomers;
     let unsubscribeVendors;
 
@@ -100,13 +100,13 @@ const Customers = () => {
           return;
         }
 
-        console.log("Setting up listeners for customers and vendors");
+
         // Set up real-time listener for customers collection
         const customersRef = getUserCollection('customers');
         const customersQuery = query(customersRef, where('type', '!=', 'vendor'));
         
         unsubscribeCustomers = onSnapshot(customersQuery, (snapshot) => {
-          console.log(`Received ${snapshot.docs.length} customer(s) from Firestore`);
+          
           const customersList = snapshot.docs
             .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
             .map(doc => {

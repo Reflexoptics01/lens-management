@@ -80,7 +80,14 @@ const ItemSuggestions = ({
     if (searchTerm && searchTerm.trim() && items && items.length > 0) {
       // Filter items that match the search term using flexible word matching
       const filtered = items.filter(item => {
-        const itemName = item.name || item.itemName || '';
+        // Get the primary name for the item based on its type
+        let itemName = '';
+        if (item.type === 'service') {
+          itemName = item.serviceName || item.name || item.itemName || '';
+        } else {
+          itemName = item.name || item.itemName || item.brandName || '';
+        }
+        
         const itemNameLower = itemName.toLowerCase();
         const searchTermLower = searchTerm.toLowerCase().trim();
         
@@ -376,8 +383,13 @@ const ItemSuggestions = ({
           description: item.serviceDescription || item.description || '',
           // Include additional fields that might be useful
           brandName: item.brandName,
+          serviceName: item.serviceName, // Add serviceName field for services
           powerSeries: item.powerSeries,
-          isContactLens: item.isContactLens
+          isContactLens: item.isContactLens,
+          // Include all item type flags
+          isItem: item.isItem,
+          isPrescription: item.isPrescription,
+          itemData: item.itemData
         };
         
         try {
@@ -586,6 +598,25 @@ const ItemSuggestions = ({
           purchasePrice: newProductPrice, // Add purchase price field that ServiceTable expects
           isActive: true
         };
+      } else if (selectedProductType === 'item') {
+        productData = {
+          ...productData,
+          itemName: newProductName,
+          brandName: newProductName, // For compatibility
+          name: newProductName, // For compatibility
+          category: 'Other',
+          brand: '',
+          unit: 'Pieces',
+          purchasePrice: newProductPrice,
+          salePrice: newProductPrice,
+          price: newProductPrice,
+          minStockLevel: 5,
+          maxStockLevel: 100,
+          location: '',
+          supplier: '',
+          description: `Item created from sales invoice`,
+          isItem: true
+        };
       }
 
       // Save to lens_inventory collection
@@ -604,8 +635,10 @@ const ItemSuggestions = ({
             total: newProductPrice * (parseInt(rowQty) || 1),
             isService: selectedProductType === 'service',
             isStockLens: selectedProductType === 'stock',
+            isItem: selectedProductType === 'item',
             serviceData: selectedProductType === 'service' ? productData : null,
-            stockData: selectedProductType === 'stock' ? productData : null
+            stockData: selectedProductType === 'stock' ? productData : null,
+            itemData: selectedProductType === 'item' ? productData : null
           };
           
           onSelect(index, dataToSend);
@@ -760,6 +793,14 @@ const ItemSuggestions = ({
                       <span className="text-xs text-teal-600 dark:text-teal-400 truncate">
                         Service - {item.serviceType || item.serviceData?.serviceType || 'General Service'}
                         {item.serviceDescription && ` • ${item.serviceDescription}`}
+                      </span>
+                    )}
+                    
+                    {(item.isItem || item.type === 'item') && (
+                      <span className="text-xs text-orange-600 dark:text-orange-400 truncate">
+                        Item - {item.category || 'General'}
+                        {item.brand && ` • ${item.brand}`}
+                        {item.unit && ` • Unit: ${item.unit}`}
                       </span>
                     )}
                     
@@ -1008,6 +1049,21 @@ const ItemSuggestions = ({
                   </svg>
                   <span className="text-sm font-medium text-teal-900 dark:text-teal-100">Service</span>
                 </button>
+
+                <button
+                  onClick={() => setSelectedProductType('item')}
+                  disabled={creatingProduct}
+                  className={`flex flex-col items-center p-3 border-2 rounded-lg transition-colors disabled:opacity-50 ${
+                    selectedProductType === 'item'
+                      ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-400'
+                      : 'border-orange-200 dark:border-orange-700 bg-white dark:bg-gray-700 hover:border-orange-400 dark:hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20'
+                  }`}
+                >
+                  <svg className="w-8 h-8 text-orange-600 dark:text-orange-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                  <span className="text-sm font-medium text-orange-900 dark:text-orange-100">Item</span>
+                </button>
               </div>
             </div>
 
@@ -1040,7 +1096,8 @@ const ItemSuggestions = ({
                   ) : (
                     `Create ${selectedProductType === 'prescription' ? 'RX Lens' : 
                            selectedProductType === 'stock' ? 'Stock Lens' : 
-                           selectedProductType === 'contact' ? 'Contact Lens' : 'Service'}`
+                           selectedProductType === 'contact' ? 'Contact Lens' : 
+                           selectedProductType === 'service' ? 'Service' : 'Item'}`
                   )}
                 </button>
               )}
