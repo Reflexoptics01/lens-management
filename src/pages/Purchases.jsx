@@ -25,6 +25,29 @@ const Purchases = () => {
     fetchVendors();
   }, []);
 
+  // Add keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (event) => {
+      // Only trigger if not typing in an input field
+      if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.tagName === 'SELECT') {
+        return;
+      }
+
+      switch (event.key.toLowerCase()) {
+        case 'p':
+          navigate('/purchases/new');
+          break;
+        default:
+          break;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    return () => {
+      document.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [navigate]);
+
   // Add print-specific styles when printing
   useEffect(() => {
     if (isPrinting) {
@@ -309,7 +332,7 @@ const Purchases = () => {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
               </svg>
-              <span className="desktop-only">Create Purchase</span>
+                              <span className="desktop-only">Create Purchase (p)</span>
             </button>
             
             {/* Returns Button */}

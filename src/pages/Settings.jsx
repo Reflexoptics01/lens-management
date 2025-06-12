@@ -848,7 +848,7 @@ const Settings = () => {
             
             // Skip placeholder documents
             if (data._placeholder) {
-              console.log(`Skipping placeholder document in ${collectionName}: ${doc.id}`);
+              // REMOVED FOR PRODUCTION: console.log(`Skipping placeholder document in ${collectionName}: ${doc.id}`);
               return;
             }
             
@@ -915,7 +915,7 @@ const Settings = () => {
             docCount++;
           });
           
-          console.log(`Collection ${collectionName}: backed up ${docCount} documents`);
+          // REMOVED FOR PRODUCTION: console.log(`Collection ${collectionName}: backed up ${docCount} documents`);
           
         } catch (collectionError) {
           console.warn(`Could not backup collection ${collectionName}:`, collectionError);
@@ -1150,11 +1150,11 @@ Are you sure you want to continue with the restoration?`
           // Loop through each collection
           for (const collectionName of collections) {
             try {
-              console.log(`Restoring collection: ${collectionName}`);
+              // REMOVED FOR PRODUCTION: console.log(`Restoring collection: ${collectionName}`);
               
               if (backupData[collectionName] && typeof backupData[collectionName] === 'object') {
                 const documents = Object.entries(backupData[collectionName]);
-                console.log(`Collection ${collectionName}: ${documents.length} documents to restore`);
+                // REMOVED FOR PRODUCTION: console.log(`Collection ${collectionName}: ${documents.length} documents to restore`);
                 
                 for (const [docId, docData] of documents) {
                   try {
@@ -1183,9 +1183,9 @@ Are you sure you want to continue with the restoration?`
                   }
                 }
                 
-                console.log(`Collection ${collectionName}: restored ${documents.length} documents to user ${user.uid}`);
+                // REMOVED FOR PRODUCTION: console.log(`Collection ${collectionName}: restored ${documents.length} documents to user ${user.uid}`);
               } else {
-                console.log(`Collection ${collectionName}: no data to restore`);
+                // REMOVED FOR PRODUCTION: console.log(`Collection ${collectionName}: no data to restore`);
               }
             } catch (collectionError) {
               console.error(`Error restoring collection ${collectionName}:`, collectionError);
@@ -1208,7 +1208,7 @@ Are you sure you want to continue with the restoration?`
 The page will refresh in 3 seconds to load your restored data...`;
           
           setBackupSuccess(successMessage);
-          console.log('Restoration completed for user:', user.uid, { restoredCount, skippedCount, errorCount });
+          // REMOVED FOR PRODUCTION: console.log('Restoration completed for user:', user.uid, { restoredCount, skippedCount, errorCount });
           
           // Refresh page after 3 seconds to load new data
           setTimeout(() => {
@@ -1270,15 +1270,15 @@ The page will refresh in 3 seconds to load your restored data...`;
         };
         
         if (userData.isActive === false) {
-          console.log(`Adding to inactive users: ${userData.email}`);
+          // REMOVED FOR PRODUCTION: console.log(`Adding to inactive users: ${userData.email}`);
           inactiveUsersList.push(userWithId);
         } else {
-          console.log(`Adding to active users: ${userData.email}`);
+          // REMOVED FOR PRODUCTION: console.log(`Adding to active users: ${userData.email}`);
           activeUsersList.push(userWithId);
         }
       });
       
-      console.log(`Found ${activeUsersList.length} active users and ${inactiveUsersList.length} inactive users`);
+      // REMOVED FOR PRODUCTION: console.log(`Found ${activeUsersList.length} active users and ${inactiveUsersList.length} inactive users`);
       setUsers(activeUsersList);
       setInactiveUsers(inactiveUsersList);
       
@@ -1326,7 +1326,7 @@ The page will refresh in 3 seconds to load your restored data...`;
     // Set up an interval to refresh users every 30 seconds
     const intervalId = setInterval(() => {
       if (activeTab === 'users') {
-        console.log('Auto-refreshing users list');
+        // REMOVED FOR PRODUCTION: console.log('Auto-refreshing users list');
         fetchUsers();
       }
     }, 30000);
@@ -1338,7 +1338,7 @@ The page will refresh in 3 seconds to load your restored data...`;
   // Also refresh users whenever we switch to the users tab
   useEffect(() => {
     if (activeTab === 'users') {
-      console.log('Tab changed to users, refreshing data');
+      // REMOVED FOR PRODUCTION: console.log('Tab changed to users, refreshing data');
       fetchUsers();
     }
   }, [activeTab]);
@@ -1363,7 +1363,7 @@ The page will refresh in 3 seconds to load your restored data...`;
       setLoading(true);
       
       // Create user using Cloud Function to avoid signing out current admin
-      console.log('Creating new user with email:', newUserEmail);
+      // REMOVED FOR PRODUCTION: console.log('Creating new user with email:', newUserEmail);
       
       try {
         // Use Cloud Function to create user without affecting current session
@@ -1376,7 +1376,7 @@ The page will refresh in 3 seconds to load your restored data...`;
         });
         
         const newUserUid = result.data.uid;
-        console.log('User created successfully with uid:', newUserUid);
+        // REMOVED FOR PRODUCTION: console.log('User created successfully with uid:', newUserUid);
         
         // Add user to user-specific Firestore collection using UID as document ID
         await setDoc(getUserDoc('teamMembers', newUserUid), {
@@ -1389,7 +1389,7 @@ The page will refresh in 3 seconds to load your restored data...`;
           isActive: true
         });
         
-        console.log('Team member document created successfully');
+        // REMOVED FOR PRODUCTION: console.log('Team member document created successfully');
         
       } catch (cloudFunctionError) {
         console.warn('Cloud function not available, falling back to direct creation:', cloudFunctionError);
@@ -1413,12 +1413,12 @@ The page will refresh in 3 seconds to load your restored data...`;
         const userCredential = await createUserWithEmailAndPassword(auth2, newUserEmail, newUserPassword);
         const newUserUid = userCredential.user.uid;
         
-        console.log('User created with fallback method, uid:', newUserUid);
+        // REMOVED FOR PRODUCTION: console.log('User created with fallback method, uid:', newUserUid);
         
         // Re-authenticate the admin immediately
         try {
           await signInWithEmailAndPassword(auth2, currentUserEmail, currentUserPassword);
-          console.log('Admin re-authenticated successfully');
+          // REMOVED FOR PRODUCTION: console.log('Admin re-authenticated successfully');
         } catch (reAuthError) {
           console.error('Failed to re-authenticate admin:', reAuthError);
           throw new Error('User created but admin re-authentication failed. Please log in again.');
@@ -1492,7 +1492,7 @@ The page will refresh in 3 seconds to load your restored data...`;
       
       // Mark user as inactive in user-specific Firestore
       // userId should now be the user's UID (used as document ID)
-      console.log(`Marking user ${userEmail} (UID: ${userUid}) as inactive`);
+      // REMOVED FOR PRODUCTION: console.log(`Marking user ${userEmail} (UID: ${userUid}) as inactive`);
       
       // Update the user document to mark as inactive in user-specific collection
       await updateDoc(getUserDoc('teamMembers', userUid), {
@@ -1553,7 +1553,7 @@ The page will refresh in 3 seconds to load your restored data...`;
     setBackupSuccess('');
     
     try {
-      console.log('Starting comprehensive data deletion...');
+      // REMOVED FOR PRODUCTION: console.log('Starting comprehensive data deletion...');
       
       // Comprehensive list of user-specific collections to delete
       // Updated to match the backup collections list
@@ -1592,19 +1592,19 @@ The page will refresh in 3 seconds to load your restored data...`;
       
       for (const collectionName of collectionsToDelete) {
         try {
-          console.log(`Deleting user-specific collection: ${collectionName}`);
+          // REMOVED FOR PRODUCTION: console.log(`Deleting user-specific collection: ${collectionName}`);
           const collectionRef = getUserCollection(collectionName);
           const collectionSnapshot = await getDocs(collectionRef);
           
           if (collectionSnapshot.docs.length > 0) {
-            console.log(`Found ${collectionSnapshot.docs.length} documents in ${collectionName}`);
+            // REMOVED FOR PRODUCTION: console.log(`Found ${collectionSnapshot.docs.length} documents in ${collectionName}`);
             
             collectionSnapshot.docs.forEach(doc => {
               deletePromises.push(deleteDoc(doc.ref));
               totalDeleted++;
             });
           } else {
-            console.log(`Collection ${collectionName} is empty, skipping...`);
+            // REMOVED FOR PRODUCTION: console.log(`Collection ${collectionName} is empty, skipping...`);
           }
         } catch (collectionError) {
           console.warn(`Could not delete collection ${collectionName}:`, collectionError);
@@ -1617,12 +1617,12 @@ The page will refresh in 3 seconds to load your restored data...`;
         return;
       }
       
-      console.log(`Deleting ${totalDeleted} documents from ${collectionsToDelete.length} collections...`);
+      // REMOVED FOR PRODUCTION: console.log(`Deleting ${totalDeleted} documents from ${collectionsToDelete.length} collections...`);
       
       // Wait for all deletes to complete
       await Promise.all(deletePromises);
       
-      console.log('All user-specific data deleted successfully');
+      // REMOVED FOR PRODUCTION: console.log('All user-specific data deleted successfully');
       
       setBackupSuccess(`✅ All data has been successfully deleted. 
       
@@ -1884,7 +1884,7 @@ The page will refresh in 3 seconds to load your restored data...`;
           // Get current user info for shop operations
           const userInfo = getCurrentUserInfo();
           await uploadLensesToShop(lenses, userInfo);
-          console.log(`Uploaded ${lenses.length} lenses to shop`);
+          // REMOVED FOR PRODUCTION: console.log(`Uploaded ${lenses.length} lenses to shop`);
         }
         
         displaySuccess(`Successfully enabled inventory sharing! ${lenses.length} lenses uploaded to Reflex Shop.`);
@@ -1906,7 +1906,7 @@ The page will refresh in 3 seconds to load your restored data...`;
         
         if (lenses.length > 0) {
           await removeLensesFromShop(lenses);
-          console.log(`Removed ${lenses.length} lenses from shop`);
+          // REMOVED FOR PRODUCTION: console.log(`Removed ${lenses.length} lenses from shop`);
         }
         
         displaySuccess('Successfully disabled inventory sharing! Your lenses have been removed from Reflex Shop.');

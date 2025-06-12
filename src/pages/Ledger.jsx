@@ -51,8 +51,8 @@ const Ledger = () => {
       const endDateObj = new Date(toDate);
       endDateObj.setHours(23, 59, 59, 999); // End of day
       
-      console.log('Filtering ledger data between:', startDateObj, 'and', endDateObj);
-      console.log('Selected entity:', selectedEntity);
+      // REMOVED FOR PRODUCTION: console.log('Filtering ledger data between:', startDateObj, 'and', endDateObj);
+      // REMOVED FOR PRODUCTION: console.log('Selected entity:', selectedEntity);
       
       let invoices = [];
       let purchases = [];
@@ -60,12 +60,12 @@ const Ledger = () => {
       // Determine if this is a customer or vendor entity
       const isVendor = selectedEntity.type === 'vendor' || selectedEntity.isVendor;
       
-      console.log('[Ledger] Entity detection:', {
-        selectedEntity,
-        isVendor,
-        entityType: selectedEntity.type,
-        entityIsVendor: selectedEntity.isVendor
-      });
+      // REMOVED FOR PRODUCTION: console.log('[Ledger] Entity detection:', {
+      //   selectedEntity,
+      //   isVendor,
+      //   entityType: selectedEntity.type,
+      //   entityIsVendor: selectedEntity.isVendor
+      // });
       
       if (!isVendor) {
         // For customers: Fetch invoices from the sales collection
@@ -250,7 +250,7 @@ const Ledger = () => {
   
   // Navigate to invoice ledger when clicking a party in balance view
   const navigateToInvoiceLedger = (entity) => {
-    console.log('Navigating to invoice ledger for entity:', entity);
+    // REMOVED FOR PRODUCTION: console.log('Navigating to invoice ledger for entity:', entity);
     
     // Set selected entity with proper type information
     const entityData = {
@@ -330,6 +330,35 @@ const Ledger = () => {
   // Try to restore filter state on component mount
   useEffect(() => {
     restoreFilterState();
+  }, []);
+
+  // Add keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (event) => {
+      // Only trigger if not typing in an input field
+      if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.tagName === 'SELECT') {
+        return;
+      }
+
+      switch (event.key.toLowerCase()) {
+        case 'b':
+          setViewMode('balanceView');
+          break;
+        case 'i':
+          setViewMode('invoiceOnly');
+          break;
+        case 'a':
+          setViewMode('accountStatement');
+          break;
+        default:
+          break;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    return () => {
+      document.removeEventListener('keydown', handleKeyPress);
+    };
   }, []);
   
   // Handle navigation state from other pages (like CreateSale.jsx)
@@ -615,7 +644,7 @@ const Ledger = () => {
               saveFilterState();
             }}
           >
-            Account Statement
+            Account Statement (a)
           </button>
           <button
             className={`flex-1 py-1 px-2 rounded-md text-sm font-medium ${
@@ -628,7 +657,7 @@ const Ledger = () => {
               saveFilterState();
             }}
           >
-            Invoice Ledger
+            Invoice Ledger (i)
           </button>
           <button
             className={`flex-1 py-1 px-2 rounded-md text-sm font-medium ${
@@ -641,7 +670,7 @@ const Ledger = () => {
               saveFilterState();
             }}
           >
-            Balance Due
+            Balance Due (b)
           </button>
         </div>
         

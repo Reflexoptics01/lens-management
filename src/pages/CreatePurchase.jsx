@@ -6,6 +6,7 @@ import Navbar from '../components/Navbar';
 import CustomerForm from '../components/CustomerForm';
 import ItemSuggestions from '../components/ItemSuggestions';
 import PowerInventoryModal from '../components/PowerInventoryModal';
+import AddNewProductModal from '../components/AddNewProductModal';
 import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 import { dateToISOString } from '../utils/dateUtils';
 
@@ -103,6 +104,9 @@ const CreatePurchase = () => {
   // Add refs for direct DOM manipulation if React state isn't working
   const maxSphRefs = useRef([]);
   const maxCylRefs = useRef([]);
+
+  // AddNewProductModal state
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
 
   // Debug effect to monitor tableRows changes
   useEffect(() => {
@@ -294,7 +298,7 @@ const CreatePurchase = () => {
       });
       
       setItemSuggestions(itemsList);
-      console.log(`Fetched ${itemsList.length} lens items for purchase (all variants included)`);
+      // REMOVED FOR PRODUCTION: console.log(`Fetched ${itemsList.length} lens items for purchase (all variants included)`);
     } catch (error) {
       console.error('Error fetching items for purchase:', error);
     }
@@ -806,6 +810,18 @@ const CreatePurchase = () => {
     setShowPowerInventoryModal(true);
   };
 
+  // Handle opening the AddNewProductModal
+  const handleShowAddProduct = () => {
+    setShowAddProductModal(true);
+  };
+
+  // Handle product creation from modal
+  const handleProductCreated = (productData) => {
+    setShowAddProductModal(false);
+    // Refresh the items to include the new product
+    fetchItems();
+  };
+
   return (
     <>
       {/* Add custom styles */}
@@ -1136,6 +1152,7 @@ const CreatePurchase = () => {
                                 className="w-full px-3 py-2 text-sm border rounded-lg form-input"
                                 onRefreshItems={fetchItems}
                                 currentPrice={parseFloat(row.price) || 0}
+                                onShowAddProduct={handleShowAddProduct}
                               />
                             </td>
                             <td className="px-3 py-3">
@@ -1609,6 +1626,15 @@ const CreatePurchase = () => {
           onClose={handlePowerInventoryModalClose}
           onSave={handlePowerInventoryModalSave}
           lensData={pendingStockLens}
+        />
+      )}
+
+      {/* AddNewProductModal */}
+      {showAddProductModal && (
+        <AddNewProductModal
+          isOpen={showAddProductModal}
+          onClose={() => setShowAddProductModal(false)}
+          onProductCreated={handleProductCreated}
         />
       )}
     </>

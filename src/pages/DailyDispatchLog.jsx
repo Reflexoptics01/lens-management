@@ -6,6 +6,7 @@ import { formatDate as utilFormatDate } from '../utils/dateUtils';
 import Navbar from '../components/Navbar';
 import ItemSuggestions from '../components/ItemSuggestions';
 import AutocompleteInput from '../components/AutocompleteInput';
+import AddNewProductModal from '../components/AddNewProductModal';
 
 const DailyDispatchLog = () => {
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -53,6 +54,11 @@ const DailyDispatchLog = () => {
       qty: 1
     }))
   );
+
+  // AddNewProductModal state
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [currentItemName, setCurrentItemName] = useState('');
+  const [currentRowIndex, setCurrentRowIndex] = useState(null);
 
   useEffect(() => {
     fetchLensInventory();
@@ -277,6 +283,35 @@ const DailyDispatchLog = () => {
       itemName: cleanItemName,
     };
     setDispatchRows(updatedRows);
+  };
+
+  // Handle opening the AddNewProductModal
+  const handleShowAddProduct = (currentItemName = '', rowIndex = null) => {
+    setCurrentRowIndex(rowIndex);
+    setCurrentItemName(currentItemName);
+    setShowAddProductModal(true);
+  };
+
+  // Handle product creation from modal
+  const handleProductCreated = (productData) => {
+    setShowAddProductModal(false);
+    
+    // If we have a current row index, update that row with the new product
+    if (currentRowIndex !== null && productData) {
+      const updatedRows = [...dispatchRows];
+      updatedRows[currentRowIndex] = {
+        ...updatedRows[currentRowIndex],
+        itemName: productData.name || productData.brandName || currentItemName
+      };
+      setDispatchRows(updatedRows);
+    }
+    
+    // Reset modal state
+    setCurrentItemName('');
+    setCurrentRowIndex(null);
+    
+    // Refresh the lens inventory to include the new product
+    fetchLensInventory();
   };
 
   const addRow = () => {
@@ -654,6 +689,7 @@ const DailyDispatchLog = () => {
                               className="w-full px-3 py-2 text-sm border rounded-lg form-input"
                               onRefreshItems={fetchLensInventory}
                               currentPrice={0}
+                              onShowAddProduct={(itemName, rowIndex) => handleShowAddProduct(itemName, rowIndex)}
                             />
                           </td>
                           <td className="px-3 py-3">
@@ -918,6 +954,20 @@ const DailyDispatchLog = () => {
           )}
         </div>
       </div>
+
+      {/* AddNewProductModal */}
+      {showAddProductModal && (
+        <AddNewProductModal
+          isOpen={showAddProductModal}
+          onClose={() => {
+            setShowAddProductModal(false);
+            setCurrentItemName('');
+            setCurrentRowIndex(null);
+          }}
+          onProductCreated={handleProductCreated}
+          initialProductName={currentItemName}
+        />
+      )}
     </div>
   );
 };

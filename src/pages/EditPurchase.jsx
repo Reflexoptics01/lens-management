@@ -7,6 +7,8 @@ import Navbar from '../components/Navbar';
 import { dateToISOString, safelyParseDate } from '../utils/dateUtils';
 import CustomerForm from '../components/CustomerForm';
 import PowerInventoryModal from '../components/PowerInventoryModal';
+import AddNewProductModal from '../components/AddNewProductModal';
+import ItemSuggestions from '../components/ItemSuggestions';
 
 const TAX_OPTIONS = [
   { id: 'TAX_FREE', label: 'Tax Free', rate: 0 },
@@ -82,6 +84,12 @@ const EditPurchase = () => {
   const [showPowerInventoryModal, setShowPowerInventoryModal] = useState(false);
   const [pendingStockLens, setPendingStockLens] = useState(null);
 
+  // AddNewProductModal state
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
+
+  // Add item suggestions state
+  const [itemSuggestions, setItemSuggestions] = useState([]);
+
   const auth = useAuth();
 
   // Check authentication
@@ -94,6 +102,7 @@ const EditPurchase = () => {
   useEffect(() => {
     fetchVendors();
     fetchPurchaseData();
+    fetchItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [purchaseId]);
 
@@ -507,6 +516,54 @@ const EditPurchase = () => {
     })}`;
   };
 
+  // Handle opening the AddNewProductModal
+  const handleShowAddProduct = () => {
+    setShowAddProductModal(true);
+  };
+
+  // Handle product creation from modal
+  const handleProductCreated = (productData) => {
+    setShowAddProductModal(false);
+    // Refresh the items to include the new product
+    fetchItems();
+  };
+
+  // Add fetchItems function
+  const fetchItems = async () => {
+    try {
+      const itemsList = [];
+      
+      // Fetch stock lenses
+      const stockLensQuery = query(getUserCollection('lensInventory'));
+      const stockLensSnapshot = await getDocs(stockLensQuery);
+      stockLensSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        itemsList.push({
+          id: doc.id,
+          name: data.brandName || data.name || 'Unknown',
+          type: 'stock-lens',
+          brandName: data.brandName,
+          price: data.price || 0,
+          quantity: data.quantity || 0,
+          isStockLens: true,
+          powerRangeDisplay: data.powerRangeDisplay,
+          minSph: data.minSph,
+          maxSph: data.maxSph,
+          minCyl: data.minCyl,
+          maxCyl: data.maxCyl,
+          minAxis: data.minAxis,
+          maxAxis: data.maxAxis,
+          minAdd: data.minAdd,
+          maxAdd: data.maxAdd
+        });
+      });
+
+      setItemSuggestions(itemsList);
+    } catch (error) {
+      console.error('Error fetching items:', error);
+    }
+  };
+
   const filteredVendors = vendorSearchTerm
     ? vendors.filter(vendor => 
         vendor.opticalName.toLowerCase().includes(vendorSearchTerm.toLowerCase()) ||
@@ -855,12 +912,25 @@ const EditPurchase = () => {
                               </span>
                             </td>
                             <td className="px-4 py-3">
-                              <input 
-                                type="text" 
+                              <ItemSuggestions
+                                items={itemSuggestions}
                                 value={row.itemName}
-                                onChange={(e) => handleTableRowChange(index, 'itemName', e.target.value)}
-                                className="w-full px-3 py-2 text-sm border rounded-lg form-input"
+                                onChange={handleTableRowChange}
+                                onSelect={(index, itemData) => {
+                                  const updatedRows = [...tableRows];
+                                  updatedRows[index] = {
+                                    ...updatedRows[index],
+                                    itemName: itemData.name || itemData.brandName || '',
+                                    price: itemData.price || 0
+                                  };
+                                  setTableRows(updatedRows);
+                                }}
+                                index={index}
                                 placeholder="Enter item name..."
+                                className="w-full px-3 py-2 text-sm border rounded-lg form-input"
+                                onRefreshItems={fetchItems}
+                                currentPrice={parseFloat(row.price) || 0}
+                                onShowAddProduct={handleShowAddProduct}
                               />
                             </td>
                             <td className="px-3 py-3">
@@ -1340,6 +1410,15 @@ const EditPurchase = () => {
           onSave={handlePowerInventoryModalSave}
           lensData={pendingStockLens}
           isEdit={false}
+        />
+      )}
+
+      {/* AddNewProductModal */}
+      {showAddProductModal && (
+        <AddNewProductModal
+          isOpen={showAddProductModal}
+          onClose={() => setShowAddProductModal(false)}
+          onProductCreated={handleProductCreated}
         />
       )}
     </>

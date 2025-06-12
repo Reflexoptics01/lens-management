@@ -62,6 +62,20 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
     }
   }, [editMode, lensToEdit]);
   
+  // Listen for ESC key to close form
+  useEffect(() => {
+    const handleCloseForm = () => {
+      if (onCancel) {
+        onCancel();
+      }
+    };
+
+    window.addEventListener('closeForm', handleCloseForm);
+    return () => {
+      window.removeEventListener('closeForm', handleCloseForm);
+    };
+  }, [onCancel]);
+  
   const handleStockLensChange = (index, field, value) => {
     const updatedRows = [...stockLensRows];
     updatedRows[index] = {
@@ -107,7 +121,7 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
       setLoading(true);
       setError('');
       
-      console.log('PowerInventoryModal data received:', inventoryData);
+      // REMOVED FOR PRODUCTION: console.log('PowerInventoryModal data received:', inventoryData);
       
       // Update the current row to mark power inventory as set up
       const updatedRows = [...stockLensRows];
@@ -117,7 +131,7 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
         powerInventoryData: inventoryData.type === 'individual' ? inventoryData.data : null
       };
       
-      console.log('Updated row data:', updatedRows[currentRowIndex]);
+      // REMOVED FOR PRODUCTION: console.log('Updated row data:', updatedRows[currentRowIndex]);
       
       setStockLensRows(updatedRows);
       
@@ -179,22 +193,22 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
     }
     
     // Debug logging
-    console.log('Setting up power inventory for:', {
-      brandName: row.brandName,
-      enteredMaxSph: row.maxSph,
-      enteredMaxCyl: row.maxCyl,
-      enteredAxis: row.axis,
-      enteredMaxAdd: row.maxAdd,
-      calculatedRanges: {
-        sphMin,
-        sphMax,
-        cylMin,
-        cylMax,
-        axis: axisNum,
-        maxAdd: maxAddNum
-      },
-      powerRange
-    });
+    // REMOVED FOR PRODUCTION: console.log('Setting up power inventory for:', {
+    //   brandName: row.brandName,
+    //   enteredMaxSph: row.maxSph,
+    //   enteredMaxCyl: row.maxCyl,
+    //   enteredAxis: row.axis,
+    //   enteredMaxAdd: row.maxAdd,
+    //   calculatedRanges: {
+    //     sphMin,
+    //     sphMax,
+    //     cylMin,
+    //     cylMax,
+    //     axis: axisNum,
+    //     maxAdd: maxAddNum
+    //   },
+    //   powerRange
+    // });
     
     // Clear any existing error
     setError('');
@@ -295,7 +309,7 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
         }
         
         await updateDoc(getUserDoc('lensInventory', lensToEdit.id), lensData);
-        console.log("Updated stock lens:", lensData);
+        // REMOVED FOR PRODUCTION: console.log("Updated stock lens:", lensData);
         
         // Call the onSubmit callback
         if (onSubmit) onSubmit();

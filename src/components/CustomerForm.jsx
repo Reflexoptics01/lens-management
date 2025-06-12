@@ -44,6 +44,30 @@ const CustomerForm = ({ onClose, customer, isVendor = false }) => {
     };
   }, []);
 
+  // Handle ESC key to close modal
+  useEffect(() => {
+    const handleEscKey = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        onClose(false);
+      }
+    };
+
+    // Listen for custom close modal events
+    const handleCloseModal = () => {
+      onClose(false);
+    };
+
+    document.addEventListener('keydown', handleEscKey, true);
+    window.addEventListener('closeModal', handleCloseModal);
+    
+    return () => {
+      document.removeEventListener('keydown', handleEscKey, true);
+      window.removeEventListener('closeModal', handleCloseModal);
+    };
+  }, [onClose]);
+
   // Handle notification of creating a new customer if the form was opened from a popup
   useEffect(() => {
     if (savedCustomer && window.opener && typeof window.opener.postMessage === 'function') {
@@ -104,8 +128,8 @@ const CustomerForm = ({ onClose, customer, isVendor = false }) => {
       setLoading(true);
       
       // Log form data for debugging
-      console.log('Submitting customer form with data:', formData);
-      console.log('Phone field value:', formData.phone);
+      // REMOVED FOR PRODUCTION: console.log('Submitting customer form with data:', formData);
+      // REMOVED FOR PRODUCTION: console.log('Phone field value:', formData.phone);
       
       // Check if it's an edit or create
       if (customer) {
@@ -115,8 +139,8 @@ const CustomerForm = ({ onClose, customer, isVendor = false }) => {
           updatedAt: serverTimestamp()
         });
         
-        console.log(`Updated ${entityName}:`, customer.id);
-        console.log('Updated data includes phone:', formData.phone);
+        // REMOVED FOR PRODUCTION: console.log(`Updated ${entityName}:`, customer.id);
+        // REMOVED FOR PRODUCTION: console.log('Updated data includes phone:', formData.phone);
         
         toast.success(`${entityName} updated successfully!`);
       } else {
@@ -126,8 +150,8 @@ const CustomerForm = ({ onClose, customer, isVendor = false }) => {
           createdAt: serverTimestamp()
         });
         
-        console.log(`Created new ${entityName}:`, docRef.id);
-        console.log('New customer data includes phone:', formData.phone);
+        // REMOVED FOR PRODUCTION: console.log(`Created new ${entityName}:`, docRef.id);
+        // REMOVED FOR PRODUCTION: console.log('New customer data includes phone:', formData.phone);
         
         toast.success(`${entityName} created successfully!`);
       }

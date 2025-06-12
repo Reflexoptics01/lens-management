@@ -79,6 +79,32 @@ const Orders = () => {
     applyFilters();
   }, [orders, fromDate, toDate, searchTerm, statusFilter]);
   
+  // Add keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (event) => {
+      // Only trigger if not typing in an input field
+      if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.tagName === 'SELECT') {
+        return;
+      }
+
+      switch (event.key.toLowerCase()) {
+        case 'o':
+          navigate('/orders/new');
+          break;
+        case 'd':
+          navigate('/daily-dispatch-log');
+          break;
+        default:
+          break;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    return () => {
+      document.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [navigate]);
+  
   // Apply all filters
   const applyFilters = () => {
     let result = [...orders];
@@ -750,7 +776,7 @@ const Orders = () => {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
-            <span>Daily Dispatch Log</span>
+            <span>Daily Dispatch Log (d)</span>
           </button>
           
           {/* Add New Order Button */}
@@ -761,7 +787,7 @@ const Orders = () => {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
             </svg>
-            <span>Add New Order</span>
+            <span>Add New Order (o)</span>
           </button>
         </div>
 
@@ -1046,7 +1072,7 @@ const Orders = () => {
         <button
           onClick={() => navigate('/daily-dispatch-log')}
           className="h-14 w-14 rounded-full bg-[#3154b3] dark:bg-[#3154b3] text-white shadow-lg flex items-center justify-center"
-          title="Daily Dispatch Log"
+          title="Daily Dispatch Log (d)"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -1057,7 +1083,7 @@ const Orders = () => {
         <button
           onClick={() => navigate('/orders/new')}
           className="h-14 w-14 rounded-full bg-[#4169E1] dark:bg-[#4169E1] text-white shadow-lg flex items-center justify-center"
-          title="Add New Order"
+          title="Add New Order (o)"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />

@@ -82,7 +82,7 @@ const SystemAnalytics = () => {
           timestamp: doc.data().timestamp?.toDate()
         }));
       } catch (globalError) {
-        console.log('Global collections not accessible, using user-scoped data');
+        // REMOVED FOR PRODUCTION: console.log('Global collections not accessible, using user-scoped data');
         // If global access fails, try user-scoped collections
         try {
           const userErrorsRef = getUserCollection('errorLogs');
@@ -96,7 +96,7 @@ const SystemAnalytics = () => {
             }));
           }
         } catch (userError) {
-          console.log('No error logs available for this user');
+          // REMOVED FOR PRODUCTION: console.log('No error logs available for this user');
         }
       }
 
@@ -241,7 +241,7 @@ const SystemAnalytics = () => {
           healthStatus.checks.firebase = 'healthy';
         }
       } catch (error) {
-        console.log('Firebase health check failed:', error);
+        // REMOVED FOR PRODUCTION: console.log('Firebase health check failed:', error);
         healthStatus.checks.firebase = 'unhealthy';
       }
 

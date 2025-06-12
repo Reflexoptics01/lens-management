@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import Login from './pages/Login';
@@ -43,8 +43,6 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
-
-
 // Import production monitoring
 import { initializeMonitoring } from './utils/productionMonitoring';
 
@@ -65,20 +63,16 @@ function App() {
     }
   }, []);
 
-  // Global keyboard listener for calculator
+  // Listen for calculator open events from universal keyboard handler
   useEffect(() => {
-    const handleGlobalKeyDown = (e) => {
-      // Only trigger if not typing in an input field and calculator is not already open
-      const isTypingInInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.contentEditable === 'true';
-      
-      if (!isTypingInInput && e.key.toLowerCase() === 't' && !calculatorOpen) {
-        e.preventDefault();
+    const handleOpenCalculator = () => {
+      if (!calculatorOpen) {
         setCalculatorOpen(true);
       }
     };
 
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    window.addEventListener('openCalculator', handleOpenCalculator);
+    return () => window.removeEventListener('openCalculator', handleOpenCalculator);
   }, [calculatorOpen]);
 
   return (
@@ -106,6 +100,7 @@ function App() {
       <AuthProvider>
         <ThemeProvider>
           <Router>
+            <UniversalKeyboardHandler />
             <Routes>
               {/* Public routes */}
               <Route path="/login" element={<Login />} />
@@ -337,7 +332,7 @@ function App() {
             <FloatingShopIcon />
           </Router>
           
-          {/* Global Calculator - accessible from anywhere with 'C' key */}
+          {/* Global Calculator - accessible from anywhere with 'T' key */}
           <GlobalCalculator 
             isOpen={calculatorOpen} 
             onClose={() => setCalculatorOpen(false)} 
@@ -347,5 +342,151 @@ function App() {
     </div>
   );
 }
+
+// Universal Keyboard Handler Component
+const UniversalKeyboardHandler = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      // Only trigger if not typing in an input field, textarea, select, or contentEditable
+      const isTypingInInput = (
+        e.target.tagName === 'INPUT' || 
+        e.target.tagName === 'TEXTAREA' || 
+        e.target.tagName === 'SELECT' ||
+        e.target.contentEditable === 'true'
+      );
+      
+      // Don't interfere with modals or if user is typing
+      if (isTypingInInput) {
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+
+      // ESC key - smart back navigation
+      if (key === 'escape') {
+        e.preventDefault();
+        
+        // Check for open modals, forms, or components that should be closed first
+        const shouldCloseLocalComponent = handleLocalEscapeActions();
+        
+        // Only navigate back if no local components were closed
+        if (!shouldCloseLocalComponent) {
+          window.history.back();
+        }
+        return;
+      }
+
+      // Calculator shortcut
+      if (key === 't') {
+        e.preventDefault();
+        // Trigger calculator open event
+        window.dispatchEvent(new CustomEvent('openCalculator'));
+        return;
+      }
+
+      // Navigation shortcuts - don't interfere with other functionality
+      switch (key) {
+        case 'x':
+          e.preventDefault();
+          navigate('/dashboard');
+          break;
+        case 'h':
+          e.preventDefault();
+          navigate('/orders');
+          break;
+        case 'u':
+          e.preventDefault();
+          navigate('/customers');
+          break;
+        case 'l':
+          e.preventDefault();
+          navigate('/sales');
+          break;
+        case 'e':
+          e.preventDefault();
+          navigate('/purchases');
+          break;
+        case 'n':
+          e.preventDefault();
+          navigate('/transactions');
+          break;
+        case 'g':
+          e.preventDefault();
+          navigate('/ledger');
+          break;
+        case 'q':
+          e.preventDefault();
+          navigate('/gst-returns');
+          break;
+        case 'v':
+          e.preventDefault();
+          navigate('/lens-inventory');
+          break;
+        case 'r':
+          e.preventDefault();
+          navigate('/reorder-dashboard');
+          break;
+        case 'z':
+          e.preventDefault();
+          navigate('/settings');
+          break;
+        default:
+          // Don't prevent default for other keys
+          break;
+      }
+    };
+
+    // Function to handle local ESC actions (close modals, forms, etc.)
+    const handleLocalEscapeActions = () => {
+      // First, try to close any modals
+      const modals = document.querySelectorAll('.fixed.inset-0, [role="dialog"], .modal');
+      for (const modal of modals) {
+        const style = window.getComputedStyle(modal);
+        if (style.display !== 'none' && style.visibility !== 'hidden') {
+          // Try to find and click a close button in the modal
+          const closeBtn = modal.querySelector('button[aria-label*="close"], button[title*="close"], .close, [data-dismiss="modal"]');
+          if (closeBtn) {
+            closeBtn.click();
+            return true;
+          }
+          // Dispatch close modal event
+          window.dispatchEvent(new CustomEvent('closeModal'));
+          return true;
+        }
+      }
+
+      // Then, try to close any visible forms by looking for Cancel buttons
+      const cancelButtons = Array.from(document.querySelectorAll('button')).filter(button => {
+        const text = button.textContent.toLowerCase().trim();
+        return (text === 'cancel' || text === 'close') && 
+               button.offsetParent !== null && 
+               !button.disabled;
+      });
+
+      if (cancelButtons.length > 0) {
+        // Click the first visible cancel button
+        cancelButtons[0].click();
+        return true;
+      }
+
+      // Also dispatch the closeForm event for components that listen to it
+      const hasFormInputs = document.querySelectorAll('form input, form select, form textarea').length > 0;
+      if (hasFormInputs) {
+        window.dispatchEvent(new CustomEvent('closeForm'));
+        return true;
+      }
+
+      return false;
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [navigate, location]);
+
+  return null; // This component doesn't render anything
+};
 
 export default App;

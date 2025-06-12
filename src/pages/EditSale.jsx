@@ -9,6 +9,7 @@ import ItemSuggestions from '../components/ItemSuggestions';
 import PrintInvoiceModal from '../components/PrintInvoiceModal';
 import BottomActionBar from '../components/BottomActionBar';
 import PowerSelectionModal from '../components/PowerSelectionModal';
+import AddNewProductModal from '../components/AddNewProductModal';
 import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 import { calculateCustomerBalance, calculateVendorBalance, formatCurrency as formatCurrencyUtil, getBalanceColorClass, getBalanceStatusText } from '../utils/ledgerUtils';
 
@@ -106,6 +107,9 @@ const EditSale = () => {
   const [powerSelectionRowIndex, setPowerSelectionRowIndex] = useState(null);
   const [selectedStockPowers, setSelectedStockPowers] = useState({}); // Track selected powers by row index
   const [selectedLensForPowerModal, setSelectedLensForPowerModal] = useState(null); // Store the lens object for the modal
+
+  // AddNewProductModal state
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
 
   // Format optical values (SPH, CYL, ADD) to "0.00" format with signs
   const formatOpticalValue = (value) => {
@@ -1340,6 +1344,18 @@ const EditSale = () => {
     setSelectedLensForPowerModal(null);
   };
 
+  // Handle opening the AddNewProductModal
+  const handleShowAddProduct = () => {
+    setShowAddProductModal(true);
+  };
+
+  // Handle product creation from modal
+  const handleProductCreated = (productData) => {
+    setShowAddProductModal(false);
+    // Refresh the items to include the new product
+    fetchItems();
+  };
+
   // Function to handle ledger button click
   const handleViewLedger = async (customer) => {
     // Navigate to Ledger page with customer data
@@ -1858,6 +1874,7 @@ const EditSale = () => {
                               saveItemToDatabase={saveItemToDatabase}
                               onRefreshItems={fetchItems}
                               currentPrice={parseFloat(row.price) || 0}
+                              onShowAddProduct={handleShowAddProduct}
                             />
                             {row.powerSeries && (
                               <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
@@ -2403,6 +2420,15 @@ const EditSale = () => {
         selectedLens={selectedLensForPowerModal}
         rowIndex={powerSelectionRowIndex}
       />
+
+      {/* AddNewProductModal */}
+      {showAddProductModal && (
+        <AddNewProductModal
+          isOpen={showAddProductModal}
+          onClose={() => setShowAddProductModal(false)}
+          onProductCreated={handleProductCreated}
+        />
+      )}
     </div>
   );
 };

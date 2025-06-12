@@ -112,7 +112,7 @@ const Transactions = () => {
       setLoading(true);
       setError('');
       
-      console.log('Fetching transactions for type:', transactionType);
+      // REMOVED FOR PRODUCTION: console.log('Fetching transactions for type:', transactionType);
       
       const transactionsRef = getUserCollection('transactions');
       
@@ -123,7 +123,7 @@ const Transactions = () => {
       );
       
       const snapshot = await getDocs(q);
-      console.log('Filtered transactions:', snapshot.docs.length);
+      // REMOVED FOR PRODUCTION: console.log('Filtered transactions:', snapshot.docs.length);
       
       // Get transactions from snapshot data
       let transactionsList = snapshot.docs
@@ -172,7 +172,7 @@ const Transactions = () => {
         return bTime - aTime; // Descending order (newest first)
       });
       
-      console.log('Setting transactions:', transactionsList);
+      // REMOVED FOR PRODUCTION: console.log('Setting transactions:', transactionsList);
       setTransactions(transactionsList);
       
     } catch (error) {
@@ -311,7 +311,7 @@ const Transactions = () => {
       setLoading(true);
       setError('');
       
-      console.log('Saving transactions:', transactionsToSave);
+      // REMOVED FOR PRODUCTION: console.log('Saving transactions:', transactionsToSave);
       
       // Save each transaction to Firestore
       for (const transaction of transactionsToSave) {
@@ -326,9 +326,9 @@ const Transactions = () => {
           createdAt: serverTimestamp(),
         };
         
-        console.log('Saving transaction data:', transactionData);
+        // REMOVED FOR PRODUCTION: console.log('Saving transaction data:', transactionData);
         const docRef = await addDoc(getUserCollection('transactions'), transactionData);
-        console.log('Transaction saved with ID:', docRef.id);
+        // REMOVED FOR PRODUCTION: console.log('Transaction saved with ID:', docRef.id);
       }
       
       // Reset form

@@ -129,7 +129,7 @@ const Customers = () => {
         const vendorsQuery = query(customersRef, where('type', '==', 'vendor'));
         
         unsubscribeVendors = onSnapshot(vendorsQuery, (snapshot) => {
-          console.log(`Received ${snapshot.docs.length} vendor(s) from Firestore`);
+          // REMOVED FOR PRODUCTION: console.log(`Received ${snapshot.docs.length} vendor(s) from Firestore`);
           const vendorsList = snapshot.docs
             .filter(doc => !doc.data()._placeholder) // Filter out placeholder documents
             .map(doc => {
@@ -157,20 +157,43 @@ const Customers = () => {
     initializeContacts();
     
     return () => {
-      console.log("Unmounting Customers component");
+      // REMOVED FOR PRODUCTION: console.log("Unmounting Customers component");
       if (unsubscribeCustomers) unsubscribeCustomers();
       if (unsubscribeVendors) unsubscribeVendors();
     };
   }, [navigate]);
 
+  // Add keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (event) => {
+      // Only trigger if not typing in an input field
+      if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.tagName === 'SELECT') {
+        return;
+      }
+
+      switch (event.key.toLowerCase()) {
+        case 'a':
+          handleAddNew();
+          break;
+        default:
+          break;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    return () => {
+      document.removeEventListener('keydown', handleKeyPress);
+    };
+  }, []);
+
   // Fetch shop information for address modal
   const fetchShopInfo = async () => {
     try {
-      console.log('Fetching shop info...');
+      // REMOVED FOR PRODUCTION: console.log('Fetching shop info...');
       const shopSettingsDoc = await getDoc(getUserSettings());
       if (shopSettingsDoc.exists()) {
         const shopData = shopSettingsDoc.data();
-        console.log('Shop info fetched successfully:', shopData);
+        // REMOVED FOR PRODUCTION: console.log('Shop info fetched successfully:', shopData);
         setShopInfo(shopData);
       } else {
         console.warn('Shop settings document does not exist');
@@ -184,7 +207,7 @@ const Customers = () => {
 
   // Handle printing address
   const handlePrintAddress = (customer) => {
-    console.log('Print address clicked for customer:', customer);
+    // REMOVED FOR PRODUCTION: console.log('Print address clicked for customer:', customer);
     
     if (!customer) {
       console.error('No customer provided for address printing');
@@ -196,7 +219,7 @@ const Customers = () => {
     
     // Ensure shop info is fetched if not available
     if (!shopInfo) {
-      console.log('Shop information not available, fetching...');
+      // REMOVED FOR PRODUCTION: console.log('Shop information not available, fetching...');
       fetchShopInfo();
     }
   };
@@ -211,7 +234,7 @@ const Customers = () => {
     
     try {
       await deleteDoc(getUserDoc('customers', itemToDelete.id));
-      console.log(`${itemType} deleted successfully`);
+      // REMOVED FOR PRODUCTION: console.log(`${itemType} deleted successfully`);
       setShowDeleteModal(false);
       setItemToDelete(null);
     } catch (error) {
@@ -253,7 +276,7 @@ const Customers = () => {
       );
       
       await Promise.all(deletePromises);
-      console.log(`${count} ${itemType} deleted successfully`);
+      // REMOVED FOR PRODUCTION: console.log(`${count} ${itemType} deleted successfully`);
       
       // Clear selections
       setSelectedItems([]);
@@ -301,7 +324,7 @@ const Customers = () => {
   };
 
   const handleEdit = (item) => {
-    console.log("Editing item:", item);
+    // REMOVED FOR PRODUCTION: console.log("Editing item:", item);
     setEditingCustomer(item);
     setIsAddingVendor(item.type === 'vendor' || activeTab === 'vendors');
     setShowAddModal(true);
@@ -309,7 +332,7 @@ const Customers = () => {
 
   const handleCloseModal = (wasSaved) => {
     try {
-      console.log("Modal closed, customer/vendor saved:", wasSaved);
+      // REMOVED FOR PRODUCTION: console.log("Modal closed, customer/vendor saved:", wasSaved);
       
       // First, clear the search term if a customer was saved
       if (wasSaved) {
@@ -331,7 +354,7 @@ const Customers = () => {
   };
   
   const handleAddNew = () => {
-    console.log("Adding new", activeTab === 'customers' ? 'customer' : 'vendor');
+    // REMOVED FOR PRODUCTION: console.log("Adding new", activeTab === 'customers' ? 'customer' : 'vendor');
     setIsAddingVendor(activeTab === 'vendors');
     setShowAddModal(true);
   };
@@ -349,7 +372,7 @@ const Customers = () => {
   // Filter and sort items based on search term with error handling
   const getFilteredItems = () => {
     const items = activeTab === 'customers' ? customers : vendors;
-    console.log(`Filtering ${items.length} ${activeTab} with search term: "${searchTerm}"`);
+    // REMOVED FOR PRODUCTION: console.log(`Filtering ${items.length} ${activeTab} with search term: "${searchTerm}"`);
     
     let filteredItems;
     if (!searchTerm || !searchTerm.trim()) {
@@ -397,23 +420,23 @@ const Customers = () => {
   let filteredItems = [];
   try {
     filteredItems = getFilteredItems();
-    console.log(`Filtered items: ${filteredItems.length}`);
+    // REMOVED FOR PRODUCTION: console.log(`Filtered items: ${filteredItems.length}`);
   } catch (error) {
     console.error("Error getting filtered items:", error);
     filteredItems = activeTab === 'customers' ? customers : vendors;
   }
   
   // Create debugging information
-  console.log("Current state:", {
-    customersCount: customers.length,
-    vendorsCount: vendors.length,
-    activeTab,
-    loading,
-    showAddModal,
-    error: error || 'none',
-    searchTerm: searchTerm || 'none',
-    filteredItemsCount: filteredItems.length
-  });
+  // REMOVED FOR PRODUCTION: console.log("Current state:", {
+  //   customersCount: customers.length,
+  //   vendorsCount: vendors.length,
+  //   activeTab,
+  //   loading,
+  //   showAddModal,
+  //   error: error || 'none',
+  //   searchTerm: searchTerm || 'none',
+  //   filteredItemsCount: filteredItems.length
+  // });
 
   // Import function for customers/vendors
   const handleImport = (event) => {
@@ -810,7 +833,7 @@ const Customers = () => {
     
     // If shop info is not available, show a loading state or fetch it
     if (!shopInfo) {
-      console.log('Shop info not available, fetching...');
+      // REMOVED FOR PRODUCTION: console.log('Shop info not available, fetching...');
       fetchShopInfo();
       return (
         <div className="fixed inset-0 overflow-y-auto z-50">
@@ -1055,7 +1078,7 @@ const Customers = () => {
               className="btn-primary inline-flex items-center justify-center px-4 py-2"
             >
               <PlusIcon className="w-5 h-5 mr-2 -ml-1" />
-              <span>Add {activeTab === 'customers' ? 'Customer' : 'Vendor'}</span>
+              <span>Add {activeTab === 'customers' ? 'Customer' : 'Vendor'} (a)</span>
             </button>
           </div>
         </div>
@@ -1166,7 +1189,7 @@ const Customers = () => {
                 className="btn-primary inline-flex items-center justify-center px-4 py-2"
               >
                 <PlusIcon className="w-5 h-5 mr-2 -ml-1" />
-                Add New {activeTab === 'customers' ? 'Customer' : 'Vendor'}
+                Add New {activeTab === 'customers' ? 'Customer' : 'Vendor'} (a)
               </button>
             )}
           </div>

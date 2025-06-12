@@ -38,6 +38,68 @@ const LensInventory = () => {
     fetchLensInventory();
   }, []);
 
+  // Add keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (event) => {
+      // Handle ESC key specifically for form closing
+      if (event.key === 'Escape') {
+        // If any form is open, close it and prevent further propagation
+        if (showAddForm || showStockLensForm || showContactLensForm || showServiceForm || showItemForm) {
+          event.preventDefault();
+          event.stopPropagation();
+          resetForms();
+          return;
+        }
+      }
+
+      // Only trigger other shortcuts if not typing in an input field
+      if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.tagName === 'SELECT') {
+        return;
+      }
+
+      switch (event.key.toLowerCase()) {
+        case 'a':
+          resetForms();
+          setShowAddForm(true);
+          break;
+        case 's':
+          resetForms();
+          setShowStockLensForm(true);
+          break;
+        case 'c':
+          resetForms();
+          setShowContactLensForm(true);
+          break;
+        case 'v':
+          resetForms();
+          setShowServiceForm(true);
+          break;
+        case 'i':
+          resetForms();
+          setShowItemForm(true);
+          break;
+        default:
+          break;
+      }
+    };
+
+    const handleCloseForm = () => {
+      // Close any open forms when ESC is pressed
+      if (showAddForm || showStockLensForm || showContactLensForm || showServiceForm || showItemForm) {
+        resetForms();
+      }
+    };
+
+    // Use capture phase to catch ESC before it bubbles up
+    document.addEventListener('keydown', handleKeyPress, true);
+    window.addEventListener('closeForm', handleCloseForm);
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyPress, true);
+      window.removeEventListener('closeForm', handleCloseForm);
+    };
+  }, [showAddForm, showStockLensForm, showContactLensForm, showServiceForm, showItemForm]);
+
   // Listen for inventory updates from other components
   useEffect(() => {
     const handleInventoryUpdate = () => {
@@ -628,7 +690,7 @@ const LensInventory = () => {
                     }}
                     className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors"
                   >
-                    Add RX Lens
+                    Add RX Lens (a)
                   </button>
                   <button
                     onClick={() => {
@@ -639,7 +701,7 @@ const LensInventory = () => {
                     }}
                     className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
                   >
-                    Add Stock Lens
+                    Add Stock Lens (s)
                   </button>
                   <button
                     onClick={() => {
@@ -650,7 +712,7 @@ const LensInventory = () => {
                     }}
                     className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
                   >
-                    Add Contact Lens
+                    Add Contact Lens (c)
                   </button>
                   <button
                     onClick={() => {
@@ -662,7 +724,7 @@ const LensInventory = () => {
                     }}
                     className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
                   >
-                    Add Service
+                    Add Service (v)
                   </button>
                   <button
                     onClick={() => {
@@ -674,7 +736,7 @@ const LensInventory = () => {
                     }}
                     className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
                   >
-                    Add Item
+                    Add Item (i)
                   </button>
                   <button
                     onClick={() => exportToExcel('all')}

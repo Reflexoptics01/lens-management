@@ -11,6 +11,7 @@ import PrintInvoiceModal from '../components/PrintInvoiceModal';
 import BottomActionBar from '../components/BottomActionBar';
 import PowerSelectionModal from '../components/PowerSelectionModal';
 import QuickTransactionModal from '../components/QuickTransactionModal';
+import AddNewProductModal from '../components/AddNewProductModal';
 import { calculateCustomerBalance, calculateVendorBalance, formatCurrency as formatCurrencyUtil, getBalanceColorClass, getBalanceStatusText } from '../utils/ledgerUtils';
 
 const TAX_OPTIONS = [
@@ -178,6 +179,11 @@ const CreateSale = () => {
 
   // Quick Transaction Modal state
   const [showQuickTransactionModal, setShowQuickTransactionModal] = useState(false);
+
+  // AddNewProductModal state
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [currentItemName, setCurrentItemName] = useState('');
+  const [currentRowIndex, setCurrentRowIndex] = useState(null);
 
 
 
@@ -1260,19 +1266,30 @@ const CreateSale = () => {
           const lensRef = getUserCollection('lensInventory');
           let matchingLenses = [];
           
-                      // Method 1: Try to find exact matches by brand name
-            if (item.itemName && item.itemName.trim() !== '') {
-              const brandQuery = query(lensRef, where('brandName', '==', item.itemName.trim()));
-              const brandSnapshot = await getDocs(brandQuery);
+          // Method 1: Try to find exact matches by brand name
+          if (item.itemName && item.itemName.trim() !== '') {
+            const brandQuery = query(lensRef, where('brandName', '==', item.itemName.trim()));
+            const brandSnapshot = await getDocs(brandQuery);
+            
+            brandSnapshot.docs.forEach(doc => {
+              const lensData = doc.data();
               
-              brandSnapshot.docs.forEach(doc => {
-                const lensData = doc.data();
-                matchingLenses.push({
-                  id: doc.id,
-                  ...lensData
-                });
+              // Skip lenses that are hidden from inventory (created via AddNewProductModal for suggestions only)
+              if (lensData.hiddenFromInventory || lensData.createdForSale) {
+                return;
+              }
+              
+              // Skip lenses with zero or negative quantity
+              if (parseFloat(lensData.qty || 0) <= 0) {
+                return;
+              }
+              
+              matchingLenses.push({
+                id: doc.id,
+                ...lensData
               });
-            }
+            });
+          }
           
                       // Method 2: If no matches by brand name, try searching by service name for services
             if (matchingLenses.length === 0 && item.itemName && item.itemName.trim() !== '') {
@@ -1281,20 +1298,42 @@ const CreateSale = () => {
               
               serviceSnapshot.docs.forEach(doc => {
                 const lensData = doc.data();
+                
+                // Skip lenses that are hidden from inventory (created via AddNewProductModal for suggestions only)
+                if (lensData.hiddenFromInventory || lensData.createdForSale) {
+                  return;
+                }
+                
+                // Skip lenses with zero or negative quantity
+                if (parseFloat(lensData.qty || 0) <= 0) {
+                  return;
+                }
+                
                 matchingLenses.push({
                   id: doc.id,
                   ...lensData
                 });
               });
             }
-            
-            // Method 2.5: If no matches by service name, try searching by item name for general items
+          
+                      // Method 2.5: If no matches by service name, try searching by item name for general items
             if (matchingLenses.length === 0 && item.itemName && item.itemName.trim() !== '') {
               const itemQuery = query(lensRef, where('itemName', '==', item.itemName.trim()));
               const itemSnapshot = await getDocs(itemQuery);
               
               itemSnapshot.docs.forEach(doc => {
                 const lensData = doc.data();
+                
+                // Skip lenses that are hidden from inventory (created via AddNewProductModal for suggestions only)
+                if (lensData.hiddenFromInventory || lensData.createdForSale) {
+                  return;
+                }
+                
+                // Skip lenses with zero or negative quantity
+                if (parseFloat(lensData.qty || 0) <= 0) {
+                  return;
+                }
+                
                 matchingLenses.push({
                   id: doc.id,
                   ...lensData
@@ -1310,6 +1349,16 @@ const CreateSale = () => {
               
               rxSnapshot.docs.forEach(doc => {
                 const lensData = doc.data();
+                
+                // Skip lenses that are hidden from inventory (created via AddNewProductModal for suggestions only)
+                if (lensData.hiddenFromInventory || lensData.createdForSale) {
+                  return;
+                }
+                
+                // Skip lenses with zero or negative quantity
+                if (parseFloat(lensData.qty || 0) <= 0) {
+                  return;
+                }
                 
                 // Check if prescription matches (with some tolerance)
                 const sphMatch = !item.sph || !lensData.sph || Math.abs(parseFloat(item.sph) - parseFloat(lensData.sph)) <= 0.25;
@@ -1337,6 +1386,17 @@ const CreateSale = () => {
               const searchTerm = item.itemName.toLowerCase().trim();
               allSnapshot.docs.forEach(doc => {
                 const lensData = doc.data();
+                
+                // Skip lenses that are hidden from inventory (created via AddNewProductModal for suggestions only)
+                if (lensData.hiddenFromInventory || lensData.createdForSale) {
+                  return;
+                }
+                
+                // Skip lenses with zero or negative quantity
+                if (parseFloat(lensData.qty || 0) <= 0) {
+                  return;
+                }
+                
                 const brandName = (lensData.brandName || '').toLowerCase();
                 const serviceName = (lensData.serviceName || '').toLowerCase();
                 const itemName = (lensData.itemName || '').toLowerCase(); // Support for Items type
@@ -1352,57 +1412,57 @@ const CreateSale = () => {
               });
             }
           
-                      if (matchingLenses.length === 0) {
+          if (matchingLenses.length === 0) {
+            continue;
+          }
+          
+          // Deduct the sold quantity from matching lenses
+          let remainingQtyToDeduct = parseFloat(item.qty) || 1;
+          
+          for (const lens of matchingLenses) {
+            if (remainingQtyToDeduct <= 0) {
+              break;
+            }
+            
+            const currentQty = parseFloat(lens.qty) || 0;
+            
+            if (currentQty <= 0) {
               continue;
             }
             
-            // Deduct the sold quantity from matching lenses
-            let remainingQtyToDeduct = parseFloat(item.qty) || 1;
-          
-                      for (const lens of matchingLenses) {
-              if (remainingQtyToDeduct <= 0) {
-                break;
-              }
+            const qtyToDeductFromThisLens = Math.min(remainingQtyToDeduct, currentQty);
+            const newQty = currentQty - qtyToDeductFromThisLens;
+            
+            try {
+              // Always update the quantity, even if it goes negative
+              await updateDoc(getUserDoc('lensInventory', lens.id), {
+                qty: newQty,
+                updatedAt: Timestamp.fromDate(new Date())
+              });
               
-              const currentQty = parseFloat(lens.qty) || 0;
-              
-              if (currentQty <= 0) {
-                continue;
-              }
-              
-              const qtyToDeductFromThisLens = Math.min(remainingQtyToDeduct, currentQty);
-              const newQty = currentQty - qtyToDeductFromThisLens;
-              
-              try {
-                // Always update the quantity, even if it goes negative
-                await updateDoc(getUserDoc('lensInventory', lens.id), {
-                  qty: newQty,
-                  updatedAt: Timestamp.fromDate(new Date())
-                });
-                
-                remainingQtyToDeduct -= qtyToDeductFromThisLens;
-              
-            } catch (dbError) {
-              console.error(`❌ Database error updating lens ${lens.id}:`, dbError);
-              throw dbError; // Re-throw to be caught by outer try-catch
-            }
+              remainingQtyToDeduct -= qtyToDeductFromThisLens;
+            
+          } catch (dbError) {
+            console.error(`❌ Database error updating lens ${lens.id}:`, dbError);
+            throw dbError; // Re-throw to be caught by outer try-catch
           }
-          
-          
-          
-        } catch (itemError) {
-          console.error(`❌ Error processing inventory for item "${item.itemName}":`, itemError);
-          // Don't throw error for individual items - continue processing others
         }
+        
+        
+        
+      } catch (itemError) {
+        console.error(`❌ Error processing inventory for item "${item.itemName}":`, itemError);
+        // Don't throw error for individual items - continue processing others
       }
-      
-      
-      
-    } catch (error) {
-      console.error('❌ Critical error in deductInventoryItems:', error);
-      throw error; // Re-throw critical errors
     }
-  };
+    
+    
+    
+  } catch (error) {
+    console.error('❌ Critical error in deductInventoryItems:', error);
+    throw error; // Re-throw critical errors
+  }
+};
 
   const handlePrintBill = () => {
     if (savedSaleId) {
@@ -2249,6 +2309,35 @@ const CreateSale = () => {
     setShowQuickTransactionModal(false);
   };
 
+  // Handle opening the AddNewProductModal
+  const handleShowAddProduct = (currentItemName = '', rowIndex = null) => {
+    setCurrentRowIndex(rowIndex);
+    setCurrentItemName(currentItemName);
+    setShowAddProductModal(true);
+  };
+
+  // Handle product creation from modal
+  const handleProductCreated = (productData) => {
+    setShowAddProductModal(false);
+    
+    // If we have a current row index, update that row with the new product
+    if (currentRowIndex !== null && productData) {
+      const updatedRows = [...tableRows];
+      updatedRows[currentRowIndex] = {
+        ...updatedRows[currentRowIndex],
+        itemName: productData.name || productData.brandName || currentItemName
+      };
+      setTableRows(updatedRows);
+    }
+    
+    // Reset modal state
+    setCurrentItemName('');
+    setCurrentRowIndex(null);
+    
+    // Refresh the items to include the new product
+    fetchItems();
+  };
+
   // Add function to fetch dispatch logs by search query
   const searchDispatchLogs = async (query) => {
     if (!query || query.trim() === '') {
@@ -2902,6 +2991,7 @@ const CreateSale = () => {
                           onRefreshItems={fetchItems}
                           currentPrice={parseFloat(row.price) || 0}
                           dataSection="create-sale"
+                          onShowAddProduct={(itemName, rowIndex) => handleShowAddProduct(itemName, rowIndex)}
                         />
                         {row.powerSeries && (
                           <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
@@ -3561,6 +3651,21 @@ const CreateSale = () => {
         preSelectedCustomer={selectedCustomer}
         onTransactionSaved={handleQuickTransactionSaved}
       />
+
+      {/* AddNewProductModal */}
+      {showAddProductModal && (
+        <AddNewProductModal
+          isOpen={showAddProductModal}
+          onClose={() => {
+            setShowAddProductModal(false);
+            setCurrentItemName('');
+            setCurrentRowIndex(null);
+          }}
+          onProductCreated={handleProductCreated}
+          initialProductName={currentItemName}
+          dataSection="create-sale"
+        />
+      )}
     </div>
   );
 };
