@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 const InvoiceLedgerView = ({ ledgerData, formatDate, formatCurrency, onInvoiceClick, onTransactionClick, onPurchaseClick }) => {
   // Function to handle navigation for purchases
   const handlePurchaseClick = (purchaseId) => {
-    console.log('[InvoiceLedgerView] Navigating to purchase detail:', purchaseId);
     // Navigate to purchase detail page
     if (onPurchaseClick) {
       onPurchaseClick(purchaseId);

@@ -4,6 +4,7 @@ import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/fi
 import { getUserCollection, getUserDoc } from '../utils/multiTenancy';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
+import { useShortcutContext, useKeyboardShortcut } from '../utils/keyboardShortcuts';
 
 const CustomerForm = ({ onClose, customer, isVendor = false }) => {
   const modalRef = useRef(null);
@@ -44,26 +45,28 @@ const CustomerForm = ({ onClose, customer, isVendor = false }) => {
     };
   }, []);
 
-  // Handle ESC key to close modal
-  useEffect(() => {
-    const handleEscKey = (event) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        event.stopPropagation();
-        onClose(false);
-      }
-    };
+  // Set up modal context for keyboard shortcuts
+  useShortcutContext('customer-form');
 
+  // ESC key to close modal with highest priority
+  useKeyboardShortcut('escape', () => {
+    onClose(false);
+  }, {
+    context: 'customer-form',
+    priority: 'high',
+    description: 'Close customer form modal'
+  });
+
+  // Handle ESC key to close modal (fallback)
+  useEffect(() => {
     // Listen for custom close modal events
     const handleCloseModal = () => {
       onClose(false);
     };
 
-    document.addEventListener('keydown', handleEscKey, true);
     window.addEventListener('closeModal', handleCloseModal);
     
     return () => {
-      document.removeEventListener('keydown', handleEscKey, true);
       window.removeEventListener('closeModal', handleCloseModal);
     };
   }, [onClose]);

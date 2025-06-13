@@ -161,7 +161,16 @@ const Ledger = () => {
       
       // Create opening balance entry if it exists
       const openingBalanceEntries = [];
-      const openingBalance = parseFloat(selectedEntity.openingBalance || 0);
+      // More robust opening balance parsing - handle null, undefined, empty strings, and non-numeric values
+      let openingBalance = 0;
+      if (selectedEntity.openingBalance !== null && selectedEntity.openingBalance !== undefined) {
+        const parsedBalance = parseFloat(selectedEntity.openingBalance);
+        if (!isNaN(parsedBalance)) {
+          openingBalance = parsedBalance;
+        }
+      }
+      
+      // Always show opening balance if it's not exactly zero (could be positive or negative)
       if (openingBalance !== 0) {
         openingBalanceEntries.push({
           id: 'opening-balance',
@@ -184,8 +193,9 @@ const Ledger = () => {
       let balance = 0;
       const dataWithBalance = combinedData.map(item => {
         if (item.type === 'opening') {
-          // Opening balance sets the initial balance
-          balance = parseFloat(item.amount || 0);
+          // Opening balance sets the initial balance - use robust parsing
+          const parsedOpeningBalance = parseFloat(item.amount || 0);
+          balance = !isNaN(parsedOpeningBalance) ? parsedOpeningBalance : 0;
         } else if (item.type === 'invoice') {
           // For customer invoices, add to the balance (customer owes us money)
           const amount = parseFloat(item.totalAmount || item.total || item.amount || 0);

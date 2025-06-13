@@ -8,6 +8,7 @@ import OrderForm from '../components/OrderForm';
 import { ArrowLeftIcon, PlusIcon, DocumentPlusIcon } from '@heroicons/react/24/outline';
 import CustomerForm from '../components/CustomerForm';
 import { searchMatchingLenses } from '../utils/shopAPI';
+import { useShortcutContext, useKeyboardShortcut } from '../utils/keyboardShortcuts';
 
 // Define colors for visual organization
 const SECTION_COLORS = {
@@ -77,6 +78,34 @@ const CreateOrder = () => {
     fetchCustomers();
     calculateNextOrderDisplayId();
   }, []);
+
+  // Set up keyboard shortcuts context
+  useShortcutContext('create-order');
+
+  // ESC key to go back to orders
+  useKeyboardShortcut('escape', () => {
+    if (showCustomerForm || showWhatsAppModal) {
+      // Let modals handle their own ESC key
+      return;
+    }
+    navigate('/orders');
+  }, {
+    context: 'create-order',
+    priority: 'high',
+    description: 'Go back to orders list'
+  });
+
+  // Ctrl+S to submit form
+  useKeyboardShortcut('ctrl+s', (e) => {
+    e.preventDefault();
+    if (!loading && !showCustomerForm && !showWhatsAppModal) {
+      handleSubmit(e);
+    }
+  }, {
+    context: 'create-order',
+    priority: 'high',
+    description: 'Save order'
+  });
 
   // Add useEffect to update the expected delivery date to always be 3 days from today
   useEffect(() => {

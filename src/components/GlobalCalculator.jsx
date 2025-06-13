@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useShortcutContext, useKeyboardShortcut } from '../utils/keyboardShortcuts';
 
 const GlobalCalculator = ({ isOpen, onClose }) => {
   const [display, setDisplay] = useState('0');
@@ -15,7 +16,56 @@ const GlobalCalculator = ({ isOpen, onClose }) => {
     }
   }, [isOpen]);
 
-  // Handle keyboard input
+  // Set up keyboard shortcuts context when calculator is open
+  useShortcutContext(isOpen ? 'calculator' : null);
+
+  // Calculator-specific keyboard shortcuts with high priority
+  useKeyboardShortcut('g', () => {
+    if (isOpen) deductGST();
+  }, {
+    context: 'calculator',
+    priority: 'high',
+    description: 'Deduct GST from current value',
+    condition: () => isOpen
+  });
+
+  useKeyboardShortcut('h', () => {
+    if (isOpen) addGST();
+  }, {
+    context: 'calculator',
+    priority: 'high',
+    description: 'Add GST to current value',
+    condition: () => isOpen
+  });
+
+  useKeyboardShortcut('escape', () => {
+    if (isOpen) onClose();
+  }, {
+    context: 'calculator',
+    priority: 'high',
+    description: 'Close calculator',
+    condition: () => isOpen
+  });
+
+  useKeyboardShortcut('c', () => {
+    if (isOpen) clear();
+  }, {
+    context: 'calculator',
+    priority: 'high',
+    description: 'Clear calculator',
+    condition: () => isOpen
+  });
+
+  useKeyboardShortcut('enter', () => {
+    if (isOpen) handleCalculate();
+  }, {
+    context: 'calculator',
+    priority: 'high',
+    description: 'Calculate result',
+    condition: () => isOpen
+  });
+
+  // Handle keyboard input for numbers and operations
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (!isOpen) return;
@@ -41,12 +91,8 @@ const GlobalCalculator = ({ isOpen, onClose }) => {
         performOperation('/');
       }
       // Equals
-      else if (key === '=' || key === 'Enter') {
-        calculate();
-      }
-      // Clear
-      else if (key === 'c' || key === 'C') {
-        clear();
+      else if (key === '=') {
+        handleCalculate();
       }
       // Decimal
       else if (key === '.') {
@@ -55,17 +101,6 @@ const GlobalCalculator = ({ isOpen, onClose }) => {
       // Backspace
       else if (key === 'Backspace') {
         backspace();
-      }
-      // ESC to close
-      else if (key === 'Escape') {
-        onClose();
-      }
-      // GST shortcuts
-      else if (key === 'g' || key === 'G') {
-        deductGST();
-      }
-      else if (key === 'h' || key === 'H') {
-        addGST();
       }
     };
 

@@ -7,8 +7,11 @@ import Navbar from '../components/Navbar';
 import ItemSuggestions from '../components/ItemSuggestions';
 import AutocompleteInput from '../components/AutocompleteInput';
 import AddNewProductModal from '../components/AddNewProductModal';
+import { useShortcutContext, useKeyboardShortcut } from '../utils/keyboardShortcuts';
+import { useNavigate } from 'react-router-dom';
 
 const DailyDispatchLog = () => {
+  const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
     return today.toISOString().split('T')[0];
@@ -65,6 +68,56 @@ const DailyDispatchLog = () => {
     fetchCustomers();
     fetchDispatchLogs();
   }, []);
+
+  // Set up keyboard shortcuts context
+  useShortcutContext('daily-dispatch-log');
+
+  // ESC key handling
+  useKeyboardShortcut('escape', () => {
+    if (showAddProductModal) {
+      // Let modal handle its own ESC key
+      return;
+    }
+    
+    if (editMode) {
+      // Cancel edit mode
+      resetForm();
+    } else {
+      // Go back to main dashboard or orders
+      navigate('/orders');
+    }
+  }, {
+    context: 'daily-dispatch-log',
+    priority: 'high',
+    description: 'Cancel edit or go back'
+  });
+
+  // Ctrl+S to submit form
+  useKeyboardShortcut('ctrl+s', (e) => {
+    e.preventDefault();
+    if (!loading && !showAddProductModal) {
+      const formElement = document.querySelector('form');
+      if (formElement) {
+        handleSubmit(e);
+      }
+    }
+  }, {
+    context: 'daily-dispatch-log',
+    priority: 'high',
+    description: 'Save dispatch log'
+  });
+
+  // Ctrl+N to add new rows
+  useKeyboardShortcut('ctrl+n', (e) => {
+    e.preventDefault();
+    if (!showAddProductModal) {
+      addRow();
+    }
+  }, {
+    context: 'daily-dispatch-log',
+    priority: 'high',
+    description: 'Add new rows'
+  });
 
   // Filter logs based on date and optical shop with error handling
   useEffect(() => {

@@ -243,42 +243,55 @@ const Dashboard = () => {
       salesSnapshot.docs.forEach(doc => {
         const sale = doc.data();
         
-        if (sale.items && Array.isArray(sale.items)) {
-          sale.items.forEach(item => {
-            try {
-              // Skip services - check multiple ways services can be identified
-              const isServiceItem = item.isService || 
-                                  item.type === 'service' || 
-                                  item.unit === 'Service' || 
-                                  item.unit === 'service' ||
-                                  (item.itemName && item.itemName.toLowerCase().includes('service')) ||
-                                  (item.serviceData && Object.keys(item.serviceData).length > 0);
-              
-              if (isServiceItem) {
-                return; // Skip this item
-              }
-              
-              const productName = item.itemName || item.productName || 'Unknown Product';
-              const qty = parseInt(item.qty) || 1;
-              
-              if (!productCounts[productName]) {
-                productCounts[productName] = 0;
-              }
-              productCounts[productName] += qty;
-            } catch (error) {
-              // Skip invalid items silently in production
+        // Skip invalid sales
+        if (!sale.items || !Array.isArray(sale.items) || sale.items.length === 0) return;
+        
+        // Validate sale date if needed for time filtering
+        const saleDate = safelyParseDate(sale.invoiceDate);
+        if (sale.invoiceDate && (!saleDate || isNaN(saleDate.getTime()))) return;
+        
+        sale.items.forEach(item => {
+          try {
+            // Skip invalid items
+            if (!item || typeof item !== 'object') return;
+            
+            // Skip services - check multiple ways services can be identified
+            const isServiceItem = item.isService || 
+                                item.type === 'service' || 
+                                item.unit === 'Service' || 
+                                item.unit === 'service' ||
+                                (item.itemName && item.itemName.toLowerCase().includes('service')) ||
+                                (item.serviceData && Object.keys(item.serviceData).length > 0);
+            
+            if (isServiceItem) {
+              return; // Skip this item
             }
-          });
-        }
+            
+            const productName = (item.itemName || item.productName || '').trim();
+            if (!productName || productName === 'Unknown Product') return;
+            
+            const qty = parseInt(item.qty) || 1;
+            if (qty <= 0) return;
+            
+            if (!productCounts[productName]) {
+              productCounts[productName] = 0;
+            }
+            productCounts[productName] += qty;
+          } catch (error) {
+            console.warn('Error processing item for top products:', error, item);
+          }
+        });
       });
       
       const sortedProducts = Object.entries(productCounts)
         .map(([name, count]) => ({ name, count }))
+        .filter(item => item.count > 0) // Only include items with positive counts
         .sort((a, b) => b.count - a.count)
         .slice(0, 20);
       
       setTopProducts(sortedProducts);
     } catch (error) {
+      console.error('Error fetching top products:', error);
       setTopProducts([]);
     }
   };
@@ -389,52 +402,63 @@ const Dashboard = () => {
       salesSnapshot.docs.forEach(doc => {
         const sale = doc.data();
         
-        if (sale.items && Array.isArray(sale.items)) {
-          sale.items.forEach(item => {
-            try {
-              const productName = item.itemName || item.productName || 'Unknown Product';
-              const qty = parseInt(item.qty) || 1;
+        // Skip invalid sales
+        if (!sale.items || !Array.isArray(sale.items) || sale.items.length === 0) return;
+        
+        // Validate sale date if needed for time filtering
+        const saleDate = safelyParseDate(sale.invoiceDate);
+        if (sale.invoiceDate && (!saleDate || isNaN(saleDate.getTime()))) return;
+        
+        sale.items.forEach(item => {
+          try {
+            // Skip invalid items
+            if (!item || typeof item !== 'object') return;
+            
+            const productName = (item.itemName || item.productName || '').trim();
+            if (!productName || productName === 'Unknown Product') return;
+            
+            const qty = parseInt(item.qty) || 1;
+            if (qty <= 0) return;
+            
+            // Build power specification string with improved validation
+            let powerSpec = '';
+            const sph = item.sph ? parseFloat(item.sph) : null;
+            const cyl = item.cyl ? parseFloat(item.cyl) : null;
+            const axis = item.axis ? parseInt(item.axis) : null;
+            const add = item.add ? parseFloat(item.add) : null;
+            
+            // Only process items that have meaningful power data
+            if (sph !== null && !isNaN(sph) && Math.abs(sph) >= 0.25) {
+              powerSpec = `${sph >= 0 ? '+' : ''}${sph.toFixed(2)} SPH`;
               
-              // Build power specification string
-              let powerSpec = '';
-              const sph = item.sph ? parseFloat(item.sph).toFixed(2) : null;
-              const cyl = item.cyl ? parseFloat(item.cyl).toFixed(2) : null;
-              const axis = item.axis ? parseInt(item.axis) : null;
-              const add = item.add ? parseFloat(item.add).toFixed(2) : null;
-              
-              // Only process items that have at least SPH power
-              if (sph !== null && sph !== '0.00') {
-                powerSpec = `${sph} SPH`;
+              if (cyl !== null && !isNaN(cyl) && Math.abs(cyl) >= 0.25) {
+                powerSpec += ` ${cyl >= 0 ? '+' : ''}${cyl.toFixed(2)} CYL`;
                 
-                if (cyl !== null && cyl !== '0.00') {
-                  powerSpec += ` ${cyl} CYL`;
-                  
-                  if (axis !== null && axis !== 0) {
-                    powerSpec += ` ${axis}°`;
-                  }
+                if (axis !== null && !isNaN(axis) && axis > 0 && axis <= 180) {
+                  powerSpec += ` ${axis}°`;
                 }
-                
-                if (add !== null && add !== '0.00') {
-                  powerSpec += ` ${add} ADD`;
-                }
-                
-                // Create unique key combining product name and power
-                const productPowerKey = `${productName} | ${powerSpec}`;
-                
-                if (!productPowerCounts[productPowerKey]) {
-                  productPowerCounts[productPowerKey] = {
-                    productName,
-                    powerSpec,
-                    count: 0
-                  };
-                }
-                productPowerCounts[productPowerKey].count += qty;
               }
-            } catch (error) {
-              // Skip invalid items
+              
+              if (add !== null && !isNaN(add) && Math.abs(add) >= 0.25) {
+                powerSpec += ` ${add >= 0 ? '+' : ''}${add.toFixed(2)} ADD`;
+              }
+              
+              // Create unique key combining product name and power
+              const productPowerKey = `${productName} | ${powerSpec}`;
+              
+              if (!productPowerCounts[productPowerKey]) {
+                productPowerCounts[productPowerKey] = {
+                  productName,
+                  powerSpec,
+                  count: 0
+                };
+              }
+              productPowerCounts[productPowerKey].count += qty;
             }
-          });
-        }
+          } catch (error) {
+            console.warn('Error processing item for product powers:', error, item);
+          }
+        });
       });
       
       const sortedProductPowers = Object.entries(productPowerCounts)
@@ -444,11 +468,13 @@ const Dashboard = () => {
           count: data.count,
           displayName: `${data.productName} | ${data.powerSpec}`
         }))
+        .filter(item => item.count > 0) // Only include items with positive counts
         .sort((a, b) => b.count - a.count)
         .slice(0, 20);
       
       setTopProductPowers(sortedProductPowers);
     } catch (error) {
+      console.error('Error fetching top product powers:', error);
       setTopProductPowers([]);
     }
   };
@@ -463,48 +489,85 @@ const Dashboard = () => {
       salesSnapshot.docs.forEach(doc => {
         const sale = doc.data();
         
-        if (sale.items && Array.isArray(sale.items)) {
-          sale.items.forEach(item => {
-            try {
-              const productName = item.itemName || item.productName || 'Unknown Product';
-              const qty = parseInt(item.qty) || 1;
-              const price = parseFloat(item.price) || 0;
-              
-              // Get cost price - if not available, assume 25% margin (cost = 75% of price)
-              let cost = parseFloat(item.cost) || parseFloat(item.costPrice) || 0;
-              let isEstimatedCost = false;
-              
-              if (cost === 0 && price > 0) {
-                cost = price * 0.75; // Assume 25% margin if no cost price
-                isEstimatedCost = true;
-              }
-              
-              const profit = (price - cost) * qty;
-              
-              if (!productProfits[productName]) {
-                productProfits[productName] = { 
-                  profit: 0, 
-                  revenue: 0, 
-                  hasEstimatedCost: false,
-                  actualCostItems: 0,
-                  estimatedCostItems: 0
-                };
-              }
-              productProfits[productName].profit += profit;
-              productProfits[productName].revenue += price * qty;
-              
-              // Track whether this product has estimated costs
-              if (isEstimatedCost) {
-                productProfits[productName].hasEstimatedCost = true;
-                productProfits[productName].estimatedCostItems += qty;
-              } else {
-                productProfits[productName].actualCostItems += qty;
-              }
-            } catch (error) {
-              // Skip invalid items
+        // Skip invalid sales
+        if (!sale.items || !Array.isArray(sale.items) || sale.items.length === 0) return;
+        
+        // Validate sale date if needed for time filtering
+        const saleDate = safelyParseDate(sale.invoiceDate);
+        if (sale.invoiceDate && (!saleDate || isNaN(saleDate.getTime()))) return;
+        
+        sale.items.forEach(item => {
+          try {
+            // Skip invalid items
+            if (!item || typeof item !== 'object') return;
+            
+            const productName = (item.itemName || item.productName || '').trim();
+            if (!productName || productName === 'Unknown Product') return;
+            
+            const qty = parseInt(item.qty) || 1;
+            if (qty <= 0) return;
+            
+            const price = parseFloat(item.price) || 0;
+            if (price <= 0) return; // Skip items with no valid price
+            
+            // Get cost price with improved validation
+            let cost = 0;
+            let isEstimatedCost = false;
+            
+            // Try to get actual cost from multiple possible fields
+            if (item.cost && parseFloat(item.cost) > 0) {
+              cost = parseFloat(item.cost);
+            } else if (item.costPrice && parseFloat(item.costPrice) > 0) {
+              cost = parseFloat(item.costPrice);
+            } else if (item.purchasePrice && parseFloat(item.purchasePrice) > 0) {
+              cost = parseFloat(item.purchasePrice);
+            } else {
+              // Use estimated cost only if no actual cost is available
+              cost = price * 0.70; // Assume 30% margin if no cost price (more conservative)
+              isEstimatedCost = true;
             }
-          });
-        }
+            
+            // Validate cost makes sense
+            if (isNaN(cost) || cost < 0) {
+              cost = price * 0.70;
+              isEstimatedCost = true;
+            }
+            
+            // Ensure cost doesn't exceed price (except for loss-making items)
+            if (cost > price * 1.5) { // Allow some margin for data entry errors
+              cost = price * 0.70;
+              isEstimatedCost = true;
+            }
+            
+            const profit = (price - cost) * qty;
+            const revenue = price * qty;
+            
+            if (!productProfits[productName]) {
+              productProfits[productName] = { 
+                profit: 0, 
+                revenue: 0, 
+                hasEstimatedCost: false,
+                actualCostItems: 0,
+                estimatedCostItems: 0,
+                totalItems: 0
+              };
+            }
+            
+            productProfits[productName].profit += profit;
+            productProfits[productName].revenue += revenue;
+            productProfits[productName].totalItems += qty;
+            
+            // Track cost estimation status
+            if (isEstimatedCost) {
+              productProfits[productName].hasEstimatedCost = true;
+              productProfits[productName].estimatedCostItems += qty;
+            } else {
+              productProfits[productName].actualCostItems += qty;
+            }
+          } catch (error) {
+            console.warn('Error processing item for profit products:', error, item);
+          }
+        });
       });
       
       const sortedProfitProducts = Object.entries(productProfits)
@@ -515,13 +578,16 @@ const Dashboard = () => {
           profitMargin: data.revenue > 0 ? (data.profit / data.revenue * 100) : 0,
           hasEstimatedCost: data.hasEstimatedCost,
           actualCostItems: data.actualCostItems,
-          estimatedCostItems: data.estimatedCostItems
+          estimatedCostItems: data.estimatedCostItems,
+          totalItems: data.totalItems
         }))
+        .filter(item => item.revenue > 0 && item.totalItems > 0) // Only include items with valid data
         .sort((a, b) => b.profit - a.profit)
         .slice(0, 20);
       
       setTopProfitProducts(sortedProfitProducts);
     } catch (error) {
+      console.error('Error fetching top profit products:', error);
       setTopProfitProducts([]);
     }
   };
@@ -690,22 +756,26 @@ const Dashboard = () => {
         };
       }
       
-      // Process sales data
+      // Process sales data with improved validation
       salesSnapshot.docs.forEach(doc => {
         const sale = doc.data();
         
-        if (!sale.invoiceDate || !sale.totalAmount) return;
+        // Skip invalid sales records
+        if (!sale.invoiceDate || !sale.totalAmount || sale.totalAmount <= 0) return;
         
         const saleDate = safelyParseDate(sale.invoiceDate);
-        if (!saleDate) return;
+        if (!saleDate || isNaN(saleDate.getTime())) return;
         
         // Only include data from April of current year onwards
         if (saleDate.getFullYear() === currentYear && saleDate.getMonth() >= 3) {
           const monthKey = `${saleDate.getFullYear()}-${(saleDate.getMonth() + 1).toString().padStart(2, '0')}`;
           
           if (monthlyData[monthKey]) {
-            monthlyData[monthKey].sales += parseFloat(sale.totalAmount) || 0;
-            monthlyData[monthKey].count += 1;
+            const amount = parseFloat(sale.totalAmount);
+            if (!isNaN(amount) && amount > 0) {
+              monthlyData[monthKey].sales += amount;
+              monthlyData[monthKey].count += 1;
+            }
           }
         }
       });
@@ -718,7 +788,7 @@ const Dashboard = () => {
       setMonthlySalesData(chartData);
       
     } catch (error) {
-      // Handle errors gracefully by setting empty array
+      console.error('Error fetching monthly sales data:', error);
       setMonthlySalesData([]);
     }
   };

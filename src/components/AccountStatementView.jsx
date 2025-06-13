@@ -158,7 +158,6 @@ const AccountStatementView = ({ ledgerData, formatDate, formatCurrency, getPayme
                     .reduce((sum, transaction) => sum + parseFloat(transaction.amount || 0), 0);
                   
                   recalculatedBalance = openingBalance + totalInvoicesAndPurchases - totalTransactions;
-                  console.log('Recalculated balance:', recalculatedBalance, 'Opening balance:', openingBalance, 'Total invoices/purchases:', totalInvoicesAndPurchases, 'Total transactions:', totalTransactions);
                   
                   const className = recalculatedBalance > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400';
                   return <span className={className}>{formatCurrency(recalculatedBalance)}</span>;

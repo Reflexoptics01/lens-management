@@ -142,6 +142,29 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
         const data = { id: saleId, ...saleDoc.data() };
         setSaleData(data);
         
+        // Fetch customer data if customerId is available to get complete customer info including GST
+        if (data.customerId) {
+          try {
+            const customerDoc = await getDoc(getUserDoc('customers', data.customerId));
+            if (customerDoc.exists()) {
+              const customerData = customerDoc.data();
+              // Merge customer data into sale data for better field availability
+              data.customerFromRecord = customerData;
+              
+              // Also update selectedCustomer if it exists
+              if (data.selectedCustomer) {
+                data.selectedCustomer = { ...data.selectedCustomer, ...customerData };
+              } else {
+                data.selectedCustomer = customerData;
+              }
+              
+              setSaleData(data); // Update with merged customer data
+            }
+          } catch (error) {
+            // Could not fetch customer data - continue without it
+          }
+        }
+        
         // Fetch shop settings from user-specific collection
         const settingsDoc = await getDoc(getUserDoc('settings', 'shopSettings'));
         let bankDetailsData = null;
@@ -607,11 +630,34 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
 
   // Get customer GST number from various possible sources
   const getCustomerGST = () => {
-    return saleData.customerGst || 
+    // Check all possible field variations found in the codebase
+    const gstNumber = saleData.customerGst || 
            saleData.customerGstNumber || 
-           saleData.selectedCustomer?.gstNumber || 
-           saleData.selectedCustomer?.gst || 
+           saleData.gstNumber ||
+           saleData.customerGSTNumber ||
+           saleData.gst ||
+           saleData.gstin ||
+           saleData.GSTIN ||
+           saleData.selectedCustomer?.gstNumber ||
+           saleData.selectedCustomer?.gst ||
+           saleData.selectedCustomer?.gstin ||
+           saleData.selectedCustomer?.GSTIN ||
+           saleData.selectedCustomer?.customerGst ||
+           saleData.selectedCustomer?.customerGstNumber ||
+           saleData.selectedCustomer?.customerGSTNumber ||
+           saleData.customer?.gstNumber ||
+           saleData.customer?.gst ||
+           saleData.customer?.gstin ||
+           saleData.customer?.GSTIN ||
+           saleData.customerFromRecord?.gstNumber ||
+           saleData.customerFromRecord?.gst ||
+           saleData.customerFromRecord?.gstin ||
+           saleData.customerFromRecord?.GSTIN ||
+           saleData.customerFromRecord?.customerGst ||
+           saleData.customerFromRecord?.customerGstNumber ||
            null;
+    
+    return gstNumber;
   };
 
   // Extract only the suffix (number part) from invoice number
@@ -1103,13 +1149,6 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
                       <div style={{ marginBottom: '3px' }}>
                         <span style={{ fontWeight: 'bold', fontSize: '10px' }}>IFSC Code: </span>
                         <span style={{ fontSize: '10px' }}>{displayBankDetails.ifscCode}</span>
-                      </div>
-                    )}
-                    
-                    {/* Only show in development and only if nothing is found */}
-                    {false && process.env.NODE_ENV === 'development' && Object.keys(displayBankDetails).length === 0 && (
-                      <div style={{ color: 'red', fontSize: '8px', marginBottom: '3px' }}>
-                        No bank details found in settings.
                       </div>
                     )}
                   </div>
