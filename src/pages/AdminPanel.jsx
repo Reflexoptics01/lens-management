@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
 import { collection, query, where, getDocs, doc, updateDoc, addDoc, deleteDoc, serverTimestamp, setDoc, getDoc } from 'firebase/firestore';
@@ -95,6 +95,41 @@ const AdminPanel = () => {
       // Combine and deduplicate by UID, prioritizing registration data
       const combinedUsers = [...allUsersData];
       
+      // Merge mobile app permissions from users collection
+      combinedUsers.forEach(regUser => {
+        try {
+          // Find ALL user documents with the same UID (handle potential duplicates)
+          const allUserData = approvedUsersData.filter(u => u.uid === regUser.uid);
+          
+          if (allUserData.length > 0) {
+            // If there are multiple documents, prefer the one with mobile app permissions
+            const userData = allUserData.find(u => u.hasOwnProperty('mobileAppAccess')) || allUserData[0];
+            
+            // Merge mobile app permission fields with proper null checks
+            regUser.mobileAppAccess = userData.mobileAppAccess !== undefined ? userData.mobileAppAccess : false;
+            regUser.mobileAppApprovedAt = userData.mobileAppApprovedAt || null;
+            regUser.mobileAppApprovedBy = userData.mobileAppApprovedBy || null;
+            regUser.mobileAppRevokedAt = userData.mobileAppRevokedAt || null;
+            regUser.mobileAppRevokedBy = userData.mobileAppRevokedBy || null;
+          } else {
+            // Set default values if no user data found
+            regUser.mobileAppAccess = false;
+            regUser.mobileAppApprovedAt = null;
+            regUser.mobileAppApprovedBy = null;
+            regUser.mobileAppRevokedAt = null;
+            regUser.mobileAppRevokedBy = null;
+          }
+        } catch (error) {
+          console.error('Error merging mobile permissions for user:', regUser.email, error);
+          // Set safe defaults
+          regUser.mobileAppAccess = false;
+          regUser.mobileAppApprovedAt = null;
+          regUser.mobileAppApprovedBy = null;
+          regUser.mobileAppRevokedAt = null;
+          regUser.mobileAppRevokedBy = null;
+        }
+      });
+      
       // Add users from users collection that aren't in registrations (orphaned users)
       approvedUsersData.forEach(approvedUser => {
         // Skip the main admin user - don't show them in the user list
@@ -104,9 +139,6 @@ const AdminPanel = () => {
         
         const existsInRegistrations = allUsersData.find(regUser => regUser.uid === approvedUser.uid);
         if (!existsInRegistrations) {
-          console.warn(`⚠️ Orphaned user found in users collection: ${approvedUser.email} (UID: ${approvedUser.uid})`);
-          console.log('🔍 Orphaned user full data:', approvedUser);
-          
           const orphanedUser = {
             ...approvedUser,
             // Mark as orphaned and add warning
@@ -118,7 +150,6 @@ const AdminPanel = () => {
             source: 'users' // Keep track that this came from users collection only
           };
           
-          console.log('🔍 Orphaned user processed data:', orphanedUser);
           combinedUsers.push(orphanedUser);
         }
       });
@@ -179,7 +210,13 @@ const AdminPanel = () => {
           status: 'approved',
           createdAt: serverTimestamp(),
           approvedAt: serverTimestamp(),
-          approvedBy: user.email
+          approvedBy: user.email,
+          // Mobile app permission fields
+          mobileAppAccess: false,
+          mobileAppApprovedAt: null,
+          mobileAppApprovedBy: null,
+          mobileAppRevokedAt: null,
+          mobileAppRevokedBy: null
         });
 
         // Create company settings for the user
@@ -353,16 +390,6 @@ const AdminPanel = () => {
   };
 
   const handleDeleteUser = async (registration) => {
-    console.log('🗑️ handleDeleteUser called with data:', registration);
-    console.log('🗑️ User properties:', {
-      id: registration.id,
-      uid: registration.uid,
-      email: registration.email,
-      isOrphaned: registration.isOrphaned,
-      source: registration.source,
-      status: registration.status
-    });
-    
     // First confirmation
     if (!window.confirm(`Are you sure you want to PERMANENTLY DELETE ${registration.email}?\n\nThis will delete ALL user data including their business records and cannot be undone.`)) {
       return;
@@ -383,33 +410,18 @@ const AdminPanel = () => {
       
       // Check if this is an orphaned user (no registration document)
       if (registration.isOrphaned || !registration.id || registration.source === 'users') {
-        console.log(`🗑️ Deleting orphaned user: ${registration.email} (UID: ${registration.uid})`);
-        console.log('🗑️ Document path will be: users/' + registration.uid);
-        
         // For orphaned users, only delete from users collection
         const userDocRef = doc(db, 'users', registration.uid);
-        console.log('🗑️ Created document reference:', userDocRef);
-        
         const existingUserDoc = await getDoc(userDocRef);
-        console.log('🗑️ Document exists check:', existingUserDoc.exists());
         
         if (existingUserDoc.exists()) {
-          console.log('🗑️ Document data:', existingUserDoc.data());
-          console.log('🗑️ Attempting to delete document...');
           await deleteDoc(userDocRef);
-          console.log(`✅ Orphaned user ${registration.email} deleted from users collection`);
-        } else {
-          console.warn(`❌ User document not found for ${registration.email} at path users/${registration.uid}`);
         }
       } else {
         // For regular users, delete from both collections
-        console.log(`🗑️ Deleting regular user: ${registration.email}`);
-        
         // Delete from userRegistrations first
         if (registration.id) {
-          console.log('🗑️ Deleting from userRegistrations:', registration.id);
           await deleteDoc(doc(db, 'userRegistrations', registration.id));
-          console.log(`✅ Registration document deleted for ${registration.email}`);
         }
 
         // Delete from users collection if exists
@@ -417,16 +429,9 @@ const AdminPanel = () => {
         const existingUserDoc = await getDoc(userDocRef);
 
         if (existingUserDoc.exists()) {
-          console.log('🗑️ Deleting from users collection:', registration.uid);
           await deleteDoc(userDocRef);
-          console.log(`✅ User document deleted for ${registration.email}`);
         }
       }
-
-      // Note: Unfortunately, we cannot delete Firebase Auth users from client-side code
-      // This requires Firebase Admin SDK which runs on server-side
-      // The user will need to contact support for complete account deletion
-      // or we need to implement a cloud function for this
 
       toast.success(`User ${registration.email} deleted from database. Note: Firebase Auth account may still exist - user should contact support if they cannot re-register.`);
       
@@ -435,12 +440,7 @@ const AdminPanel = () => {
       await fetchUsers();
       
     } catch (error) {
-      console.error('🗑️ Error deleting user:', error);
-      console.error('🗑️ Error details:', {
-        code: error.code,
-        message: error.message,
-        stack: error.stack
-      });
+      console.error('Error deleting user:', error);
       toast.error('Failed to delete user: ' + error.message);
     } finally {
       setRefreshing(false);
@@ -629,7 +629,7 @@ const AdminPanel = () => {
     }
   };
 
-  // New function to handle orphaned user cleanup
+  // Handle orphaned user cleanup
   const handleDeleteOrphanedUser = async (user) => {
     if (!window.confirm(`Clean up orphaned user ${user.email}?\n\nThis user exists in the users collection but has no registration record. This will remove them from the users collection only.`)) {
       return;
@@ -657,22 +657,193 @@ const AdminPanel = () => {
     }
   };
 
-  const filteredUsers = allUsers.filter(user => {
+  // Mobile App Permission Functions
+  const handleApproveMobileAccess = useCallback(async (userRecord) => {
+    // Validate inputs
+    if (!userRecord?.uid || !userRecord?.email || !user?.email) {
+      toast.error('Invalid user data or admin session');
+      return;
+    }
+
+    if (!confirm(`Grant mobile app access to ${userRecord.email}?`)) {
+      return;
+    }
+
+    try {
+      setRefreshing(true);
+      
+      // Get or create user document in users collection
+      const userDocRef = doc(db, 'users', userRecord.uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (!userDoc.exists()) {
+        // Create user document if it doesn't exist
+        const defaultPermissions = {
+          '/dashboard': true,
+          '/orders': true,
+          '/customers': true,
+          '/sales': true,
+          '/purchases': true,
+          '/transactions': true,
+          '/ledger': true,
+          '/gst-returns': true,
+          '/lens-inventory': true,
+          '/settings': true
+        };
+
+        await setDoc(userDocRef, {
+          uid: userRecord.uid,
+          email: userRecord.email,
+          role: 'admin',
+          permissions: defaultPermissions,
+          isActive: true,
+          status: 'approved',
+          createdAt: serverTimestamp(),
+          mobileAppAccess: true,
+          mobileAppApprovedAt: serverTimestamp(),
+          mobileAppApprovedBy: user.email,
+          mobileAppRevokedAt: null,
+          mobileAppRevokedBy: null
+        });
+      } else {
+        // Update existing user document
+        await updateDoc(userDocRef, {
+          mobileAppAccess: true,
+          mobileAppApprovedAt: serverTimestamp(),
+          mobileAppApprovedBy: user.email,
+          mobileAppRevokedAt: null,
+          mobileAppRevokedBy: null
+        });
+      }
+
+      await fetchUsers();
+      toast.success(`Mobile app access granted to ${userRecord.email}`);
+
+    } catch (error) {
+      console.error('Error approving mobile access:', error);
+      toast.error('Failed to grant mobile access. Please try again.');
+    } finally {
+      setRefreshing(false);
+    }
+  }, [user?.email, fetchUsers]);
+
+  const handleRevokeMobileAccess = useCallback(async (userRecord) => {
+    // Validate inputs
+    if (!userRecord?.uid || !userRecord?.email || !user?.email) {
+      toast.error('Invalid user data or admin session');
+      return;
+    }
+
+    if (!confirm(`Revoke mobile app access for ${userRecord.email}? They will be signed out automatically.`)) {
+      return;
+    }
+
+    try {
+      setRefreshing(true);
+      
+      const userDocRef = doc(db, 'users', userRecord.uid);
+      await updateDoc(userDocRef, {
+        mobileAppAccess: false,
+        mobileAppRevokedAt: serverTimestamp(),
+        mobileAppRevokedBy: user.email
+      });
+
+      await fetchUsers();
+      toast.success(`Mobile app access revoked for ${userRecord.email}`);
+
+    } catch (error) {
+      console.error('Error revoking mobile access:', error);
+      toast.error('Failed to revoke mobile access. Please try again.');
+    } finally {
+      setRefreshing(false);
+    }
+  }, [user?.email, fetchUsers]);
+
+  const renderMobileAppStatus = useCallback((userRecord) => {
+    // For users not in the users collection yet (only in registrations)
+    if (userRecord.mobileAppAccess === undefined || userRecord.mobileAppAccess === null) {
+      return (
+        <div className="text-sm">
+          <span className="text-gray-500">Not Approved</span>
+        </div>
+      );
+    }
+
+    if (userRecord.mobileAppAccess) {
+      return (
+        <div className="text-sm">
+          <span className="text-green-600 font-medium">✅ Approved</span>
+          {userRecord.mobileAppApprovedAt && (
+            <div className="text-xs text-gray-500 mt-1">
+              {formatDate(userRecord.mobileAppApprovedAt)}
+            </div>
+          )}
+        </div>
+      );
+    } else {
+      return (
+        <div className="text-sm">
+          <span className="text-red-600">❌ Not Approved</span>
+          {userRecord.mobileAppRevokedAt && (
+            <div className="text-xs text-gray-500 mt-1">
+              Revoked: {formatDate(userRecord.mobileAppRevokedAt)}
+            </div>
+          )}
+        </div>
+      );
+    }
+  }, [formatDate]);
+
+  const getMobileAppActionButtons = useCallback((userRecord) => {
+    const buttonClass = "px-2 py-1 text-xs font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+    const isOperating = refreshing;
+
+    // Only show mobile app buttons for approved users (users that exist in the system)
+    if (userRecord.status !== 'approved') {
+      return (
+        <span className="text-xs text-gray-400">Approve user first</span>
+      );
+    }
+
+    if (userRecord.mobileAppAccess) {
+      return (
+        <button
+          onClick={() => handleRevokeMobileAccess(userRecord)}
+          disabled={isOperating}
+          className={`${buttonClass} bg-red-100 text-red-700 hover:bg-red-200 disabled:hover:bg-red-100`}
+          title="Revoke mobile app access"
+        >
+          {isOperating ? 'Processing...' : 'Revoke'}
+        </button>
+      );
+    } else {
+      return (
+        <button
+          onClick={() => handleApproveMobileAccess(userRecord)}
+          disabled={isOperating}
+          className={`${buttonClass} bg-green-100 text-green-700 hover:bg-green-200 disabled:hover:bg-green-100`}
+          title="Grant mobile app access"
+        >
+          {isOperating ? 'Processing...' : 'Approve'}
+        </button>
+      );
+    }
+  }, [refreshing, handleRevokeMobileAccess, handleApproveMobileAccess]);
+
+  const filteredUsers = useMemo(() => allUsers.filter(user => {
     if (filterStatus === 'all') return true;
     return user.status === filterStatus;
-  });
+  }), [allUsers, filterStatus]);
 
-  const getStatusCounts = () => {
-    return {
-      all: allUsers.length,
-      pending: allUsers.filter(u => u.status === 'pending').length,
-      approved: allUsers.filter(u => u.status === 'approved').length,
-      rejected: allUsers.filter(u => u.status === 'rejected').length,
-      orphaned: allUsers.filter(u => u.status === 'orphaned').length
-    };
-  };
+  const statusCounts = useMemo(() => ({
+    all: allUsers.length,
+    pending: allUsers.filter(u => u.status === 'pending').length,
+    approved: allUsers.filter(u => u.status === 'approved').length,
+    rejected: allUsers.filter(u => u.status === 'rejected').length,
+    orphaned: allUsers.filter(u => u.status === 'orphaned').length
+  }), [allUsers]);
 
-  const statusCounts = getStatusCounts();
+
 
   if (loading) {
     return (
@@ -845,6 +1016,9 @@ const AdminPanel = () => {
                         Status
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Mobile App
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Registration Date
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -875,6 +1049,12 @@ const AdminPanel = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {getStatusBadge(user.status)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex flex-col gap-2">
+                            {renderMobileAppStatus(user)}
+                            {getMobileAppActionButtons(user)}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {formatDate(user.createdAt)}

@@ -29,6 +29,15 @@ service cloud.firestore {
       return isOwner(userId) || isTeamMember(userId) || isSuperAdmin();
     }
 
+    function canAccessUserDataFromMobile(userId) {
+      return (isOwner(userId) || isTeamMember(userId)) && hasMobileAppAccess(userId) || isSuperAdmin();
+    }
+
+    function hasMobileAppAccess(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId)) &&
+             get(/databases/$(database)/documents/users/$(userId)).data.mobileAppAccess == true;
+    }
+
     // Global collections - secured rules
     match /userRegistrations/{document} {
       // Super admin can read/write everything
@@ -157,6 +166,14 @@ service cloud.firestore {
     // Backup collections - only owner can access
     match /users/{userId}/backups/{document} {
       allow read, write: if isOwner(userId) || isSuperAdmin();
+    }
+
+    // Mobile app specific collections (if needed in future)
+    // Note: For additional security, you can change user data rules to use 
+    // canAccessUserDataFromMobile() instead of canAccessUserData() to enforce
+    // mobile app approval for all mobile access
+    match /users/{userId}/mobileAppData/{document} {
+      allow read, write: if isOwner(userId) && hasMobileAppAccess(userId);
     }
 
     // Deny all other access
