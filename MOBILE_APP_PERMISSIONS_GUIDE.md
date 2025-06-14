@@ -73,14 +73,10 @@ New fields added to user documents in Firestore:
    - User automatically signed out
    - Clear message explaining the situation
 
-## 📋 Migration Steps
+## 📋 Setup Steps
 
-### Step 1: Run Migration Script
-```javascript
-// Run this once to add mobile app permissions to existing users
-import { runMigration } from './migration_script_mobile_permissions.js';
-runMigration();
-```
+### Step 1: Migration Complete ✅
+The database migration has been completed. All existing users now have mobile app permission fields.
 
 ### Step 2: Update Mobile App
 Replace your authentication logic with the provided Flutter code:
@@ -88,12 +84,10 @@ Replace your authentication logic with the provided Flutter code:
 - Implement `AppWrapper` as your main app wrapper
 - Add the `NoPermissionScreen` for unauthorized users
 
-### Step 3: Grant Initial Permissions
-```javascript
-// Grant mobile access to specific users
-import { grantMobileAccessToUsers } from './migration_script_mobile_permissions.js';
-grantMobileAccessToUsers(['user1@example.com', 'user2@example.com']);
-```
+### Step 3: Grant Permissions via Admin Panel
+Use the web admin panel to grant mobile access to users:
+- Navigate to the user table
+- Click "Approve" in the Mobile App column for authorized users
 
 ## 🔧 Technical Details
 
