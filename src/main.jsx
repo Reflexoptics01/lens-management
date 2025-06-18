@@ -6,16 +6,19 @@ import App from './App.jsx'
 import ErrorBoundary from './components/ErrorBoundary'
 import { ThemeProvider } from './contexts/ThemeContext.jsx'
 
-// Clean up service workers in production (removed debug logging)
-if ('serviceWorker' in navigator) {
+// Clean up service workers only in development to prevent conflicts
+if (import.meta.env.DEV && 'serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then(function(registrations) {
-    for(let registration of registrations) {
+    registrations.forEach(function(registration) {
       registration.unregister();
-    }
+    });
   });
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+// Create root only once and render
+const root = ReactDOM.createRoot(document.getElementById('root'));
+
+root.render(
   <React.StrictMode>
     <ThemeProvider>
       <ErrorBoundary>

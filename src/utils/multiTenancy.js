@@ -6,39 +6,42 @@ import { db, auth } from '../firebaseConfig';
  * @returns {string|null} The user's UID or null if not found
  */
 export const getUserUid = () => {
-  // Check for team member organization UID first
-  const organizationId = localStorage.getItem('organizationId');
-  if (organizationId) {
-    return organizationId; // Team members use their organization's UID
-  }
-  
-  // First try localStorage (existing approach for organization owners)
-  let uid = localStorage.getItem('userUid');
-  
-  // If not found in localStorage, try the global auth user
-  if (!uid && typeof window !== 'undefined' && window.__authUser) {
-    uid = window.__authUser.uid;
-  }
-  
-  // Try Firebase auth directly as last resort
-  if (!uid) {
-    try {
-      if (auth.currentUser) {
-        uid = auth.currentUser.uid;
-        // Update localStorage if we found a user
-        localStorage.setItem('userUid', uid);
-        localStorage.setItem('userEmail', auth.currentUser.email);
-      }
-    } catch (error) {
-      // Silent auth check in production
+  try {
+    // Check for team member organization UID first
+    const organizationId = localStorage.getItem('organizationId');
+    if (organizationId) {
+      return organizationId; // Team members use their organization's UID
     }
+    
+    // First try localStorage (existing approach for organization owners)
+    let uid = localStorage.getItem('userUid');
+    
+    // If not found in localStorage, try the global auth user
+    if (!uid && typeof window !== 'undefined' && window.__authUser) {
+      uid = window.__authUser.uid;
+    }
+    
+    // Try Firebase auth directly as last resort
+    if (!uid) {
+      try {
+        if (auth && auth.currentUser) {
+          uid = auth.currentUser.uid;
+          // Update localStorage if we found a user
+          localStorage.setItem('userUid', uid);
+          if (auth.currentUser.email) {
+            localStorage.setItem('userEmail', auth.currentUser.email);
+          }
+        }
+      } catch (authError) {
+        // Silent auth check in production
+      }
+    }
+    
+    return uid;
+  } catch (error) {
+    // Return null if any error occurs
+    return null;
   }
-  
-  // Only log errors in production
-  if (!uid) {
-    console.error('No user UID found in localStorage, AuthContext, or Firebase auth');
-  }
-  return uid;
 };
 
 /**

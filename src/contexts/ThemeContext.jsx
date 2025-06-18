@@ -13,74 +13,93 @@ export const useTheme = () => {
 
 // Get user-specific theme preference (MULTI-TENANT SAFE)
 const getUserTheme = () => {
-  const userUid = getUserUid();
-  
-  if (userUid) {
-    // Use user-specific localStorage key
-    const savedTheme = localStorage.getItem(`theme_${userUid}`);
-    if (savedTheme) return savedTheme;
-  }
-  
-  // Fallback for non-authenticated users or first time
-  const globalTheme = localStorage.getItem('theme');
-  if (globalTheme) return globalTheme;
-  
-  // Check system preference as final fallback
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    return 'dark';
+  try {
+    const userUid = getUserUid();
+    
+    if (userUid) {
+      // Use user-specific localStorage key
+      const savedTheme = localStorage.getItem(`theme_${userUid}`);
+      if (savedTheme) return savedTheme;
+    }
+    
+    // Fallback for non-authenticated users or first time
+    const globalTheme = localStorage.getItem('theme');
+    if (globalTheme) return globalTheme;
+    
+    // Check system preference as final fallback
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      return 'dark';
+    }
+  } catch (error) {
+    // Fallback if any error occurs
   }
   return 'light';
 };
 
 // Save user-specific theme preference (MULTI-TENANT SAFE)
 const saveUserTheme = (theme) => {
-  const userUid = getUserUid();
-  
-  if (userUid) {
-    // Save with user-specific key
-    localStorage.setItem(`theme_${userUid}`, theme);
+  try {
+    const userUid = getUserUid();
     
-    // Also update global key for backward compatibility and non-authenticated state
-    localStorage.setItem('theme', theme);
-  } else {
-    // If no user authenticated, save globally
-    localStorage.setItem('theme', theme);
+    if (userUid) {
+      // Save with user-specific key
+      localStorage.setItem(`theme_${userUid}`, theme);
+      
+      // Also update global key for backward compatibility and non-authenticated state
+      localStorage.setItem('theme', theme);
+    } else {
+      // If no user authenticated, save globally
+      localStorage.setItem('theme', theme);
+    }
+  } catch (error) {
+    // Silently handle storage errors
   }
 };
 
 // Clean up old global theme when user logs in
 const migrateThemeToUser = () => {
-  const userUid = getUserUid();
-  
-  if (userUid) {
-    const globalTheme = localStorage.getItem('theme');
-    const userTheme = localStorage.getItem(`theme_${userUid}`);
+  try {
+    const userUid = getUserUid();
     
-    // If user doesn't have a theme preference but global exists, migrate it
-    if (!userTheme && globalTheme) {
-      localStorage.setItem(`theme_${userUid}`, globalTheme);
-      console.log(`📱 Migrated theme preference '${globalTheme}' for user:`, userUid);
+    if (userUid) {
+      const globalTheme = localStorage.getItem('theme');
+      const userTheme = localStorage.getItem(`theme_${userUid}`);
+      
+      // If user doesn't have a theme preference but global exists, migrate it
+      if (!userTheme && globalTheme) {
+        localStorage.setItem(`theme_${userUid}`, globalTheme);
+      }
     }
+  } catch (error) {
+    // Silently handle migration errors
   }
 };
 
 export const ThemeProvider = ({ children }) => {
+  // Initialize theme state safely
   const [theme, setTheme] = useState(() => {
-    // Migrate theme preferences if needed
-    migrateThemeToUser();
-    
-    // Get user-specific theme preference
-    return getUserTheme();
+    try {
+      // Migrate theme preferences if needed
+      migrateThemeToUser();
+      
+      // Get user-specific theme preference
+      return getUserTheme();
+    } catch (error) {
+      return 'light'; // Safe fallback
+    }
   });
 
   // Watch for user authentication changes
   useEffect(() => {
     const handleStorageChange = (e) => {
-      // If userUid changes (login/logout), update theme
-      if (e.key === 'userUid') {
-        const newTheme = getUserTheme();
-        setTheme(newTheme);
-        console.log(`🎨 Updated theme to '${newTheme}' for authentication change`);
+      try {
+        // If userUid changes (login/logout), update theme
+        if (e.key === 'userUid') {
+          const newTheme = getUserTheme();
+          setTheme(newTheme);
+        }
+      } catch (error) {
+        // Silently handle storage change errors
       }
     };
 
@@ -89,59 +108,75 @@ export const ThemeProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    // Save user-specific theme preference
-    saveUserTheme(theme);
-    
-    // Apply theme to document
-    const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-
-    const userUid = getUserUid();
-    if (userUid) {
-      console.log(`🎨 Applied '${theme}' theme for user:`, userUid);
+    try {
+      // Save user-specific theme preference
+      saveUserTheme(theme);
+      
+      // Apply theme to document
+      const root = document.documentElement;
+      if (theme === 'dark') {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+    } catch (error) {
+      // Silently handle theme application errors
     }
   }, [theme]);
 
   // Listen for system theme changes
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e) => {
-      const userUid = getUserUid();
-      const userThemeKey = userUid ? `theme_${userUid}` : 'theme';
-      
-      // Only change if no theme is explicitly set for this user
-      if (!localStorage.getItem(userThemeKey)) {
-        const newTheme = e.matches ? 'dark' : 'light';
-        setTheme(newTheme);
-        console.log(`🌓 System theme changed to '${newTheme}'`);
-      }
-    };
+    try {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleChange = (e) => {
+        try {
+          const userUid = getUserUid();
+          const userThemeKey = userUid ? `theme_${userUid}` : 'theme';
+          
+          // Only change if no theme is explicitly set for this user
+          if (!localStorage.getItem(userThemeKey)) {
+            const newTheme = e.matches ? 'dark' : 'light';
+            setTheme(newTheme);
+          }
+        } catch (error) {
+          // Silently handle change errors
+        }
+      };
 
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    } catch (error) {
+      // Silently handle media query errors
+    }
   }, []);
 
   const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
-    
-    const userUid = getUserUid();
-    console.log(`🔄 Theme toggled to '${newTheme}'${userUid ? ` for user: ${userUid}` : ''}`);
+    try {
+      const newTheme = theme === 'light' ? 'dark' : 'light';
+      setTheme(newTheme);
+    } catch (error) {
+      // Silently handle toggle errors
+    }
   };
 
   // Get current user's theme preferences summary
   const getThemeInfo = () => {
-    const userUid = getUserUid();
-    return {
-      currentTheme: theme,
-      userUid: userUid,
-      isUserSpecific: !!userUid,
-      storageKey: userUid ? `theme_${userUid}` : 'theme'
-    };
+    try {
+      const userUid = getUserUid();
+      return {
+        currentTheme: theme,
+        userUid: userUid,
+        isUserSpecific: !!userUid,
+        storageKey: userUid ? `theme_${userUid}` : 'theme'
+      };
+    } catch (error) {
+      return {
+        currentTheme: theme,
+        userUid: null,
+        isUserSpecific: false,
+        storageKey: 'theme'
+      };
+    }
   };
 
   const value = {

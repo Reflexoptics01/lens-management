@@ -3,6 +3,20 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  // Development server configuration
+  server: {
+    port: 5174,
+    strictPort: true,
+    hmr: {
+      port: 5174,
+      host: 'localhost'
+    },
+    headers: {
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'X-XSS-Protection': '1; mode=block'
+    }
+  },
   build: {
     outDir: 'dist',
     // Optimize bundle splitting
@@ -53,13 +67,5 @@ export default defineConfig({
   // Optimize dependencies
   optimizeDeps: {
     include: ['firebase/app', 'firebase/auth', 'firebase/firestore']
-  },
-  // Security headers for development
-  server: {
-    headers: {
-      'X-Content-Type-Options': 'nosniff',
-      'X-Frame-Options': 'DENY',
-      'X-XSS-Protection': '1; mode=block'
-    }
   }
 }) 
