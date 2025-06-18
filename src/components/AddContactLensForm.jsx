@@ -220,7 +220,6 @@ const AddContactLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onC
         }
         
         await updateDoc(getUserDoc('lensInventory', lensToEdit.id), lensData);
-        console.log("Updated contact lens:", lensData);
         
         // Call the onSubmit callback
         if (onSubmit) onSubmit();

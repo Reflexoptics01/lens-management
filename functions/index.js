@@ -315,6 +315,6 @@ exports.findTeamMember = functions.https.onCall(async (data, context) => {
       `Error finding team member: ${error.message}`
     );
   }
-});
+}); 
 
  

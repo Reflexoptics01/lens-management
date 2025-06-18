@@ -53,7 +53,6 @@ export const AuthProvider = ({ children }) => {
     const setupAuthPersistence = async () => {
       try {
         await setPersistence(auth, browserLocalPersistence);
-        console.log('🔐 Firebase Auth persistence set to LOCAL');
       } catch (error) {
         console.error('🔐 Error setting auth persistence:', error);
       }
@@ -64,12 +63,10 @@ export const AuthProvider = ({ children }) => {
 
   // Initialize auth listener
   useEffect(() => {
-    console.log('🔐 AuthContext: Initializing auth listener...');
     
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
         setAuthError(null);
-        console.log('🔐 Auth state changed:', firebaseUser ? firebaseUser.email : 'No user');
         
         if (!firebaseUser) {
           // User signed out
@@ -90,7 +87,6 @@ export const AuthProvider = ({ children }) => {
     });
 
     return () => {
-      console.log('🔐 AuthContext: Cleaning up auth listener');
       unsubscribe();
     };
   }, []);
@@ -121,13 +117,11 @@ export const AuthProvider = ({ children }) => {
 
   // Validate and setup authenticated user
   const validateAndSetupUser = async (firebaseUser) => {
-    console.log('🔐 Validating user:', firebaseUser.email);
     setCheckingPermissions(true);
     
     try {
       // Check if super admin first
       if (isSuperAdmin(firebaseUser.email)) {
-        console.log('🔐 Super admin detected');
         await setupSuperAdmin(firebaseUser);
         return;
       }
@@ -136,7 +130,6 @@ export const AuthProvider = ({ children }) => {
       const userData = await checkApprovedUser(firebaseUser);
       
       if (userData) {
-        console.log('🔐 Approved user found:', userData);
         await setupApprovedUser(firebaseUser, userData);
         return;
       }
@@ -145,7 +138,6 @@ export const AuthProvider = ({ children }) => {
       const teamMemberData = await checkTeamMemberStatus(firebaseUser);
       
       if (teamMemberData) {
-        console.log('🔐 Team member found:', teamMemberData);
         await setupTeamMember(firebaseUser, teamMemberData);
         return;
       }
@@ -159,7 +151,6 @@ export const AuthProvider = ({ children }) => {
       }
 
       // User not found anywhere - unauthorized
-      console.log('🔐 Unauthorized user - not found in any collection');
       setAuthState(AUTH_STATES.UNAUTHENTICATED);
       setAuthError('Unauthorized access. Please register for an account or contact an administrator.');
       await signOut(auth);
@@ -170,16 +161,12 @@ export const AuthProvider = ({ children }) => {
       // Handle specific network and authentication errors
       if (error.code === 'auth/network-request-failed') {
         setAuthError('Network error. Please check your internet connection and try again.');
-        console.log('🔐 Network error detected - not signing out user');
-        // Don't sign out on network errors, just show error
         setAuthState(AUTH_STATES.UNAUTHENTICATED);
       } else if (error.code === 'auth/internal-error') {
         setAuthError('Authentication service temporarily unavailable. Please try again.');
-        console.log('🔐 Internal auth error - not signing out user');
         setAuthState(AUTH_STATES.UNAUTHENTICATED);
       } else if (error.message?.includes('Missing or insufficient permissions')) {
         setAuthError('Database access error. Please contact an administrator.');
-        console.log('🔐 Firestore permissions error - not signing out user');
         setAuthState(AUTH_STATES.UNAUTHENTICATED);
       } else {
         setAuthError('Authentication error. Please try again.');
@@ -313,7 +300,6 @@ export const AuthProvider = ({ children }) => {
 
   // Setup team member user
   const setupTeamMember = async (firebaseUser, teamMemberData) => {
-    console.log('🔐 Setting up team member:', teamMemberData);
     
     // Check if team member is active
     if (teamMemberData.isActive === false) {
@@ -344,7 +330,6 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('userPermissions', JSON.stringify(teamMemberData.permissions || {}));
     localStorage.setItem('organizationId', teamMemberData.organizationId);
     
-    console.log('🔐 Team member setup complete for organization:', teamMemberData.organizationId);
   };
 
   // Check user registration status
@@ -372,82 +357,69 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Handle registration status
+  // Handle different registration statuses
   const handleRegistrationStatus = async (firebaseUser, registrationData) => {
-    console.log('🔐 Handling registration status:', registrationData.status);
     
-    switch (registrationData.status) {
-      case 'pending':
-        setAuthState(AUTH_STATES.PENDING_APPROVAL);
-        setAuthError('Your account is pending approval. Please wait for admin verification.');
-        await signOut(auth);
-        break;
-        
-      case 'rejected':
-        setAuthState(AUTH_STATES.REJECTED);
-        setAuthError('Your account registration was rejected. Please contact an administrator.');
-        await signOut(auth);
-        break;
-        
-      case 'approved':
-        // User has approved registration but no user document - complete the setup
-        console.log('🔐 User has approved registration but no user document - completing setup...');
-        try {
-          await completeApprovedUserSetup(firebaseUser, registrationData);
-        } catch (error) {
-          console.error('🔐 Error completing approved user setup:', error);
-          setAuthState(AUTH_STATES.UNAUTHENTICATED);
-          setAuthError('Error setting up your account. Please contact an administrator.');
-          await signOut(auth);
-        }
-        break;
-        
-      default:
-        setAuthState(AUTH_STATES.UNAUTHENTICATED);
-        setAuthError('Your account is not properly configured. Please contact an administrator.');
-        await signOut(auth);
-        break;
+    if (registrationData.status === 'pending') {
+      setAuthState(AUTH_STATES.PENDING_APPROVAL);
+      setAuthError('Your registration is pending approval. Please wait for admin verification.');
+      await signOut(auth);
+      return;
     }
+    
+    if (registrationData.status === 'approved') {
+      // Check if user document exists in main users collection
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (!userDoc.exists()) {
+        // User has approved registration but no user document - complete setup
+        await completeApprovedUserSetup(firebaseUser, registrationData);
+        return;
+      }
+      
+      // User document exists, setup normally
+      const userData = userDoc.data();
+      await setupApprovedUser(firebaseUser, userData);
+      return;
+    }
+    
+    // Default case - unauthorized
+    setAuthState(AUTH_STATES.UNAUTHENTICATED);
+    setAuthError('Registration status unknown. Please contact an administrator.');
+    await signOut(auth);
   };
 
-  // Complete setup for approved user who doesn't have a user document yet
+  // Complete setup for approved users who don't have user documents yet
   const completeApprovedUserSetup = async (firebaseUser, registrationData) => {
-    console.log('🔐 Completing approved user setup...');
     
-    // Create the user document that should have been created during approval
-    const defaultPermissions = {
-      '/dashboard': true,
-      '/orders': true,
-      '/customers': true,
-      '/sales': true,
-      '/purchases': true,
-      '/transactions': true,
-      '/ledger': true,
-      '/gst-returns': true,
-      '/lens-inventory': true,
-      '/settings': true
-    };
-
-    const userData = {
-      uid: firebaseUser.uid,
-      email: firebaseUser.email,
-      role: 'admin',
-      permissions: defaultPermissions,
-      isActive: true,
-      status: 'approved',
-      approvedAt: registrationData.approvedAt,
-      approvedBy: registrationData.approvedBy,
-      // Use current timestamp for creation since this is a recovery operation
-      createdAt: new Date()
-    };
-
-    // Create the user document
-    await setDoc(doc(db, 'users', firebaseUser.uid), userData);
-    
-    console.log('🔐 User document created during recovery setup');
-    
-    // Now set up the user normally
-    await setupApprovedUser(firebaseUser, userData);
+    try {
+      // Create user document in main users collection
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
+      const userData = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        role: registrationData.assignedRole || USER_ROLES.USER,
+        permissions: registrationData.assignedPermissions || {},
+        status: 'approved',
+        isActive: true,
+        createdAt: new Date(),
+        companyName: registrationData.companyName,
+        phoneNumber: registrationData.phoneNumber,
+        address: registrationData.address,
+        gstNumber: registrationData.gstNumber,
+        businessType: registrationData.businessType
+      };
+      
+      await setDoc(userDocRef, userData);
+      
+      // Setup user session
+      await setupApprovedUser(firebaseUser, userData);
+      
+    } catch (error) {
+      console.error('🔐 Error in completeApprovedUserSetup:', error);
+      throw error;
+    }
   };
 
   // Permission checking utilities
@@ -491,7 +463,6 @@ export const AuthProvider = ({ children }) => {
   // Sign out function
   const logout = async () => {
     try {
-      console.log('🔐 User requested logout...');
       await signOut(auth);
       // handleSignOut will be called by onAuthStateChanged
     } catch (error) {

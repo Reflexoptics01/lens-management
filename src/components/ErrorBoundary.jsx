@@ -49,18 +49,11 @@ class ErrorBoundary extends React.Component {
                 Refresh Page
               </button>
               {import.meta.env.DEV && (
-                <details className="mt-4">
-                  <summary className="text-xs text-gray-500 dark:text-gray-400 cursor-pointer">
-                    Debug Information
-                  </summary>
-                  <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-700 rounded text-xs">
-                    <pre className="whitespace-pre-wrap text-red-600 dark:text-red-400">
-                      {this.state.error && this.state.error.toString()}
-                    </pre>
-                    <pre className="whitespace-pre-wrap text-gray-600 dark:text-gray-400 mt-2">
-                      {this.state.errorInfo.componentStack}
-                    </pre>
-                  </div>
+                <details style={{ whiteSpace: 'pre-wrap' }}>
+                  <summary>Click to see error details</summary>
+                  <p><strong>Error:</strong> {this.state.error?.toString()}</p>
+                  <p><strong>Component Stack:</strong></p>
+                  <pre>{this.state.errorInfo?.componentStack || 'No component stack available'}</pre>
                 </details>
               )}
             </div>

@@ -1415,37 +1415,6 @@ The page will refresh in 3 seconds to load your restored data...`;
         setPendingAction('createUser');
         setShowSecurePrompt(true);
         return; // Exit early, modal will handle the rest
-        
-        if (!currentUserPassword) {
-          throw new Error('Admin password required for direct user creation');
-        }
-        
-        // Create the new user (this will sign out current admin)
-        const auth2 = getAuth();
-        const userCredential = await createUserWithEmailAndPassword(auth2, newUserEmail, newUserPassword);
-        const newUserUid = userCredential.user.uid;
-        
-        // REMOVED FOR PRODUCTION: console.log('User created with fallback method, uid:', newUserUid);
-        
-        // Re-authenticate the admin immediately
-        try {
-          await signInWithEmailAndPassword(auth2, currentUserEmail, currentUserPassword);
-          // REMOVED FOR PRODUCTION: console.log('Admin re-authenticated successfully');
-        } catch (reAuthError) {
-          console.error('Failed to re-authenticate admin:', reAuthError);
-          throw new Error('User created but admin re-authentication failed. Please log in again.');
-        }
-        
-        // Add user to teamMembers collection using UID as document ID
-        await setDoc(getUserDoc('teamMembers', newUserUid), {
-          uid: newUserUid,
-          email: newUserEmail,
-          role: newUserRole,
-          permissions: newUserPermissions,
-          createdAt: new Date(),
-          createdBy: user.uid,
-          isActive: true
-        });
       }
       
       // Reset form and refresh users
@@ -1545,21 +1514,6 @@ The page will refresh in 3 seconds to load your restored data...`;
       setPendingAction({ type: 'testLogin', email: userEmail });
       setShowSecurePrompt(true);
       return; // Exit early, modal will handle the rest
-      
-      if (!password) {
-        setLoading(false);
-        return;
-      }
-      
-      // Try to sign in
-      const auth2 = getAuth();  // Get a new auth instance to avoid signing out the current user
-      try {
-        await signInWithEmailAndPassword(auth2, userEmail, password);
-        setUserSuccess(`Login test successful for ${userEmail}! This user's credentials are valid.`);
-      } catch (error) {
-        console.error('Test login error:', error);
-        setUserError(`Login test failed: ${error.message || error.code}`);
-      }
     } catch (error) {
       console.error('Error in test login function:', error);
       setUserError(`Test login error: ${error.message}`);

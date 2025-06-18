@@ -818,17 +818,17 @@ const Orders = () => {
                       <li>Checking your internet connection</li>
                       <li>Verifying you're logged in correctly</li>
                     </ul>
-                  </div>
-                  
-                  <div className="mt-3 space-x-2">
-                    <button
-                      onClick={() => {
-                        fetchOrders();
-                      }}
+              </div>
+              
+              <div className="mt-3 space-x-2">
+                <button
+                  onClick={() => {
+                    fetchOrders();
+                  }}
                       className="px-3 py-1 text-xs bg-yellow-100 dark:bg-yellow-800 text-yellow-700 dark:text-yellow-200 rounded-md hover:bg-yellow-200 dark:hover:bg-yellow-700"
-                    >
+                >
                       Retry Loading
-                    </button>
+                </button>
                   </div>
                 </div>
               </div>

@@ -77,8 +77,6 @@ const GSTReturns = () => {
       const endDate = new Date(toDate);
       endDate.setHours(23, 59, 59, 999); // End of day
       
-      console.log('Generating GST reports from:', startDate, 'to:', endDate);
-      
       // Fetch all sales within date range
       const salesRef = getUserCollection('sales');
       const salesQuery = query(

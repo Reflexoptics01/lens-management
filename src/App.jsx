@@ -338,8 +338,6 @@ function App() {
               <Route path="/" element={<Navigate to="/orders" replace />} />
               <Route path="*" element={<Navigate to="/orders" replace />} />
             </Routes>
-            
-
           </Router>
           
           {/* Global Calculator - accessible from anywhere with 'T' key */}

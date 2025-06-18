@@ -88,13 +88,6 @@ const StickerPrint = ({ order, eye = 'right' }) => {
   const axis = safeExtractValue(eye === 'right' ? order.rightAxis : order.leftAxis, '0');
   const add = safeExtractValue(eye === 'right' ? order.rightAdd : order.leftAdd, '0.00');
   
-  // Debug log the date value when component mounts
-  useEffect(() => {
-    console.log('Order in StickerPrint:', order);
-    console.log('CreatedAt type:', order.createdAt ? typeof order.createdAt : 'undefined');
-    console.log('CreatedAt value:', order.createdAt);
-  }, [order]);
-  
   // Format date for display
   const formatDate = (dateValue) => {
     if (!dateValue) return 'N/A';
