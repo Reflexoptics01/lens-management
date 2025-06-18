@@ -71,19 +71,35 @@ const GlobalCalculator = ({ isOpen, onClose }) => {
       if (!isOpen) return;
       
       const key = e.key;
+      const isTypingInInput = e.target.tagName === 'INPUT' && e.target.type === 'number';
       
+      // Special handling for GST input field - only allow numbers and navigation
+      if (isTypingInInput) {
+        // Allow only numbers, backspace, delete, arrow keys, tab, and enter for GST input
+        if (!/[0-9]/.test(key) && 
+            !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'].includes(key)) {
+          e.preventDefault();
+        }
+        return; // Exit early for input fields, let them handle their own keys
+      }
+      
+      // Handle calculator shortcuts globally when calculator is open (even if focus is elsewhere)
       // Numbers
       if (/[0-9]/.test(key)) {
+        e.preventDefault(); // Prevent input in other fields
         inputNumber(key);
       }
       // Operations
       else if (key === '+') {
+        e.preventDefault();
         performOperation('+');
       }
       else if (key === '-') {
+        e.preventDefault();
         performOperation('-');
       }
       else if (key === '*') {
+        e.preventDefault();
         performOperation('*');
       }
       else if (key === '/') {
@@ -92,21 +108,41 @@ const GlobalCalculator = ({ isOpen, onClose }) => {
       }
       // Equals
       else if (key === '=') {
+        e.preventDefault();
         handleCalculate();
       }
       // Decimal
       else if (key === '.') {
+        e.preventDefault();
         inputDecimal();
       }
       // Backspace
       else if (key === 'Backspace') {
+        e.preventDefault();
         backspace();
+      }
+      // GST shortcuts work globally when calculator is open
+      else if (key.toLowerCase() === 'g') {
+        e.preventDefault();
+        e.stopPropagation();
+        deductGST();
+      }
+      else if (key.toLowerCase() === 'h') {
+        e.preventDefault();
+        e.stopPropagation();
+        addGST();
+      }
+      // Clear shortcut
+      else if (key.toLowerCase() === 'c') {
+        e.preventDefault();
+        clear();
       }
     };
 
     if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
+      // Use capture phase to ensure calculator shortcuts work regardless of focus
+      document.addEventListener('keydown', handleKeyDown, { capture: true });
+      return () => document.removeEventListener('keydown', handleKeyDown, { capture: true });
     }
   }, [isOpen, display, previousValue, operation, waitingForOperand]);
 
@@ -221,6 +257,15 @@ const GlobalCalculator = ({ isOpen, onClose }) => {
               type="number"
               value={gstRate}
               onChange={(e) => setGstRate(Number(e.target.value))}
+              onKeyDown={(e) => {
+                // Prevent global calculator handlers when typing in GST field
+                e.stopPropagation();
+                // Allow only valid input keys
+                if (!/[0-9]/.test(e.key) && 
+                    !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'].includes(e.key)) {
+                  e.preventDefault();
+                }
+              }}
               className="w-10 text-xs px-1 py-0.5 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               min="0"
               max="50"

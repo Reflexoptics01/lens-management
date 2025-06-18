@@ -1476,45 +1476,67 @@ const EditSale = () => {
   const SuccessModal = () => {
     // Handle keyboard shortcuts and ESC key
     useEffect(() => {
-      const handleKeyDown = (e) => {
-        // Prevent default behavior for our custom shortcuts
-        if (['Escape', 's', 'S', 'd', 'D', 'p', 'P', 'w', 'W'].includes(e.key)) {
-          e.preventDefault();
-        }
-        
-        switch (e.key) {
-          case 'Escape':
-            // ESC key - go to Sales page
-            setShowSuccessModal(false);
-            navigate('/sales');
-            break;
-          case 's':
-          case 'S':
-            // S key - Sales list
-            setShowSuccessModal(false);
-            navigate('/sales');
-            break;
-          case 'd':
-          case 'D':
-            // D key - View details
-            setShowSuccessModal(false);
-            navigate(`/sales/${savedSaleId}`);
-            break;
-          case 'p':
-          case 'P':
-            // P key - Quick print (auto-close)
-            handleQuickPrint();
-            break;
-          case 'w':
-          case 'W':
-            // W key - Send WhatsApp
-            handleSendWhatsApp();
-            break;
+      // Create a modal-specific handler that completely overrides global shortcuts
+      const handleModalKeyDown = (e) => {
+        // Only handle if the modal is actually visible and not typing in an input
+        if (!['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) {
+          
+          switch (e.key) {
+            case 'Escape':
+              e.preventDefault();
+              e.stopImmediatePropagation(); // Stop ALL other handlers
+              setShowSuccessModal(false);
+              navigate('/sales');
+              return false;
+            case 's':
+            case 'S':
+              e.preventDefault();
+              e.stopImmediatePropagation(); // Stop ALL other handlers
+              setShowSuccessModal(false);
+              navigate('/sales');
+              return false;
+            case 'd':
+            case 'D':
+              e.preventDefault();
+              e.stopImmediatePropagation(); // Stop ALL other handlers
+              setShowSuccessModal(false);
+              navigate(`/sales/${savedSaleId}`);
+              return false;
+            case 'p':
+            case 'P':
+              e.preventDefault();
+              e.stopImmediatePropagation(); // Stop ALL other handlers
+              handleQuickPrint();
+              return false;
+            case 'w':
+            case 'W':
+              e.preventDefault();
+              e.stopImmediatePropagation(); // Stop ALL other handlers
+              handleSendWhatsApp();
+              return false;
+          }
         }
       };
 
-      document.addEventListener('keydown', handleKeyDown);
-      return () => document.removeEventListener('keydown', handleKeyDown);
+      // Add modal overlay to capture events with highest priority
+      const modalOverlay = document.querySelector('.fixed.inset-0.bg-gray-600');
+      if (modalOverlay) {
+        modalOverlay.addEventListener('keydown', handleModalKeyDown, { capture: true });
+      }
+      
+      // Also add to document with capture and high priority
+      document.addEventListener('keydown', handleModalKeyDown, { capture: true });
+      
+      // Set a flag to indicate modal is open (for global handler to check)
+      window.__editSuccessModalOpen = true;
+      
+      return () => {
+        if (modalOverlay) {
+          modalOverlay.removeEventListener('keydown', handleModalKeyDown, { capture: true });
+        }
+        document.removeEventListener('keydown', handleModalKeyDown, { capture: true });
+        window.__editSuccessModalOpen = false;
+      };
     }, [savedSaleId]);
 
     const handleCloseModal = () => {

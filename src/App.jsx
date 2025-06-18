@@ -364,7 +364,13 @@ const UniversalKeyboardHandler = () => {
       ['u', () => navigate('/customers'), 'Go to customers'],
       ['l', () => navigate('/sales'), 'Go to sales'],
       ['e', () => navigate('/purchases'), 'Go to purchases'],
-      ['n', () => navigate('/transactions'), 'Go to transactions'],
+      ['n', () => {
+        // Check if success modals are open before navigating
+        if (window.__successModalOpen || window.__editSuccessModalOpen) {
+          return; // Skip navigation if modal is open
+        }
+        navigate('/transactions');
+      }, 'Go to transactions'],
       ['g', () => navigate('/ledger'), 'Go to ledger'],
       ['q', () => navigate('/gst-returns'), 'Go to GST returns'],
       ['v', () => navigate('/lens-inventory'), 'Go to lens inventory'],

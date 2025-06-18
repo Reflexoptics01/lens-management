@@ -4,12 +4,8 @@ admin.initializeApp();
 
 // Create a new user (admin only)
 exports.createUser = functions.https.onCall(async (data, context) => {
-  console.log('createUser function called with data:', JSON.stringify(data));
-  console.log('Auth context:', context.auth ? 'Authenticated' : 'Not authenticated');
-  
   // Check if request is made by an authenticated admin
   if (!context.auth) {
-    console.error('Authentication required');
     throw new functions.https.HttpsError(
       'unauthenticated',
       'The function must be called while authenticated.'
@@ -18,12 +14,10 @@ exports.createUser = functions.https.onCall(async (data, context) => {
 
   // Check if user is an admin by querying Firestore
   try {
-    console.log(`Checking if ${context.auth.token.email} is an admin`);
     const userRef = admin.firestore().collection('users');
     const querySnapshot = await userRef.where('email', '==', context.auth.token.email).get();
     
     if (querySnapshot.empty) {
-      console.error('User not found in database');
       throw new functions.https.HttpsError(
         'permission-denied',
         'User not found in database.'
@@ -31,17 +25,14 @@ exports.createUser = functions.https.onCall(async (data, context) => {
     }
     
     const userData = querySnapshot.docs[0].data();
-    console.log('User role:', userData.role);
     
     if (userData.role !== 'admin') {
-      console.error('User is not an admin');
       throw new functions.https.HttpsError(
         'permission-denied',
         'Only admins can create new users.'
       );
     }
   } catch (error) {
-    console.error('Error verifying admin status:', error);
     throw new functions.https.HttpsError(
       'internal',
       `Internal error while verifying admin status: ${error.message}`
@@ -50,7 +41,6 @@ exports.createUser = functions.https.onCall(async (data, context) => {
 
   // Validate required fields
   if (!data.email || !data.password) {
-    console.error('Missing required fields');
     throw new functions.https.HttpsError(
       'invalid-argument',
       'Email and password are required.'
@@ -58,7 +48,6 @@ exports.createUser = functions.https.onCall(async (data, context) => {
   }
 
   if (data.password.length < 6) {
-    console.error('Password too short');
     throw new functions.https.HttpsError(
       'invalid-argument',
       'Password must be at least 6 characters long.'
@@ -67,7 +56,6 @@ exports.createUser = functions.https.onCall(async (data, context) => {
 
   // Create new user
   try {
-    console.log(`Creating new user with email: ${data.email}`);
     const userRecord = await admin.auth().createUser({
       email: data.email,
       password: data.password,
@@ -75,10 +63,8 @@ exports.createUser = functions.https.onCall(async (data, context) => {
       disabled: false
     });
     
-    console.log('User created successfully:', userRecord.uid);
     return { uid: userRecord.uid };
   } catch (error) {
-    console.error('Error creating new user:', error);
     // Map Firebase Auth error codes to more user-friendly messages
     let errorCode = 'internal';
     let errorMessage = `Error creating user: ${error.message}`;
@@ -128,7 +114,6 @@ exports.deleteUser = functions.https.onCall(async (data, context) => {
       );
     }
   } catch (error) {
-    console.error('Error verifying admin status:', error);
     throw new functions.https.HttpsError(
       'internal',
       'Internal error while verifying admin status.'
@@ -148,7 +133,6 @@ exports.deleteUser = functions.https.onCall(async (data, context) => {
     await admin.auth().deleteUser(data.userId);
     return { success: true };
   } catch (error) {
-    console.error('Error deleting user:', error);
     throw new functions.https.HttpsError(
       'internal',
       `Error deleting user: ${error.message}`
@@ -186,7 +170,6 @@ exports.listUsers = functions.https.onCall(async (data, context) => {
       );
     }
   } catch (error) {
-    console.error('Error verifying admin status:', error);
     throw new functions.https.HttpsError(
       'internal',
       'Internal error while verifying admin status.'
@@ -207,7 +190,6 @@ exports.listUsers = functions.https.onCall(async (data, context) => {
 
     return { users };
   } catch (error) {
-    console.error('Error listing users:', error);
     throw new functions.https.HttpsError(
       'internal',
       `Error listing users: ${error.message}`
@@ -217,8 +199,6 @@ exports.listUsers = functions.https.onCall(async (data, context) => {
 
 // Find team member status for authentication (no admin check needed - this is for auth flow)
 exports.findTeamMember = functions.https.onCall(async (data, context) => {
-  console.log('findTeamMember function called for UID:', data.uid);
-  
   // Check if request is made by an authenticated user
   if (!context.auth) {
     throw new functions.https.HttpsError(
@@ -243,11 +223,8 @@ exports.findTeamMember = functions.https.onCall(async (data, context) => {
   }
 
   try {
-    console.log(`Searching for team member: ${data.email} (${data.uid})`);
-    
     // Get all users (organization owners) with admin privileges
     const usersSnapshot = await admin.firestore().collection('users').get();
-    console.log(`Found ${usersSnapshot.docs.length} organizations to check`);
     
     // Check each organization's teamMembers collection
     for (const userDoc of usersSnapshot.docs) {
@@ -265,21 +242,13 @@ exports.findTeamMember = functions.https.onCall(async (data, context) => {
         if (teamMemberDoc.exists) {
           const teamMemberData = teamMemberDoc.data();
           
-          console.log(`Found team member in organization ${orgOwnerId}:`, {
-            email: teamMemberData.email,
-            role: teamMemberData.role,
-            isActive: teamMemberData.isActive
-          });
-          
           // Security check - ensure email matches
           if (teamMemberData.email !== data.email) {
-            console.warn(`Email mismatch for team member in org ${orgOwnerId}`);
             continue;
           }
           
           // Check if team member is active
           if (teamMemberData.isActive === false) {
-            console.log(`Team member is inactive in org ${orgOwnerId}`);
             continue;
           }
           
@@ -300,16 +269,13 @@ exports.findTeamMember = functions.https.onCall(async (data, context) => {
           };
         }
       } catch (orgError) {
-        console.warn(`Error checking team member in org ${orgOwnerId}:`, orgError.message);
         // Continue checking other organizations
       }
     }
     
-    console.log('User not found as team member in any organization');
     return { found: false };
     
   } catch (error) {
-    console.error('Error finding team member:', error);
     throw new functions.https.HttpsError(
       'internal',
       `Error finding team member: ${error.message}`
