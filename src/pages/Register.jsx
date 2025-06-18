@@ -81,35 +81,21 @@ const Register = () => {
 
   const [errors, setErrors] = useState({});
 
-  // Check if email exists in database
+  // Check if email already exists
   const checkEmailExists = async (email) => {
     try {
-      console.log('Checking email existence for:', email);
+      // Simple email format validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return { exists: false, error: 'Invalid email format' };
+      }
+
+      // In production, we rely on Firebase Auth for email validation
+      return { exists: false, error: null };
       
-      // Since we can't check unauthenticated, we'll rely on Firebase Auth
-      // to be the primary check for email existence
-      console.log('⚠️ Cannot check email in Firestore due to security rules');
-      console.log('Firebase Auth will be the final check for email availability');
-      
-      return { 
-        inRegistrations: false, 
-        inUsers: false, 
-        registrationData: null, 
-        userData: null,
-        securityRestricted: true 
-      };
     } catch (error) {
-      console.error('Error checking email:', error);
-      
-      // For any errors, assume email is available to prevent blocking legitimate registrations
-      console.log('⚠️ Database check failed - assuming email is available');
-      return { 
-        inRegistrations: false, 
-        inUsers: false, 
-        registrationData: null, 
-        userData: null,
-        checkFailed: true 
-      };
+      // If we can't check, assume email is available
+      return { exists: false, error: null };
     }
   };
 
@@ -200,71 +186,49 @@ const Register = () => {
   };
 
   const handleNext = async (e) => {
-    console.log('=== handleNext function called ===');
-    console.log('Current step:', step);
-    console.log('Event details:', e?.type, e?.key);
-    console.log('Event target:', e?.target?.name, e?.target?.type);
-    
-    // Prevent any form submission
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
+    // Check for Enter key on specific fields
+    if (e && e.type === 'keydown' && e.key === 'Enter') {
+      // Allow form progression on Enter for input fields
+      if (e.target.name === 'email' && step === 1) {
+        e.preventDefault();
+      } else if (['companyName', 'phone', 'city', 'state'].includes(e.target.name) && step === 2) {
+        e.preventDefault();
+      } else {
+        return; // Don't handle Enter on other elements
+      }
     }
-    
-    if (validateStep(step)) {
-      // Check email on step 1
-      if (step === 1) {
-        console.log('Step 1: Starting email validation...');
-        setLoading(true);
-        try {
-          const emailExists = await checkEmailExists(formData.email);
-          
-          // Handle security-restricted checks gracefully
-          if (emailExists.securityRestricted) {
-            console.log('✅ Email check restricted due to security rules - proceeding to step 2');
-            toast.success('Proceeding to next step. Email availability will be verified during registration.');
-          } else if (emailExists.checkFailed) {
-            console.log('⚠️ Email check failed - proceeding to step 2');
-            toast.success('Proceeding to next step. Email availability will be verified during registration.');
-          } else if (emailExists.inRegistrations || emailExists.inUsers) {
-            let message = 'This email is already registered';
-            
-            if (emailExists.registrationData) {
-              const status = emailExists.registrationData.status;
-              if (status === 'pending') {
-                message = 'This email is already registered and pending approval. Please wait for admin verification or contact support.';
-              } else if (status === 'approved') {
-                message = 'This email is already registered and approved. Please login instead.';
-              } else if (status === 'rejected') {
-                message = 'Your previous registration was rejected. Please contact admin for assistance.';
-              }
-            } else if (emailExists.userData) {
-              message = 'This email is already registered. Please login instead.';
-            }
-            
-            console.log('Email validation failed:', message);
-            toast.error(message);
-            setErrors({ email: message });
-            return;
-          } else {
-            console.log('Email validation passed');
-          }
-        } catch (error) {
-          console.error('Error checking email:', error);
-          console.log('⚠️ Email validation failed - proceeding anyway');
-          toast.success('Proceeding to next step. Email availability will be verified during registration.');
-        } finally {
-          setLoading(false);
-        }
+
+    // Step 1: Email validation and check
+    if (step === 1) {
+      const emailCheckResult = await checkEmailExists(formData.email);
+      
+      if (emailCheckResult.error) {
+        setErrors({ email: emailCheckResult.error });
+        return;
       }
       
-      // Only advance to next step, never trigger form submission
+      // Proceed to step 2
       const nextStep = step + 1;
-      console.log('Advancing from step', step, 'to step', nextStep);
       setStep(nextStep);
-      console.log('Step advancement completed');
-    } else {
-      console.log('Step validation failed for step:', step);
+      return;
+    }
+
+    // Step 2: Basic info validation
+    if (step === 2) {
+      const stepErrors = {};
+      
+      if (!formData.companyName?.trim()) stepErrors.companyName = 'Company name is required';
+      if (!formData.phone?.trim()) stepErrors.phone = 'Phone number is required';
+      if (!formData.city?.trim()) stepErrors.city = 'City is required';
+      if (!formData.state?.trim()) stepErrors.state = 'State is required';
+      
+      if (Object.keys(stepErrors).length > 0) {
+        setErrors(stepErrors);
+        return;
+      }
+      
+      const nextStep = step + 1;
+      setStep(nextStep);
     }
   };
 
@@ -273,43 +237,30 @@ const Register = () => {
   };
 
   const handleSubmit = async (e) => {
-    console.log('=== handleSubmit function called ===');
-    console.log('Current step:', step);
-    console.log('Event type:', e?.type);
-    console.log('Event target:', e?.target?.type, e?.target?.name);
-    
     e.preventDefault();
     e.stopPropagation();
-    
-    // Prevent submission unless we're on the final step (step 3)
+
+    // Only allow submission on step 3
     if (step !== 3) {
-      console.log('❌ SUBMISSION BLOCKED - Not on step 3. Current step:', step);
-      console.log('Form submission prevented on wrong step');
       return;
     }
-    
-    console.log('✅ Step 3 confirmed - proceeding with submission');
-    
-    // Only allow submission on the final step
+
+    // Validate step 3 before submission
     if (!validateStep(step)) {
-      console.log('❌ SUBMISSION BLOCKED - Step validation failed');
       return;
     }
-    
-    console.log('✅ Step validation passed - starting registration');
+
     setLoading(true);
-    
+    setSubmissionAttempted(true);
+
     try {
-      console.log('Starting registration process for:', formData.email);
-      
-      // Double-check email doesn't exist
+      // Check email availability one more time
       const emailExists = await checkEmailExists(formData.email);
       if (emailExists.inRegistrations || emailExists.inUsers) {
         throw new Error('Email is already registered');
       }
       
       // Create Firebase Auth user
-      console.log('Creating Firebase Auth user...');
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         formData.email,
@@ -317,10 +268,8 @@ const Register = () => {
       );
       
       const user = userCredential.user;
-      console.log('Firebase user created with UID:', user.uid);
       
       // Create user registration request in Firestore
-      console.log('Creating registration document...');
       await addDoc(collection(db, 'userRegistrations'), {
         uid: user.uid,
         email: formData.email,
@@ -359,18 +308,10 @@ const Register = () => {
         createdAt: serverTimestamp()
       });
       
-      console.log('User registration document created successfully');
-      
-      // Don't sign out the user immediately - let them see their registration status
-      // await auth.signOut();
-      // console.log('User signed out after registration');
-      
       toast.success('Registration successful! Please wait for admin approval. You can check your registration status in your profile.');
       navigate('/dashboard'); // Navigate to dashboard where they can see pending approval status
       
     } catch (error) {
-      console.error('Registration error:', error);
-      
       // Handle specific Firebase Auth errors
       if (error.code === 'auth/email-already-in-use') {
         setErrors({ email: 'This email is already registered in our system. If you believe this is an error or you were previously deleted by admin, please contact support at Info@reflexoptics.in for assistance.' });
@@ -395,11 +336,9 @@ const Register = () => {
       // If Firebase user was created but registration doc failed, clean up
       if (user && error.message !== 'Email is already registered') {
         try {
-          console.log('Cleaning up Firebase user due to registration failure...');
           await deleteUser(user);
-          console.log('Firebase user cleaned up');
         } catch (cleanupError) {
-          console.error('Failed to cleanup Firebase user:', cleanupError);
+          // Cleanup failed, but not critical
         }
       }
     } finally {
@@ -458,7 +397,6 @@ const Register = () => {
           // Prevent form submission on Enter key unless we're on step 3 and focused on the submit button
           if (e.key === 'Enter' && step !== 3) {
             e.preventDefault();
-            console.log('Enter key blocked on step:', step);
             // Trigger Next button if on steps 1-2
             if (step < 3) {
               handleNext();

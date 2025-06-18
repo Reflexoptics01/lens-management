@@ -6,6 +6,8 @@ import Navbar from '../components/Navbar';
 import PrintInvoiceModal from '../components/PrintInvoiceModal';
 import { safelyParseDate, formatDate, formatDateTime } from '../utils/dateUtils';
 import { getUserDoc } from '../utils/multiTenancy';
+import { securePrint, getSecureElementContent } from '../utils/securePrint';
+import { toast } from 'react-hot-toast';
 
 const SaleDetail = () => {
   const { saleId } = useParams();
@@ -235,86 +237,57 @@ const SaleDetail = () => {
 
   // Function to actually print the address content
   const printAddressContent = () => {
-    const content = document.getElementById('address-content');
-    if (!content) return;
+    try {
+      const content = getSecureElementContent('address-content');
+      if (!content) {
+        throw new Error('Address content not found');
+      }
 
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('Popup blocked. Please allow popups for this site.');
-      return;
+      const printOptions = {
+        title: 'Address Label',
+        styles: `
+          .address-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            max-width: 400px;
+            margin: 0 auto;
+          }
+          .address-block {
+            border: 1px solid #000;
+            padding: 15px;
+            margin-bottom: 20px;
+          }
+          .address-label {
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+          }
+          .address-text {
+            font-size: 16px;
+            line-height: 1.4;
+          }
+          h2 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 18px;
+            text-align: center;
+          }
+          .divider {
+            border-bottom: 1px dashed #000;
+            margin: 15px 0;
+          }
+        `
+      };
+
+      const success = securePrint(content, printOptions);
+      if (!success) {
+        throw new Error('Print operation failed');
+      }
+    } catch (error) {
+      toast.error(`Address print failed: ${error.message}`);
     }
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Print Address</title>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              margin: 0;
-              padding: 20px;
-    }
-            .address-wrapper {
-              display: flex;
-              flex-direction: column;
-              gap: 30px;
-              max-width: 400px;
-              margin: 0 auto;
-            }
-            .address-block {
-              border: 1px solid #000;
-              padding: 15px;
-              margin-bottom: 20px;
-            }
-            .address-label {
-              font-weight: bold;
-              font-size: 14px;
-              margin-bottom: 5px;
-              text-transform: uppercase;
-            }
-            .address-text {
-              font-size: 16px;
-              line-height: 1.4;
-            }
-            h2 {
-              margin-top: 0;
-              margin-bottom: 10px;
-              font-size: 18px;
-              text-align: center;
-            }
-            .divider {
-              border-bottom: 1px dashed #000;
-              margin: 15px 0;
-            }
-            @media print {
-              body {
-                padding: 0;
-              }
-              .no-print {
-                display: none;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          ${content ? content.innerHTML : ''}
-          <div class="no-print" style="margin-top: 20px; text-align: center;">
-            <button onclick="window.print();" style="padding: 10px 20px; background: #4a90e2; color: white; border: none; border-radius: 4px; cursor: pointer;">
-              Print
-            </button>
-            <button onclick="window.close();" style="padding: 10px 20px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">
-              Close
-            </button>
-          </div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    
-    // Auto-print after a delay to ensure content is loaded
-    setTimeout(() => {
-      printWindow.focus();
-      printWindow.print();
-    }, 500);
   };
 
   // Address Modal Component
@@ -386,6 +359,32 @@ const SaleDetail = () => {
         </div>
       </div>
     );
+  };
+
+  const handlePrint = () => {
+    try {
+      const content = getSecureElementContent('invoice-content');
+      if (!content) {
+        throw new Error('Invoice content not found');
+      }
+
+      const printOptions = {
+        title: `Invoice #${sale.displayId}`,
+        styles: `
+          .invoice-header { margin-bottom: 30px; }
+          .invoice-details { margin-bottom: 20px; }
+          .invoice-items table { width: 100%; }
+          .invoice-total { margin-top: 20px; font-weight: bold; }
+        `
+      };
+
+      const success = securePrint(content, printOptions);
+      if (!success) {
+        throw new Error('Print operation failed');
+      }
+    } catch (error) {
+      toast.error(`Print failed: ${error.message}`);
+    }
   };
 
   if (loading) {

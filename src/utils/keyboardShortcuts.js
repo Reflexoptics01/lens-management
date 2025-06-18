@@ -3,6 +3,8 @@
  * Handles global and component-specific shortcuts with proper priority handling
  */
 
+import { useEffect } from 'react';
+
 class KeyboardShortcutManager {
   constructor() {
     this.shortcuts = new Map();
@@ -279,8 +281,6 @@ export default keyboardManager;
 /**
  * React hook for using keyboard shortcuts
  */
-import { useEffect } from 'react';
-
 export const useKeyboardShortcut = (key, handler, options = {}) => {
   useEffect(() => {
     const shortcutId = keyboardManager.register(key, handler, options);

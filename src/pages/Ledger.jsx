@@ -9,6 +9,8 @@ import AccountStatementView from '../components/AccountStatementView';
 import InvoiceLedgerView from '../components/InvoiceLedgerView';
 import BalanceDueView from '../components/BalanceDueView';
 import LedgerFilters from '../components/LedgerFilters';
+import { securePrint, getSecureElementContent } from '../utils/securePrint';
+import { toast } from 'react-hot-toast';
 
 const Ledger = () => {
   const navigate = useNavigate();
@@ -239,7 +241,7 @@ const Ledger = () => {
       
       // Setup window functions as soon as we have the data
       if (dataWithBalance.length > 0) {
-        window.printLedger = () => handlePrint(viewMode);
+        window.printLedger = () => handlePrint();
         window.exportToExcel = () => exportToExcel(viewMode);
         window.shareViaWhatsApp = () => shareViaWhatsApp(viewMode);
       }
@@ -447,63 +449,49 @@ const Ledger = () => {
   };
   
   // Function to handle printing
-  const handlePrint = (viewMode) => {
-    let printContents = '';
-    let title = '';
-    
-    if (viewMode === 'accountStatement') {
-      printContents = document.getElementById('account-statement-container').innerHTML;
-      title = `Account Statement - ${selectedEntity?.opticalName}`;
-    } else if (viewMode === 'invoiceOnly') {
-      printContents = document.getElementById('invoice-ledger-container').innerHTML;
-      title = `Invoice Ledger - ${selectedEntity?.opticalName}`;
+  const handlePrint = () => {
+    try {
+      let content = '';
+      
+      if (viewMode === 'accountStatement') {
+        content = getSecureElementContent('account-statement-container');
+      } else {
+        content = getSecureElementContent('invoice-ledger-container');
+      }
+      
+      if (!content) {
+        throw new Error('Content not found for printing');
+      }
+
+      const printOptions = {
+        title: viewMode === 'accountStatement' ? 'Account Statement' : 'Invoice Ledger',
+        styles: `
+          .ledger-table {
+            width: 100%;
+            border-collapse: collapse;
+          }
+          .ledger-table th,
+          .ledger-table td {
+            padding: 8px;
+            text-align: left;
+            border: 1px solid #ddd;
+          }
+          .ledger-table th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+          }
+          .text-right { text-align: right; }
+          .font-semibold { font-weight: 600; }
+        `
+      };
+
+      const success = securePrint(content, printOptions);
+      if (!success) {
+        throw new Error('Print operation failed');
+      }
+    } catch (error) {
+      toast.error(`Print failed: ${error.message}`);
     }
-    
-    // Use a popup window for printing instead of replacing the current document
-    const printWindow = window.open('', '_blank');
-    
-    // Create print content
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>${title}</title>
-          <style>
-            body { font-family: Arial, sans-serif; }
-            table { width: 100%; border-collapse: collapse; }
-            th, td { padding: 8px; text-align: left; border: 1px solid #ddd; }
-            th { background-color: #f2f2f2; }
-            .text-right { text-align: right; }
-            .text-center { text-align: center; }
-            .balance-negative { color: green; }
-            .balance-positive { color: red; }
-            .total-row { font-weight: bold; background-color: #f9f9f9; }
-            h2 { margin-bottom: 5px; }
-            .subtitle { margin-top: 0; color: #666; }
-            .text-xs { font-size: 12px; }
-                        .text-\[10px\] { font-size: 10px; }            .font-medium { font-weight: 500; }            .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }            .mt-0\.5 { margin-top: 0.125rem; }
-            .gap-2 { gap: 0.5rem; }
-            .flex { display: flex; }
-            .flex-wrap { flex-wrap: wrap; }
-            .ml-2 { margin-left: 0.5rem; }
-            .ml-4 { margin-left: 1rem; }
-          </style>
-        </head>
-        <body>
-          <h2>${title}</h2>
-          <p class="subtitle">${formatDateDisplay(fromDate)} to ${formatDateDisplay(toDate)}</p>
-          ${printContents}
-        </body>
-      </html>
-    `);
-    
-    printWindow.document.close();
-    printWindow.focus();
-    
-    // Print after content is loaded
-    printWindow.onload = function() {
-      printWindow.print();
-      // Don't close automatically so user can interact with print dialog
-    };
   };
   
   // Function to export as Excel
@@ -630,7 +618,7 @@ const Ledger = () => {
   // Update window functions when viewMode changes
   useEffect(() => {
     if (selectedEntity && ledgerData.length > 0) {
-      window.printLedger = () => handlePrint(viewMode);
+      window.printLedger = () => handlePrint();
       window.exportToExcel = () => exportToExcel(viewMode);
       window.shareViaWhatsApp = () => shareViaWhatsApp(viewMode);
     }

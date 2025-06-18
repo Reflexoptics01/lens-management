@@ -21,25 +21,45 @@ export default defineConfig({
           charts: ['recharts'],
           // Utils chunk
           utils: ['qrcode', 'qrcode.react', 'xlsx']
+        },
+        // Remove comments in production
+        generatedCode: {
+          constBindings: true
         }
       }
     },
     // Increase chunk size warning limit since we're dealing with Firebase
     chunkSizeWarningLimit: 1000,
-    // Enable minification and compression
+    // Enable minification and compression for production
     minify: 'terser',
     terserOptions: {
       compress: {
-        // Keep console.log but remove console.debug in production for debugging
-        drop_console: false,
+        // Remove all console statements in production builds
+        drop_console: true,
         drop_debugger: true,
-        // Only drop specific methods
-        pure_funcs: ['console.debug']
+        // Remove specific debug functions
+        pure_funcs: ['console.log', 'console.debug', 'console.info', 'console.warn'],
+        // Remove dead code
+        dead_code: true,
+        // Remove unused variables
+        unused: true
+      },
+      mangle: {
+        // Mangle variable names for additional security
+        safari10: true
       }
     }
   },
   // Optimize dependencies
   optimizeDeps: {
     include: ['firebase/app', 'firebase/auth', 'firebase/firestore']
+  },
+  // Security headers for development
+  server: {
+    headers: {
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'X-XSS-Protection': '1; mode=block'
+    }
   }
 }) 

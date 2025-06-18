@@ -279,15 +279,11 @@ const Sales = () => {
     if (!timestamp) return { date: '-', time: '-' };
     
     try {
-      console.log('Formatting date, original value:', timestamp);
-      
       // Use safelyParseDate from dateUtils for consistent parsing
       const date = safelyParseDate(timestamp);
-      console.log('After safelyParseDate:', date);
       
       // Check if date is valid
       if (!date || isNaN(date.getTime())) {
-        console.warn('Invalid date after parsing:', date, 'Original:', timestamp);
         return { date: 'Invalid Date', time: '-' };
       }
       
@@ -296,7 +292,6 @@ const Sales = () => {
         time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
       };
     } catch (error) {
-      console.error('Error formatting date:', error, 'Original timestamp:', timestamp);
       return { date: 'Invalid Date', time: '-' };
     }
   };
@@ -359,14 +354,12 @@ const Sales = () => {
         
         return invoiceMatch || customerMatch;
       });
-      console.log(`After text search filter: ${filtered.length} sales remaining`);
     }
     
     // Apply date from filter
     if (dateFrom) {
       const fromDate = new Date(dateFrom);
       fromDate.setHours(0, 0, 0, 0);
-      console.log('Filtering by from date:', fromDate);
       
       filtered = filtered.filter(sale => {
         try {
@@ -376,33 +369,22 @@ const Sales = () => {
             ? dateToUse 
             : safelyParseDate(dateToUse);
           
-          // Debug info for date comparison
+          // Skip invalid dates
           if (!saleDate || isNaN(saleDate.getTime())) {
-            console.warn('Invalid sale date during filtering:', dateToUse, 'for sale:', sale.id);
             return false;
           }
           
-          // Debug date comparison
-          const result = saleDate >= fromDate;
-          if (!result) {
-            console.log('Sale date excluded by fromDate filter:', saleDate, '>=', fromDate, '=', result);
-          }
-          
-          return result;
+          return saleDate >= fromDate;
         } catch (error) {
-          console.error('Error parsing sale date for filtering:', error, sale);
           return false;
         }
       });
-      
-      console.log(`After fromDate filter: ${filtered.length} sales remaining`);
     }
     
     // Apply date to filter
     if (dateTo) {
       const toDate = new Date(dateTo);
       toDate.setHours(23, 59, 59, 999);
-      console.log('Filtering by to date:', toDate);
       
       filtered = filtered.filter(sale => {
         try {
@@ -413,30 +395,19 @@ const Sales = () => {
             : safelyParseDate(dateToUse);
           
           if (!saleDate || isNaN(saleDate.getTime())) {
-            console.warn('Invalid sale date during filtering:', dateToUse, 'for sale:', sale.id);
             return false;
           }
           
-          // Debug date comparison
-          const result = saleDate <= toDate;
-          if (!result) {
-            console.log('Sale date excluded by toDate filter:', saleDate, '<=', toDate, '=', result);
-          }
-          
-          return result;
+          return saleDate <= toDate;
         } catch (error) {
-          console.error('Error parsing sale date for filtering:', error, sale);
           return false;
         }
       });
-      
-      console.log(`After toDate filter: ${filtered.length} sales remaining`);
     }
     
     // Apply customer filter (only if not using text search - avoid double filtering)
     if (selectedCustomerId && !searchTerm.trim()) {
       filtered = filtered.filter(sale => sale.customerId === selectedCustomerId);
-      console.log(`After customer filter: ${filtered.length} sales remaining`);
     }
     
     setFilteredSales(filtered);

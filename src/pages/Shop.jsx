@@ -51,7 +51,7 @@ const CONTACT_COLORS = [
   'ENHANCER FOR DARK EYES', 'OPAQUE HAZEL'
 ];
 
-const Shop = () => {
+const Shop = ({ hideNavbar = false, hideHeader = false }) => {
   const { user, isAuthenticated } = useAuth();
   const location = useLocation();
   
@@ -365,9 +365,6 @@ const Shop = () => {
                         <p className="text-sm text-gray-700 dark:text-gray-300">
                           <strong>Phone:</strong> {selectedLens.userInfo?.phone || 'Not specified'}
                         </p>
-                        <p className="text-sm text-gray-700 dark:text-gray-300">
-                          <strong>Email:</strong> {selectedLens.userInfo?.email || 'Not specified'}
-                        </p>
                       </div>
                       
                       <div className="bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg">
@@ -401,61 +398,9 @@ const Shop = () => {
   
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
-      <Navbar />
+      {!hideNavbar && <Navbar />}
       
       <div className="flex-grow">
-        {/* Hero Section */}
-        <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 text-white py-12 px-4">
-          <div className="max-w-7xl mx-auto text-center">
-            {location.state?.autoSearch ? (
-              <>
-                <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
-                  Searching Reflex Marketplace
-                </h1>
-                <p className="text-xl text-blue-100 mb-6 max-w-3xl mx-auto">
-                  Finding lenses that match your prescription from verified distributors across our network.
-                </p>
-                <div className="flex justify-center items-center space-x-2 text-sm">
-                  <svg className="animate-spin h-5 w-5 text-blue-200" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <span className="text-blue-200">Auto-searching with your prescription...</span>
-                </div>
-              </>
-            ) : (
-              <>
-                <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
-                  Reflex Lens Marketplace
-                </h1>
-                <p className="text-xl text-blue-100 mb-6 max-w-3xl mx-auto">
-                  Discover premium lenses from verified distributors across our network. 
-                  Find exactly what you need with precision search.
-                </p>
-                <div className="flex justify-center items-center space-x-8 text-sm">
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-green-300" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    Verified Distributors
-                  </div>
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-green-300" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    Premium Quality
-                  </div>
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-green-300" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    Instant Connect
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
 
         <div className="max-w-7xl mx-auto px-4 py-8">
           {error && (
@@ -488,46 +433,27 @@ const Shop = () => {
             </div>
           )}
           
-          {/* Search Filters */}
+          {/* Search Filters - Horizontal Split Layout */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 mb-8 overflow-hidden">
-            <div className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-gray-800 px-6 py-4 border-b border-gray-200 dark:border-gray-600">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
-                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Find Your Perfect Lens</h2>
-                </div>
+            <form onSubmit={handleSearch}>
+
                 
-                <div className="text-sm text-gray-500 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-lg border border-blue-200 dark:border-blue-700">
-                  👓 Prescription Required
-                </div>
-              </div>
-            </div>
-            
-            <form onSubmit={handleSearch} className="p-6 space-y-6">
-              {/* Simple Search - Prescription Only */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-3">
+              {/* Horizontally Split Content */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[500px]">
+                {/* Left Half - Prescription Section (P) */}
+                <div className="p-6">
+                  <div className="flex items-center space-x-3 mb-4">
                     <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
+                      <span className="text-white font-bold text-sm">P</span>
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      Enter Your Prescription
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-left">
+                      Lens Prescription
                     </h3>
-                  </div>
-                  
                   <div className="text-xs text-gray-500 dark:text-gray-400 bg-amber-50 dark:bg-amber-900/30 px-3 py-1 rounded-lg border border-amber-200 dark:border-amber-700">
-                    Required to search
+                      Required
                   </div>
                 </div>
-                
-                <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-900/20 dark:via-indigo-900/20 dark:to-purple-900/20 rounded-xl p-6 border border-blue-200 dark:border-blue-700">
+                  <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-900/20 dark:via-indigo-900/20 dark:to-purple-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-700 h-full overflow-y-auto">
                   <LensPrescription 
                     formData={searchCriteria} 
                     onChange={handlePrescriptionChange}
@@ -535,52 +461,138 @@ const Shop = () => {
                     shopMatchingLenses={[]} 
                     shopLoading={false}
                   />
+                    
+                    {/* Dynamic Additional Options based on category */}
+                    {searchCriteria.type === 'contact' ? (
+                      /* Contact Lens Options */
+                      <div className="mt-6 pt-4 border-t border-blue-200 dark:border-blue-600">
+                        <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                          <div className="w-5 h-5 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center mr-2">
+                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
                 </div>
+                          Contact Lens Options
+                        </h4>
+                        
+                        <div className="grid grid-cols-1 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              Type
+                            </label>
+                            <select
+                              value={searchCriteria.contactType}
+                              onChange={(e) => handleInputChange('contactType', e.target.value)}
+                              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 dark:focus:ring-emerald-400 dark:focus:border-emerald-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
+                            >
+                              <option value="">Any Type</option>
+                              {CONTACT_TYPES.map(type => (
+                                <option key={type} value={type}>{type}</option>
+                              ))}
+                            </select>
               </div>
               
-              {/* Advanced Search Toggle */}
-              <div className="flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
-                  className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-100 to-indigo-100 dark:from-purple-900/50 dark:to-indigo-900/50 hover:from-purple-200 hover:to-indigo-200 dark:hover:from-purple-800/50 dark:hover:to-indigo-800/50 text-purple-700 dark:text-purple-300 font-medium rounded-lg border border-purple-300 dark:border-purple-600 transition-all transform hover:scale-105"
-                >
-                  <svg className={`w-4 h-4 mr-2 transition-transform ${showAdvancedSearch ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              Duration
+                            </label>
+                            <select
+                              value={searchCriteria.contactDuration}
+                              onChange={(e) => handleInputChange('contactDuration', e.target.value)}
+                              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 dark:focus:ring-emerald-400 dark:focus:border-emerald-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
+                            >
+                              <option value="">Any Duration</option>
+                              {CONTACT_DURATIONS.map(duration => (
+                                <option key={duration} value={duration}>{duration}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Basic Lens Options for Prescription/All Categories */
+                      <div className="mt-6 pt-4 border-t border-blue-200 dark:border-blue-600">
+                        <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                          <div className="w-5 h-5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center mr-2">
+                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                   </svg>
-                  {showAdvancedSearch ? 'Hide Advanced Filters' : 'Show Advanced Filters'}
-                  <span className="ml-2 text-xs bg-purple-200 dark:bg-purple-800 px-2 py-1 rounded-full">Optional</span>
-                </button>
               </div>
-              
-              {/* Advanced Search Filters */}
-              {showAdvancedSearch && (
-                <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-6 border border-purple-200 dark:border-purple-700 space-y-6">
-                  <div className="flex items-center space-x-3 mb-4">
+                          Basic Lens Options
+                        </h4>
+                        
+                        <div className="grid grid-cols-1 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              Lens Design
+                            </label>
+                            <select
+                              value={searchCriteria.lensType}
+                              onChange={(e) => handleInputChange('lensType', e.target.value)}
+                              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm py-3 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
+                            >
+                              <option value="">Any Design</option>
+                              {LENS_TYPES.map(type => (
+                                <option key={type} value={type}>{type}</option>
+                              ))}
+                            </select>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              Base Tint
+                            </label>
+                            <select
+                              value={searchCriteria.baseTint}
+                              onChange={(e) => handleInputChange('baseTint', e.target.value)}
+                              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm py-3 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
+                            >
+                              <option value="">Any Tint</option>
+                              {BASE_TINTS.map(tint => (
+                                <option key={tint} value={tint}>{tint}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                                {/* Right Half - Advanced Filters Section (A) */}
+                <div className="p-6">
+                                      <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
-                      </svg>
+                        <span className="text-white font-bold text-sm">A</span>
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Advanced Filters</h3>
-                    <span className="text-xs bg-purple-100 dark:bg-purple-800 text-purple-700 dark:text-purple-300 px-2 py-1 rounded-full">All Optional</span>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-left">
+                        Advanced Filters
+                      </h3>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 bg-purple-50 dark:bg-purple-900/30 px-3 py-1 rounded-lg border border-purple-200 dark:border-purple-700">
+                        Optional
+                      </div>
                   </div>
                   
-                  {/* Lens Category */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                      Lens Category
+                    {/* Lens Category moved to header */}
+                    <div className="flex items-center space-x-2">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Category:
                     </label>
                     <select
                       value={searchCriteria.type}
                       onChange={(e) => handleInputChange('type', e.target.value)}
-                      className="w-full md:w-1/3 rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm py-3 px-4 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:focus:ring-purple-400 dark:focus:border-purple-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
+                        className="rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:focus:ring-purple-400 dark:focus:border-purple-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all text-sm"
                     >
                       <option value="all">All Categories</option>
                       <option value="prescription">Prescription Lenses</option>
                       <option value="contact">Contact Lenses</option>
                     </select>
+                    </div>
                   </div>
+                  
+                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-4 border border-purple-200 dark:border-purple-700 h-full overflow-y-auto space-y-4">
               
                   {/* Lens Specifications */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -613,37 +625,7 @@ const Shop = () => {
                               />
                             </div>
                             
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Type
-                              </label>
-                              <select
-                                value={searchCriteria.contactType}
-                                onChange={(e) => handleInputChange('contactType', e.target.value)}
-                                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 dark:focus:ring-emerald-400 dark:focus:border-emerald-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
-                              >
-                                <option value="">Any Type</option>
-                                {CONTACT_TYPES.map(type => (
-                                  <option key={type} value={type}>{type}</option>
-                                ))}
-                              </select>
-                            </div>
-                            
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Duration
-                              </label>
-                              <select
-                                value={searchCriteria.contactDuration}
-                                onChange={(e) => handleInputChange('contactDuration', e.target.value)}
-                                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm py-3 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 dark:focus:ring-emerald-400 dark:focus:border-emerald-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
-                              >
-                                <option value="">Any Duration</option>
-                                {CONTACT_DURATIONS.map(duration => (
-                                  <option key={duration} value={duration}>{duration}</option>
-                                ))}
-                              </select>
-                            </div>
+
                             
                             <div>
                               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -782,37 +764,7 @@ const Shop = () => {
                               </select>
                             </div>
                             
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Lens Design
-                              </label>
-                              <select
-                                value={searchCriteria.lensType}
-                                onChange={(e) => handleInputChange('lensType', e.target.value)}
-                                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm py-3 px-4 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:focus:ring-purple-400 dark:focus:border-purple-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
-                              >
-                                <option value="">Any Design</option>
-                                {LENS_TYPES.map(type => (
-                                  <option key={type} value={type}>{type}</option>
-                                ))}
-                              </select>
-                            </div>
-                            
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Base Tint
-                              </label>
-                              <select
-                                value={searchCriteria.baseTint}
-                                onChange={(e) => handleInputChange('baseTint', e.target.value)}
-                                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm py-3 px-4 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:focus:ring-purple-400 dark:focus:border-purple-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
-                              >
-                                <option value="">Any Tint</option>
-                                {BASE_TINTS.map(tint => (
-                                  <option key={tint} value={tint}>{tint}</option>
-                                ))}
-                              </select>
-                            </div>
+
                           </div>
                         </div>
                         
@@ -880,10 +832,11 @@ const Shop = () => {
                     )}
                   </div>
                 </div>
-              )}
+                  </div>
+                </div>
               
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-gray-200 dark:border-gray-600">
+              <div className="flex flex-col sm:flex-row gap-4 p-4 mt-4 mx-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
                 <button
                   type="submit"
                   disabled={loading}
@@ -969,7 +922,7 @@ const Shop = () => {
                 <div className="text-center py-16">
                   <div className="w-16 h-16 bg-gradient-to-r from-blue-100 to-purple-100 dark:bg-gradient-to-r dark:from-blue-900/50 dark:to-purple-900/50 rounded-full flex items-center justify-center mx-auto mb-4">
                     <svg className="w-8 h-8 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                     </svg>
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Ready to Find Your Lenses?</h3>

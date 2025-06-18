@@ -4,6 +4,7 @@ import { getUserCollection } from '../utils/multiTenancy';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { safelyParseDate, formatDate } from '../utils/dateUtils';
+import { MarketplaceNotificationBell } from '../components/MarketplaceNotifications';
 import * as XLSX from 'xlsx';
 
 const Dashboard = () => {
@@ -1659,6 +1660,74 @@ const Dashboard = () => {
           </div>
         </div>
 
+        {/* Marketplace Section */}
+        <div className="mb-8">
+          <div 
+            className="rounded-lg shadow-lg p-6 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700"
+            style={{ 
+              background: 'linear-gradient(135deg, #3B82F6 0%, #8B5CF6 50%, #4338CA 100%)'
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-4">
+                  <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
+                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-white mb-2">Reflex Marketplace</h2>
+                    <p className="text-blue-100 text-sm">Connect with distributors • Buy & Sell Lenses • Post Queries</p>
+                    <div className="flex items-center space-x-6 mt-3 text-blue-100 text-sm">
+                      <span className="flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        500+ Lenses Available
+                      </span>
+                      <span className="flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z"/>
+                        </svg>
+                        50+ Distributors
+                      </span>
+                      <span className="flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"/>
+                        </svg>
+                        24/7 Access
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-4">
+                {/* Marketplace Notifications */}
+                <div className="bg-white/20 backdrop-blur-sm rounded-full p-2">
+                  <MarketplaceNotificationBell iconColor="text-white" />
+                </div>
+                
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => navigate('/marketplace')}
+                    className="bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-all duration-200 transform hover:scale-105 shadow-lg"
+                  >
+                    Open Marketplace
+                  </button>
+                  <button
+                    onClick={() => navigate('/shop')}
+                    className="bg-white/20 backdrop-blur-sm text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/30 transition-all duration-200 border border-white/30"
+                  >
+                    Browse Lenses
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Sales Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Today's Sales */}
@@ -1980,6 +2049,8 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+
+
 
         {/* Top Products Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

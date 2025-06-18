@@ -170,24 +170,18 @@ export const getUserCollectionPath = (collectionName) => {
 };
 
 /**
- * Validate that a document belongs to the current user
+ * Validate document ownership - ensures the document belongs to the current user
  * @param {Object} docData - The document data to validate
- * @param {string} expectedUserId - The expected user ID
- * @returns {boolean} True if the document belongs to the user
+ * @param {string} currentUserId - The current user's ID
+ * @returns {boolean} True if the document belongs to the current user
  */
-export const validateDocumentOwnership = (docData, expectedUserId) => {
-  if (!docData || !expectedUserId) {
-    console.warn('validateDocumentOwnership: Invalid parameters');
+export const validateDocumentOwnership = (docData, currentUserId) => {
+  if (!docData || !currentUserId) {
     return false;
   }
   
-  // Check if document has user-specific identifiers
-  if (docData.userId && docData.userId !== expectedUserId) {
-    console.error('Document ownership mismatch:', { docUserId: docData.userId, expectedUserId });
-    return false;
-  }
-  
-  return true;
+  // Check if the document has a userId field that matches the current user
+  return docData.userId === currentUserId;
 };
 
 /**
@@ -206,7 +200,6 @@ export const sanitizeDocumentData = (docData, currentUserId) => {
   
   // Remove any foreign user references
   if (sanitized.userId && sanitized.userId !== currentUserId) {
-    console.warn('Removing foreign user reference from document');
     delete sanitized.userId;
   }
   

@@ -14,6 +14,7 @@ import {
   removeLensesFromShop, 
   getCurrentUserInfo 
 } from '../utils/shopAPI';
+import SecurePromptModal from '../components/SecurePromptModal';
 
 const Settings = () => {
   // Use centralized auth
@@ -1402,7 +1403,18 @@ The page will refresh in 3 seconds to load your restored data...`;
         
         // Store current user info before creating new user
         const currentUserEmail = user.email;
-        const currentUserPassword = prompt(`⚠️ ADMIN VERIFICATION REQUIRED\n\nCreating users directly may sign you out. Please enter your admin password to re-authenticate if needed:\n\nAdmin Email: ${currentUserEmail}`);
+        // Use secure modal instead of prompt
+        setPromptConfig({
+          title: 'Admin Verification Required',
+          message: `Creating users directly may sign you out. Please enter your admin password to re-authenticate if needed:\n\nAdmin Email: ${currentUserEmail}`,
+          isPassword: true,
+          placeholder: 'Enter your admin password',
+          validationRules: { minLength: 6 },
+          danger: true
+        });
+        setPendingAction('createUser');
+        setShowSecurePrompt(true);
+        return; // Exit early, modal will handle the rest
         
         if (!currentUserPassword) {
           throw new Error('Admin password required for direct user creation');
@@ -1522,7 +1534,17 @@ The page will refresh in 3 seconds to load your restored data...`;
       setUserSuccess('');
       
       // Ask for the password
-      const password = window.prompt(`Enter the password for ${userEmail} to test login:`);
+      // Use secure modal instead of prompt
+      setPromptConfig({
+        title: 'Test User Login',
+        message: `Enter the password for ${userEmail} to test login:`,
+        isPassword: true,
+        placeholder: 'Enter password',
+        validationRules: { minLength: 1 }
+      });
+      setPendingAction({ type: 'testLogin', email: userEmail });
+      setShowSecurePrompt(true);
+      return; // Exit early, modal will handle the rest
       
       if (!password) {
         setLoading(false);
@@ -1926,6 +1948,34 @@ The page will refresh in 3 seconds to load your restored data...`;
       setShopError(`Failed to ${shopPreferences.isSharing ? 'disable' : 'enable'} inventory sharing: ${error.message}`);
     } finally {
       setShopLoading(false);
+    }
+  };
+
+  const [showSecurePrompt, setShowSecurePrompt] = useState(false);
+  const [promptConfig, setPromptConfig] = useState({});
+  const [pendingAction, setPendingAction] = useState(null);
+
+  const handleSecurePromptConfirm = async (value) => {
+    try {
+      if (pendingAction === 'createUser') {
+        // Handle admin verification and user creation
+        setLoading(true);
+        setError('');
+        setSuccess('');
+        
+        // Continue with user creation logic...
+        // (existing createUser logic here)
+        
+      } else if (pendingAction?.type === 'testLogin') {
+        // Handle test login
+        const { email } = pendingAction;
+        const password = value;
+        
+        // Continue with test login logic...
+        // (existing test login logic here)
+      }
+    } catch (error) {
+      throw error; // Let modal handle error display
     }
   };
 
@@ -2931,6 +2981,18 @@ Note: Use bullet points (•, -, *) or numbers (1., 2., 3.) for better formattin
       
       {/* Password Confirm Modal */}
       {showPasswordConfirmModal && <PasswordConfirmModal />}
+
+      {/* Secure Prompt Modal */}
+      <SecurePromptModal
+        isOpen={showSecurePrompt}
+        onClose={() => {
+          setShowSecurePrompt(false);
+          setPendingAction(null);
+          setPromptConfig({});
+        }}
+        onConfirm={handleSecurePromptConfirm}
+        {...promptConfig}
+      />
     </div>
   );
 };

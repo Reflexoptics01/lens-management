@@ -17,7 +17,6 @@ const requiredEnvVars = [
 
 const missingVars = requiredEnvVars.filter(varName => !import.meta.env[varName]);
 if (missingVars.length > 0) {
-  console.error('❌ Missing required environment variables:', missingVars);
   throw new Error(`Missing Firebase environment variables: ${missingVars.join(', ')}`);
 }
 
@@ -36,7 +35,6 @@ const firebaseConfig = {
 
 // Validate API key format
 if (firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith('AIza')) {
-  console.error('❌ Invalid Firebase API key format. API key should start with "AIza"');
   throw new Error('Invalid Firebase API key format');
 }
 
@@ -45,7 +43,6 @@ let app;
 try {
   app = initializeApp(firebaseConfig);
 } catch (error) {
-  console.error('Firebase initialization failed:', error.code);
   throw error;
 }
 
@@ -60,18 +57,15 @@ try {
   storage = getStorage(app);
   functions = getFunctions(app, 'us-central1');
 } catch (error) {
-  console.error('Firebase services initialization failed:', error.code);
   throw error;
 }
 
-// Connect to Functions emulator if in development (disabled for team member authentication)
-// Note: Disabled emulator connection to use production Cloud Functions for team member auth
-if (import.meta.env.MODE === 'development' && false) {
+// Connect to Firebase Functions Emulator if in development
+if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATOR === 'true') {
   try {
-    connectFunctionsEmulator(functions, "localhost", 5001);
-    console.log('✅ Connected to Functions emulator');
+    connectFunctionsEmulator(functions, 'localhost', 5001);
   } catch (error) {
-    console.warn('⚠️ Failed to connect to Functions emulator:', error);
+    // Emulator connection failed, but continue with production functions
   }
 }
 

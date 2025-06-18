@@ -51,24 +51,14 @@ const Customers = () => {
 
   // Global error handler to prevent white screen
   useEffect(() => {
-    const originalConsoleError = console.error;
-    console.error = (...args) => {
-      originalConsoleError(...args);
-      // Check if this is a React error
-      const errorString = args.join(' ');
-      if (errorString.includes('React') || errorString.includes('rendering')) {
-        setComponentError(`An error occurred: ${errorString}`);
-      }
-    };
-
-    // Enable error recovery
+    // Enable error recovery for component errors
     window.addEventListener('error', (event) => {
       setComponentError(`App error: ${event.message}`);
       event.preventDefault();
     });
 
     return () => {
-      console.error = originalConsoleError;
+      // Cleanup event listener
     };
   }, []);
 

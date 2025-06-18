@@ -6,7 +6,7 @@ import Navbar from '../components/Navbar';
 import { safelyParseDate, formatDate, formatDateTime } from '../utils/dateUtils';
 import { getUserCollection, getUserDoc, diagnoseAuthIssues, attemptAuthFix } from '../utils/multiTenancy';
 import { useAuth } from '../contexts/AuthContext';
-import ShopButton from '../components/ShopButton';
+import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 const ORDER_STATUSES = [
   'PENDING',
@@ -803,48 +803,34 @@ const Orders = () => {
               <div className="text-sm">{error}</div>
             </div>
             
-            {/* Debug Information Panel */}
-            <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">🔧 Debug Information</div>
-              <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-                <div>User ID: {localStorage.getItem('userUid') || 'Not found'}</div>
-                <div>User Email: {localStorage.getItem('userEmail') || 'Not found'}</div>
-                <div>Current URL: {window.location.pathname}</div>
-                <div>Orders Array Length: {orders ? orders.length : 'undefined'}</div>
-                <div>Timestamp: {new Date().toLocaleString()}</div>
-              </div>
-              
-              <div className="mt-3 space-x-2">
-                <button
-                  onClick={() => {
-                    fetchOrders();
-                  }}
-                  className="px-3 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-md hover:bg-blue-200 dark:hover:bg-blue-800"
-                >
-                  Retry Fetch
-                </button>
-                
-                <button
-                  onClick={() => {
-                    const diagnosis = diagnoseAuthIssues();
-                    alert(`Auth Status:\n\nUID: ${diagnosis.hasUid ? '✓' : '✗'}\nEmail: ${diagnosis.hasEmail ? '✓' : '✗'}\n\nIssues: ${diagnosis.issues.length}\nRecommendations: ${diagnosis.recommendations.length}`);
-                  }}
-                  className="px-3 py-1 text-xs bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-md hover:bg-yellow-200 dark:hover:bg-yellow-800"
-                >
-                  Check Auth
-                </button>
-                
-                <button
-                  onClick={() => {
-                    if (confirm('This will logout and redirect to login page. Continue?')) {
-                      localStorage.clear();
-                      window.location.href = '/login';
-                    }
-                  }}
-                  className="px-3 py-1 text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-md hover:bg-red-200 dark:hover:bg-red-800"
-                >
-                  Force Logout
-                </button>
+            {/* System Status Panel */}
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
+              <div className="flex items-center">
+                <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400 mr-3" />
+                <div>
+                  <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                    Unable to Load Orders
+                  </h3>
+                  <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
+                    <p>If you expected to see orders here, try:</p>
+                    <ul className="list-disc list-inside mt-1 space-y-1">
+                      <li>Refreshing the page</li>
+                      <li>Checking your internet connection</li>
+                      <li>Verifying you're logged in correctly</li>
+                    </ul>
+                  </div>
+                  
+                  <div className="mt-3 space-x-2">
+                    <button
+                      onClick={() => {
+                        fetchOrders();
+                      }}
+                      className="px-3 py-1 text-xs bg-yellow-100 dark:bg-yellow-800 text-yellow-700 dark:text-yellow-200 rounded-md hover:bg-yellow-200 dark:hover:bg-yellow-700"
+                    >
+                      Retry Loading
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

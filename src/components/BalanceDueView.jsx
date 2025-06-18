@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { getUserCollection } from '../utils/multiTenancy';
+import { securePrint, getSecureElementContent } from '../utils/securePrint';
+import { toast } from 'react-hot-toast';
 
 const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
   const [loading, setLoading] = useState(false);
@@ -333,23 +335,18 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
         return;
       }
 
-      // Cutoff is the START of the day AFTER the selected "as of" date.
-      // Items must be strictly BEFORE this cutoff.
-      const cutoffDate = new Date(selectedAsOfDate.getFullYear(), selectedAsOfDate.getMonth(), selectedAsOfDate.getDate() + 1, 0, 0, 0, 0);
-      
-      console.log(`[BalanceDueView] Calculating balances for items strictly BEFORE ${cutoffDate.toISOString()} (selected 'as of' date: ${selectedAsOfDate.toISOString()})`);
+      // Calculate balances based on the cutoff date
+      const cutoffDate = new Date(selectedAsOfDate);
+      cutoffDate.setHours(23, 59, 59, 999); // Set to end of day for proper comparison
       
       // Calculate customer and vendor balances in parallel
-      const [customerBalances, vendorBalances] = await Promise.all([
+      const [customerBalancesResult, vendorBalancesResult] = await Promise.all([
         calculateCustomerBalances(cutoffDate),
         calculateVendorBalances(cutoffDate)
       ]);
       
-      console.log('[BalanceDueView] Customer balances:', customerBalances);
-      console.log('[BalanceDueView] Vendor balances:', vendorBalances);
-      
-      setCustomerBalances(customerBalances);
-      setVendorBalances(vendorBalances);
+      setCustomerBalances(customerBalancesResult);
+      setVendorBalances(vendorBalancesResult);
       
     } catch (error) {
       console.error('[BalanceDueView] Error calculating balance summary:', error);
@@ -382,41 +379,43 @@ const BalanceDueView = ({ formatCurrency, navigateToInvoiceLedger }) => {
 
   // Function to handle printing the table
   const handlePrint = () => {
-    const printContents = document.getElementById('balance-table-container').innerHTML;
-    const originalContents = document.body.innerHTML;
-    
-    // Create a styled print layout
-    const printPage = `
-      <html>
-        <head>
-          <title>Balance Due Report - ${formatDisplayDate(balanceAsOfDate)}</title>
-          <style>
-            body { font-family: Arial, sans-serif; }
-            table { width: 100%; border-collapse: collapse; }
-            th, td { padding: 8px; text-align: left; border: 1px solid #ddd; }
-            th { background-color: #f2f2f2; }
-            .text-right { text-align: right; }
-            .balance-negative { color: green; }
-            .balance-positive { color: red; }
-            .total-row { font-weight: bold; background-color: #f9f9f9; }
-            h2 { margin-bottom: 5px; }
-            .subtitle { margin-top: 0; color: #666; }
-          </style>
-        </head>
-        <body>
-          <h2>Balance Due Report</h2>
-          <p class="subtitle">As of ${formatDisplayDate(balanceAsOfDate)}</p>
-          ${printContents}
-        </body>
-      </html>
-    `;
-    
-    document.body.innerHTML = printPage;
-    window.print();
-    document.body.innerHTML = originalContents;
-    
-    // Force a refresh of the app after printing
-    window.location.reload();
+    try {
+      const content = getSecureElementContent('balance-table-container');
+      if (!content) {
+        throw new Error('Balance table content not found');
+      }
+
+      const printOptions = {
+        title: 'Balance Due Report',
+        styles: `
+          .balance-table {
+            width: 100%;
+            border-collapse: collapse;
+          }
+          .balance-table th,
+          .balance-table td {
+            padding: 8px;
+            text-align: left;
+            border: 1px solid #ddd;
+          }
+          .balance-table th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+          }
+          .total-row {
+            font-weight: bold;
+            background-color: #f9f9f9;
+          }
+        `
+      };
+
+      const success = securePrint(content, printOptions);
+      if (!success) {
+        throw new Error('Print operation failed');
+      }
+    } catch (error) {
+      toast.error(`Print failed: ${error.message}`);
+    }
   };
 
   // Function to export as Excel

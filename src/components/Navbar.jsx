@@ -331,6 +331,7 @@ const Navbar = () => {
       ),
       color: 'from-red-500 to-orange-400'
     },
+
     { 
       path: '/settings', 
       title: 'Settings', 
@@ -687,6 +688,8 @@ const Navbar = () => {
               </span>
               </button>
             ))}
+          
+
           
           {/* Theme Toggle for Desktop */}
           <div className="flex-shrink-0 flex flex-col items-center p-2 rounded-xl min-w-[80px]">

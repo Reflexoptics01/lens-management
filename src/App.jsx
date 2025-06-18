@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -34,10 +33,16 @@ import ReorderDashboard from './pages/ReorderDashboard';
 import SalesReturn from "./pages/SalesReturn";
 import PurchaseReturn from "./pages/PurchaseReturn";
 import Shop from './pages/Shop';
-import FloatingShopIcon from './components/FloatingShopIcon';
+import MarketplaceDashboard from './pages/MarketplaceDashboard';
+import MarketplaceLayout from './pages/MarketplaceLayout';
+import MyListings from './pages/MyListings';
+import CreateFlashSale from './pages/CreateFlashSale';
+
 import UserManagement from './pages/UserManagement';
 import SystemAnalytics from './pages/SystemAnalytics';
 import GlobalCalculator from './components/GlobalCalculator';
+
+import FloatingShopIcon from './components/FloatingShopIcon';
 import './App.css';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
@@ -102,6 +107,10 @@ function App() {
         <ThemeProvider>
           <Router>
             <UniversalKeyboardHandler />
+            
+            {/* Global components accessible from anywhere */}
+            <FloatingShopIcon />
+            
             <Routes>
               {/* Public routes */}
               <Route path="/login" element={<Login />} />
@@ -172,11 +181,7 @@ function App() {
                   <Sales />
                 </ProtectedRoute>
               } />
-              <Route path="/sales/new" element={
-                <ProtectedRoute requiredPermission="/sales">
-                  <CreateSale />
-                </ProtectedRoute>
-              } />
+              <Route path="/sales/new" element={<CreateSale />} />
               <Route path="/sales/:saleId" element={
                 <ProtectedRoute requiredPermission="/sales">
                   <SaleDetail />
@@ -317,20 +322,24 @@ function App() {
                 </ProtectedRoute>
               } />
               
-              {/* Shop route - require authentication */}
-              <Route path="/shop" element={
-                <ProtectedRoute requireAuth={true}>
-                  <Shop />
-                </ProtectedRoute>
-              } />
+              {/* Marketplace route - open access for faster loading */}
+              <Route path="/marketplace" element={<MarketplaceLayout />} />
+              
+              {/* Flash Sale route - open access for faster loading */}
+              <Route path="/create-flash-sale" element={<MarketplaceLayout activeTab="create-flash-sale" />} />
+              
+              {/* Add Optical Product route - open access for faster loading */}
+              <Route path="/add-optical-product" element={<MarketplaceLayout activeTab="add-optical-product" />} />
+              
+              {/* Shop route - open access for faster loading */}
+              <Route path="/shop" element={<Shop />} />
               
               {/* Default routes */}
               <Route path="/" element={<Navigate to="/orders" replace />} />
               <Route path="*" element={<Navigate to="/orders" replace />} />
             </Routes>
             
-            {/* Floating Shop Icon - appears only on specific pages */}
-            <FloatingShopIcon />
+
           </Router>
           
           {/* Global Calculator - accessible from anywhere with 'T' key */}
