@@ -6,14 +6,13 @@ import { getUserCollection } from '../utils/multiTenancy';
 import { formatDate } from '../utils/dateUtils';
 import Navbar from '../components/Navbar';
 import { BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { useTheme } from '../contexts/ThemeContext';
 
 const LensInventoryReport = () => {
   const [lenses, setLenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { isDark } = useTheme();
+  const isDark = false; // Using light theme only
   
   // Get current date for report generation
   const currentDate = formatDate(new Date());

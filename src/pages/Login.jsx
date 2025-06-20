@@ -3,7 +3,6 @@ import { auth } from '../firebaseConfig';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -23,8 +22,7 @@ const Login = () => {
     USER_ROLES 
   } = useAuth();
 
-  // Use theme context for proper dark mode
-  const { isDark } = useTheme();
+  // Using light theme only
 
   const slides = [
     { 

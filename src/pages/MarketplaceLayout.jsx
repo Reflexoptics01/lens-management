@@ -19,24 +19,7 @@ const MarketplaceLayout = ({ activeTab: propActiveTab }) => {
   // Set marketplace context to override global shortcuts
   useShortcutContext('marketplace');
 
-  // Enhanced ESC key handler for marketplace pages
-  useEffect(() => {
-    const handleEscapeKey = (event) => {
-      if (event.key === 'Escape') {
-        // Block navigation on marketplace pages
-        event.preventDefault();
-        event.stopPropagation();
-        // Optionally show a message or handle marketplace-specific behavior
-        return false;
-      }
-    };
-
-    document.addEventListener('keydown', handleEscapeKey, { capture: true });
-
-    return () => {
-      document.removeEventListener('keydown', handleEscapeKey, { capture: true });
-    };
-  }, []);
+  // Marketplace shortcut blocking is now handled globally in App.jsx
 
   const tabs = [
     {

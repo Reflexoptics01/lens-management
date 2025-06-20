@@ -41,23 +41,7 @@
   --neutral-900: #111827;
 }
 
-/* Dark theme colors */
-.dark {
-  --bg-primary: #0F172A;
-  --bg-secondary: #1E293B;
-  --bg-tertiary: #334155;
-  --text-primary: #F1F5F9;
-  --text-secondary: #CBD5E1;
-  --text-muted: #94A3B8;
-  --border-primary: #334155;
-  --border-secondary: #475569;
-  --shadow-primary: rgba(0, 0, 0, 0.3);
-  --shadow-secondary: rgba(0, 0, 0, 0.2);
-  --overlay: rgba(0, 0, 0, 0.7);
-  
-  /* Update primary colors for better dark mode contrast */
-  --primary-light: #1E293B;
-}
+/* No dark theme - keeping simple white theme for all users */
 
 * {
   margin: 0;
@@ -250,19 +234,7 @@ h1, h2, h3, h4, h5, h6 {
   transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* Theme toggle button */
-.theme-toggle {
-  background-color: var(--bg-tertiary);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-primary);
-  @apply p-2 rounded-lg transition-all duration-200 hover:bg-opacity-80;
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
-}
-
-.theme-toggle:hover {
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-}
+/* Theme toggle removed - using simple white theme */
 
 /* Animations */
 .slide-up {

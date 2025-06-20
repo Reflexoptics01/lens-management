@@ -127,7 +127,7 @@ const AddOpticalProduct = ({ hideNavbar = false }) => {
       const productData = {
         ...formData,
         price: parseFloat(formData.price),
-        quantity: parseInt(formData.quantity),
+        quantity: parseFloat(formData.quantity),
         userId: user?.uid,
         userEmail: user?.email,
         userName: user?.displayName || user?.email,
@@ -314,8 +314,9 @@ const AddOpticalProduct = ({ hideNavbar = false }) => {
                   value={formData.quantity}
                   onChange={(e) => handleInputChange('quantity', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                  placeholder="Enter quantity"
-                  min="1"
+                  placeholder="Enter quantity (e.g., 0.5, 1, 2.5)"
+                  min="0.1"
+                  step="0.1"
                 />
               </div>
             </div>

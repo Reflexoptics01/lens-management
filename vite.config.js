@@ -6,9 +6,8 @@ export default defineConfig({
   // Development server configuration
   server: {
     port: 5174,
-    strictPort: true,
+    strictPort: false,
     hmr: {
-      port: 5174,
       host: 'localhost'
     },
     headers: {

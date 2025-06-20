@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { searchLensesBySpecs, getAllShopLenses } from '../utils/shopAPI';
 import { useAuth } from '../contexts/AuthContext';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import LensPrescription from '../components/LensPrescription';
+import { useShortcutContext } from '../utils/keyboardShortcuts';
+import toast from 'react-hot-toast';
 
 // Constants from OrderForm.jsx
 const MATERIALS = ['CR', 'POLY', 'GLASS', 'POLARISED', 'TRIVEX', 'MR8'];
@@ -54,6 +56,12 @@ const CONTACT_COLORS = [
 const Shop = ({ hideNavbar = false, hideHeader = false }) => {
   const { user, isAuthenticated } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+  
+  // Set shop context to override global shortcuts when accessed directly
+  useShortcutContext('shop');
+
+  // Shop shortcut blocking is now handled globally in App.jsx
   
   // Search criteria - expanded to match OrderForm specifications
   const [searchCriteria, setSearchCriteria] = useState({

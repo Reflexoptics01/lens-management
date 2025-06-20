@@ -30,6 +30,12 @@ const ReorderDashboard = () => {
   });
   const [expandedReorderBrands, setExpandedReorderBrands] = useState(new Set());
   
+  // Reorder selection modal
+  const [showReorderModal, setShowReorderModal] = useState(false);
+  const [reorderSelections, setReorderSelections] = useState({});
+  const [batchQuantities, setBatchQuantities] = useState({});
+  const [expandedGroups, setExpandedGroups] = useState(new Set());
+  
   const [reorderData, setReorderData] = useState({
     needsReorder: [],
     outOfStock: [],
@@ -185,6 +191,21 @@ const ReorderDashboard = () => {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2 
     })}`;
+  };
+
+  // Helper function to determine the correct unit for lens types
+  const getUnitForLens = (item) => {
+    if (item.type === 'power_specific') {
+      return 'pairs'; // Stock lenses with specific powers are in pairs
+    }
+    
+    // Check if it's contact lens
+    const lensType = item.lensType || item.lens?.type || '';
+    if (lensType.toLowerCase().includes('contact') || lensType.toLowerCase().includes('cl')) {
+      return 'pieces'; // Contact lenses are in pieces
+    }
+    
+    return 'pairs'; // Default for regular lenses is pairs
   };
 
   const getPriorityColor = (priority) => {
@@ -431,9 +452,9 @@ const ReorderDashboard = () => {
         'Lens Brand': item.lensName,
         'Type': item.type === 'power_specific' ? 'Power Specific' : 'General',
         'Details': item.type === 'power_specific' ? item.powerDisplay : `${item.lensType} lens`,
-        'Current Stock': `${item.currentQty} ${item.type === 'power_specific' ? 'pieces' : 'units'}`,
-        'Threshold': `${item.threshold} ${item.type === 'power_specific' ? 'pieces' : 'units'}`,
-        'Suggested Order': `${item.suggestedOrder} ${item.type === 'power_specific' ? 'pieces' : 'units'}`,
+        'Current Stock': `${item.currentQty} ${getUnitForLens(item)}`,
+        'Threshold': `${item.threshold} ${getUnitForLens(item)}`,
+        'Suggested Order': `${item.suggestedOrder} ${getUnitForLens(item)}`,
         'Estimated Cost': `₹${item.estimatedCost.toFixed(2)}`
       }));
 
@@ -442,8 +463,8 @@ const ReorderDashboard = () => {
         'S.No': index + 1,
         'Lens Brand': item.lensName,
         'Power Combination': item.powerDisplay,
-        'Threshold': `${item.threshold} pieces`,
-        'Suggested Order': `${item.suggestedOrder} pieces`,
+        'Threshold': `${item.threshold} pairs`,
+        'Suggested Order': `${item.suggestedOrder} pairs`,
         'Estimated Cost': `₹${item.estimatedCost.toFixed(2)}`
       }));
 
@@ -478,6 +499,456 @@ const ReorderDashboard = () => {
       alert(`Excel file exported successfully!\nFile: ${filename}\nNeeds Reorder: ${needsReorderData.length}\nOut of Stock: ${outOfStockData.length}`);
     } catch (error) {
       alert('Failed to export Excel file. Please try again.');
+    }
+  };
+
+  // Open reorder selection modal
+  const openReorderModal = () => {
+    setShowReorderModal(true);
+    // Initialize selections with current data
+    const initialSelections = {};
+    const initialBatchQty = {};
+    
+    // Add needs reorder items
+    getGroupedNeedsReorderData().forEach(group => {
+      const groupKey = group.brandName;
+      initialSelections[groupKey] = {
+        selected: false,
+        type: 'group',
+        brandName: group.brandName,
+        lensType: group.lensType,
+        items: group.items.map(item => ({
+          ...item,
+          selected: false,
+          customQty: item.suggestedOrder
+        }))
+      };
+      initialBatchQty[groupKey] = group.totalSuggestedOrder;
+    });
+
+    // Add out of stock items
+    getGroupedOutOfStockData().forEach(group => {
+      const groupKey = `${group.brandName}_outofstock`;
+      initialSelections[groupKey] = {
+        selected: false,
+        type: 'group',
+        brandName: group.brandName,
+        lensType: group.lensType,
+        isOutOfStock: true,
+        items: group.items.map(item => ({
+          ...item,
+          selected: false,
+          customQty: item.suggestedOrder
+        }))
+      };
+      initialBatchQty[groupKey] = group.totalSuggestedOrder;
+    });
+
+    setReorderSelections(initialSelections);
+    setBatchQuantities(initialBatchQty);
+    setExpandedGroups(new Set()); // Start with all groups collapsed
+  };
+
+  // Toggle group selection
+  const toggleGroupSelection = (groupKey) => {
+    setReorderSelections(prev => ({
+      ...prev,
+      [groupKey]: {
+        ...prev[groupKey],
+        selected: !prev[groupKey].selected,
+        items: prev[groupKey].items.map(item => ({
+          ...item,
+          selected: !prev[groupKey].selected
+        }))
+      }
+    }));
+  };
+
+  // Toggle individual item selection
+  const toggleItemSelection = (groupKey, itemId) => {
+    setReorderSelections(prev => {
+      const newItems = prev[groupKey].items.map(item => 
+        item.id === itemId ? { ...item, selected: !item.selected } : item
+      );
+      const allSelected = newItems.every(item => item.selected);
+      const noneSelected = newItems.every(item => !item.selected);
+      
+      return {
+        ...prev,
+        [groupKey]: {
+          ...prev[groupKey],
+          selected: allSelected,
+          items: newItems
+        }
+      };
+    });
+  };
+
+  // Update custom quantity for individual item
+  const updateItemQuantity = (groupKey, itemId, quantity) => {
+    setReorderSelections(prev => ({
+      ...prev,
+      [groupKey]: {
+        ...prev[groupKey],
+        items: prev[groupKey].items.map(item =>
+          item.id === itemId ? { ...item, customQty: parseInt(quantity) || 0 } : item
+        )
+      }
+    }));
+  };
+
+  // Update batch quantity for group - sets same quantity for each selected item
+  const updateBatchQuantity = (groupKey, quantity) => {
+    const qty = parseInt(quantity) || 0;
+    setBatchQuantities(prev => ({
+      ...prev,
+      [groupKey]: qty
+    }));
+    
+    // Set the same quantity for each selected item
+    setReorderSelections(prev => {
+      return {
+        ...prev,
+        [groupKey]: {
+          ...prev[groupKey],
+          items: prev[groupKey].items.map(item => {
+            if (!item.selected) return item;
+            return { ...item, customQty: qty };
+          })
+        }
+      };
+    });
+  };
+
+  // Toggle group expansion
+  const toggleGroupExpansion = (groupKey) => {
+    setExpandedGroups(prev => {
+      const newExpanded = new Set(prev);
+      if (newExpanded.has(groupKey)) {
+        newExpanded.delete(groupKey);
+      } else {
+        newExpanded.add(groupKey);
+      }
+      return newExpanded;
+    });
+  };
+
+  // Generate reorder PDF
+  const generateReorderPDF = () => {
+    try {
+      const selectedItems = [];
+      
+      Object.values(reorderSelections).forEach(group => {
+        group.items.forEach(item => {
+          if (item.selected && item.customQty > 0) {
+                            selectedItems.push({
+                  brandName: group.brandName,
+                  lensType: group.lensType,
+                  details: item.type === 'power_specific' ? item.powerDisplay : `${item.lensType || 'General'} lens`,
+                  quantity: item.customQty,
+                  unit: getUnitForLens(item),
+                  isOutOfStock: group.isOutOfStock || false
+                });
+          }
+        });
+      });
+
+      if (selectedItems.length === 0) {
+        alert('Please select at least one item to reorder.');
+        return;
+      }
+
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        alert("Please allow popups to print the reorder form. Check your browser's popup blocker settings.");
+        return;
+      }
+
+      const now = new Date();
+      const dateStr = now.toLocaleDateString();
+      const timeStr = now.toLocaleTimeString();
+
+      // Generate HTML content for the reorder form
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Lens Reorder Form</title>
+            <meta charset="UTF-8">
+            <style>
+              body {
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background-color: white;
+                color: black;
+                font-size: 12px;
+              }
+              .header {
+                text-align: center;
+                margin-bottom: 30px;
+                border-bottom: 2px solid #333;
+                padding-bottom: 15px;
+              }
+              .header h1 {
+                font-size: 24px;
+                margin: 0 0 10px 0;
+                color: #1f2937;
+              }
+              .header .meta {
+                font-size: 14px;
+                color: #6b7280;
+              }
+              .supplier-info {
+                background-color: #f9fafb;
+                padding: 15px;
+                border-radius: 8px;
+                margin-bottom: 20px;
+                border: 1px solid #e5e7eb;
+              }
+              .supplier-info h3 {
+                margin: 0 0 10px 0;
+                color: #374151;
+              }
+              .supplier-fields {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 15px;
+              }
+              .field {
+                display: flex;
+                align-items: center;
+              }
+              .field label {
+                font-weight: bold;
+                margin-right: 10px;
+                min-width: 120px;
+              }
+              .field .line {
+                border-bottom: 1px solid #333;
+                flex-grow: 1;
+                height: 20px;
+              }
+              table {
+                border-collapse: collapse;
+                width: 100%;
+                margin-bottom: 30px;
+                border: 2px solid #333;
+              }
+              th, td {
+                border: 1px solid #333;
+                padding: 10px;
+                text-align: left;
+                font-size: 11px;
+              }
+              th {
+                background-color: #f3f4f6;
+                font-weight: bold;
+                color: #374151;
+                text-align: center;
+              }
+              .lens-brand {
+                font-weight: bold;
+                color: #1f2937;
+              }
+              .power-details {
+                font-family: monospace;
+                font-size: 10px;
+              }
+              .quantity {
+                text-align: center;
+                font-weight: bold;
+                font-size: 12px;
+              }
+              .out-of-stock {
+                background-color: #fee2e2;
+              }
+              .summary {
+                margin-top: 20px;
+                padding: 15px;
+                background-color: #f3f4f6;
+                border-radius: 8px;
+                border: 1px solid #d1d5db;
+              }
+              .summary h3 {
+                margin: 0 0 10px 0;
+                color: #374151;
+              }
+              .summary-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr 1fr;
+                gap: 15px;
+                text-align: center;
+              }
+              .summary-item {
+                padding: 10px;
+                background-color: white;
+                border-radius: 4px;
+                border: 1px solid #d1d5db;
+              }
+              .summary-value {
+                font-size: 16px;
+                font-weight: bold;
+                color: #1f2937;
+              }
+              .summary-label {
+                font-size: 11px;
+                color: #6b7280;
+                margin-top: 5px;
+              }
+              .footer {
+                margin-top: 40px;
+                padding-top: 20px;
+                border-top: 1px solid #d1d5db;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 30px;
+              }
+              .signature-section {
+                text-align: center;
+              }
+              .signature-line {
+                border-bottom: 1px solid #333;
+                height: 40px;
+                margin: 20px 0 5px 0;
+              }
+              @media print {
+                @page {
+                  margin: 15mm;
+                  size: A4;
+                }
+                body {
+                  margin: 0;
+                  padding: 0;
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>LENS REORDER FORM</h1>
+              <div class="meta">Generated on: ${dateStr} at ${timeStr}</div>
+            </div>
+            
+            <div class="supplier-info">
+              <h3>Supplier Information</h3>
+              <div class="supplier-fields">
+                <div class="field">
+                  <label>Supplier Name:</label>
+                  <div class="line"></div>
+                </div>
+                <div class="field">
+                  <label>Contact Person:</label>
+                  <div class="line"></div>
+                </div>
+                <div class="field">
+                  <label>Phone Number:</label>
+                  <div class="line"></div>
+                </div>
+                <div class="field">
+                  <label>Email:</label>
+                  <div class="line"></div>
+                </div>
+                <div class="field">
+                  <label>Order Date:</label>
+                  <div class="line"></div>
+                </div>
+                <div class="field">
+                  <label>Expected Delivery:</label>
+                  <div class="line"></div>
+                </div>
+              </div>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th width="5%">S.No</th>
+                  <th width="25%">Lens Brand</th>
+                  <th width="15%">Type</th>
+                  <th width="35%">Details/Power Combination</th>
+                  <th width="10%">Quantity</th>
+                  <th width="10%">Unit</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${selectedItems.map((item, index) => `
+                  <tr ${item.isOutOfStock ? 'class="out-of-stock"' : ''}>
+                    <td style="text-align: center;">${index + 1}</td>
+                    <td class="lens-brand">${item.brandName}</td>
+                    <td>${item.lensType}</td>
+                    <td class="power-details">${item.details}</td>
+                    <td class="quantity">${item.quantity}</td>
+                    <td style="text-align: center;">${item.unit}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+
+            <div class="summary">
+              <h3>Order Summary</h3>
+              <div class="summary-grid">
+                <div class="summary-item">
+                  <div class="summary-value">${selectedItems.length}</div>
+                  <div class="summary-label">Total Items</div>
+                </div>
+                <div class="summary-item">
+                  <div class="summary-value">${selectedItems.reduce((sum, item) => sum + item.quantity, 0)}</div>
+                  <div class="summary-label">Total Quantity</div>
+                </div>
+                <div class="summary-item">
+                  <div class="summary-value">${selectedItems.filter(item => item.isOutOfStock).length}</div>
+                  <div class="summary-label">Out of Stock Items</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="footer">
+              <div class="signature-section">
+                <div><strong>Prepared By:</strong></div>
+                <div class="signature-line"></div>
+                <div>Name & Signature</div>
+              </div>
+              <div class="signature-section">
+                <div><strong>Approved By:</strong></div>
+                <div class="signature-line"></div>
+                <div>Name & Signature</div>
+              </div>
+            </div>
+
+            <script>
+              window.onload = function() {
+                setTimeout(function() {
+                  window.print();
+                }, 500);
+              };
+            </script>
+          </body>
+        </html>
+      `;
+
+      // Write to the new window
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+
+      // Fallback if window.onload doesn't trigger
+      setTimeout(() => {
+        if (printWindow && !printWindow.closed) {
+          printWindow.focus();
+          try {
+            printWindow.print();
+          } catch (e) {
+            // Ignore printing errors
+          }
+        }
+      }, 1000);
+
+      setShowReorderModal(false);
+      alert(`Reorder form generated successfully!\n${selectedItems.length} items selected for reorder.`);
+    } catch (error) {
+      alert('Failed to generate reorder form. Please try again.');
     }
   };
 
@@ -657,9 +1128,9 @@ const ReorderDashboard = () => {
                           <td>${item.lensName}</td>
                           <td>${item.type === 'power_specific' ? 'Power Specific' : 'General'}</td>
                           <td>${item.type === 'power_specific' ? item.powerDisplay : `${item.lensType} lens`}</td>
-                          <td>${item.currentQty} ${item.type === 'power_specific' ? 'pieces' : 'units'}</td>
-                          <td>${item.threshold} ${item.type === 'power_specific' ? 'pieces' : 'units'}</td>
-                          <td>${item.suggestedOrder} ${item.type === 'power_specific' ? 'pieces' : 'units'}</td>
+                          <td>${item.currentQty} ${getUnitForLens(item)}</td>
+                          <td>${item.threshold} ${getUnitForLens(item)}</td>
+                          <td>${item.suggestedOrder} ${getUnitForLens(item)}</td>
                           <td>₹${item.estimatedCost.toFixed(2)}</td>
                         </tr>
                       `).join('')}
@@ -690,8 +1161,8 @@ const ReorderDashboard = () => {
                          <tr class="out-of-stock-row">
                            <td>${item.lensName}</td>
                            <td>${item.powerDisplay}</td>
-                           <td>${item.threshold} pieces</td>
-                           <td>${item.suggestedOrder} pieces</td>
+                           <td>${item.threshold} pairs</td>
+                           <td>${item.suggestedOrder} pairs</td>
                            <td>₹${item.estimatedCost.toFixed(2)}</td>
                          </tr>
                        `).join('')}
@@ -764,6 +1235,15 @@ const ReorderDashboard = () => {
             </div>
             <div className="flex space-x-3">
               <button
+                onClick={openReorderModal}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:outline-none shadow-sm transition-colors flex items-center"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                Create Reorder Form
+              </button>
+              <button
                 onClick={exportToExcel}
                 className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 focus:outline-none shadow-sm transition-colors flex items-center"
               >
@@ -779,7 +1259,7 @@ const ReorderDashboard = () => {
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                 </svg>
-                Export PDF
+                Export Report
               </button>
               <button
                 onClick={fetchReorderData}
@@ -1116,14 +1596,14 @@ const ReorderDashboard = () => {
                                       <span className={`text-sm font-medium ${
                                         item.currentQty === 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'
                                       }`}>
-                                        {item.currentQty} {item.type === 'power_specific' ? 'pieces' : 'units'}
+                                        {item.currentQty} {getUnitForLens(item)}
                                       </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                      {item.threshold} {item.type === 'power_specific' ? 'pieces' : 'units'}
+                                      {item.threshold} {getUnitForLens(item)}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600 dark:text-blue-400">
-                                      {item.suggestedOrder} {item.type === 'power_specific' ? 'pieces' : 'units'}
+                                      {item.suggestedOrder} {getUnitForLens(item)}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                                       {formatCurrency(item.estimatedCost)}
@@ -1315,10 +1795,10 @@ const ReorderDashboard = () => {
                                       <span className="text-sm font-mono text-gray-900 dark:text-white">{item.powerDisplay}</span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                      {item.threshold} pieces
+                                      {item.threshold} pairs
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600 dark:text-red-400">
-                                      {item.suggestedOrder} pieces
+                                      {item.suggestedOrder} pairs
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                                       {formatCurrency(item.estimatedCost)}
@@ -1358,6 +1838,217 @@ const ReorderDashboard = () => {
           </div>
         </div>
       </main>
+
+      {/* Reorder Selection Modal */}
+      {showReorderModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Create Reorder Form</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  Select lens groups and specify quantities for your reorder
+                </p>
+              </div>
+              <button
+                onClick={() => setShowReorderModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+              {/* Group Controls */}
+              <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  {Object.keys(reorderSelections).length} lens groups available
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setExpandedGroups(new Set(Object.keys(reorderSelections)))}
+                    className="px-3 py-1 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+                  >
+                    Expand All
+                  </button>
+                  <button
+                    onClick={() => setExpandedGroups(new Set())}
+                    className="px-3 py-1 text-xs bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    Collapse All
+                  </button>
+                </div>
+              </div>
+
+              {Object.entries(reorderSelections).map(([groupKey, group]) => (
+                <div key={groupKey} className="mb-6 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                  {/* Group Header */}
+                  <div 
+                    className={`p-4 cursor-pointer ${
+                      group.isOutOfStock 
+                        ? 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30' 
+                        : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'
+                    } ${!expandedGroups.has(groupKey) ? '' : 'border-b border-gray-200 dark:border-gray-700'}`}
+                    onClick={() => toggleGroupExpansion(groupKey)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <button className="flex items-center">
+                          {expandedGroups.has(groupKey) ? (
+                            <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          ) : (
+                            <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                            </svg>
+                          )}
+                        </button>
+                        <input
+                          type="checkbox"
+                          checked={group.selected}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            toggleGroupSelection(groupKey);
+                          }}
+                          className="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                        />
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                            {group.brandName}
+                            {group.isOutOfStock && (
+                              <span className="ml-2 px-2 py-1 text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200 rounded-full">
+                                Out of Stock
+                              </span>
+                            )}
+                          </h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            {group.lensType} lens • {group.items.length} items
+                            {group.items.filter(item => item.selected).length > 0 && (
+                              <span className="ml-2 text-blue-600 dark:text-blue-400 font-medium">
+                                • {group.items.filter(item => item.selected).length} selected
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <div className="text-right">
+                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Qty per Item
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={batchQuantities[groupKey] || 0}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              updateBatchQuantity(groupKey, e.target.value);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            placeholder="0"
+                          />
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Sets same qty for each
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Group Items - Only show when expanded */}
+                  {expandedGroups.has(groupKey) && (
+                    <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {group.items.map((item) => (
+                        <div key={item.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <input
+                                type="checkbox"
+                                checked={item.selected}
+                                onChange={() => toggleItemSelection(groupKey, item.id)}
+                                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                              />
+                              <div className="flex-grow">
+                                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {item.type === 'power_specific' ? (
+                                    <span className="font-mono">{item.powerDisplay}</span>
+                                  ) : (
+                                    `${item.lensType || 'General'} lens`
+                                  )}
+                                </div>
+                                {item.priority && (
+                                  <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${getPriorityColor(item.priority)}`}>
+                                    {item.priority.charAt(0).toUpperCase() + item.priority.slice(1)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                              <div className="text-sm text-gray-500 dark:text-gray-400">
+                                Current: {item.currentQty || 0} {getUnitForLens(item)}
+                              </div>
+                              <div className="text-right">
+                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                  Reorder Qty
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={item.customQty || 0}
+                                  onChange={(e) => updateItemQuantity(groupKey, item.id, e.target.value)}
+                                  disabled={!item.selected}
+                                  className={`w-20 px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                                    item.selected 
+                                      ? 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white' 
+                                      : 'border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500'
+                                  }`}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                {(() => {
+                  const selectedCount = Object.values(reorderSelections).reduce((total, group) => 
+                    total + group.items.filter(item => item.selected && item.customQty > 0).length, 0
+                  );
+                  const totalQuantity = Object.values(reorderSelections).reduce((total, group) => 
+                    total + group.items.filter(item => item.selected).reduce((sum, item) => sum + (item.customQty || 0), 0), 0
+                  );
+                  return `${selectedCount} items selected • Total quantity: ${totalQuantity}`;
+                })()}
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowReorderModal(false)}
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={generateReorderPDF}
+                  className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
+                >
+                  Generate Reorder Form
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

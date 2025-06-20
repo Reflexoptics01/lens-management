@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Login from './pages/Login';
@@ -33,54 +33,17 @@ import ReorderDashboard from './pages/ReorderDashboard';
 import SalesReturn from "./pages/SalesReturn";
 import PurchaseReturn from "./pages/PurchaseReturn";
 import Shop from './pages/Shop';
-import MarketplaceDashboard from './pages/MarketplaceDashboard';
 import MarketplaceLayout from './pages/MarketplaceLayout';
-import MyListings from './pages/MyListings';
-import CreateFlashSale from './pages/CreateFlashSale';
-
+import ItemDetail from './pages/ItemDetail';
 import UserManagement from './pages/UserManagement';
 import SystemAnalytics from './pages/SystemAnalytics';
-import GlobalCalculator from './components/GlobalCalculator';
 
-import FloatingShopIcon from './components/FloatingShopIcon';
-import './App.css';
-import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import keyboardManager, { ShortcutUtils } from './utils/keyboardShortcuts';
-
-// Import production monitoring
-import { initializeMonitoring } from './utils/productionMonitoring';
+import './App.css';
 
 function App() {
-  const [calculatorOpen, setCalculatorOpen] = useState(false);
-
-  useEffect(() => {
-    // Remove console.log statements for production
-    // Environment validation is handled by firebaseConfig.js
-
-    // Initialize production monitoring in production environment
-    // Safe check for environment variable
-    const isProduction = import.meta.env?.REACT_APP_ENV === 'production' || 
-                        (typeof process !== 'undefined' && process.env?.REACT_APP_ENV === 'production');
-    
-    if (isProduction) {
-      initializeMonitoring();
-    }
-  }, []);
-
-  // Listen for calculator open events from universal keyboard handler
-  useEffect(() => {
-    const handleOpenCalculator = () => {
-      if (!calculatorOpen) {
-        setCalculatorOpen(true);
-      }
-    };
-
-    window.addEventListener('openCalculator', handleOpenCalculator);
-    return () => window.removeEventListener('openCalculator', handleOpenCalculator);
-  }, [calculatorOpen]);
-
   return (
     <div className="app-container">
       <Toaster 
@@ -103,292 +66,257 @@ function App() {
           },
         }}
       />
+      
       <AuthProvider>
-        <ThemeProvider>
-          <Router>
-            <UniversalKeyboardHandler />
+        <Router>
+          <UniversalShortcuts />
+          <Routes>
+            {/* Public routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
             
-            {/* Global components accessible from anywhere */}
-            <FloatingShopIcon />
+            {/* Protected routes */}
+            <Route path="/dashboard" element={
+              <ProtectedRoute requireAuth={true}>
+                <Dashboard />
+              </ProtectedRoute>
+            } />
             
-            <Routes>
-              {/* Public routes */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              
-              {/* Protected routes - require authentication */}
-              <Route path="/dashboard" element={
-                <ProtectedRoute requireAuth={true}>
-                  <Dashboard />
-                </ProtectedRoute>
-              } />
-              
-              {/* Admin route - requires super admin role */}
-              <Route path="/admin" element={
-                <ProtectedRoute requiredRoles={['superadmin']}>
-                  <AdminPanel />
-                </ProtectedRoute>
-              } />
-              
-              {/* Order routes - require order permission */}
-              <Route path="/orders" element={
-                <ProtectedRoute requiredPermission="/orders">
-                  <Orders />
-                </ProtectedRoute>
-              } />
-              <Route path="/orders/new" element={
-                <ProtectedRoute requiredPermission="/orders">
-                  <CreateOrder />
-                </ProtectedRoute>
-              } />
-              <Route path="/orders/:orderId" element={
-                <ProtectedRoute requiredPermission="/orders">
-                  <OrderDetail />
-                </ProtectedRoute>
-              } />
-              <Route path="/orders/edit/:orderId" element={
-                <ProtectedRoute requiredPermission="/orders">
-                  <EditOrder />
-                </ProtectedRoute>
-              } />
-              <Route path="/daily-dispatch-log" element={
-                <ProtectedRoute requiredPermission="/orders">
-                  <DailyDispatchLog />
-                </ProtectedRoute>
-              } />
-              
-              {/* Customer routes - require customer permission */}
-              <Route path="/customers" element={
-                <ProtectedRoute requiredPermission="/customers">
-                  <Customers />
-                </ProtectedRoute>
-              } />
-              <Route path="/customers/new" element={
-                <ProtectedRoute requiredPermission="/customers">
-                  <CreateCustomer />
-                </ProtectedRoute>
-              } />
-              <Route path="/add-vendor" element={
-                <ProtectedRoute requiredPermission="/customers">
-                  <CreateCustomer isVendor={true} />
-                </ProtectedRoute>
-              } />
-              
-              {/* Sales routes - require sales permission */}
-              <Route path="/sales" element={
-                <ProtectedRoute requiredPermission="/sales">
-                  <Sales />
-                </ProtectedRoute>
-              } />
-              <Route path="/sales/new" element={<CreateSale />} />
-              <Route path="/sales/:saleId" element={
-                <ProtectedRoute requiredPermission="/sales">
-                  <SaleDetail />
-                </ProtectedRoute>
-              } />
-              <Route path="/sales/edit/:saleId" element={
-                <ProtectedRoute requiredPermission="/sales">
-                  <EditSale />
-                </ProtectedRoute>
-              } />
-              <Route path="/sales-returns" element={
-                <ProtectedRoute requiredPermission="/sales">
-                  <SalesReturn />
-                </ProtectedRoute>
-              } />
-              <Route path="/sales/return/:id" element={
-                <ProtectedRoute requiredPermission="/sales">
-                  <SalesReturn isCreate={true} />
-                </ProtectedRoute>
-              } />
-              <Route path="/sales/return/new" element={
-                <ProtectedRoute requiredPermission="/sales">
-                  <SalesReturn isCreate={true} newReturn={true} />
-                </ProtectedRoute>
-              } />
-              <Route path="/sales-returns/:id" element={
-                <ProtectedRoute requiredPermission="/sales">
-                  <SalesReturn isView={true} />
-                </ProtectedRoute>
-              } />
-              
-              {/* Purchase routes - require purchase permission */}
-              <Route path="/purchases" element={
-                <ProtectedRoute requiredPermission="/purchases">
-                  <Purchases />
-                </ProtectedRoute>
-              } />
-              <Route path="/purchases/new" element={
-                <ProtectedRoute requiredPermission="/purchases">
-                  <CreatePurchase />
-                </ProtectedRoute>
-              } />
-              <Route path="/purchases/:purchaseId" element={
-                <ProtectedRoute requiredPermission="/purchases">
-                  <PurchaseDetail />
-                </ProtectedRoute>
-              } />
-              <Route path="/purchases/edit/:purchaseId" element={
-                <ProtectedRoute requiredPermission="/purchases">
-                  <EditPurchase />
-                </ProtectedRoute>
-              } />
-              <Route path="/purchase-returns" element={
-                <ProtectedRoute requiredPermission="/purchases">
-                  <PurchaseReturn />
-                </ProtectedRoute>
-              } />
-              <Route path="/purchases/return/:id" element={
-                <ProtectedRoute requiredPermission="/purchases">
-                  <PurchaseReturn isCreate={true} />
-                </ProtectedRoute>
-              } />
-              <Route path="/purchases/return/new" element={
-                <ProtectedRoute requiredPermission="/purchases">
-                  <PurchaseReturn isCreate={true} newReturn={true} />
-                </ProtectedRoute>
-              } />
-              <Route path="/purchase-returns/:id" element={
-                <ProtectedRoute requiredPermission="/purchases">
-                  <PurchaseReturn isView={true} />
-                </ProtectedRoute>
-              } />
-              
-              {/* Financial routes - require transaction permission */}
-              <Route path="/transactions" element={
-                <ProtectedRoute requiredPermission="/transactions">
-                  <Transactions />
-                </ProtectedRoute>
-              } />
-              <Route path="/ledger" element={
-                <ProtectedRoute requiredPermission="/ledger">
-                  <Ledger />
-                </ProtectedRoute>
-              } />
-              <Route path="/gst-returns" element={
-                <ProtectedRoute requiredPermission="/gst-returns">
-                  <GSTReturns />
-                </ProtectedRoute>
-              } />
-              
-              {/* Inventory routes - require lens inventory permission */}
-              <Route path="/lens-inventory" element={
-                <ProtectedRoute requiredPermission="/lens-inventory">
-                  <LensInventory />
-                </ProtectedRoute>
-              } />
-              <Route path="/lens-inventory/:id" element={
-                <ProtectedRoute requiredPermission="/lens-inventory">
-                  <LensDetail />
-                </ProtectedRoute>
-              } />
-              <Route path="/lens-inventory-report" element={
-                <ProtectedRoute requiredPermission="/lens-inventory">
-                  <LensInventoryReport />
-                </ProtectedRoute>
-              } />
-              <Route path="/reorder-dashboard" element={
-                <ProtectedRoute requiredPermission="/lens-inventory">
-                  <ReorderDashboard />
-                </ProtectedRoute>
-              } />
-              
-              {/* Settings route - require settings permission */}
-              <Route path="/settings" element={
-                <ProtectedRoute requiredPermission="/settings">
-                  <Settings />
-                </ProtectedRoute>
-              } />
-              
-              {/* Test print - admin only */}
-              <Route path="/test-print" element={
-                <ProtectedRoute requiredRoles={['superadmin', 'admin']}>
-                  <TestPrintPage />
-                </ProtectedRoute>
-              } />
-              
-              {/* User Management - super admin only */}
-              <Route path="/user-management" element={
-                <ProtectedRoute requiredRoles={['superadmin']}>
-                  <UserManagement />
-                </ProtectedRoute>
-              } />
-              
-              {/* System Analytics - super admin only */}
-              <Route path="/system-analytics" element={
-                <ProtectedRoute requiredRoles={['superadmin']}>
-                  <SystemAnalytics />
-                </ProtectedRoute>
-              } />
-              
-              {/* Marketplace route - open access for faster loading */}
-              <Route path="/marketplace" element={<MarketplaceLayout />} />
-              
-              {/* Flash Sale route - open access for faster loading */}
-              <Route path="/create-flash-sale" element={<MarketplaceLayout activeTab="create-flash-sale" />} />
-              
-              {/* Add Optical Product route - open access for faster loading */}
-              <Route path="/add-optical-product" element={<MarketplaceLayout activeTab="add-optical-product" />} />
-              
-              {/* Shop route - open access for faster loading */}
-              <Route path="/shop" element={<Shop />} />
-              
-              {/* Default routes */}
-              <Route path="/" element={<Navigate to="/orders" replace />} />
-              <Route path="*" element={<Navigate to="/orders" replace />} />
-            </Routes>
+            <Route path="/admin" element={
+              <ProtectedRoute requiredRoles={['superadmin']}>
+                <AdminPanel />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/orders" element={
+              <ProtectedRoute requiredPermission="/orders">
+                <Orders />
+              </ProtectedRoute>
+            } />
+            <Route path="/orders/new" element={
+              <ProtectedRoute requiredPermission="/orders">
+                <CreateOrder />
+              </ProtectedRoute>
+            } />
+            <Route path="/orders/:orderId" element={
+              <ProtectedRoute requiredPermission="/orders">
+                <OrderDetail />
+              </ProtectedRoute>
+            } />
+            <Route path="/orders/edit/:orderId" element={
+              <ProtectedRoute requiredPermission="/orders">
+                <EditOrder />
+              </ProtectedRoute>
+            } />
+            <Route path="/daily-dispatch-log" element={
+              <ProtectedRoute requiredPermission="/orders">
+                <DailyDispatchLog />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/customers" element={
+              <ProtectedRoute requiredPermission="/customers">
+                <Customers />
+              </ProtectedRoute>
+            } />
+            <Route path="/customers/new" element={
+              <ProtectedRoute requiredPermission="/customers">
+                <CreateCustomer />
+              </ProtectedRoute>
+            } />
+            <Route path="/add-vendor" element={
+              <ProtectedRoute requiredPermission="/customers">
+                <CreateCustomer isVendor={true} />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/sales" element={
+              <ProtectedRoute requiredPermission="/sales">
+                <Sales />
+              </ProtectedRoute>
+            } />
+            <Route path="/sales/new" element={<CreateSale />} />
+            <Route path="/sales/:saleId" element={
+              <ProtectedRoute requiredPermission="/sales">
+                <SaleDetail />
+              </ProtectedRoute>
+            } />
+            <Route path="/sales/edit/:saleId" element={
+              <ProtectedRoute requiredPermission="/sales">
+                <EditSale />
+              </ProtectedRoute>
+            } />
+            <Route path="/sales-returns" element={
+              <ProtectedRoute requiredPermission="/sales">
+                <SalesReturn />
+              </ProtectedRoute>
+            } />
+            <Route path="/sales-returns/new" element={
+              <ProtectedRoute requiredPermission="/sales">
+                <SalesReturn isCreate={true} newReturn={true} />
+              </ProtectedRoute>
+            } />
+            <Route path="/sales-returns/:id" element={
+              <ProtectedRoute requiredPermission="/sales">
+                <SalesReturn isView={true} />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/purchases" element={
+              <ProtectedRoute requiredPermission="/purchases">
+                <Purchases />
+              </ProtectedRoute>
+            } />
+            <Route path="/purchases/new" element={
+              <ProtectedRoute requiredPermission="/purchases">
+                <CreatePurchase />
+              </ProtectedRoute>
+            } />
+            <Route path="/purchases/:purchaseId" element={
+              <ProtectedRoute requiredPermission="/purchases">
+                <PurchaseDetail />
+              </ProtectedRoute>
+            } />
+            <Route path="/purchases/edit/:purchaseId" element={
+              <ProtectedRoute requiredPermission="/purchases">
+                <EditPurchase />
+              </ProtectedRoute>
+            } />
+            <Route path="/purchase-returns" element={
+              <ProtectedRoute requiredPermission="/purchases">
+                <PurchaseReturn />
+              </ProtectedRoute>
+            } />
+            <Route path="/purchase-returns/new" element={
+              <ProtectedRoute requiredPermission="/purchases">
+                <PurchaseReturn isCreate={true} newReturn={true} />
+              </ProtectedRoute>
+            } />
+            <Route path="/purchase-returns/:id" element={
+              <ProtectedRoute requiredPermission="/purchases">
+                <PurchaseReturn isView={true} />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/transactions" element={
+              <ProtectedRoute requiredPermission="/transactions">
+                <Transactions />
+              </ProtectedRoute>
+            } />
+            <Route path="/ledger" element={
+              <ProtectedRoute requiredPermission="/ledger">
+                <Ledger />
+              </ProtectedRoute>
+            } />
+            <Route path="/gst-returns" element={
+              <ProtectedRoute requiredPermission="/gst-returns">
+                <GSTReturns />
+              </ProtectedRoute>
+            } />
+            
+            {/* Lens inventory routes - treated exactly like other detail pages */}
+            <Route path="/lens-inventory" element={
+              <ProtectedRoute requiredPermission="/lens-inventory">
+                <LensInventory />
+              </ProtectedRoute>
+            } />
+            <Route path="/lens-inventory/:id" element={
+              <ProtectedRoute requiredPermission="/lens-inventory">
+                <LensDetail />
+              </ProtectedRoute>
+            } />
+            <Route path="/lens-inventory-report" element={
+              <ProtectedRoute requiredPermission="/lens-inventory">
+                <LensInventoryReport />
+              </ProtectedRoute>
+            } />
+            <Route path="/reorder-dashboard" element={
+              <ProtectedRoute requiredPermission="/lens-inventory">
+                <ReorderDashboard />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/item/:id" element={
+              <ProtectedRoute requiredPermission="/sales">
+                <ItemDetail />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/settings" element={
+              <ProtectedRoute requiredPermission="/settings">
+                <Settings />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/test-print" element={
+              <ProtectedRoute requiredRoles={['superadmin', 'admin']}>
+                <TestPrintPage />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/user-management" element={
+              <ProtectedRoute requiredRoles={['superadmin']}>
+                <UserManagement />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/system-analytics" element={
+              <ProtectedRoute requiredRoles={['superadmin']}>
+                <SystemAnalytics />
+              </ProtectedRoute>
+            } />
+            
+            {/* Marketplace routes */}
+            <Route path="/marketplace" element={<MarketplaceLayout />} />
+            <Route path="/create-flash-sale" element={<MarketplaceLayout activeTab="create-flash-sale" />} />
+            <Route path="/add-optical-product" element={<MarketplaceLayout activeTab="add-optical-product" />} />
+            <Route path="/shop" element={<Shop />} />
+            
+            {/* Default routes */}
+            <Route path="/" element={<Navigate to="/orders" replace />} />
+            <Route path="*" element={<Navigate to="/orders" replace />} />
+                      </Routes>
           </Router>
-          
-          {/* Global Calculator - accessible from anywhere with 'T' key */}
-          <GlobalCalculator 
-            isOpen={calculatorOpen} 
-            onClose={() => setCalculatorOpen(false)} 
-          />
-        </ThemeProvider>
-      </AuthProvider>
+        </AuthProvider>
     </div>
   );
 }
 
-// Universal Keyboard Handler Component - Now using priority-based system
-const UniversalKeyboardHandler = () => {
+// Component to handle universal keyboard shortcuts
+const UniversalShortcuts = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
-    // Register global navigation shortcuts with normal priority
+    // Register global navigation shortcuts
     const globalShortcuts = [
-      ['t', () => window.dispatchEvent(new CustomEvent('openCalculator')), 'Open calculator'],
-      ['x', () => navigate('/dashboard'), 'Go to dashboard'],
+      ['l', () => navigate('/sales'), 'Go to sales'],
       ['h', () => navigate('/orders'), 'Go to orders'],
       ['u', () => navigate('/customers'), 'Go to customers'],
-      ['l', () => navigate('/sales'), 'Go to sales'],
       ['e', () => navigate('/purchases'), 'Go to purchases'],
-      ['n', () => {
-        // Check if success modals are open before navigating
-        if (window.__successModalOpen || window.__editSuccessModalOpen) {
-          return; // Skip navigation if modal is open
-        }
-        navigate('/transactions');
-      }, 'Go to transactions'],
+      ['n', () => navigate('/transactions'), 'Go to transactions'],
       ['g', () => navigate('/ledger'), 'Go to ledger'],
       ['q', () => navigate('/gst-returns'), 'Go to GST returns'],
       ['v', () => navigate('/lens-inventory'), 'Go to lens inventory'],
       ['r', () => navigate('/reorder-dashboard'), 'Go to reorder dashboard'],
       ['z', () => navigate('/settings'), 'Go to settings'],
+      ['x', () => navigate('/dashboard'), 'Go to dashboard'],
       ['escape', () => {
-        // Smart back navigation as fallback when no high-priority ESC handlers are active
-        window.history.back();
+        // Don't navigate back on marketplace pages
+        const marketplacePaths = ['/marketplace', '/create-flash-sale', '/add-optical-product', '/shop'];
+        if (!marketplacePaths.includes(location.pathname)) {
+          window.history.back();
+        }
       }, 'Navigate back']
     ];
 
     const shortcutIds = ShortcutUtils.registerGlobalShortcuts(globalShortcuts);
 
     return () => {
-      // Cleanup shortcuts
       shortcutIds.forEach(id => keyboardManager.unregister(id));
     };
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   return null; // This component doesn't render anything
 };

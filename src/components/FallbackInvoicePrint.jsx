@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { getUserDoc, getUserCollection } from '../utils/multiTenancy';
+import { useShortcutContext, useKeyboardShortcut } from '../utils/keyboardShortcuts';
 
 const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
   const [saleData, setSaleData] = useState(null);
@@ -91,41 +92,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
     }
   };
 
-  // Add keyboard shortcuts
-  useEffect(() => {
-    const handleKeyPress = (event) => {
-      // Only handle if not typing in input fields
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)) {
-        return;
-      }
 
-      switch (event.key.toLowerCase()) {
-        case 'p':
-          event.preventDefault();
-          if (!printing && !loading) {
-            handlePrint();
-          }
-          break;
-        case 'd':
-          event.preventDefault();
-          if (!loading) {
-            handleDirectDownload();
-          }
-          break;
-        case 'escape':
-          event.preventDefault();
-          if (onClose) {
-            onClose();
-          }
-          break;
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyPress);
-    return () => {
-      document.removeEventListener('keydown', handleKeyPress);
-    };
-  }, [printing, loading, onClose]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -296,7 +263,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
   }, [saleId, onClose, autoPrint]);
 
   // Add print handler function
-  const handlePrint = () => {
+  const handlePrint = useCallback(() => {
     if (printing) {
       return;
     }
@@ -455,10 +422,10 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
       }
       setPrinting(false);
     }
-  };
+  }, [printing, saleData, onClose]);
 
   // Add direct PDF download function
-  const handleDirectDownload = async () => {
+  const handleDirectDownload = useCallback(async () => {
     if (!saleData) {
       alert("Please wait for the invoice data to load completely.");
       return;
@@ -522,9 +489,41 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
               // Error creating download
       alert('Error preparing download. Please try the regular print option.');
     }
-  };
+  }, [saleData, onClose]);
 
+  // Set up component context for keyboard shortcuts
+  useShortcutContext('invoice-print');
 
+  // Register keyboard shortcuts using the proper system
+  useKeyboardShortcut('p', () => {
+    if (!printing && !loading) {
+      handlePrint();
+    }
+  }, {
+    priority: 'high',
+    context: 'invoice-print',
+    description: 'Print invoice'
+  });
+
+  useKeyboardShortcut('d', () => {
+    if (!loading) {
+      handleDirectDownload();
+    }
+  }, {
+    priority: 'high',
+    context: 'invoice-print',
+    description: 'Download invoice'
+  });
+
+  useKeyboardShortcut('escape', () => {
+    if (onClose) {
+      onClose();
+    }
+  }, {
+    priority: 'high',
+    context: 'invoice-print',
+    description: 'Close invoice'
+  });
 
   // Format currency
   const formatCurrency = (amount) => {

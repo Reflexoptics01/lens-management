@@ -46,7 +46,7 @@ const DailyDispatchLog = () => {
   
   // Form state
   const [dispatchRows, setDispatchRows] = useState(
-    Array(5).fill().map((_, index) => ({
+    Array(10).fill().map((_, index) => ({
       id: index + 1,
       slNo: index + 1,
       itemName: '',
@@ -368,7 +368,7 @@ const DailyDispatchLog = () => {
   };
 
   const addRow = () => {
-    const newRows = Array(5).fill().map((_, i) => ({
+    const newRows = Array(10).fill().map((_, i) => ({
       id: dispatchRows.length + i + 1,
       slNo: dispatchRows.length + i + 1,
       itemName: '',
@@ -394,7 +394,7 @@ const DailyDispatchLog = () => {
   };
 
   const resetForm = () => {
-    setDispatchRows(Array(5).fill().map((_, index) => ({
+    setDispatchRows(Array(10).fill().map((_, index) => ({
       id: index + 1,
       slNo: index + 1,
       itemName: '',
@@ -431,8 +431,8 @@ const DailyDispatchLog = () => {
           qty: item.qty || 1
         }));
         
-        // Ensure minimum 5 rows
-        while (editRows.length < 5) {
+        // Ensure minimum 10 rows
+        while (editRows.length < 10) {
           editRows.push({
             id: editRows.length + 1,
             slNo: editRows.length + 1,
@@ -676,7 +676,7 @@ const DailyDispatchLog = () => {
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                   </svg>
-                  Add 5 Rows
+                  Add 10 Rows
                 </button>
               </div>
 

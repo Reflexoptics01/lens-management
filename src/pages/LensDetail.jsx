@@ -294,6 +294,312 @@ const LensDetail = () => {
     }
   };
 
+  // New function for stock availability chart PDF
+  const exportStockAvailabilityChart = (lens) => {
+    try {
+      if (!lens.powerInventory || Object.keys(lens.powerInventory).length === 0) {
+        alert('No power inventory data available for chart generation.');
+        return;
+      }
+
+      // Process power inventory data
+      const powers = Object.entries(lens.powerInventory || {});
+      const processedPowers = powers.map(([powerKey, powerData]) => {
+        const parts = powerKey.split('_');
+        const quantity = parseInt(powerData?.quantity) || 0;
+        const isAvailable = quantity > 0;
+        
+        if (parts.length >= 3) {
+          // Bifocal format: "sph_cyl_addition"
+          const [sph, cyl, addition] = parts.map(p => parseFloat(p));
+          return {
+            sph,
+            cyl,
+            addition,
+            axis: powerData?.axis || lens.axis || 0,
+            isAvailable,
+            type: 'bifocal'
+          };
+        } else {
+          // Single vision format: "sph_cyl"
+          const [sph, cyl] = parts.map(p => parseFloat(p));
+          return {
+            sph,
+            cyl,
+            axis: powerData?.axis || lens.axis || 0,
+            isAvailable,
+            type: 'single'
+          };
+        }
+      });
+
+      // Create PDF document
+      const doc = new jsPDF('landscape', 'pt', 'a4');
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      
+      // Title and header
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      const title = `${lens.brandName || 'Lens'} - Stock Availability Chart`;
+      const titleWidth = doc.getTextWidth(title);
+      doc.text(title, (pageWidth - titleWidth) / 2, 40);
+      
+      // Subtitle
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      const now = new Date();
+      const subtitle = `Generated on: ${now.toLocaleDateString()} at ${now.toLocaleTimeString()}`;
+      const subtitleWidth = doc.getTextWidth(subtitle);
+      doc.text(subtitle, (pageWidth - subtitleWidth) / 2, 60);
+
+             // Lens type info
+       const lensTypeInfo = `Lens Type: ${lens.lensType === 'bifocal' ? 'Bifocal/Progressive' : 'Single Vision'} | Total Powers: ${processedPowers.length}`;
+       const lensTypeWidth = doc.getTextWidth(lensTypeInfo);
+       doc.text(lensTypeInfo, (pageWidth - lensTypeWidth) / 2, 80);
+       
+       // Add some spacing
+       const axisInfo = `X-Axis: ${lens.lensType === 'bifocal' ? 'Addition Power' : 'Cylindrical Power'} | Y-Axis: Spherical Power`;
+       const axisInfoWidth = doc.getTextWidth(axisInfo);
+       doc.text(axisInfo, (pageWidth - axisInfoWidth) / 2, 100);
+
+             // Chart area setup
+       const chartStartY = 140;
+       const chartWidth = pageWidth - 160;
+       const chartHeight = pageHeight - 220;
+       const marginLeft = 80;
+       const marginBottom = 60;
+
+      if (lens.lensType === 'bifocal') {
+        // For bifocal: X-axis = ADD, Y-axis = SPH (with CYL info)
+        const addValues = [...new Set(processedPowers.filter(p => p.type === 'bifocal').map(p => p.addition))].sort((a, b) => a - b);
+        const sphValues = [...new Set(processedPowers.map(p => p.sph))].sort((a, b) => a - b);
+        
+        if (addValues.length === 0 || sphValues.length === 0) {
+          throw new Error('Insufficient bifocal power data for chart generation');
+        }
+
+        // Sort values with 0 first, then ascending order
+        const sortPowerValues = (values) => {
+          const hasZero = values.includes(0);
+          const negatives = values.filter(v => v < 0).sort((a, b) => b - a); // Descending for negatives (0, -0.25, -0.5...)
+          const positives = values.filter(v => v > 0).sort((a, b) => a - b); // Ascending for positives (0, 0.25, 0.5...)
+          
+          if (hasZero) {
+            return [0, ...negatives, ...positives];
+          } else {
+            return [...negatives, ...positives];
+          }
+        };
+
+        // Addition values are typically positive, so sort them normally (smallest to largest)
+        const sortedAddValues = [...addValues].sort((a, b) => a - b);
+        const sortedSphValues = sortPowerValues(sphValues);
+
+        // Calculate cell dimensions
+        const cellWidth = chartWidth / sortedAddValues.length;
+        const cellHeight = chartHeight / sortedSphValues.length;
+
+        // Draw X-axis labels (ADD values) at the TOP
+        doc.setFontSize(9);
+        doc.setTextColor(0, 0, 0);
+        sortedAddValues.forEach((add, index) => {
+          const x = marginLeft + (index * cellWidth) + cellWidth / 2;
+          const label = `+${add}`;
+          const labelWidth = doc.getTextWidth(label);
+          doc.text(label, x - labelWidth / 2, chartStartY - 10);
+        });
+
+        // Draw grid and fill cells
+        sortedSphValues.forEach((sph, sphIndex) => {
+          sortedAddValues.forEach((add, addIndex) => {
+            const x = marginLeft + (addIndex * cellWidth);
+            const y = chartStartY + (sphIndex * cellHeight);
+            
+            // Find if this combination exists and is available
+            const powerCombo = processedPowers.find(p => 
+              p.type === 'bifocal' && p.sph === sph && p.addition === add
+            );
+            
+            // Color coding: Green for available, Red for not available, Gray for not in range
+            let fillColor;
+            if (powerCombo) {
+              fillColor = powerCombo.isAvailable ? [144, 238, 144] : [255, 182, 193]; // Light green or light red
+            } else {
+              fillColor = [220, 220, 220]; // Light gray for not in range
+            }
+            
+            // Fill cell
+            doc.setFillColor(fillColor[0], fillColor[1], fillColor[2]);
+            doc.rect(x, y, cellWidth, cellHeight, 'F');
+            
+            // Draw border
+            doc.setDrawColor(100, 100, 100);
+            doc.setLineWidth(0.5);
+            doc.rect(x, y, cellWidth, cellHeight, 'S');
+            
+            // Add text if cell is large enough
+            if (cellWidth > 30 && cellHeight > 15) {
+              doc.setFontSize(8);
+              doc.setTextColor(0, 0, 0);
+              const statusText = powerCombo ? (powerCombo.isAvailable ? '✓' : '✗') : '-';
+              const textWidth = doc.getTextWidth(statusText);
+              doc.text(statusText, x + (cellWidth - textWidth) / 2, y + cellHeight / 2 + 3);
+            }
+          });
+        });
+
+        // Draw Y-axis labels (SPH values) on the LEFT
+        doc.setFontSize(9);
+        doc.setTextColor(0, 0, 0);
+        sortedSphValues.forEach((sph, index) => {
+          const y = chartStartY + (index * cellHeight) + cellHeight / 2;
+          const label = sph === 0 ? '0' : sph > 0 ? `+${sph}` : `${sph}`;
+          doc.text(label, marginLeft - 40, y + 3);
+        });
+
+        // Axis titles removed since they're already mentioned in header
+
+      } else {
+        // For single vision: X-axis = CYL, Y-axis = SPH
+        const cylValues = [...new Set(processedPowers.map(p => p.cyl))].sort((a, b) => a - b);
+        const sphValues = [...new Set(processedPowers.map(p => p.sph))].sort((a, b) => a - b);
+        
+        if (cylValues.length === 0 || sphValues.length === 0) {
+          throw new Error('Insufficient power data for chart generation');
+        }
+
+        // Sort values with 0 first, then ascending order
+        const sortPowerValues = (values) => {
+          const hasZero = values.includes(0);
+          const negatives = values.filter(v => v < 0).sort((a, b) => b - a); // Descending for negatives (0, -0.25, -0.5...)
+          const positives = values.filter(v => v > 0).sort((a, b) => a - b); // Ascending for positives (0, 0.25, 0.5...)
+          
+          if (hasZero) {
+            return [0, ...negatives, ...positives];
+          } else {
+            return [...negatives, ...positives];
+          }
+        };
+
+        const sortedCylValues = sortPowerValues(cylValues);
+        const sortedSphValues = sortPowerValues(sphValues);
+
+        // Calculate cell dimensions
+        const cellWidth = chartWidth / sortedCylValues.length;
+        const cellHeight = chartHeight / sortedSphValues.length;
+
+        // Draw X-axis labels (CYL values) at the TOP
+        doc.setFontSize(9);
+        doc.setTextColor(0, 0, 0);
+        sortedCylValues.forEach((cyl, index) => {
+          const x = marginLeft + (index * cellWidth) + cellWidth / 2;
+          const label = cyl === 0 ? '0' : cyl > 0 ? `+${cyl}` : `${cyl}`;
+          const labelWidth = doc.getTextWidth(label);
+          doc.text(label, x - labelWidth / 2, chartStartY - 10);
+        });
+
+        // Draw grid and fill cells
+        sortedSphValues.forEach((sph, sphIndex) => {
+          sortedCylValues.forEach((cyl, cylIndex) => {
+            const x = marginLeft + (cylIndex * cellWidth);
+            const y = chartStartY + (sphIndex * cellHeight);
+            
+            // Find if this combination exists and is available
+            const powerCombo = processedPowers.find(p => 
+              p.type === 'single' && p.sph === sph && p.cyl === cyl
+            );
+            
+            // Color coding: Green for available, Red for not available, Gray for not in range
+            let fillColor;
+            if (powerCombo) {
+              fillColor = powerCombo.isAvailable ? [144, 238, 144] : [255, 182, 193]; // Light green or light red
+            } else {
+              fillColor = [220, 220, 220]; // Light gray for not in range
+            }
+            
+            // Fill cell
+            doc.setFillColor(fillColor[0], fillColor[1], fillColor[2]);
+            doc.rect(x, y, cellWidth, cellHeight, 'F');
+            
+            // Draw border
+            doc.setDrawColor(100, 100, 100);
+            doc.setLineWidth(0.5);
+            doc.rect(x, y, cellWidth, cellHeight, 'S');
+            
+            // Add text if cell is large enough
+            if (cellWidth > 30 && cellHeight > 15) {
+              doc.setFontSize(8);
+              doc.setTextColor(0, 0, 0);
+              const statusText = powerCombo ? (powerCombo.isAvailable ? '✓' : '✗') : '-';
+              const textWidth = doc.getTextWidth(statusText);
+              doc.text(statusText, x + (cellWidth - textWidth) / 2, y + cellHeight / 2 + 3);
+            }
+          });
+        });
+
+        // Draw Y-axis labels (SPH values) on the LEFT
+        doc.setFontSize(9);
+        doc.setTextColor(0, 0, 0);
+        sortedSphValues.forEach((sph, index) => {
+          const y = chartStartY + (index * cellHeight) + cellHeight / 2;
+          const label = sph === 0 ? '0' : sph > 0 ? `+${sph}` : `${sph}`;
+          doc.text(label, marginLeft - 40, y + 3);
+        });
+
+        // Axis titles removed since they're already mentioned in header
+      }
+
+      // Legend
+      const legendY = pageHeight - 40;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Legend:', marginLeft, legendY);
+      
+      // Available box
+      doc.setFillColor(144, 238, 144);
+      doc.rect(marginLeft + 50, legendY - 10, 15, 10, 'F');
+      doc.setDrawColor(0, 0, 0);
+      doc.rect(marginLeft + 50, legendY - 10, 15, 10, 'S');
+      doc.setFont('helvetica', 'normal');
+      doc.text('Available', marginLeft + 70, legendY - 2);
+      
+      // Not available box
+      doc.setFillColor(255, 182, 193);
+      doc.rect(marginLeft + 150, legendY - 10, 15, 10, 'F');
+      doc.rect(marginLeft + 150, legendY - 10, 15, 10, 'S');
+      doc.text('Not Available', marginLeft + 170, legendY - 2);
+      
+      // Not in range box
+      doc.setFillColor(220, 220, 220);
+      doc.rect(marginLeft + 270, legendY - 10, 15, 10, 'F');
+      doc.rect(marginLeft + 270, legendY - 10, 15, 10, 'S');
+      doc.text('Not in Range', marginLeft + 290, legendY - 2);
+
+      // Statistics
+      const availableCount = processedPowers.filter(p => p.isAvailable).length;
+      const totalCount = processedPowers.length;
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Available Powers: ${availableCount}/${totalCount} (${((availableCount/totalCount)*100).toFixed(1)}%)`, marginLeft + 400, legendY - 2);
+
+      // Generate filename
+      const now_filename = new Date();
+      const dateStr = now_filename.toISOString().split('T')[0];
+      const lensTypeStr = lens.lensType === 'bifocal' ? 'Bifocal' : 'SingleVision';
+      const filename = `${lens.brandName || 'Lens'}_StockAvailability_${lensTypeStr}_${dateStr}.pdf`;
+
+      // Save PDF
+      doc.save(filename);
+
+      // Show success message
+      alert(`Stock availability chart exported successfully!\nFile: ${filename}\nChart Type: ${lens.lensType === 'bifocal' ? 'Bifocal (ADD vs SPH)' : 'Single Vision (CYL vs SPH)'}\nTotal Powers: ${totalCount}, Available: ${availableCount}`);
+
+    } catch (error) {
+      console.error('Error generating stock availability chart:', error);
+      alert(`Failed to generate stock availability chart: ${error.message}`);
+    }
+  };
+
   useEffect(() => {
     fetchLensDetails();
   }, [id]);
@@ -909,8 +1215,8 @@ const LensDetail = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </button>
-              <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
-                <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-2">Keyboard Shortcuts</h4>
+              <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-2">Keyboard Shortcuts & Export Options</h4>
                 <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
                   <div className="flex justify-between">
                     <span>Focus search:</span>
@@ -943,6 +1249,12 @@ const LensDetail = () => {
                   <div className="flex justify-between">
                     <span>Toggle sort:</span>
                     <kbd className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">S</kbd>
+                  </div>
+                  <div className="border-t border-gray-200 dark:border-gray-600 pt-2 mt-2">
+                    <div className="font-medium text-gray-700 dark:text-gray-300 mb-1">Export Options:</div>
+                    <div className="text-xs">• Excel: Detailed inventory data</div>
+                    <div className="text-xs">• PDF: Formatted inventory report</div>
+                    <div className="text-xs">• Chart: Visual availability grid for customers</div>
                   </div>
                 </div>
               </div>
@@ -1726,7 +2038,7 @@ const LensDetail = () => {
                           Power Inventory Management
                         </h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                          Filter and export your lens inventory data for orders and reports
+                          Filter and export your lens inventory data for orders and reports. Use the Chart export to create visual availability grids for customers.
                         </p>
                       </div>
                       
@@ -1908,6 +2220,16 @@ const LensDetail = () => {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                             </svg>
                             PDF
+                          </button>
+                          <button
+                            onClick={() => exportStockAvailabilityChart(lens)}
+                            className="flex items-center px-3 py-1 text-xs bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors"
+                            title="Export stock availability chart for customers"
+                          >
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            Chart
                           </button>
                         </div>
                       </div>

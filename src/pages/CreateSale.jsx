@@ -49,7 +49,7 @@ const CreateSale = () => {
   const [amountPaid, setAmountPaid] = useState(0);
   
   // Table rows (invoice items)
-  const [tableRows, setTableRows] = useState(Array(5).fill().map(() => ({
+  const [tableRows, setTableRows] = useState(Array(10).fill().map(() => ({
     orderId: '',
     orderDetails: null,
     itemName: '',
@@ -65,7 +65,7 @@ const CreateSale = () => {
 
   // UI state for table rows
   const [showAllRows, setShowAllRows] = useState(false);
-  const [displayRowCount, setDisplayRowCount] = useState(5);
+  const [displayRowCount, setDisplayRowCount] = useState(10);
   
   // Add more rows
   const addMoreRows = (count = 10) => {
@@ -1528,7 +1528,7 @@ const CreateSale = () => {
     setNotes('');
     setPaymentStatus('UNPAID');
     setAmountPaid(0);
-    setTableRows(Array(5).fill().map(() => ({
+    setTableRows(Array(10).fill().map(() => ({
       orderId: '',
       orderDetails: null,
       itemName: '',

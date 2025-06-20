@@ -4,7 +4,6 @@ import './index.css'
 import './styles/global.css'
 import App from './App.jsx'
 import ErrorBoundary from './components/ErrorBoundary'
-import { ThemeProvider } from './contexts/ThemeContext.jsx'
 
 // Clean up service workers only in development to prevent conflicts
 if (import.meta.env.DEV && 'serviceWorker' in navigator) {
@@ -19,9 +18,7 @@ if (import.meta.env.DEV && 'serviceWorker' in navigator) {
 const root = ReactDOM.createRoot(document.getElementById('root'));
 
 root.render(
-  <React.StrictMode>
-      <ErrorBoundary>
-        <App />
-      </ErrorBoundary>
-  </React.StrictMode>
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
 )
