@@ -41,6 +41,7 @@ import SystemAnalytics from './pages/SystemAnalytics';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import keyboardManager, { ShortcutUtils } from './utils/keyboardShortcuts';
+import { ThemeProvider } from './contexts/ThemeContext';
 import './App.css';
 
 function App() {
@@ -67,218 +68,220 @@ function App() {
         }}
       />
       
-      <AuthProvider>
-        <Router>
-          <UniversalShortcuts />
-          <Routes>
-            {/* Public routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            
-            {/* Protected routes */}
-            <Route path="/dashboard" element={
-              <ProtectedRoute requireAuth={true}>
-                <Dashboard />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/admin" element={
-              <ProtectedRoute requiredRoles={['superadmin']}>
-                <AdminPanel />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/orders" element={
-              <ProtectedRoute requiredPermission="/orders">
-                <Orders />
-              </ProtectedRoute>
-            } />
-            <Route path="/orders/new" element={
-              <ProtectedRoute requiredPermission="/orders">
-                <CreateOrder />
-              </ProtectedRoute>
-            } />
-            <Route path="/orders/:orderId" element={
-              <ProtectedRoute requiredPermission="/orders">
-                <OrderDetail />
-              </ProtectedRoute>
-            } />
-            <Route path="/orders/edit/:orderId" element={
-              <ProtectedRoute requiredPermission="/orders">
-                <EditOrder />
-              </ProtectedRoute>
-            } />
-            <Route path="/daily-dispatch-log" element={
-              <ProtectedRoute requiredPermission="/orders">
-                <DailyDispatchLog />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/customers" element={
-              <ProtectedRoute requiredPermission="/customers">
-                <Customers />
-              </ProtectedRoute>
-            } />
-            <Route path="/customers/new" element={
-              <ProtectedRoute requiredPermission="/customers">
-                <CreateCustomer />
-              </ProtectedRoute>
-            } />
-            <Route path="/add-vendor" element={
-              <ProtectedRoute requiredPermission="/customers">
-                <CreateCustomer isVendor={true} />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/sales" element={
-              <ProtectedRoute requiredPermission="/sales">
-                <Sales />
-              </ProtectedRoute>
-            } />
-            <Route path="/sales/new" element={<CreateSale />} />
-            <Route path="/sales/:saleId" element={
-              <ProtectedRoute requiredPermission="/sales">
-                <SaleDetail />
-              </ProtectedRoute>
-            } />
-            <Route path="/sales/edit/:saleId" element={
-              <ProtectedRoute requiredPermission="/sales">
-                <EditSale />
-              </ProtectedRoute>
-            } />
-            <Route path="/sales-returns" element={
-              <ProtectedRoute requiredPermission="/sales">
-                <SalesReturn />
-              </ProtectedRoute>
-            } />
-            <Route path="/sales-returns/new" element={
-              <ProtectedRoute requiredPermission="/sales">
-                <SalesReturn isCreate={true} newReturn={true} />
-              </ProtectedRoute>
-            } />
-            <Route path="/sales-returns/:id" element={
-              <ProtectedRoute requiredPermission="/sales">
-                <SalesReturn isView={true} />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/purchases" element={
-              <ProtectedRoute requiredPermission="/purchases">
-                <Purchases />
-              </ProtectedRoute>
-            } />
-            <Route path="/purchases/new" element={
-              <ProtectedRoute requiredPermission="/purchases">
-                <CreatePurchase />
-              </ProtectedRoute>
-            } />
-            <Route path="/purchases/:purchaseId" element={
-              <ProtectedRoute requiredPermission="/purchases">
-                <PurchaseDetail />
-              </ProtectedRoute>
-            } />
-            <Route path="/purchases/edit/:purchaseId" element={
-              <ProtectedRoute requiredPermission="/purchases">
-                <EditPurchase />
-              </ProtectedRoute>
-            } />
-            <Route path="/purchase-returns" element={
-              <ProtectedRoute requiredPermission="/purchases">
-                <PurchaseReturn />
-              </ProtectedRoute>
-            } />
-            <Route path="/purchase-returns/new" element={
-              <ProtectedRoute requiredPermission="/purchases">
-                <PurchaseReturn isCreate={true} newReturn={true} />
-              </ProtectedRoute>
-            } />
-            <Route path="/purchase-returns/:id" element={
-              <ProtectedRoute requiredPermission="/purchases">
-                <PurchaseReturn isView={true} />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/transactions" element={
-              <ProtectedRoute requiredPermission="/transactions">
-                <Transactions />
-              </ProtectedRoute>
-            } />
-            <Route path="/ledger" element={
-              <ProtectedRoute requiredPermission="/ledger">
-                <Ledger />
-              </ProtectedRoute>
-            } />
-            <Route path="/gst-returns" element={
-              <ProtectedRoute requiredPermission="/gst-returns">
-                <GSTReturns />
-              </ProtectedRoute>
-            } />
-            
-            {/* Lens inventory routes - treated exactly like other detail pages */}
-            <Route path="/lens-inventory" element={
-              <ProtectedRoute requiredPermission="/lens-inventory">
-                <LensInventory />
-              </ProtectedRoute>
-            } />
-            <Route path="/lens-inventory/:id" element={
-              <ProtectedRoute requiredPermission="/lens-inventory">
-                <LensDetail />
-              </ProtectedRoute>
-            } />
-            <Route path="/lens-inventory-report" element={
-              <ProtectedRoute requiredPermission="/lens-inventory">
-                <LensInventoryReport />
-              </ProtectedRoute>
-            } />
-            <Route path="/reorder-dashboard" element={
-              <ProtectedRoute requiredPermission="/lens-inventory">
-                <ReorderDashboard />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/item/:id" element={
-              <ProtectedRoute requiredPermission="/sales">
-                <ItemDetail />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/settings" element={
-              <ProtectedRoute requiredPermission="/settings">
-                <Settings />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/test-print" element={
-              <ProtectedRoute requiredRoles={['superadmin', 'admin']}>
-                <TestPrintPage />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/user-management" element={
-              <ProtectedRoute requiredRoles={['superadmin']}>
-                <UserManagement />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/system-analytics" element={
-              <ProtectedRoute requiredRoles={['superadmin']}>
-                <SystemAnalytics />
-              </ProtectedRoute>
-            } />
-            
-            {/* Marketplace routes */}
-            <Route path="/marketplace" element={<MarketplaceLayout />} />
-            <Route path="/create-flash-sale" element={<MarketplaceLayout activeTab="create-flash-sale" />} />
-            <Route path="/add-optical-product" element={<MarketplaceLayout activeTab="add-optical-product" />} />
-            <Route path="/shop" element={<Shop />} />
-            
-            {/* Default routes */}
-            <Route path="/" element={<Navigate to="/orders" replace />} />
-            <Route path="*" element={<Navigate to="/orders" replace />} />
-                      </Routes>
+      <ThemeProvider>
+        <AuthProvider>
+          <Router>
+            <UniversalShortcuts />
+            <Routes>
+              {/* Public routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              
+              {/* Protected routes */}
+              <Route path="/dashboard" element={
+                <ProtectedRoute requireAuth={true}>
+                  <Dashboard />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/admin" element={
+                <ProtectedRoute requiredRoles={['superadmin']}>
+                  <AdminPanel />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/orders" element={
+                <ProtectedRoute requiredPermission="/orders">
+                  <Orders />
+                </ProtectedRoute>
+              } />
+              <Route path="/orders/new" element={
+                <ProtectedRoute requiredPermission="/orders">
+                  <CreateOrder />
+                </ProtectedRoute>
+              } />
+              <Route path="/orders/:orderId" element={
+                <ProtectedRoute requiredPermission="/orders">
+                  <OrderDetail />
+                </ProtectedRoute>
+              } />
+              <Route path="/orders/edit/:orderId" element={
+                <ProtectedRoute requiredPermission="/orders">
+                  <EditOrder />
+                </ProtectedRoute>
+              } />
+              <Route path="/daily-dispatch-log" element={
+                <ProtectedRoute requiredPermission="/orders">
+                  <DailyDispatchLog />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/customers" element={
+                <ProtectedRoute requiredPermission="/customers">
+                  <Customers />
+                </ProtectedRoute>
+              } />
+              <Route path="/customers/new" element={
+                <ProtectedRoute requiredPermission="/customers">
+                  <CreateCustomer />
+                </ProtectedRoute>
+              } />
+              <Route path="/add-vendor" element={
+                <ProtectedRoute requiredPermission="/customers">
+                  <CreateCustomer isVendor={true} />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/sales" element={
+                <ProtectedRoute requiredPermission="/sales">
+                  <Sales />
+                </ProtectedRoute>
+              } />
+              <Route path="/sales/new" element={<CreateSale />} />
+              <Route path="/sales/:saleId" element={
+                <ProtectedRoute requiredPermission="/sales">
+                  <SaleDetail />
+                </ProtectedRoute>
+              } />
+              <Route path="/sales/edit/:saleId" element={
+                <ProtectedRoute requiredPermission="/sales">
+                  <EditSale />
+                </ProtectedRoute>
+              } />
+              <Route path="/sales-returns" element={
+                <ProtectedRoute requiredPermission="/sales">
+                  <SalesReturn />
+                </ProtectedRoute>
+              } />
+              <Route path="/sales-returns/new" element={
+                <ProtectedRoute requiredPermission="/sales">
+                  <SalesReturn isCreate={true} newReturn={true} />
+                </ProtectedRoute>
+              } />
+              <Route path="/sales-returns/:id" element={
+                <ProtectedRoute requiredPermission="/sales">
+                  <SalesReturn isView={true} />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/purchases" element={
+                <ProtectedRoute requiredPermission="/purchases">
+                  <Purchases />
+                </ProtectedRoute>
+              } />
+              <Route path="/purchases/new" element={
+                <ProtectedRoute requiredPermission="/purchases">
+                  <CreatePurchase />
+                </ProtectedRoute>
+              } />
+              <Route path="/purchases/:purchaseId" element={
+                <ProtectedRoute requiredPermission="/purchases">
+                  <PurchaseDetail />
+                </ProtectedRoute>
+              } />
+              <Route path="/purchases/edit/:purchaseId" element={
+                <ProtectedRoute requiredPermission="/purchases">
+                  <EditPurchase />
+                </ProtectedRoute>
+              } />
+              <Route path="/purchase-returns" element={
+                <ProtectedRoute requiredPermission="/purchases">
+                  <PurchaseReturn />
+                </ProtectedRoute>
+              } />
+              <Route path="/purchase-returns/new" element={
+                <ProtectedRoute requiredPermission="/purchases">
+                  <PurchaseReturn isCreate={true} newReturn={true} />
+                </ProtectedRoute>
+              } />
+              <Route path="/purchase-returns/:id" element={
+                <ProtectedRoute requiredPermission="/purchases">
+                  <PurchaseReturn isView={true} />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/transactions" element={
+                <ProtectedRoute requiredPermission="/transactions">
+                  <Transactions />
+                </ProtectedRoute>
+              } />
+              <Route path="/ledger" element={
+                <ProtectedRoute requiredPermission="/ledger">
+                  <Ledger />
+                </ProtectedRoute>
+              } />
+              <Route path="/gst-returns" element={
+                <ProtectedRoute requiredPermission="/gst-returns">
+                  <GSTReturns />
+                </ProtectedRoute>
+              } />
+              
+              {/* Lens inventory routes - treated exactly like other detail pages */}
+              <Route path="/lens-inventory" element={
+                <ProtectedRoute requiredPermission="/lens-inventory">
+                  <LensInventory />
+                </ProtectedRoute>
+              } />
+              <Route path="/lens-inventory/:id" element={
+                <ProtectedRoute requiredPermission="/lens-inventory">
+                  <LensDetail />
+                </ProtectedRoute>
+              } />
+              <Route path="/lens-inventory-report" element={
+                <ProtectedRoute requiredPermission="/lens-inventory">
+                  <LensInventoryReport />
+                </ProtectedRoute>
+              } />
+              <Route path="/reorder-dashboard" element={
+                <ProtectedRoute requiredPermission="/lens-inventory">
+                  <ReorderDashboard />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/item/:id" element={
+                <ProtectedRoute requiredPermission="/sales">
+                  <ItemDetail />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/settings" element={
+                <ProtectedRoute requiredPermission="/settings">
+                  <Settings />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/test-print" element={
+                <ProtectedRoute requiredRoles={['superadmin', 'admin']}>
+                  <TestPrintPage />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/user-management" element={
+                <ProtectedRoute requiredRoles={['superadmin']}>
+                  <UserManagement />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/system-analytics" element={
+                <ProtectedRoute requiredRoles={['superadmin']}>
+                  <SystemAnalytics />
+                </ProtectedRoute>
+              } />
+              
+              {/* Marketplace routes */}
+              <Route path="/marketplace" element={<MarketplaceLayout />} />
+              <Route path="/create-flash-sale" element={<MarketplaceLayout activeTab="create-flash-sale" />} />
+              <Route path="/add-optical-product" element={<MarketplaceLayout activeTab="add-optical-product" />} />
+              <Route path="/shop" element={<Shop />} />
+              
+              {/* Default routes */}
+              <Route path="/" element={<Navigate to="/orders" replace />} />
+              <Route path="*" element={<Navigate to="/orders" replace />} />
+            </Routes>
           </Router>
         </AuthProvider>
+      </ThemeProvider>
     </div>
   );
 }

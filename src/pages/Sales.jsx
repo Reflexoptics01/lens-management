@@ -188,16 +188,16 @@ const Sales = () => {
           if (!invoiceNumber) return { year: 0, number: 0 };
           
           // Handle different invoice formats:
-          // "2024-25/01" -> year: 2024, number: 1
-          // "2023-24/15" -> year: 2023, number: 15  
+          // "2024-2025/01" -> year: 2024, number: 1
+          // "2024-2025/100" -> year: 2024, number: 100  
           // "INV-0001" -> year: 0, number: 1
           // "123" -> year: 0, number: 123
           
           let year = 0;
           let number = 0;
           
-          // Try to extract year from financial year format (2024-25, 2023-24, etc.)
-          const yearMatch = invoiceNumber.match(/(\d{4})-\d{2}/);
+          // Try to extract year from financial year format (2024-2025, 2023-2024, etc.)
+          const yearMatch = invoiceNumber.match(/(\d{4})-\d{4}/);
           if (yearMatch) {
             year = parseInt(yearMatch[1]);
           }
@@ -309,13 +309,25 @@ const Sales = () => {
   const getInvoiceSuffix = (invoiceNumber) => {
     if (!invoiceNumber) return '';
     
-    // Try to match pattern like "2024-2025/61" and extract "61"
-    const match = invoiceNumber.match(/^(\d{4}-\d{4})\/(\d+)$/);
-    if (match) {
-      return match[2]; // Return just the number part
+    // Handle the current financial year format like "2024-2025/100" or "2024-2025/61"
+    const financialYearMatch = invoiceNumber.match(/^(\d{4}-\d{4})\/(\d+)$/);
+    if (financialYearMatch) {
+      return financialYearMatch[2]; // Return the number part (61, 100, etc.)
     }
     
-    // Fallback: extract numbers from end of string
+    // Handle simple financial year format like "2025-26/100"
+    const simpleFinancialMatch = invoiceNumber.match(/^(\d{4}-\d{2})\/(\d+)$/);
+    if (simpleFinancialMatch) {
+      return simpleFinancialMatch[2]; // Return the number part
+    }
+    
+    // Handle legacy formats like "INV-0061" or "INV-100"
+    const legacyMatch = invoiceNumber.match(/^[A-Z]+-0*(\d+)$/);
+    if (legacyMatch) {
+      return legacyMatch[1]; // Return the number part without leading zeros
+    }
+    
+    // Fallback: extract any sequence of digits from the end
     const numberMatch = invoiceNumber.match(/(\d+)$/);
     return numberMatch ? numberMatch[1] : invoiceNumber;
   };
