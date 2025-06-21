@@ -2585,8 +2585,8 @@ const CreateSale = () => {
               setShowSuccessModal(false);
               navigate('/sales');
               return false;
-            case 'n':
-            case 'N':
+            case 'k':
+            case 'K':
               e.preventDefault();
               e.stopImmediatePropagation(); // Stop ALL other handlers
               setShowSuccessModal(false);
@@ -2689,7 +2689,7 @@ const CreateSale = () => {
                   }}
                   className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-sm font-medium"
                 >
-                  New Bill (N)
+                  New Bill (K)
                 </button>
                 <button
                   onClick={() => {
