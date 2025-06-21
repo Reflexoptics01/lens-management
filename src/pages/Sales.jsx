@@ -185,43 +185,59 @@ const Sales = () => {
       // Sort by invoice number value (highest first)
       salesList.sort((a, b) => {
         const parseInvoiceNumber = (invoiceNumber) => {
-          if (!invoiceNumber) return { year: 0, number: 0 };
+          if (!invoiceNumber) return { year: 0, number: 0, numberString: '0' };
           
           // Handle different invoice formats:
-          // "2024-2025/01" -> year: 2024, number: 1
-          // "2024-2025/100" -> year: 2024, number: 100  
-          // "INV-0001" -> year: 0, number: 1
-          // "123" -> year: 0, number: 123
+          // "2024-25/01" -> year: 2024, number: 1, numberString: "01"
+          // "2023-24/15" -> year: 2023, number: 15, numberString: "15"
+          // "2024-25/100" -> year: 2024, number: 100, numberString: "100"
+          // "2025-2026/0101" -> year: 2025, number: 101, numberString: "0101"
+          // "INV-0101" -> year: 0, number: 101, numberString: "0101"
+          // "123" -> year: 0, number: 123, numberString: "123"
           
           let year = 0;
           let number = 0;
+          let numberString = '0';
           
-          // Try to extract year from financial year format (2024-2025, 2023-2024, etc.)
-          const yearMatch = invoiceNumber.match(/(\d{4})-\d{4}/);
+          // Try to extract year from financial year format (2024-25, 2025-2026, etc.)
+          const yearMatch = invoiceNumber.match(/(\d{4})-\d{2,4}/);
           if (yearMatch) {
             year = parseInt(yearMatch[1]);
           }
           
-          // Extract the final numeric part
+          // Extract the final numeric part (preserve original string)
           const numberMatch = invoiceNumber.match(/(\d+)$/);
           if (numberMatch) {
-            number = parseInt(numberMatch[1]);
+            numberString = numberMatch[1]; // Keep original string with leading zeros
+            number = parseInt(numberMatch[1]); // Convert to number for comparison
           }
           
-          return { year, number };
+          return { year, number, numberString };
         };
         
         const aParsed = parseInvoiceNumber(a.invoiceNumber);
         const bParsed = parseInvoiceNumber(b.invoiceNumber);
         
-        // Sort by year first (newest year first)
-        if (bParsed.year !== aParsed.year) {
-          return bParsed.year - aParsed.year;
-        }
-        
-        // Then sort by number (highest number first)
+        // Sort by invoice number only (highest number first), ignore year differences
+        // This ensures 101 > 100 > 99 regardless of which financial year they're from
         if (bParsed.number !== aParsed.number) {
           return bParsed.number - aParsed.number;
+        }
+        
+        // If invoice numbers are the same, compare by string format to handle leading zeros
+        // "0101" should come before "101" if they have the same numeric value
+        if (bParsed.numberString !== aParsed.numberString) {
+          // Longer strings (with leading zeros) come first
+          if (bParsed.numberString.length !== aParsed.numberString.length) {
+            return bParsed.numberString.length - aParsed.numberString.length;
+          }
+          // If same length, sort alphabetically
+          return bParsed.numberString.localeCompare(aParsed.numberString);
+        }
+        
+        // If invoice numbers are identical, then sort by year (newest year first)
+        if (bParsed.year !== aParsed.year) {
+          return bParsed.year - aParsed.year;
         }
         
         // If invoice numbers are identical, fall back to creation date (newest first)
@@ -305,29 +321,23 @@ const Sales = () => {
     })}`;
   };
 
-  // Extract only the suffix (number part) from invoice number
+  // Extract only the suffix (number part) from invoice number, preserving leading zeros
   const getInvoiceSuffix = (invoiceNumber) => {
     if (!invoiceNumber) return '';
     
-    // Handle the current financial year format like "2024-2025/100" or "2024-2025/61"
-    const financialYearMatch = invoiceNumber.match(/^(\d{4}-\d{4})\/(\d+)$/);
-    if (financialYearMatch) {
-      return financialYearMatch[2]; // Return the number part (61, 100, etc.)
+    // Try to match patterns like "2024-25/61", "2025-2026/0101" and extract "61" or "0101"
+    const match = invoiceNumber.match(/^(\d{4}-\d{2,4})\/(\d+)$/);
+    if (match) {
+      return match[2]; // Return just the number part (preserves leading zeros)
     }
     
-    // Handle simple financial year format like "2025-26/100"
-    const simpleFinancialMatch = invoiceNumber.match(/^(\d{4}-\d{2})\/(\d+)$/);
-    if (simpleFinancialMatch) {
-      return simpleFinancialMatch[2]; // Return the number part
-    }
-    
-    // Handle legacy formats like "INV-0061" or "INV-100"
-    const legacyMatch = invoiceNumber.match(/^[A-Z]+-0*(\d+)$/);
+    // For patterns like "INV-0101", extract "0101"
+    const legacyMatch = invoiceNumber.match(/^[A-Z]+-(\d+)$/);
     if (legacyMatch) {
-      return legacyMatch[1]; // Return the number part without leading zeros
+      return legacyMatch[1]; // Return number part (preserves leading zeros)
     }
     
-    // Fallback: extract any sequence of digits from the end
+    // Fallback: extract numbers from end of string
     const numberMatch = invoiceNumber.match(/(\d+)$/);
     return numberMatch ? numberMatch[1] : invoiceNumber;
   };

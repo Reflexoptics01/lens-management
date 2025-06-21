@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { doc, getDoc, getDocs } from 'firebase/firestore';
 import React from 'react';
 import ThemeToggle from './ThemeToggle';
-import { useTheme } from '../contexts/ThemeContext';
 import { 
   getShopPreferences, 
   setShopPreferences, 
@@ -22,9 +21,6 @@ const Navbar = () => {
   const bottomNavRef = useRef(null);
   const [shopName, setShopName] = useState('');
   const [logoDataURL, setLogoDataURL] = useState('');
-  
-  // Use theme context
-  const { theme } = useTheme();
   
   // Use centralized auth
   const { 
@@ -402,11 +398,18 @@ const Navbar = () => {
   return (
     <>
       {/* Mobile Navbar */}
-      <nav className="mobile-header mobile-only z-50 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+      <nav className="mobile-header mobile-only z-50" 
+           style={{ 
+             backgroundColor: 'var(--bg-secondary)', 
+             boxShadow: '0 1px 3px var(--shadow-secondary)' 
+           }}>
         <div className="flex items-center justify-between px-4 py-2">
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="p-2 rounded-lg transition-colors duration-300 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+            className="p-2 rounded-lg transition-colors duration-300"
+            style={{ color: 'var(--text-primary)' }}
+            onMouseEnter={(e) => e.target.style.color = 'var(--primary-blue)'}
+            onMouseLeave={(e) => e.target.style.color = 'var(--text-primary)'}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -415,7 +418,10 @@ const Navbar = () => {
           
           <div className="flex items-center space-x-2">
             {renderLogoOrInitial()}
-            <span className="font-bold text-lg text-gray-900 dark:text-white">
+            <span 
+              className="font-bold text-lg"
+              style={{ color: 'var(--text-primary)' }}
+            >
               {shopName}
             </span>
           </div>
@@ -424,70 +430,127 @@ const Navbar = () => {
             <ThemeToggle />
             
             {/* Shop Modal Toggle Button */}
-            <button
+          <button
               onClick={() => setShowShopModal(true)}
-              className={`p-2 rounded-lg transition-colors duration-300 ${
-                shopPreferences.isSharing 
-                  ? 'bg-blue-600 text-white' 
-                  : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-              }`}
+              className="p-2 rounded-lg transition-colors duration-300"
+              style={{ 
+                color: shopPreferences.isSharing ? 'white' : 'var(--text-primary)',
+                backgroundColor: shopPreferences.isSharing ? 'var(--primary-blue)' : 'transparent'
+              }}
+              onMouseEnter={(e) => {
+                if (!shopPreferences.isSharing) {
+                  e.target.style.color = 'var(--primary-blue)';
+                  e.target.style.backgroundColor = 'var(--bg-tertiary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!shopPreferences.isSharing) {
+                  e.target.style.color = 'var(--text-primary)';
+                  e.target.style.backgroundColor = 'transparent';
+                }
+              }}
               title={shopPreferences.isSharing ? 'Shop sharing enabled' : 'Shop sharing disabled'}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </button>
+            </svg>
+          </button>
             
-            <button
+                <button
               onClick={handleLogout}
-              className="p-2 rounded-lg transition-colors duration-300 text-gray-700 dark:text-gray-300 hover:text-white hover:bg-red-600"
-            >
+              className="p-2 rounded-lg transition-colors duration-300"
+              style={{ color: 'var(--text-primary)' }}
+                  onMouseEnter={(e) => {
+                e.target.style.color = 'white';
+                e.target.style.backgroundColor = 'var(--danger, #dc2626)';
+                  }}
+                  onMouseLeave={(e) => {
+                e.target.style.color = 'var(--text-primary)';
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-            </button>
-          </div>
+                  </svg>
+                </button>
+              </div>
         </div>
 
         {/* Mobile Menu Dropdown */}
         {isMenuOpen && (
-          <div className="absolute top-full left-0 right-0 shadow-lg border-t border-gray-200 dark:border-gray-700 z-40 bg-white dark:bg-gray-800">
+          <div 
+            className="absolute top-full left-0 right-0 shadow-lg border-t z-40"
+            style={{ 
+              backgroundColor: 'var(--bg-secondary)', 
+              borderColor: 'var(--border-color)' 
+            }}
+          >
             <div className="py-2">
-              {getAccessibleMenuItems().map((item) => (
-                <button
-                  key={item.path}
-                  onClick={() => {
-                    handleNavigation(item.path);
-                    setIsMenuOpen(false);
-                  }}
+                  {getAccessibleMenuItems().map((item) => (
+                    <button
+                      key={item.path}
+                      onClick={() => {
+                        handleNavigation(item.path);
+                        setIsMenuOpen(false);
+                      }}
                   className={`w-full text-left px-6 py-3 transition-colors duration-200 flex items-center space-x-3 ${
-                    location.pathname === item.path 
-                      ? 'font-medium bg-blue-600 text-white' 
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <div className={`text-lg ${
-                    location.pathname === item.path ? 'text-white' : 'text-blue-600 dark:text-blue-400'
-                  }`}>
-                    {item.icon}
-                  </div>
+                    location.pathname === item.path ? 'font-medium' : ''
+                      }`}
+                      style={{
+                    backgroundColor: location.pathname === item.path ? 'var(--primary-blue)' : 'transparent',
+                    color: location.pathname === item.path ? 'white' : 'var(--text-primary)'
+                      }}
+                      onMouseEnter={(e) => {
+                    if (location.pathname !== item.path) {
+                          e.target.style.backgroundColor = 'var(--bg-tertiary)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                    if (location.pathname !== item.path) {
+                          e.target.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
+                  <div 
+                    className="text-lg"
+                    style={{
+                      color: location.pathname === item.path ? 'white' : 'var(--primary-blue)'
+                    }}
+                  >
+                      {item.icon}
+                    </div>
                   <span>{item.title} {item.shortcut}</span>
-                </button>
-              ))}
+                  </button>
+                ))}
             
               {/* Logout option in mobile menu */}
-              <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
+              <div 
+                className="border-t my-2"
+                style={{ borderColor: 'var(--border-color)' }}
+              ></div>
               <button
                 onClick={() => {
                   handleLogout();
                   setIsMenuOpen(false);
                 }}
-                className="w-full text-left px-6 py-3 transition-colors duration-200 flex items-center space-x-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-800 dark:hover:text-red-300"
+                className="w-full text-left px-6 py-3 transition-colors duration-200 flex items-center space-x-3"
+                style={{ 
+                  backgroundColor: 'transparent',
+                  color: '#dc2626'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#fef2f2';
+                  e.target.style.color = '#991b1b';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = '#dc2626';
+                }}
               >
-                <div className="text-lg">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
+                <div className="text-lg" style={{ color: 'inherit' }}>
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
                 </div>
                 <span>Logout</span>
               </button>
@@ -510,15 +573,37 @@ const Navbar = () => {
                 key={item.path}
                 onClick={() => handleNavigation(item.path)}
                 className={`flex flex-col items-center justify-center px-2 py-1 rounded-lg transition-all duration-200 min-w-0 flex-1 ${
-                  location.pathname === item.path 
-                    ? 'transform scale-105 bg-blue-600 text-white' 
-                    : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-300'
+                  location.pathname === item.path ? 'transform scale-105' : ''
                 }`}
+                style={{
+                  backgroundColor: location.pathname === item.path ? 'var(--primary-blue)' : 'transparent',
+                  color: location.pathname === item.path ? 'white' : 'var(--text-muted)'
+                }}
+                onMouseEnter={(e) => {
+                  if (location.pathname !== item.path) {
+                    e.target.style.backgroundColor = 'var(--bg-tertiary)';
+                    e.target.style.color = 'var(--text-primary)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (location.pathname !== item.path) {
+                    e.target.style.backgroundColor = 'transparent';
+                    e.target.style.color = 'var(--text-muted)';
+                  }
+                }}
               >
-                <div className="text-lg mb-1">
+                <div 
+                  className="text-lg mb-1"
+                  style={{
+                    color: 'inherit'
+                  }}
+                >
                   {item.icon}
                 </div>
-                <span className="text-xs font-medium truncate w-full text-center">
+                <span 
+                  className="text-xs font-medium truncate w-full text-center"
+                  style={{ color: 'inherit' }}
+                >
                   {item.shortTitle || item.title}
                 </span>
               </button>
@@ -528,7 +613,10 @@ const Navbar = () => {
       </nav>
 
       {/* Desktop Bottom Navigation */}
-      <nav className="desktop-only bottom-nav z-40 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+      <nav 
+        className="desktop-only bottom-nav z-40"
+        style={{ backgroundColor: 'var(--bg-secondary)' }}
+      >
         <div 
           ref={bottomNavRef}
           className="flex justify-center items-center overflow-x-auto py-1 px-4 space-x-2 scrollbar-hide"
@@ -541,7 +629,16 @@ const Navbar = () => {
           {/* Desktop Logo */}
           <button 
             onClick={() => handleNavigation('/orders')}
-            className="flex-shrink-0 flex flex-col items-center p-2 rounded-xl min-w-[80px] hover:scale-105 transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+            className="flex-shrink-0 flex flex-col items-center p-2 rounded-xl min-w-[80px] hover:scale-105 transition-all duration-200"
+            style={{
+              backgroundColor: 'transparent'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = 'var(--bg-tertiary)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+            }}
             title="Go to Orders"
           >
             <div className="mb-1">
@@ -555,64 +652,108 @@ const Navbar = () => {
               onClick={() => handleNavigation(item.path)}
               className={`flex-shrink-0 flex flex-col items-center p-2 rounded-xl transition-all duration-200 min-w-[80px] ${
                 location.pathname === item.path 
-                  ? 'transform scale-105 shadow-lg bg-blue-600 text-white' 
-                  : 'hover:scale-105 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  ? 'transform scale-105 shadow-lg' 
+                  : 'hover:scale-105'
               }`}
+              style={{
+                backgroundColor: location.pathname === item.path ? 'var(--primary-blue)' : 'transparent',
+                boxShadow: location.pathname === item.path ? '0 4px 12px var(--shadow-primary)' : 'none'
+              }}
+              onMouseEnter={(e) => {
+                if (location.pathname !== item.path) {
+                  e.target.style.backgroundColor = 'var(--bg-tertiary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (location.pathname !== item.path) {
+                  e.target.style.backgroundColor = 'transparent';
+                }
+              }}
             >
-              <div className={`mb-1 transition-colors duration-200 ${
-                location.pathname === item.path ? 'text-white' : 'text-blue-600 dark:text-blue-400'
-              }`}>
+              <div 
+                className="mb-1 transition-colors duration-200"
+                  style={{
+                  color: location.pathname === item.path ? 'white' : 'var(--primary-blue)'
+                }}
+              >
                 {item.icon}
-              </div>
-              <span className={`text-xs font-medium transition-colors duration-200 ${
-                location.pathname === item.path ? 'text-white' : 'text-gray-600 dark:text-gray-400'
-              }`}>
+                  </div>
+              <span 
+                className="text-xs font-medium transition-colors duration-200"
+                style={{
+                  color: location.pathname === item.path ? 'white' : 'var(--text-secondary)'
+                }}
+              >
                 {item.shortTitle || item.title} {item.shortcut}
               </span>
-            </button>
-          ))}
+              </button>
+            ))}
           
 
           
           {/* Theme Toggle for Desktop */}
           <div className="flex-shrink-0 flex flex-col items-center p-2 rounded-xl min-w-[80px]">
             <div className="mb-1">
-              <ThemeToggle />
-            </div>
-            <span className="text-xs font-medium transition-colors duration-200 text-gray-600 dark:text-gray-400">
+              <ThemeToggle className="mx-auto" />
+        </div>
+            <span 
+              className="text-xs font-medium transition-colors duration-200"
+              style={{ color: 'var(--text-secondary)' }}
+            >
               Theme
             </span>
-          </div>
+      </div>
 
           {/* Logout Button for Desktop */}
-          <button
+      <button
             onClick={handleLogout}
-            className="flex-shrink-0 flex flex-col items-center p-2 rounded-xl transition-all duration-200 min-w-[80px] hover:scale-105 hover:bg-red-50 dark:hover:bg-red-900/20"
+            className="flex-shrink-0 flex flex-col items-center p-2 rounded-xl transition-all duration-200 min-w-[80px] hover:scale-105"
+        style={{
+              backgroundColor: 'transparent'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#fef2f2';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = 'transparent';
+            }}
             title="Logout"
-          >
-            <div className="mb-1 transition-colors duration-200 text-red-600 dark:text-red-400">
+      >
+            <div 
+              className="mb-1 transition-colors duration-200"
+              style={{ color: '#dc2626' }}
+            >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-            </div>
-            <span className="text-xs font-medium transition-colors duration-200 text-red-600 dark:text-red-400">
+            </svg>
+          </div>
+            <span 
+              className="text-xs font-medium transition-colors duration-200"
+              style={{ color: '#dc2626' }}
+            >
               Logout
             </span>
-          </button>
+      </button>
         </div>
       </nav>
 
       {/* Shop Modal */}
       {showShopModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div 
+            className="rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto"
+            style={{ backgroundColor: 'var(--bg-primary)' }}
+          >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
                 Lens Shop Settings
               </h3>
               <button 
                 onClick={() => setShowShopModal(false)} 
-                className="p-1 rounded-lg transition-colors text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                className="p-1 rounded-lg transition-colors"
+                style={{ color: 'var(--text-muted)' }}
+                onMouseEnter={(e) => e.target.style.color = 'var(--danger)'}
+                onMouseLeave={(e) => e.target.style.color = 'var(--text-muted)'}
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -623,52 +764,58 @@ const Navbar = () => {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-900 dark:text-white">
+                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
                     Share your lenses in the centralized shop
                   </label>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                     Allow other optical shops to see and contact you about your available lenses
                   </p>
                 </div>
-                <button
-                  onClick={handleShopPermissionToggle}
-                  disabled={shopLoading}
+                    <button
+                      onClick={handleShopPermissionToggle}
+                      disabled={shopLoading}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                     shopPreferences.isSharing 
                       ? 'bg-blue-600 focus:ring-blue-500' 
-                      : 'bg-gray-200 dark:bg-gray-600 focus:ring-gray-500'
+                      : 'bg-gray-200 focus:ring-gray-500'
                   } ${shopLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  <span
+                    >
+                      <span
                     className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      shopPreferences.isSharing ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-              </div>
+                          shopPreferences.isSharing ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
               
               {shopError && (
-                <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300">
+                <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--danger-light)', color: 'var(--danger)' }}>
                   <p className="text-sm">{shopError}</p>
                 </div>
               )}
               
               {shopPreferences.isSharing && (
-                <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300">
+                <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--success-light)', color: 'var(--success)' }}>
                   <p className="text-sm">
                     ✅ Your lenses are visible in the centralized shop. Other optical shops can see your inventory and contact you for purchases.
                   </p>
                 </div>
               )}
-            </div>
+              </div>
 
             <div className="mt-6 flex justify-end">
-              <button
+                <button
                 onClick={() => setShowShopModal(false)}
-                className="px-4 py-2 rounded-lg transition-colors bg-blue-600 text-white hover:bg-blue-700"
+                className="px-4 py-2 rounded-lg transition-colors"
+                style={{ 
+                  backgroundColor: 'var(--primary)', 
+                  color: 'white' 
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--primary-dark)'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--primary)'}
               >
                 Close
-              </button>
+                </button>
             </div>
           </div>
         </div>

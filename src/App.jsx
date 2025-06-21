@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Login from './pages/Login';
@@ -37,6 +37,7 @@ import MarketplaceLayout from './pages/MarketplaceLayout';
 import ItemDetail from './pages/ItemDetail';
 import UserManagement from './pages/UserManagement';
 import SystemAnalytics from './pages/SystemAnalytics';
+import GlobalCalculator from './components/GlobalCalculator';
 
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -45,6 +46,8 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import './App.css';
 
 function App() {
+  const [showCalculator, setShowCalculator] = useState(false);
+
   return (
     <div className="app-container">
       <Toaster 
@@ -71,7 +74,7 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <Router>
-            <UniversalShortcuts />
+            <UniversalShortcuts showCalculator={showCalculator} setShowCalculator={setShowCalculator} />
             <Routes>
               {/* Public routes */}
               <Route path="/login" element={<Login />} />
@@ -279,6 +282,12 @@ function App() {
               <Route path="/" element={<Navigate to="/orders" replace />} />
               <Route path="*" element={<Navigate to="/orders" replace />} />
             </Routes>
+            
+            {/* Global Calculator */}
+            <GlobalCalculator 
+              isOpen={showCalculator} 
+              onClose={() => setShowCalculator(false)} 
+            />
           </Router>
         </AuthProvider>
       </ThemeProvider>
@@ -287,7 +296,7 @@ function App() {
 }
 
 // Component to handle universal keyboard shortcuts
-const UniversalShortcuts = () => {
+const UniversalShortcuts = ({ showCalculator, setShowCalculator }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -305,13 +314,19 @@ const UniversalShortcuts = () => {
       ['r', () => navigate('/reorder-dashboard'), 'Go to reorder dashboard'],
       ['z', () => navigate('/settings'), 'Go to settings'],
       ['x', () => navigate('/dashboard'), 'Go to dashboard'],
+      ['t', () => setShowCalculator(!showCalculator), 'Toggle calculator'],
       ['escape', () => {
+        // Close calculator first if it's open
+        if (showCalculator) {
+          setShowCalculator(false);
+          return;
+        }
         // Don't navigate back on marketplace pages
         const marketplacePaths = ['/marketplace', '/create-flash-sale', '/add-optical-product', '/shop'];
         if (!marketplacePaths.includes(location.pathname)) {
           window.history.back();
         }
-      }, 'Navigate back']
+      }, 'Navigate back or close calculator']
     ];
 
     const shortcutIds = ShortcutUtils.registerGlobalShortcuts(globalShortcuts);
@@ -319,7 +334,7 @@ const UniversalShortcuts = () => {
     return () => {
       shortcutIds.forEach(id => keyboardManager.unregister(id));
     };
-  }, [navigate, location.pathname]);
+  }, [navigate, location.pathname, showCalculator, setShowCalculator]);
 
   return null; // This component doesn't render anything
 };

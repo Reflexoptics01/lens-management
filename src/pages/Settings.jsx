@@ -1933,6 +1933,38 @@ The page will refresh in 3 seconds to load your restored data...`;
     }
   };
 
+  // Cache clearing function
+  const handleClearCache = async () => {
+    try {
+      if ('serviceWorker' in navigator && 'caches' in window) {
+        // Clear all caches
+        const cacheNames = await caches.keys();
+        await Promise.all(
+          cacheNames.map(cacheName => caches.delete(cacheName))
+        );
+        
+        // Unregister service worker
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(
+          registrations.map(registration => registration.unregister())
+        );
+        
+        displaySuccess('Cache cleared successfully! The page will reload to load the latest version.');
+        
+        // Reload the page after a short delay
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+        
+      } else {
+        displayError('Cache clearing is not supported in this browser.');
+      }
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+      displayError('Failed to clear cache. Please try refreshing the page manually.');
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-gray-900">
       <Navbar />
@@ -2628,6 +2660,28 @@ Note: Use bullet points (•, -, *) or numbers (1., 2., 3.) for better formattin
                   </div>
                 </div>
                 
+                {/* Clear Cache Section */}
+                <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+                  <div className="bg-blue-50 dark:bg-blue-900/30 p-6 rounded-lg border border-blue-200 dark:border-blue-700">
+                    <h3 className="text-lg font-medium text-blue-900 dark:text-blue-200 mb-4">🔄 Cache Management</h3>
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
+                      If you're experiencing issues with outdated content or the app not loading properly, clearing the cache can help.
+                      This will remove cached files and force the app to load the latest version.
+                    </p>
+                    
+                    <button
+                      type="button"
+                      onClick={handleClearCache}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-blue-500"
+                    >
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Clear Cache & Reload
+                    </button>
+                  </div>
+                </div>
+
                 {/* Clear All Data Section */}
                 <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
                   <div className="bg-red-50 dark:bg-red-900/30 p-6 rounded-lg border border-red-200 dark:border-red-700">

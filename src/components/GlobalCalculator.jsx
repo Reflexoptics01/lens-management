@@ -12,7 +12,10 @@ const GlobalCalculator = ({ isOpen, onClose }) => {
   // Focus on calculator when opened
   useEffect(() => {
     if (isOpen && inputRef.current) {
-      inputRef.current.focus();
+      // Small delay to ensure the calculator is rendered before focusing
+      setTimeout(() => {
+        inputRef.current.focus();
+      }, 100);
     }
   }, [isOpen]);
 
@@ -71,19 +74,49 @@ const GlobalCalculator = ({ isOpen, onClose }) => {
       if (!isOpen) return;
       
       const key = e.key;
-      const isTypingInInput = e.target.tagName === 'INPUT' && e.target.type === 'number';
+      const isTypingInInput = e.target.tagName === 'INPUT';
+      const isGSTInput = isTypingInInput && e.target.type === 'number' && e.target.closest('.calculator-gst-input');
+      const isCalculatorDisplay = isTypingInInput && e.target.readOnly;
       
       // Special handling for GST input field - only allow numbers and navigation
-      if (isTypingInInput) {
+      if (isGSTInput) {
         // Allow only numbers, backspace, delete, arrow keys, tab, and enter for GST input
         if (!/[0-9]/.test(key) && 
             !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'].includes(key)) {
           e.preventDefault();
         }
-        return; // Exit early for input fields, let them handle their own keys
+        return; // Exit early for GST input field only
       }
       
       // Handle calculator shortcuts globally when calculator is open (even if focus is elsewhere)
+      // GST shortcuts work globally when calculator is open - HIGHEST PRIORITY
+      if (key.toLowerCase() === 'g') {
+        e.preventDefault();
+        e.stopPropagation();
+        deductGST();
+        return;
+      }
+      else if (key.toLowerCase() === 'h') {
+        e.preventDefault();
+        e.stopPropagation();
+        addGST();
+        return;
+      }
+      // Clear shortcut
+      else if (key.toLowerCase() === 'c') {
+        e.preventDefault();
+        e.stopPropagation();
+        clear();
+        return;
+      }
+      
+      // For other input fields (not GST and not calculator display), still allow calculator shortcuts but don't interfere with typing
+      if (isTypingInInput && !isGSTInput && !isCalculatorDisplay) {
+        // Only handle GST shortcuts, let other keys work normally in input fields
+        return;
+      }
+      
+      // Handle calculator number and operation shortcuts only when NOT typing in input fields
       // Numbers
       if (/[0-9]/.test(key)) {
         e.preventDefault(); // Prevent input in other fields
@@ -120,22 +153,6 @@ const GlobalCalculator = ({ isOpen, onClose }) => {
       else if (key === 'Backspace') {
         e.preventDefault();
         backspace();
-      }
-      // GST shortcuts work globally when calculator is open
-      else if (key.toLowerCase() === 'g') {
-        e.preventDefault();
-        e.stopPropagation();
-        deductGST();
-      }
-      else if (key.toLowerCase() === 'h') {
-        e.preventDefault();
-        e.stopPropagation();
-        addGST();
-      }
-      // Clear shortcut
-      else if (key.toLowerCase() === 'c') {
-        e.preventDefault();
-        clear();
       }
     };
 
@@ -266,7 +283,7 @@ const GlobalCalculator = ({ isOpen, onClose }) => {
                   e.preventDefault();
                 }
               }}
-              className="w-10 text-xs px-1 py-0.5 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              className="calculator-gst-input w-10 text-xs px-1 py-0.5 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               min="0"
               max="50"
             />

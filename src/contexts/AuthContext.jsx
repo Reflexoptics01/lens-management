@@ -472,17 +472,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Get auth info for debugging
+  // Get auth info (production safe)
   const getAuthInfo = () => {
     return {
       authState,
-      userRole,
-      userPermissions,
-      userEmail: user?.email,
-      userUid: user?.uid,
       isAuthenticated: isAuthenticated(),
       isLoading: isLoading(),
-      timestamp: dateToISOString(new Date())
+      hasRole: userRole ? true : false,
+      hasPermissions: Object.keys(userPermissions).length > 0
     };
   };
 

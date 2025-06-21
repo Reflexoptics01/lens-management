@@ -192,23 +192,7 @@ const AddStockLensForm = ({ editMode = false, lensToEdit = null, onSubmit, onCan
       powerRange += `, ADD: +1.00 to +${maxAddNum}`;
     }
     
-    // Debug logging
-    // REMOVED FOR PRODUCTION: console.log('Setting up power inventory for:', {
-    //   brandName: row.brandName,
-    //   enteredMaxSph: row.maxSph,
-    //   enteredMaxCyl: row.maxCyl,
-    //   enteredAxis: row.axis,
-    //   enteredMaxAdd: row.maxAdd,
-    //   calculatedRanges: {
-    //     sphMin,
-    //     sphMax,
-    //     cylMin,
-    //     cylMax,
-    //     axis: axisNum,
-    //     maxAdd: maxAddNum
-    //   },
-    //   powerRange
-    // });
+    // Power inventory setup validation complete
     
     // Clear any existing error
     setError('');

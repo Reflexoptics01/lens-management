@@ -108,9 +108,9 @@ const CreatePurchase = () => {
   // AddNewProductModal state
   const [showAddProductModal, setShowAddProductModal] = useState(false);
 
-  // Debug effect to monitor tableRows changes
+  // Monitor table rows state changes
   useEffect(() => {
-    // Monitor state changes for debugging if needed
+    // State monitoring for table rows
   }, [tableRows]);
 
   useEffect(() => {

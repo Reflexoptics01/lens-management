@@ -51,6 +51,9 @@
   display: flex;
   flex-direction: column;
   flex-grow: 1;
+  background-color: var(--bg-primary, #F9FAFB);
+  color: var(--text-primary, #111827);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Responsive utilities */

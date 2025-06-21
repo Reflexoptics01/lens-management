@@ -41,7 +41,23 @@
   --neutral-900: #111827;
 }
 
-/* No dark theme - keeping simple white theme for all users */
+/* Dark theme colors */
+.dark {
+  --bg-primary: #0F172A;
+  --bg-secondary: #1E293B;
+  --bg-tertiary: #334155;
+  --text-primary: #F8FAFC;
+  --text-secondary: #E2E8F0;
+  --text-muted: #94A3B8;
+  --border-primary: #334155;
+  --border-secondary: #475569;
+  --shadow-primary: rgba(0, 0, 0, 0.3);
+  --shadow-secondary: rgba(0, 0, 0, 0.2);
+  --overlay: rgba(0, 0, 0, 0.7);
+  
+  /* Dark theme primary colors */
+  --primary-light: #1E293B;
+}
 
 * {
   margin: 0;
@@ -52,6 +68,8 @@
 
 html {
   height: -webkit-fill-available;
+  background-color: var(--bg-primary);
+  transition: background-color 0.3s ease;
 }
 
 body {

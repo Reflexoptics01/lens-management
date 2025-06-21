@@ -126,28 +126,32 @@ export const parseInvoiceNumber = (invoiceNumber) => {
     return { prefix: '', number: 0, fullDisplay: '', paddedNumber: '00' };
   }
 
-  // Handle "2024-2025/61" format
-  const financialYearMatch = invoiceNumber.match(/^(\d{4}-\d{4})\/(\d+)$/);
+  // Handle "2024-2025/61" and "2025-2026/0101" formats
+  const financialYearMatch = invoiceNumber.match(/^(\d{4}-\d{2,4})\/(\d+)$/);
   if (financialYearMatch) {
     const prefix = financialYearMatch[1];
-    const number = parseInt(financialYearMatch[2]);
+    const numberString = financialYearMatch[2]; // Preserve original string
+    const number = parseInt(numberString);
     return {
       prefix,
       number,
       fullDisplay: invoiceNumber,
-      paddedNumber: number.toString().padStart(2, '0')
+      paddedNumber: number.toString().padStart(2, '0'),
+      originalNumberString: numberString // Add original string for reference
     };
   }
 
-  // Handle legacy formats like "INV-0061"
+  // Handle legacy formats like "INV-0061" or "INV-0101"
   const legacyMatch = invoiceNumber.match(/(\d+)$/);
   if (legacyMatch) {
-    const number = parseInt(legacyMatch[1]);
+    const numberString = legacyMatch[1]; // Preserve original string
+    const number = parseInt(numberString);
     return {
       prefix: '',
       number,
       fullDisplay: invoiceNumber,
-      paddedNumber: number.toString().padStart(2, '0')
+      paddedNumber: number.toString().padStart(2, '0'),
+      originalNumberString: numberString // Add original string for reference
     };
   }
 
@@ -158,12 +162,13 @@ export const parseInvoiceNumber = (invoiceNumber) => {
       prefix: '',
       number: simpleNumber,
       fullDisplay: invoiceNumber,
-      paddedNumber: simpleNumber.toString().padStart(2, '0')
+      paddedNumber: simpleNumber.toString().padStart(2, '0'),
+      originalNumberString: invoiceNumber // Preserve original string
     };
   }
 
   // Fallback
-  return { prefix: '', number: 0, fullDisplay: invoiceNumber, paddedNumber: '00' };
+  return { prefix: '', number: 0, fullDisplay: invoiceNumber, paddedNumber: '00', originalNumberString: invoiceNumber };
 };
 
 /**
