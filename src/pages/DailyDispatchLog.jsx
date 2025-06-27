@@ -290,6 +290,36 @@ const DailyDispatchLog = () => {
 
   const handleRowChange = (index, field, value) => {
     const updatedRows = [...dispatchRows];
+    
+    // Special feature: Double space in item name copies from above row
+    if (field === 'itemName' && value === '  ' && index > 0) {
+      const aboveRowItemName = updatedRows[index - 1].itemName;
+      if (aboveRowItemName && aboveRowItemName.trim() !== '') {
+        updatedRows[index] = {
+          ...updatedRows[index],
+          [field]: aboveRowItemName
+        };
+        setDispatchRows(updatedRows);
+        
+        // Show a brief visual feedback
+        const toast = document.createElement('div');
+        toast.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity';
+        toast.textContent = `📋 Copied: "${aboveRowItemName}"`;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          setTimeout(() => {
+            if (document.body.contains(toast)) {
+              document.body.removeChild(toast);
+            }
+          }, 300);
+        }, 1500);
+        
+        return; // Exit early after copying
+      }
+    }
+    
     updatedRows[index] = {
       ...updatedRows[index],
       [field]: value
@@ -742,6 +772,7 @@ const DailyDispatchLog = () => {
                               className="w-full px-3 py-2 text-sm border rounded-lg form-input"
                               onRefreshItems={fetchLensInventory}
                               currentPrice={0}
+                              dataSection="daily-dispatch-log"
                               onShowAddProduct={(itemName, rowIndex) => handleShowAddProduct(itemName, rowIndex)}
                             />
                           </td>

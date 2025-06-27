@@ -748,50 +748,150 @@ const CreateSale = () => {
       if (!snapshot.empty) {
         orderDoc = snapshot.docs[0];
 
-      if (orderDoc && orderDoc.exists()) {
-        const orderData = { id: orderDoc.id, ...orderDoc.data() };
-        
-        // Calculate proper quantity in pairs
-        let quantity = 1; // default
-        const rightQty = parseInt(orderData.rightQty || 0);
-        const leftQty = parseInt(orderData.leftQty || 0);
-        
-        // If both right and left are present, this is a pair
-        if (rightQty > 0 && leftQty > 0) {
-          // In optical terms, 1 right + 1 left = 1 pair
-          // We take the maximum since you can't have a partial pair
-          quantity = Math.max(rightQty, leftQty);
-        } else {
-          // If only one side is ordered, then count just that side
-          quantity = Math.max(rightQty, leftQty);
-        }
-        
-        // Ensure we have at least 1 quantity
-        quantity = quantity || 1;
-        
-        // Update the row with order details
-        const updatedRows = [...tableRows];
-        updatedRows[rowIndex] = {
-          ...updatedRows[rowIndex],
-          // Use the displayId for showing in the UI
-          orderId: orderData.displayId, 
-          orderDetails: orderData,
-          itemName: orderData.brandName || '',
-          // Extract prescription from either the right or left eye and format it
-          sph: formatOpticalValue(orderData.rightSph || orderData.leftSph || ''),
-          cyl: formatOpticalValue(orderData.rightCyl || orderData.leftCyl || ''),
-          axis: orderData.rightAxis || orderData.leftAxis || '', // No formatting for AXIS
-          add: formatOpticalValue(orderData.rightAdd || orderData.leftAdd || ''),
-          qty: quantity,
-          unit: 'Pairs', // Always use 'Pairs' regardless of the unit in the order
-          price: orderData.price || 0,
-          total: (orderData.price || 0) * quantity
-        };
-        setTableRows(updatedRows);
+        if (orderDoc && orderDoc.exists()) {
+          const orderData = { id: orderDoc.id, ...orderDoc.data() };
+          
+          // Calculate proper quantity in pairs
+          let quantity = 1; // default
+          const rightQty = parseInt(orderData.rightQty || 0);
+          const leftQty = parseInt(orderData.leftQty || 0);
+          
+          // If both right and left are present, this is a pair
+          if (rightQty > 0 && leftQty > 0) {
+            // In optical terms, 1 right + 1 left = 1 pair
+            // We take the maximum since you can't have a partial pair
+            quantity = Math.max(rightQty, leftQty);
+          } else {
+            // If only one side is ordered, then count just that side
+            quantity = Math.max(rightQty, leftQty);
+          }
+          
+          // Ensure we have at least 1 quantity
+          quantity = quantity || 1;
+
+          // Auto-select customer if order has customer information and no customer is currently selected
+          if (!selectedCustomer && orderData.customerId) {
+            try {
+              // Find customer in the customers list
+              const matchingCustomer = customers.find(customer => customer.id === orderData.customerId);
+              if (matchingCustomer) {
+                await handleCustomerSelect(matchingCustomer);
+              } else if (orderData.customerName) {
+                // If customer not found by ID, try to find by name
+                const customerByName = customers.find(customer => 
+                  customer.opticalName && customer.opticalName.toLowerCase() === orderData.customerName.toLowerCase()
+                );
+                if (customerByName) {
+                  await handleCustomerSelect(customerByName);
+                }
+              }
+            } catch (error) {
+              console.error('Error auto-selecting customer:', error);
+            }
+          }
+
+          // Ensure product exists in lens inventory
+          await ensureProductInInventory(orderData);
+          
+          // Update the row with order details
+          const updatedRows = [...tableRows];
+          updatedRows[rowIndex] = {
+            ...updatedRows[rowIndex],
+            // Use the displayId for showing in the UI
+            orderId: orderData.displayId, 
+            orderDetails: orderData,
+            itemName: orderData.brandName || '',
+            // Extract prescription from either the right or left eye and format it
+            sph: formatOpticalValue(orderData.rightSph || orderData.leftSph || ''),
+            cyl: formatOpticalValue(orderData.rightCyl || orderData.leftCyl || ''),
+            axis: orderData.rightAxis || orderData.leftAxis || '', // No formatting for AXIS
+            add: formatOpticalValue(orderData.rightAdd || orderData.leftAdd || ''),
+            qty: quantity,
+            unit: 'Pairs', // Always use 'Pairs' regardless of the unit in the order
+            price: orderData.price || 0,
+            total: (orderData.price || 0) * quantity,
+            // Mark this as an order-based item to prevent AddNewProductModal
+            isOrderBasedItem: true,
+            orderData: orderData
+          };
+          setTableRows(updatedRows);
+
+          // Refresh items to include the newly created product
+          await fetchItems();
         }
       }
     } catch (error) {
       console.error('Error fetching order details:', error);
+    }
+  };
+
+  // Function to ensure product exists in lens inventory
+  const ensureProductInInventory = async (orderData) => {
+    try {
+      if (!orderData.brandName || !orderData.brandName.trim()) {
+        return; // No brand name to work with
+      }
+
+      // Check if product already exists in lens inventory
+      const lensRef = getUserCollection('lensInventory');
+      const brandQuery = query(lensRef, where('brandName', '==', orderData.brandName.trim()));
+      const existingSnapshot = await getDocs(brandQuery);
+
+      if (!existingSnapshot.empty) {
+        // Product already exists, check if we need to update quantity
+        const existingLens = existingSnapshot.docs[0];
+        const existingLensData = existingLens.data();
+
+        // Only update quantity if order status is RECEIVED, DISPATCHED, or DELIVERED
+        const validStatuses = ['RECEIVED', 'DISPATCHED', 'DELIVERED'];
+        if (validStatuses.includes(orderData.status)) {
+          const currentQty = parseFloat(existingLensData.qty || 0);
+          const orderQty = Math.max(parseInt(orderData.rightQty || 0), parseInt(orderData.leftQty || 0)) || 1;
+          const newQty = currentQty + orderQty;
+
+          await updateDoc(getUserDoc('lensInventory', existingLens.id), {
+            qty: newQty,
+            updatedAt: Timestamp.now(),
+            lastOrderId: orderData.id,
+            lastOrderDisplayId: orderData.displayId
+          });
+
+
+        }
+        return; // Product exists, we're done
+      }
+
+      // Product doesn't exist, create it as RX lens
+      const lensData = {
+        brandName: orderData.brandName.trim(),
+        type: 'prescription',
+        eye: 'both', // Default for order-based products
+        sph: formatOpticalValue(orderData.rightSph || orderData.leftSph || ''),
+        cyl: formatOpticalValue(orderData.rightCyl || orderData.leftCyl || ''),
+        axis: orderData.rightAxis || orderData.leftAxis || '',
+        add: formatOpticalValue(orderData.rightAdd || orderData.leftAdd || ''),
+        material: orderData.material || '',
+        index: orderData.index || '',
+        purchasePrice: parseFloat(orderData.purchasePrice || orderData.price || 0),
+        salePrice: parseFloat(orderData.price || 0),
+        price: parseFloat(orderData.price || 0),
+        // Only set quantity if order status allows it
+        qty: ['RECEIVED', 'DISPATCHED', 'DELIVERED'].includes(orderData.status) 
+          ? (Math.max(parseInt(orderData.rightQty || 0), parseInt(orderData.leftQty || 0)) || 1)
+          : 0,
+        isPrescription: true,
+        createdAt: Timestamp.now(),
+        createdBy: 'order_import',
+        sourceOrderId: orderData.id,
+        sourceOrderDisplayId: orderData.displayId,
+        orderStatus: orderData.status
+      };
+
+      await addDoc(lensRef, lensData);
+
+    } catch (error) {
+      console.error('Error ensuring product in inventory:', error);
+      // Don't throw error to prevent order import from failing
     }
   };
 
@@ -831,42 +931,39 @@ const CreateSale = () => {
         return;
       }
       
-      // Process each lens in inventory
-      const batch = [];
-      snapshot.docs.forEach(lensDoc => {
-        const lens = lensDoc.data();
-        const lensId = lensDoc.id;
-        
-        // Determine if we should deduct or delete
-        if (lens.qty > 1) {
-          // Deduct one from the quantity
+              // Process each lens in inventory
+        const batch = [];
+        snapshot.docs.forEach(lensDoc => {
+          const lens = lensDoc.data();
+          const lensId = lensDoc.id;
+          
+          // Calculate quantity to deduct (1 pair = the order quantity)
+          const orderQty = Math.max(parseInt(orderData.rightQty || 0), parseInt(orderData.leftQty || 0)) || 1;
+          const currentQty = parseFloat(lens.qty || 0);
+          const newQty = currentQty - orderQty;
+          
+          // Always update quantity, never delete the product entry
+          // This ensures the product name is retained in inventory
           batch.push({
             id: lensId,
             action: 'update',
             data: {
-              qty: lens.qty - 1,
-              updatedAt: Timestamp.fromDate(new Date())
+              qty: Math.max(0, newQty), // Ensure qty doesn't go below 0
+              lastSoldOrderId: orderData.id,
+              lastSoldOrderDisplayId: orderData.displayId,
+              lastSoldAt: Timestamp.now(),
+              updatedAt: Timestamp.now()
             }
           });
-        } else {
-          // Remove the lens from inventory if qty is 1 or less
-          batch.push({
-            id: lensId,
-            action: 'delete'
-          });
-        }
-      });
+          
+
+        });
       
-      // Execute all updates/deletes
-      for (const operation of batch) {
-        const lensDocRef = getUserDoc('lensInventory', operation.id);
-        
-        if (operation.action === 'update') {
+              // Execute all updates (no deletes - we retain product names)
+        for (const operation of batch) {
+          const lensDocRef = getUserDoc('lensInventory', operation.id);
           await updateDoc(lensDocRef, operation.data);
-        } else if (operation.action === 'delete') {
-          await deleteDoc(lensDocRef);
         }
-      }
       
       
     } catch (error) {
@@ -876,6 +973,35 @@ const CreateSale = () => {
 
   const handleTableRowChange = (index, field, value) => {
     const updatedRows = [...tableRows];
+    
+    // Special feature: Double space in item name copies from above row
+    if (field === 'itemName' && value === '  ' && index > 0) {
+      const aboveRowItemName = updatedRows[index - 1].itemName;
+      if (aboveRowItemName && aboveRowItemName.trim() !== '') {
+        updatedRows[index] = {
+          ...updatedRows[index],
+          [field]: aboveRowItemName
+        };
+        setTableRows(updatedRows);
+        
+        // Show a brief visual feedback
+        const toast = document.createElement('div');
+        toast.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity';
+        toast.textContent = `📋 Copied: "${aboveRowItemName}"`;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          setTimeout(() => {
+            if (document.body.contains(toast)) {
+              document.body.removeChild(toast);
+            }
+          }, 300);
+        }, 1500);
+        
+        return; // Exit early after copying
+      }
+    }
     
     // Format SPH, CYL, and ADD values when they're changed
     if (field === 'sph' || field === 'cyl' || field === 'add') {
@@ -1110,18 +1236,23 @@ const CreateSale = () => {
               const orderDoc = snapshot2.docs[0];
               const orderData = { id: orderDoc.id, ...orderDoc.data() };
               
-              // Skip orders with invalid statuses
-              const invalidStatuses = ['PENDING', 'PLACED', 'CANCELLED', 'DECLINED'];
+                            // Skip only cancelled and declined orders
+              const invalidStatuses = ['CANCELLED', 'DECLINED'];
               if (invalidStatuses.includes(orderData.status)) {
   
                 continue;
               }
               
-              // Mark this order as DELIVERED in the orders collection using multi-tenant reference
-              await updateDoc(getUserDoc('orders', orderData.id), {
-                status: 'DELIVERED',
-                updatedAt: serverTimestamp()
-              });
+              // Update order status to DELIVERED if it was PENDING, PLACED, RECEIVED, or DISPATCHED
+              const validStatuses = ['PENDING', 'PLACED', 'RECEIVED', 'DISPATCHED'];
+              if (validStatuses.includes(orderData.status)) {
+                await updateDoc(getUserDoc('orders', orderData.id), {
+                  status: 'DELIVERED',
+                  deliveredAt: serverTimestamp(),
+                  updatedAt: serverTimestamp()
+                });
+
+              }
 
               
               // Deduct lenses from inventory
@@ -1137,18 +1268,23 @@ const CreateSale = () => {
           
 
           
-          // Skip orders with invalid statuses
-          const invalidStatuses = ['PENDING', 'PLACED', 'CANCELLED', 'DECLINED'];
+          // Skip only cancelled and declined orders
+          const invalidStatuses = ['CANCELLED', 'DECLINED'];
           if (invalidStatuses.includes(orderData.status)) {
-
+  
             continue;
           }
           
-          // Mark this order as DELIVERED in the orders collection using multi-tenant reference
-          await updateDoc(getUserDoc('orders', orderData.id), {
-            status: 'DELIVERED',
-            updatedAt: serverTimestamp()
-          });
+          // Update order status to DELIVERED if it was PENDING, PLACED, RECEIVED, or DISPATCHED
+          const validStatuses = ['PENDING', 'PLACED', 'RECEIVED', 'DISPATCHED'];
+          if (validStatuses.includes(orderData.status)) {
+            await updateDoc(getUserDoc('orders', orderData.id), {
+              status: 'DELIVERED',
+              deliveredAt: serverTimestamp(),
+              updatedAt: serverTimestamp()
+            });
+
+          }
 
           
           // Deduct lenses from inventory
@@ -1215,7 +1351,7 @@ const CreateSale = () => {
             await updateDoc(lensDocRef, {
               powerInventory: updatedPowerInventory,
               totalQuantity: newTotalQuantity,
-              updatedAt: Timestamp.fromDate(new Date())
+              updatedAt: Timestamp.now()
             });
             
 
@@ -1438,7 +1574,7 @@ const CreateSale = () => {
               // Always update the quantity, even if it goes negative
               await updateDoc(getUserDoc('lensInventory', lens.id), {
                 qty: newQty,
-                updatedAt: Timestamp.fromDate(new Date())
+                updatedAt: Timestamp.now()
               });
               
               remainingQtyToDeduct -= qtyToDeductFromThisLens;
@@ -2031,6 +2167,12 @@ const CreateSale = () => {
         return;
       }
     }
+
+    // Update invoice date to match dispatch log date
+    if (log.date) {
+      setInvoiceDate(log.date);
+
+    }
     
     try {
       if (!log.items || !Array.isArray(log.items) || log.items.length === 0) {
@@ -2074,28 +2216,104 @@ const CreateSale = () => {
           }
         }
         
-        // Try to find matching item from lens inventory
-        const matchingItem = itemSuggestions.find(inventoryItem => {
-          const inventoryName = (inventoryItem.brandName || inventoryItem.serviceName || inventoryItem.name || '').toLowerCase().trim();
+        // Enhanced matching logic to consider both name and power range
+        const findBestMatchingItem = () => {
           const dispatchItemName = (item.itemName || '').toLowerCase().trim();
+          const dispatchSph = parseFloat(item.sph) || 0;
+          const dispatchCyl = parseFloat(item.cyl) || 0;
+          const dispatchAxis = parseInt(item.axis) || 0;
+          const dispatchAdd = parseFloat(item.add) || 0;
           
-          // Check exact match first
-          if (inventoryName === dispatchItemName) {
-            return true;
+          // Helper function to check name match
+          const isNameMatch = (inventoryItem) => {
+            const inventoryName = (inventoryItem.brandName || inventoryItem.serviceName || inventoryItem.name || '').toLowerCase().trim();
+            
+            // Exact match
+            if (inventoryName === dispatchItemName) return true;
+            
+            // Partial matches (both ways)
+            if (dispatchItemName.includes(inventoryName) && inventoryName.length > 3) return true;
+            if (inventoryName.includes(dispatchItemName) && dispatchItemName.length > 3) return true;
+            
+            return false;
+          };
+          
+          // Helper function to calculate power match score (lower is better)
+          const calculatePowerScore = (inventoryItem) => {
+            const invSph = parseFloat(inventoryItem.sph) || 0;
+            const invCyl = parseFloat(inventoryItem.cyl) || 0;
+            const invAxis = parseInt(inventoryItem.axis) || 0;
+            const invAdd = parseFloat(inventoryItem.add) || 0;
+            
+            let score = 0;
+            score += Math.abs(dispatchSph - invSph) * 10; // SPH difference weighted heavily
+            score += Math.abs(dispatchCyl - invCyl) * 10; // CYL difference weighted heavily
+            score += Math.abs(dispatchAxis - invAxis) * 0.1; // AXIS difference weighted lightly
+            score += Math.abs(dispatchAdd - invAdd) * 5; // ADD difference weighted moderately
+            
+            return score;
+          };
+          
+          // Filter items by name match first
+          const nameMatches = itemSuggestions.filter(isNameMatch);
+          
+          if (nameMatches.length === 0) {
+            return null; // No name matches found
           }
           
-          // Check if the inventory item name is contained in dispatch item name
-          if (dispatchItemName.includes(inventoryName) && inventoryName.length > 3) {
-            return true;
+          // If we have power values in dispatch log, find the best power match
+          const hasPowerValues = item.sph || item.cyl || item.axis || item.add;
+          
+          if (hasPowerValues) {
+            // Calculate power scores for all name matches
+            const scoredMatches = nameMatches.map(inventoryItem => ({
+              item: inventoryItem,
+              powerScore: calculatePowerScore(inventoryItem),
+              hasInventoryPower: inventoryItem.sph || inventoryItem.cyl || inventoryItem.axis || inventoryItem.add
+            }));
+            
+            // Prefer items that have power values in inventory
+            const itemsWithPower = scoredMatches.filter(match => match.hasInventoryPower);
+            
+            if (itemsWithPower.length > 0) {
+              // Sort by power score (best match first) and prefer reasonable prices
+              itemsWithPower.sort((a, b) => {
+                const scoreDiff = a.powerScore - b.powerScore;
+                if (Math.abs(scoreDiff) < 1) { // If power scores are very close
+                  // Prefer items with reasonable prices (not too high)
+                  const priceA = parseFloat(a.item.salePrice || a.item.price || 0);
+                  const priceB = parseFloat(b.item.salePrice || b.item.price || 0);
+                  
+                  // If one price is suspiciously high (>5000), prefer the other
+                  if (priceA > 5000 && priceB <= 5000) return 1;
+                  if (priceB > 5000 && priceA <= 5000) return -1;
+                  
+                  // Otherwise prefer lower price
+                  return priceA - priceB;
+                }
+                return scoreDiff;
+              });
+              
+              return itemsWithPower[0].item;
+            }
           }
           
-          // Check if dispatch item name is contained in inventory item name
-          if (inventoryName.includes(dispatchItemName) && dispatchItemName.length > 3) {
-            return true;
-          }
+          // Fallback: return the first name match, preferring items with reasonable prices
+          const sortedByPrice = nameMatches.sort((a, b) => {
+            const priceA = parseFloat(a.salePrice || a.price || 0);
+            const priceB = parseFloat(b.salePrice || b.price || 0);
+            
+            // Prefer items with reasonable prices
+            if (priceA > 5000 && priceB <= 5000) return 1;
+            if (priceB > 5000 && priceA <= 5000) return -1;
+            
+            return priceA - priceB;
+          });
           
-          return false;
-        });
+          return sortedByPrice[0];
+        };
+        
+        const matchingItem = findBestMatchingItem();
         
         if (matchingItem) {
           // Use handleItemSelect to properly set up the item with all its properties
@@ -2163,30 +2381,63 @@ const CreateSale = () => {
       // Update the table with imported data
       setTableRows(updatedRows);
       
-              // Set success message
+              // Set success message with enhanced matching details
         setTimeout(() => {
-          const matchedItems = log.items.filter(item => {
-            const itemName = (item.itemName || '').toLowerCase().trim();
-            return itemSuggestions.some(inventoryItem => {
-              const inventoryName = (inventoryItem.brandName || inventoryItem.serviceName || inventoryItem.name || '').toLowerCase().trim();
-              return inventoryName === itemName || 
-                     (itemName.includes(inventoryName) && inventoryName.length > 3) ||
-                     (inventoryName.includes(itemName) && itemName.length > 3);
-            });
-          });
-          
           const importedItemDetails = log.items.map(item => {
-            const isMatched = itemSuggestions.some(inventoryItem => {
-              const inventoryName = (inventoryItem.brandName || inventoryItem.serviceName || inventoryItem.name || '').toLowerCase().trim();
-              const itemName = (item.itemName || '').toLowerCase().trim();
-              return inventoryName === itemName || 
-                     (itemName.includes(inventoryName) && inventoryName.length > 3) ||
-                     (inventoryName.includes(itemName) && itemName.length > 3);
-            });
-            return `${item.itemName} (Qty: ${item.qty})${isMatched ? ' ✓' : ' ⚠️'}`;
+            const dispatchItemName = (item.itemName || '').toLowerCase().trim();
+            const hasPowerValues = item.sph || item.cyl || item.axis || item.add;
+            
+            // Check if matched with power consideration
+            const findBestMatch = () => {
+              const nameMatches = itemSuggestions.filter(inventoryItem => {
+                const inventoryName = (inventoryItem.brandName || inventoryItem.serviceName || inventoryItem.name || '').toLowerCase().trim();
+                return inventoryName === dispatchItemName || 
+                       (dispatchItemName.includes(inventoryName) && inventoryName.length > 3) ||
+                       (inventoryName.includes(dispatchItemName) && dispatchItemName.length > 3);
+              });
+              
+              if (nameMatches.length === 0) return { matched: false, type: 'no_match' };
+              
+              if (hasPowerValues) {
+                const itemsWithPower = nameMatches.filter(inv => inv.sph || inv.cyl || inv.axis || inv.add);
+                return { 
+                  matched: true, 
+                  type: itemsWithPower.length > 0 ? 'power_match' : 'name_only',
+                  count: nameMatches.length
+                };
+              }
+              
+              return { matched: true, type: 'name_only', count: nameMatches.length };
+            };
+            
+            const matchResult = findBestMatch();
+            let status = ' ⚠️'; // Default: needs manual entry
+            
+            if (matchResult.matched) {
+              if (matchResult.type === 'power_match') {
+                status = ' ✓✓'; // Best match: name + power
+              } else if (matchResult.type === 'name_only') {
+                status = ' ✓'; // Good match: name only
+              }
+            }
+            
+            const powerInfo = hasPowerValues ? ` [${item.sph || ''}/${item.cyl || ''}/${item.axis || ''}/${item.add || ''}]` : '';
+            return `${item.itemName}${powerInfo} (Qty: ${item.qty})${status}`;
           }).join('\n');
           
-          alert(`Successfully imported ${log.items.length} items from dispatch log ${log.logId}:\n\n${importedItemDetails}\n\n✓ = Matched with inventory\n⚠️ = Manual price entry needed`);
+          const powerMatchCount = log.items.filter(item => {
+            if (!item.sph && !item.cyl && !item.axis && !item.add) return false;
+            const dispatchItemName = (item.itemName || '').toLowerCase().trim();
+            const nameMatches = itemSuggestions.filter(inventoryItem => {
+              const inventoryName = (inventoryItem.brandName || inventoryItem.serviceName || inventoryItem.name || '').toLowerCase().trim();
+              return inventoryName === dispatchItemName || 
+                     (dispatchItemName.includes(inventoryName) && inventoryName.length > 3) ||
+                     (inventoryName.includes(dispatchItemName) && dispatchItemName.length > 3);
+            });
+            return nameMatches.some(inv => inv.sph || inv.cyl || inv.axis || inv.add);
+          }).length;
+          
+          alert(`Successfully imported ${log.items.length} items from dispatch log ${log.logId}:\n\n${importedItemDetails}\n\n✓✓ = Matched with power range\n✓ = Matched by name only\n⚠️ = Manual price entry needed\n\nPower matches found: ${powerMatchCount}/${log.items.length}`);
         }, 100);
       
     } catch (error) {
@@ -2312,6 +2563,12 @@ const CreateSale = () => {
 
   // Handle opening the AddNewProductModal
   const handleShowAddProduct = (currentItemName = '', rowIndex = null) => {
+    // Check if this is an order-based item - if so, don't show the modal
+    if (rowIndex !== null && tableRows[rowIndex] && tableRows[rowIndex].isOrderBasedItem) {
+
+      return;
+    }
+    
     setCurrentRowIndex(rowIndex);
     setCurrentItemName(currentItemName);
     setShowAddProductModal(true);
