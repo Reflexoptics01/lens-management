@@ -40,7 +40,15 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
         
         if (nameMatch || phoneMatch) {
           customer = { id: doc.id, ...customerData };
-          openingBalance = parseFloat(customerData.openingBalance) || 0;
+          
+          // Parse opening balance from various possible field names
+          openingBalance = parseFloat(customerData.openingBalance) || 
+                          parseFloat(customerData.opening_balance) || 
+                          parseFloat(customerData.initialBalance) || 
+                          parseFloat(customerData.balance) || 
+                          parseFloat(customerData.currentBalance) || 0;
+          
+          // Customer opening balance loaded successfully
         }
       });
       
@@ -48,46 +56,81 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
         return 0;
       }
       
-      // Calculate total sales (including current invoice)
-      let totalSales = 0;
-      let matchedSales = 0;
+      // Calculate total invoice amounts (full amounts, not outstanding)
+      let totalInvoiceAmounts = 0;
+      let totalPaidOnInvoices = 0;
+      let currentInvoiceAmount = 0;
+      let currentInvoicePaid = 0;
       
       salesSnapshot.forEach(doc => {
         const sale = doc.data();
         
         // Include all sales for this customer (including current invoice)
         if (sale.customerId === customer.id) {
-          matchedSales++;
-          // Use 'total' field first, fallback to 'totalAmount'
-          totalSales += parseFloat(sale.total || sale.totalAmount) || 0;
-        }
-      });
-      
-      // Calculate total payments from transactions
-      let totalPayments = 0;
-      
-      transactionsSnapshot.forEach(doc => {
-        const transaction = doc.data();
-        if (transaction.entityId === customer.id) {
-          const amount = parseFloat(transaction.amount) || 0;
+          // Get full invoice amount - prioritize totalAmount over total for accuracy
+          const invoiceAmount = parseFloat(sale.totalAmount || sale.total) || 0;
+          totalInvoiceAmounts += invoiceAmount;
           
-          // For customers: 'received' payments reduce balance, 'paid' increases balance
-          if (transaction.type === 'received') {
-            totalPayments += amount;
-          } else if (transaction.type === 'paid') {
-            totalPayments -= amount; // Negative because it's money paid TO customer (refund)
+          // Get amount paid on this specific invoice - check multiple field variations
+          const paidOnInvoice = parseFloat(sale.amountPaid) || 
+                               parseFloat(sale.paidAmount) || 
+                               parseFloat(sale.paid) || 
+                               parseFloat(sale.paymentReceived) || 0;
+          totalPaidOnInvoices += paidOnInvoice;
+          
+          // Track current invoice separately
+          if (doc.id === currentSaleId) {
+            currentInvoiceAmount = invoiceAmount;
+            currentInvoicePaid = paidOnInvoice;
           }
         }
       });
       
-      // Calculate final outstanding balance
-      const currentBalance = openingBalance + totalSales - totalPayments;
+      // Calculate total standalone payments from transactions
+      let totalStandalonePayments = 0;
       
-      // Return positive balance only (outstanding amount)
-      return Math.max(0, currentBalance);
+      transactionsSnapshot.forEach(doc => {
+        const transaction = doc.data();
+        
+        // Match customer by ID or name/phone for more robust matching
+        const matchesCustomer = transaction.entityId === customer.id ||
+                               transaction.customerId === customer.id ||
+                               (transaction.customerName && transaction.customerName.toLowerCase().trim() === customerName.toLowerCase().trim()) ||
+                               (transaction.customerPhone && transaction.customerPhone.toString().trim() === customerPhone.toString().trim());
+        
+        if (matchesCustomer) {
+          const amount = parseFloat(transaction.amount) || 0;
+          
+          // Handle various payment transaction types
+          if (transaction.type === 'received' || 
+              transaction.type === 'payment' || 
+              transaction.type === 'transaction') {
+            totalStandalonePayments += amount;
+          } else if (transaction.type === 'paid' || 
+                    transaction.type === 'refund') {
+            totalStandalonePayments -= amount; // Negative because it's money paid TO customer (refund)
+          }
+        }
+      });
+      
+      // Calculate customer's previous balance (before current invoice)
+      const previousInvoices = totalInvoiceAmounts - currentInvoiceAmount;
+      const previousPaymentsOnInvoices = totalPaidOnInvoices - currentInvoicePaid;
+      const customerCreditBalance = openingBalance + previousInvoices - (previousPaymentsOnInvoices + totalStandalonePayments);
+      
+      // Current invoice outstanding (before applying existing credit)
+      const currentInvoiceOutstanding = currentInvoiceAmount - currentInvoicePaid;
+      
+      // Apply customer's existing credit to reduce current invoice outstanding
+      // If customer has credit (negative customerCreditBalance), it reduces the outstanding
+      // If customer owes money (positive customerCreditBalance), it adds to the outstanding
+      const netOutstanding = currentInvoiceOutstanding + customerCreditBalance;
+      
+            // Return the net outstanding (minimum 0, as we don't show negative outstanding)
+      return Math.max(0, netOutstanding);
       
     } catch (error) {
-              // Error calculating customer outstanding - fail silently and show 0
+      console.error('Error calculating customer outstanding:', error);
       return 0;
     }
   };
@@ -175,15 +218,12 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
         // If bank details are not complete, try dedicated bankDetails document from user-specific collection
         if (!bankDetailsData || Object.keys(bankDetailsData).filter(k => bankDetailsData[k]).length < 3) {
           try {
-                          // Fetching bank details from dedicated document
             const bankDoc = await getDoc(getUserDoc('settings', 'bankDetails'));
             
             if (bankDoc.exists()) {
               const bankData = bankDoc.data();
-                              // Found dedicated bank details document
               bankDetailsData = bankData;
             } else {
-                              // Searching in other settings documents
               
               // Try to find bank details in any settings document from user-specific collection
               const settingsCollection = await getDocs(getUserCollection('settings'));
@@ -213,7 +253,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
               });
             }
           } catch (error) {
-            // Error fetching bank details - use defaults
+            console.error('Error fetching bank details:', error);
           }
         }
         
@@ -240,7 +280,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
             setCustomerOutstanding(outstanding);
           })
           .catch(error => {
-            // Error calculating outstanding - fail silently
+            console.error('Error calculating outstanding:', error);
             setCustomerOutstanding(0);
           });
       }
@@ -253,7 +293,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
           }, 1200);
         }
       } catch (err) {
-        // Error during setup - fail silently
+        console.error('Error during setup:', err);
         setError(err.message || 'Failed to load invoice');
         setLoading(false);
       }
@@ -277,7 +317,6 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-              // Print window blocked - user will need to allow popups
       alert("Please allow popups to print the invoice. Check your browser's popup blocker settings.");
       setPrinting(false);
       return;
@@ -286,20 +325,20 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
     // Get the HTML content of the print-only div
     const content = document.querySelector('.print-only');
     if (!content) {
-              // Print content not ready yet
       alert("Print content is not ready. Please wait for the invoice to load completely.");
       printWindow.close();
       setPrinting(false);
       return;
     }
 
-    // Generate intelligent filename with customer name and invoice number
+    // Generate intelligent filename with customer name and invoice number (sanitized)
     const customerName = (saleData.customerName || saleData.selectedCustomer?.opticalName || 'Customer')
       .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters
-      .replace(/\s+/g, '_'); // Replace spaces with underscores
+      .replace(/\s+/g, '_') // Replace spaces with underscores
+      .substring(0, 50); // Limit length for security
     
     const invoiceNum = getInvoiceSuffix(saleData?.invoiceNumber) || 'Invoice';
-    const suggestedFilename = `${customerName}_Invoice_${invoiceNum}`;
+    const suggestedFilename = `${customerName}_Invoice_${invoiceNum}`.substring(0, 100); // Limit total filename length
 
     try {
       // Write to the new window
@@ -401,7 +440,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
           try {
             printWindow.print();
           } catch (e) {
-            // Error during printing - fail silently
+            console.error('Error during printing:', e);
           }
         }
         setPrinting(false);
@@ -415,7 +454,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
       }, 1000);
 
     } catch (error) {
-              // Error setting up print window
+      console.error('Error setting up print window:', error);
       alert('Error preparing the invoice for printing. Please try again.');
       if (printWindow) {
         printWindow.close();
@@ -432,13 +471,14 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
     }
 
     try {
-      // Generate filename
+      // Generate filename (sanitized)
       const customerName = (saleData.customerName || saleData.selectedCustomer?.opticalName || 'Customer')
         .replace(/[^a-zA-Z0-9\s]/g, '')
-        .replace(/\s+/g, '_');
+        .replace(/\s+/g, '_')
+        .substring(0, 50); // Limit length for security
       
       const invoiceNum = getInvoiceSuffix(saleData?.invoiceNumber) || 'Invoice';
-      const filename = `${customerName}_Invoice_${invoiceNum}.pdf`;
+      const filename = `${customerName}_Invoice_${invoiceNum}.pdf`.substring(0, 100); // Limit total filename length
 
       // Create a temporary link to trigger download
       const content = document.querySelector('.print-only');
@@ -486,7 +526,7 @@ const FallbackInvoicePrint = ({ saleId, onClose, autoPrint = false }) => {
       }, 1000);
 
     } catch (error) {
-              // Error creating download
+      console.error('Error creating download:', error);
       alert('Error preparing download. Please try the regular print option.');
     }
   }, [saleData, onClose]);

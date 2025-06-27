@@ -1042,6 +1042,7 @@ const CreateSale = () => {
         taxAmount: calculateTaxAmount(),
         frieghtCharge: parseFloat(frieghtCharge || 0),
         totalAmount: calculateTotal(),
+        total: calculateTotal(), // Add total field for backward compatibility
         amountPaid: parseFloat(amountPaid || 0),
         balanceDue: calculateTotal() - parseFloat(amountPaid || 0),
         paymentStatus,
@@ -2396,12 +2397,21 @@ const CreateSale = () => {
 
   // Function to handle ledger button click
   const handleViewLedger = async (customer) => {
-    // Navigate to Ledger page with customer data
+    // Navigate to Ledger page with complete customer data including opening balance
     navigate('/ledger', { 
       state: { 
         selectedCustomer: {
           id: customer.id,
-          opticalName: customer.opticalName
+          opticalName: customer.opticalName,
+          openingBalance: customer.openingBalance || 0,
+          type: customer.type || (customer.isVendor ? 'vendor' : 'customer'),
+          isVendor: customer.isVendor || customer.type === 'vendor',
+          // Include other essential fields that might be needed
+          address: customer.address,
+          city: customer.city,
+          state: customer.state,
+          phone: customer.phone,
+          gstNumber: customer.gstNumber
         },
         viewMode: 'invoiceOnly'
       } 

@@ -46,6 +46,44 @@ const Ledger = () => {
       setLoading(true);
       setError('');
       
+      // Ensure we have complete customer/vendor data including opening balance
+      let completeEntityData = selectedEntity;
+      
+      // If opening balance is missing or entity data is incomplete, fetch from database
+      if (selectedEntity.openingBalance === undefined || selectedEntity.openingBalance === null) {
+        try {
+          const customersRef = getUserCollection('customers');
+          const customerQuery = query(customersRef, where('__name__', '==', selectedEntity.id));
+          const customerSnapshot = await getDocs(customerQuery);
+          
+          if (!customerSnapshot.empty) {
+            const customerDoc = customerSnapshot.docs[0];
+            const fullCustomerData = { id: customerDoc.id, ...customerDoc.data() };
+            completeEntityData = {
+              ...selectedEntity,
+              openingBalance: fullCustomerData.openingBalance || 0,
+              type: fullCustomerData.type || (fullCustomerData.isVendor ? 'vendor' : 'customer'),
+              isVendor: fullCustomerData.isVendor || fullCustomerData.type === 'vendor',
+              // Update selectedEntity with complete data for future use
+              address: fullCustomerData.address,
+              city: fullCustomerData.city,
+              state: fullCustomerData.state,
+              phone: fullCustomerData.phone,
+              gstNumber: fullCustomerData.gstNumber
+            };
+            // Update the selectedEntity state with complete data
+            setSelectedEntity(completeEntityData);
+          }
+        } catch (fetchError) {
+          console.error('Error fetching complete customer data:', fetchError);
+          // Continue with existing data, defaulting opening balance to 0
+          completeEntityData = {
+            ...selectedEntity,
+            openingBalance: 0
+          };
+        }
+      }
+      
       // Create date objects for range filtering
       const startDateObj = new Date(fromDate);
       startDateObj.setHours(0, 0, 0, 0); // Start of day
@@ -60,7 +98,7 @@ const Ledger = () => {
       let purchases = [];
       
       // Determine if this is a customer or vendor entity
-      const isVendor = selectedEntity.type === 'vendor' || selectedEntity.isVendor;
+      const isVendor = completeEntityData.type === 'vendor' || completeEntityData.isVendor;
       
       // REMOVED FOR PRODUCTION: console.log('[Ledger] Entity detection:', {
       //   selectedEntity,
@@ -74,7 +112,7 @@ const Ledger = () => {
         const salesRef = getUserCollection('sales');
         const salesQuery = query(
           salesRef,
-          where('customerId', '==', selectedEntity.id),
+          where('customerId', '==', completeEntityData.id),
           where('invoiceDate', '>=', startDateObj),
           where('invoiceDate', '<=', endDateObj),
           orderBy('invoiceDate', 'asc')
@@ -101,7 +139,7 @@ const Ledger = () => {
         const purchasesRef = getUserCollection('purchases');
         const purchasesQuery = query(
           purchasesRef,
-          where('vendorId', '==', selectedEntity.id)
+          where('vendorId', '==', completeEntityData.id)
         );
         
         const purchasesSnapshot = await getDocs(purchasesQuery);
@@ -132,7 +170,7 @@ const Ledger = () => {
       const transactionsRef = getUserCollection('transactions');
       const transactionsQuery = query(
         transactionsRef,
-        where('entityId', '==', selectedEntity.id)
+        where('entityId', '==', completeEntityData.id)
       );
       
       const transactionsSnapshot = await getDocs(transactionsQuery);
@@ -166,8 +204,8 @@ const Ledger = () => {
       // More robust opening balance parsing - handle null, undefined, empty strings, and non-numeric values
       let openingBalance = 0;
       
-      if (selectedEntity.openingBalance !== null && selectedEntity.openingBalance !== undefined) {
-        const parsedBalance = parseFloat(selectedEntity.openingBalance);
+      if (completeEntityData.openingBalance !== null && completeEntityData.openingBalance !== undefined) {
+        const parsedBalance = parseFloat(completeEntityData.openingBalance);
         if (!isNaN(parsedBalance)) {
           openingBalance = parsedBalance;
         }
@@ -265,10 +303,11 @@ const Ledger = () => {
   const navigateToInvoiceLedger = (entity) => {
     // REMOVED FOR PRODUCTION: console.log('Navigating to invoice ledger for entity:', entity);
     
-    // Set selected entity with proper type information
+    // Set selected entity with proper type information including opening balance
     const entityData = {
       id: entity.id,
       opticalName: entity.name,
+      openingBalance: entity.openingBalance || 0, // Include opening balance
       type: entity.type, // This will be 'customer' or 'vendor'
       isVendor: entity.type === 'vendor'
     };
@@ -284,10 +323,10 @@ const Ledger = () => {
     // Change view mode
     setViewMode('invoiceOnly');
     
-    // Trigger search after state updates
+    // Trigger search after state updates - use longer timeout to ensure all state is set
     setTimeout(() => {
       fetchLedgerData();
-    }, 300);
+    }, 500);
   };
   
   // Navigation functions for clicking on invoice or transaction
@@ -407,10 +446,10 @@ const Ledger = () => {
   // Effect to fetch ledger data when filter state is restored or navigation state is processed
   useEffect(() => {
     if (selectedEntity && viewMode !== 'balanceView') {
-      // Add a small delay to ensure state is fully set
+      // Add a delay to ensure state is fully set and avoid race conditions
       const timeoutId = setTimeout(() => {
         fetchLedgerData();
-      }, 100);
+      }, 200);
       
       return () => clearTimeout(timeoutId);
     }

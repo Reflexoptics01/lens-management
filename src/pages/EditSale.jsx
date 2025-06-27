@@ -693,7 +693,7 @@ const EditSale = () => {
       const total = calculateTotal();
       const taxOption = getTaxOption(selectedTaxOption);
 
-      // Update sale data
+      // Update sale data - consistent with CreateSale.jsx field naming
       const saleData = {
         customerId: selectedCustomer.id,
         customerName: selectedCustomer.opticalName,
@@ -710,7 +710,9 @@ const EditSale = () => {
         taxRate: taxOption.rate,
         taxAmount,
         frieghtCharge: parseFloat(frieghtCharge || 0),
-        total,
+        totalAmount: total, // Use totalAmount to match CreateSale.jsx
+        total: total, // Keep total for backward compatibility
+        balanceDue: total - parseFloat(amountPaid || 0), // Add balanceDue field
         paymentStatus,
         amountPaid: parseFloat(amountPaid || 0),
         notes: notes.trim(),
