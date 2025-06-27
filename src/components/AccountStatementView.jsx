@@ -24,7 +24,7 @@ const AccountStatementView = ({ ledgerData, formatDate, formatCurrency, getPayme
                   className={`hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-600 ${
                     (item.type === 'invoice' && onInvoiceClick) || 
                     (item.type === 'purchase' && onPurchaseClick) ||
-                    ((item.type === 'transaction' || item.type === 'received' || item.type === 'paid') && onTransactionClick) 
+                    ((item.type === 'transaction' || item.type === 'received' || item.type === 'paid' || item.type === 'payment') && onTransactionClick) 
                       ? 'cursor-pointer' 
                       : ''
                   }`}
@@ -33,7 +33,7 @@ const AccountStatementView = ({ ledgerData, formatDate, formatCurrency, getPayme
                       onInvoiceClick(item.id);
                     } else if (item.type === 'purchase' && onPurchaseClick) {
                       onPurchaseClick(item.id);
-                    } else if ((item.type === 'transaction' || item.type === 'received' || item.type === 'paid') && onTransactionClick) {
+                    } else if ((item.type === 'transaction' || item.type === 'received' || item.type === 'paid' || item.type === 'payment') && onTransactionClick) {
                       onTransactionClick(item.id);
                     }
                   }}
@@ -46,30 +46,38 @@ const AccountStatementView = ({ ledgerData, formatDate, formatCurrency, getPayme
                       ? <div className="font-medium">Invoice</div>
                       : item.type === 'purchase'
                         ? <div className="font-medium">Purchase</div>
-                        : item.type === 'opening'
+                        : (item.type === 'opening' || item.type === 'opening_balance' || item.type === 'openingBalance')
                           ? <div className="font-medium text-blue-600 dark:text-blue-400">Opening Balance</div>
-                          : item.type === 'transaction' || item.type === 'received' || item.type === 'paid' 
-                            ? <div className="font-medium">Payment {item.type === 'received' ? 'Received' : 'Made'}</div>
+                          : (item.type === 'transaction' || item.type === 'received' || item.type === 'paid' || item.type === 'payment')
+                            ? <div className="font-medium">Payment {item.type === 'received' ? 'Received' : item.type === 'paid' ? 'Made' : (item.type === 'payment' ? 'Made' : 'Made')}</div>
                             : ''}
-                    {item.type === 'transaction' || item.type === 'received' || item.type === 'paid' 
+                    {(item.type === 'transaction' || item.type === 'received' || item.type === 'paid' || item.type === 'payment')
                       ? <div className="text-xs text-gray-600 dark:text-gray-400">{getPaymentMethodLabel(item.paymentMethod)} {item.notes ? `- ${item.notes}` : ''}</div>
                       : null}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600">
                     {item.type === 'invoice' ? item.invoiceNumber 
                       : item.type === 'purchase' ? (item.purchaseNumber || item.invoiceNumber || 'Purchase')
-                      : item.type === 'opening' ? 'Opening Balance'
+                      : (item.type === 'opening' || item.type === 'opening_balance' || item.type === 'openingBalance') ? 'Opening Balance'
                       : item.notes || '-'}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600">
                     {(item.type === 'invoice' || item.type === 'purchase')
-                      ? <span className="font-medium">{formatCurrency(item.totalAmount || item.total || item.amount || 0)}</span>
-                      : item.type === 'opening'
-                        ? <span className="font-medium text-blue-600 dark:text-blue-400">{formatCurrency(item.amount || 0)}</span> 
+                      ? <span className="font-medium">{formatCurrency((() => {
+                          // Show outstanding balance for invoices/purchases
+                          if (item.balanceDue !== undefined && item.balanceDue !== null) {
+                            return item.balanceDue;
+                          }
+                          const totalAmount = item.totalAmount || item.total || item.amount || 0;
+                          const amountPaid = item.amountPaid || 0;
+                          return totalAmount - amountPaid;
+                        })())}</span>
+                      : (item.type === 'opening' || item.type === 'opening_balance' || item.type === 'openingBalance')
+                        ? <span className="font-medium text-blue-600 dark:text-blue-400">{formatCurrency(item.totalAmount || item.total || item.amount || 0)}</span> 
                         : '-'}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600">
-                    {(item.type === 'transaction' || item.type === 'received' || item.type === 'paid')
+                    {(item.type === 'transaction' || item.type === 'received' || item.type === 'paid' || item.type === 'payment')
                       ? <span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(item.amount || 0)}</span> 
                       : '-'}
                   </td>
@@ -139,28 +147,68 @@ const AccountStatementView = ({ ledgerData, formatDate, formatCurrency, getPayme
               </td>
               <td className="px-4 py-3 text-right font-bold">
                 {(() => {
-                  // Recalculate the balance directly from the displayed items
-                  let recalculatedBalance = 0;
-                  
-                  // Calculate opening balance
+                  // Helper function to safely parse numbers
+                  const safeParseFloat = (value) => {
+                    if (value === null || value === undefined || value === '') return 0;
+                    const parsed = parseFloat(value);
+                    return isNaN(parsed) ? 0 : parsed;
+                  };
+
+                  // Get amount from item with multiple field fallbacks
+                  const getItemAmount = (item) => {
+                    return safeParseFloat(item.totalAmount) || 
+                           safeParseFloat(item.total) || 
+                           safeParseFloat(item.amount) || 0;
+                  };
+
+                  // Get outstanding balance for invoices/purchases (what's actually owed)
+                  const getOutstandingAmount = (item) => {
+                    // For invoices and purchases, use balanceDue if available, otherwise totalAmount - amountPaid
+                    if (item.type === 'invoice' || item.type === 'purchase') {
+                      // First check if balanceDue is available and valid
+                      if (item.balanceDue !== undefined && item.balanceDue !== null) {
+                        return safeParseFloat(item.balanceDue);
+                      }
+                      
+                      // Otherwise calculate: totalAmount - amountPaid
+                      const totalAmount = getItemAmount(item);
+                      const amountPaid = safeParseFloat(item.amountPaid) || 0;
+                      return totalAmount - amountPaid;
+                    }
+                    
+                    // For other types, use the standard amount
+                    return getItemAmount(item);
+                  };
+
+                  // Calculate opening balance - check multiple possible type values
                   const openingBalance = ledgerData
-                    .filter(item => item.type === 'opening')
-                    .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+                    .filter(item => item.type === 'opening' || item.type === 'opening_balance' || item.type === 'openingBalance')
+                    .reduce((sum, item) => {
+                      const amount = getItemAmount(item);
+                      return sum + amount;
+                    }, 0);
                   
-                  // Calculate total invoices and purchases
-                  const totalInvoicesAndPurchases = ledgerData
+                  // Calculate total debits (invoices + purchases) - use outstanding amounts
+                  const totalDebits = ledgerData
                     .filter(item => item.type === 'invoice' || item.type === 'purchase')
-                    .reduce((sum, item) => sum + parseFloat(item.totalAmount || item.total || item.amount || 0), 0);
+                    .reduce((sum, item) => {
+                      const outstandingAmount = getOutstandingAmount(item);
+                      return sum + outstandingAmount;
+                    }, 0);
                   
-                  // Calculate total transactions
-                  const totalTransactions = ledgerData
-                    .filter(item => item.type === 'transaction' || item.type === 'received' || item.type === 'paid')
-                    .reduce((sum, transaction) => sum + parseFloat(transaction.amount || 0), 0);
+                  // Calculate total credits (payments/transactions)
+                  const totalCredits = ledgerData
+                    .filter(item => item.type === 'transaction' || item.type === 'received' || item.type === 'paid' || item.type === 'payment')
+                    .reduce((sum, item) => {
+                      const amount = getItemAmount(item);
+                      return sum + amount;
+                    }, 0);
                   
-                  recalculatedBalance = openingBalance + totalInvoicesAndPurchases - totalTransactions;
+                  // Final balance = Opening Balance + Debits - Credits
+                  const finalBalance = openingBalance + totalDebits - totalCredits;
                   
-                  const className = recalculatedBalance > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400';
-                  return <span className={className}>{formatCurrency(recalculatedBalance)}</span>;
+                  const className = finalBalance > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400';
+                  return <span className={className}>{formatCurrency(finalBalance)}</span>;
                 })()}
               </td>
             </tr>

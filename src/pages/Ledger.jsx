@@ -165,6 +165,7 @@ const Ledger = () => {
       const openingBalanceEntries = [];
       // More robust opening balance parsing - handle null, undefined, empty strings, and non-numeric values
       let openingBalance = 0;
+      
       if (selectedEntity.openingBalance !== null && selectedEntity.openingBalance !== undefined) {
         const parsedBalance = parseFloat(selectedEntity.openingBalance);
         if (!isNaN(parsedBalance)) {

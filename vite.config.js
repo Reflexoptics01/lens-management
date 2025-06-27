@@ -5,11 +5,8 @@ export default defineConfig({
   plugins: [react()],
   // Development server configuration
   server: {
-    port: 5174,
-    strictPort: false,
-    hmr: {
-      host: 'localhost'
-    },
+    port: 5173,
+    open: true,
     headers: {
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',
